@@ -1,0 +1,1 @@
+Real search — my co-founder is taking an acqui-hire and I'm not going with it, so I need a paying job. Two things I'd take: Head of Platform Engineering at an AI infra company, or VP Eng at a Series B fintech. I've done 5 interviews over the last 3 months — got to final round twice, both no. I'd like to have something in 6 weeks.

@@ -1,0 +1,8 @@
+{
+  "name": "10xjobs",
+  "description": "Executive job-search copilot with a built-in coach: story bank, one-verdict role evaluation, pipeline board, tailored applications, interview prep + practice, and outreach \u2014 all data local to your machine.",
+  "version": "0.9.1",
+  "author": {
+    "name": "10xjobs.co"
+  }
+}

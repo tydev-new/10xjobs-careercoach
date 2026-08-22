@@ -1,0 +1,1 @@
+OK here's one. Our support team was drowning in tickets, so on my own initiative I built a prototype triage assistant with LangChain that classified and routed tickets automatically. It worked pretty well — it saved the team a bunch of time each week, my manager was thrilled, and it got mentioned at the department all-hands. I honestly don't remember the exact numbers.

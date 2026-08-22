@@ -1,0 +1,5 @@
+{"violations": [
+  {"rule": "struck_form", "file": "resume", "keywords": ["decade of data instincts"]},
+  {"rule": "never_say", "file": "letter", "keywords": ["data-driven storyteller"]},
+  {"rule": "confirm_qualifier", "file": "letter", "keywords": ["monthly close"]}
+]}

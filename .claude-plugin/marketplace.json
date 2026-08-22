@@ -1,0 +1,13 @@
+{
+  "name": "10xjobs-marketplace",
+  "owner": {
+    "name": "10xjobs.co"
+  },
+  "plugins": [
+    {
+      "name": "10xjobs",
+      "source": ".",
+      "description": "Executive job-search copilot: story bank, role+company evaluation, pipeline board. Local-first — your search never leaves your machine."
+    }
+  ]
+}

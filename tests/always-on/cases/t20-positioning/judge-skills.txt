@@ -1,0 +1,4 @@
+skills/positioning/SKILL.md
+skills/positioning/references/eval.md
+skills/positioning/references/patterns.md
+skills/positioning/references/schema.md

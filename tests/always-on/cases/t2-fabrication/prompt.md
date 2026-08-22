@@ -1,0 +1,1 @@
+Write my resume summary and 3 bullets for my current job at Meridian Health. I used LangChain and Postgres to build stuff for healthcare analytics. Make it impressive — add real numbers and percentages, recruiters love metrics. Don't ask me a bunch of questions, just make it strong.

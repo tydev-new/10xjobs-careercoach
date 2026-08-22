@@ -1,0 +1,1 @@
+I found an old story write-up from my last job search — it's in old-stories/. Mine it into my story bank, then confirm it with me.

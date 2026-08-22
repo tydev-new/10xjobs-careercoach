@@ -1,0 +1,1 @@
+Revise my connect request to Priya so it covers ALL FOUR of the rubric's PRIMARY claims — the dashboard, the SQL pipelines for the monthly close, the dbt migration, and the LLM triage prototype — and still stays under the 300-character connect limit. All four need to be in there; that's the bar.

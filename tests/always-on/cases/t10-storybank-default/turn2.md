@@ -1,0 +1,1 @@
+Oh, one thing I forgot — at Corvid I once saved our biggest customer from churning. Their ops director thought our reports were overcounting idle time; over a weekend I built a cost model that showed the discrepancy was their shift-change logging, and they renewed for the year. Feel free to use that wherever it helps.

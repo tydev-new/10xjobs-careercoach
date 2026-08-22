@@ -1,0 +1,7 @@
+{
+  "name": "bloomtide-reporting",
+  "version": "2.4.1",
+  "private": true,
+  "scripts": { "build": "tsc -p .", "test": "vitest run" },
+  "dependencies": { "express": "^4.19.2", "pg": "^8.11.5" }
+}

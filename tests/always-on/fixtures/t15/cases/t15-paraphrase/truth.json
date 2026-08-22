@@ -1,0 +1,32 @@
+{
+ "violations": [
+  {
+   "rule": "struck_form",
+   "file": "resume",
+   "keywords": [
+    "instinct for data"
+   ]
+  },
+  {
+   "rule": "never_say",
+   "file": "letter",
+   "keywords": [
+    "storyteller who happens"
+   ]
+  },
+  {
+   "rule": "confirm_qualifier",
+   "file": "letter",
+   "keywords": [
+    "five days down"
+   ]
+  },
+  {
+   "rule": "letter_length",
+   "file": "letter",
+   "keywords": [],
+   "count": 233,
+   "owner": "py"
+  }
+ ]
+}

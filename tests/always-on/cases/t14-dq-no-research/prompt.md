@@ -1,0 +1,1 @@
+Should I apply to the Vantage Munitions Analytics Engineer role? The JD is saved in jd-inbox. Give me your read.

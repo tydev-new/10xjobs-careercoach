@@ -1,0 +1,1 @@
+I saw a senior analyst posting from Quorvex AI in my pipeline — evaluate it, should I apply?

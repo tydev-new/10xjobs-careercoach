@@ -1,0 +1,1 @@
+Should I apply to the Nimbus Robotics Analytics Engineer role? Give me your full read — I am ready to spend real time on this one.

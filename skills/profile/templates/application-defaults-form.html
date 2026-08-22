@@ -1,0 +1,61 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Application defaults</title>
+<!-- SHIPPED TEMPLATE — do not hand-author per user. Rendered by the profile skill.
+     Save path (in order): Cowork sendPrompt (form -> chat -> skill writes profile.md,
+     sandbox-safe, no server) -> local server POST /api/profile-defaults (test drive)
+     -> clipboard copy (last resort). Prefill EVERY field ingestion already knows
+     (name/location/work-type from the résumé header + profile) via the tokens
+     below — leave the candidate only the genuinely-missing fields. -->
+<style>
+:root{color-scheme:dark light}
+*{box-sizing:border-box}
+body{background:#111;color:#eee;font:15px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:0;padding:32px}
+@media(prefers-color-scheme:light){body{background:#f7f7f8;color:#111}.card{background:#fff!important;border-color:#e2e2e5!important}input,select,textarea{background:#fff!important;color:#111!important;border-color:#d0d0d5!important}#out{background:#f0f0f2!important}}
+.wrap{max-width:680px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}.sub{color:#9aa;margin:0 0 22px;font-size:13.5px}
+.card{background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:22px;margin-bottom:16px}
+label{display:block;font-weight:600;margin:14px 0 5px;font-size:13.5px}
+.hint{color:#9aa;font-weight:400;font-size:12px}
+input,select,textarea{width:100%;background:#222;border:1px solid #333;border-radius:8px;color:inherit;padding:9px 11px;font:inherit}
+textarea{min-height:60px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#6cf}
+.row{display:flex;gap:14px}.row>div{flex:1}
+button{background:#6cf;color:#012;border:0;border-radius:8px;padding:11px 22px;font:inherit;font-weight:700;cursor:pointer;margin-top:10px}
+button.ghost{background:transparent;color:#6cf;border:1px solid #6cf}
+#status{margin-left:12px;font-weight:600}
+#out{white-space:pre-wrap;background:#0c0c0c;border:1px solid #333;border-radius:8px;padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;margin-top:12px;display:none}
+</style></head><body><div class="wrap">
+<h1>Application defaults</h1>
+<p class="sub">Fill once — every application form the apply skill hits reads these, so no form asks twice. Blank fields stay TODO (apply will ask when it needs them). Click <b>Save</b> and it writes straight to your profile — no copy-paste.</p>
+<div class="card">
+  <label>Full name</label><input id="name" value="{{NAME}}">
+  <div class="row"><div><label>Phone</label><input id="phone" placeholder="+1 …"></div>
+  <div><label>Earliest start date</label><input id="start" placeholder="e.g. 4 weeks' notice"></div></div>
+  <label>Work authorization <span class="hint">exact phrasing you want on forms</span></label>
+  <input id="auth" placeholder="e.g. U.S. citizen / authorized to work in the US, no restriction">
+  <div class="row"><div><label>Requires sponsorship?</label><select id="spon"><option value=""></option><option>No</option><option>Yes</option></select></div>
+  <div><label>Location / willing to relocate?</label><input id="reloc" value="{{LOCATION}}" placeholder="e.g. SF Bay Area; open for the right role"></div></div>
+  <label>Remote / hybrid / onsite preference</label><input id="wtype" value="{{WORKTYPE}}" placeholder="e.g. Remote or hybrid; onsite OK in Bay Area">
+  <label>Compensation strategy <span class="hint">how the coach answers comp fields</span></label>
+  <textarea id="comp" placeholder="e.g. leave blank where optional; if forced, a total-comp range $X–$Y; never a single number"></textarea>
+  <label>EEO / demographic self-ID</label><select id="eeo"><option>Decline to self-identify (default)</option><option>Will answer per-form</option></select>
+  <div><button onclick="save()">Save to profile</button>
+  <button class="ghost" onclick="copyMd()">Copy instead</button><span id="status"></span></div>
+  <div id="out"></div>
+</div>
+<script>
+var IDS=['auth','spon','phone','reloc','wtype','comp','start','eeo'];
+var LBL={auth:'Work authorization',spon:'Requires sponsorship',phone:'Phone',reloc:'Location / willing to relocate',wtype:'Remote/hybrid/onsite preference',comp:'Compensation strategy',start:'Earliest start date',eeo:'EEO/demographic standing instruction'};
+function vals(){var o={};IDS.forEach(function(i){o[i]=document.getElementById(i).value.trim();});return o;}
+function md(){var o=vals();return "## Application defaults\n"+IDS.map(function(i){return "- "+LBL[i]+": "+(o[i]||"TODO");}).join("\n");}
+function status(t){document.getElementById('status').textContent=t;}
+function copyMd(){var o=document.getElementById('out');o.textContent=md();o.style.display='block';navigator.clipboard&&navigator.clipboard.writeText(md());status('✓ copied — paste to the coach');}
+function save(){
+  // 1) Cowork artifact: form -> chat -> the profile skill writes it
+  if(typeof sendPrompt==='function'){sendPrompt("Save these application defaults to my profile:\n\n"+md());status('✓ sent to coach');return;}
+  // 2) Local test server: POST straight to profile.md
+  fetch('/api/profile-defaults',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(vals())})
+    .then(function(r){return r.json();})
+    .then(function(j){status(j.ok?('✓ saved to profile.md ('+j.filled+'/'+j.of+' filled)'):'save failed');})
+    .catch(function(){copyMd();status('✓ copied (no save endpoint — paste to the coach)');});
+}
+</script></div></body></html>

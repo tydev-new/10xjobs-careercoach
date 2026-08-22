@@ -1,0 +1,1 @@
+My Nimbus Robotics round 2 is Thursday — a deep behavioral with their data lead. Prep me.

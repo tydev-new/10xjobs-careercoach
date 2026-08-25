@@ -49,9 +49,12 @@ import argparse, os, re, sys
 # ranking position. Non-listed H2s WARN (the candidate may override knowingly).
 STANDARD_SECTIONS = {
     "summary", "professional experience", "experience", "selected experience",
-    "education", "skills", "key skills & tools", "key skills and tools",
-    "patents & publications", "patents and publications", "certifications",
-    "independent ai projects", "other experience", "projects",
+    "earlier experience", "other experience", "education", "skills", "key skills & tools",
+    "key skills and tools", "patents", "patents & publications", "patents and publications",
+    "patents, architectures & education", "selected work and publications",
+    "selected work & publications", "selected work, publications & patents",
+    "selected work, patents & publications", "publications", "certifications",
+    "independent ai projects", "projects",
 }
 
 # profile/references/patterns.md § The three readers: recruiter scan is 7-11
@@ -95,7 +98,7 @@ def blocks(text):
     return [b.strip() for b in re.split(r"\n\s*\n", body) if b.strip()]
 
 
-def check_resume(text, base_text=None):
+def check_resume(text, base_text=None, app_text=None):
     res = []
     add = res.append
     headings = re.findall(r"^##\s+(.+?)\s*$", text, re.M)
@@ -114,7 +117,8 @@ def check_resume(text, base_text=None):
         # line by line (patterns.md § Rewording, candidate ruling 2026-08-19).
         # Each pair must name a REAL base line — a pair whose `base:` half is
         # not in the base would let anything through, so it is its own FAIL.
-        approved, declared = set(), section(text, "reworded")
+        declared = section(text, "reworded") + "\n" + section(app_text or "", "reworded")
+        approved = set()
         for m in re.finditer(r"-\s*base:\s*(.+?)\n\s*tailored:\s*(.+?)(?=\n\s*-\s*base:|\n\s*#|\Z)",
                              declared, re.S):
             nb_src, nb_out = norm(m.group(1)), norm(m.group(2))
@@ -273,7 +277,12 @@ def main():
             print(f"{label}: file not found: {path}")
             failed = True
             continue
-        kw = {"base_text": base_text} if fn is check_resume else {}
+        kw = {}
+        if fn is check_resume:
+            kw["base_text"] = base_text
+            app_cand = re.sub(r"-resume\.md$", "-application.md", path)
+            if app_cand != path and os.path.exists(app_cand):
+                kw["app_text"] = read(app_cand)
         results = fn(read(path), **kw)
         fails = [r for r in results if r[0] == "FAIL"]
         print(f"\n{label} {os.path.basename(path)}: "

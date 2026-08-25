@@ -73,7 +73,7 @@ CRITERIA_TYPES = {"themes": list, "seniority_regex": str, "geo_include": list,
                   "comp_floor": int, "min_mgmt_yoe": int}
 
 
-def parse_criteria_md(workspace):
+def parse_criteria_filters(workspace):
     """Directly parse criteria.md into criteria filters."""
     path = os.path.join(workspace, "criteria.md")
     if not os.path.exists(path):
@@ -140,7 +140,7 @@ def parse_criteria_md(workspace):
 def load_criteria(workspace):
     """Load criteria from criteria.md (direct SSOT) or legacy criteria.json."""
     crit = dict(DEFAULT_CRITERIA)
-    md_crit = parse_criteria_md(workspace)
+    md_crit = parse_criteria_filters(workspace)
     crit.update(md_crit)
     
     json_path = os.path.join(workspace, "criteria.json")

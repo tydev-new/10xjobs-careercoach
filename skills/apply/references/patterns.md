@@ -79,17 +79,18 @@ unchanged sections come straight from the base.
 
 ### Shape, top to bottom
 
-1. **Header**, then `## Summary` — the single opening section, the
-   F-pattern's prime real estate.
-2. Inside it: **positioning line** (function + level) → **the case**
-   (one claim, ≤50 words). Add the requirement checklist only when
-   over-qualification or a doubted hard screen is the real risk.
-3. **Selected Experience** — 2–4 roles; 4–6 bullets on the top one or
-   two, 2–3 elsewhere; outcome first.
-4. **Other Experience** — roles older than ~10 years get one line each;
-   older than ~15 fold into a single "Earlier" line with no dates.
-5. **Education** (no graduation dates), then **Skills** (JD-matched, no
-   soft skills).
+1. **Header**: Name (`# Name`), followed by single delimiter-spaced contact line (`Location | Email | Phone | LinkedIn | GitHub`), followed by an optional italicized **target subtitle** (e.g., `*Technical Program Manager — Field & Enterprise Deployments*`). Never make the target title an H2 section name (confuses ATS parsers).
+2. **Clean Typography (Zero Decorative Scaffolding)**:
+   - **No horizontal rules (`---`, `***`, `___`)**: Banned across all candidate-facing documents (résumé, cover letter, outreach messages, pitch). In ATS parsers, plain-text clipboards, and PDF renderers, horizontal rules inject unmanaged vertical margins, break page-budget calculations, or get misinterpreted as document termination / signature markers.
+   - **No ASCII box-art or raw HTML tags (`<hr>`, `<br>`, `<div>`)**: Structural hierarchy is expressed exclusively through semantic markdown headings (`#`, `##`, `###`) and clean paragraphs. The destination engine (PDF printer, ATS portal, email client) owns visual decoration.
+   - **No decorative emojis** in professional artifacts (résumé, cover letter, executive outreach).
+3. **`## Summary` — the single opening section**:
+   - Inside it: **positioning line** (function + level) → **the case** (one claim, ≤50 words).
+   - **No Dual-Summary Duplication**: Never stack both a narrative summary paragraph AND a bulleted "Core Expertise / Core Strengths" list that re-says the same points. Choose ONE: a crisp 3-line narrative case OR a structured requirement checklist.
+4. **`## Professional Experience` / `## Experience`**: 2–4 roles; 4–6 bullets on the top one or two, 2–3 elsewhere; outcome first.
+5. **`## Earlier Experience` / `## Other Experience`**: Roles older than ~10 years get one line each; older than ~15 fold into a single "Earlier" line with no dates.
+6. **`## Selected Work, Patents & Publications` / `## Patents`**: Exact USPTO numbers and verified titles (without redundant co-inventor listings if not universally listed); open-source repos with direct URLs.
+7. **`## Education`** (no graduation dates), then **`## Skills`** (JD-matched, no soft skills).
 
 Omit a section rather than fabricate to fill it. One page under 5
 years' experience; **2 pages maximum otherwise**, even from a 3-page
@@ -105,13 +106,15 @@ and bolded openers); it states the function and level the titles do not
 
 Three or four lines, two things: the **positioning line** (function +
 level, plainly) and the **strongest card** — ONE claim, ≤50 words, with
-its numbers: the posting's hardest screen, answered. No thesis line.
+its numbers: the posting's hardest screen, answered. No thesis line, and
+no redundant "Core Competencies" bullet list underneath.
 
-**The requirement checklist is a different tool** — 5–7 bullets in the
-posting's phrasing, evidence after the colon. Each bullet's evidence
-proves the opener's EXACT claim; content proving a different claim moves
-to its own bullet. A JD's "N+ years of X" is answered with THEIR number
-("8+: yes —") proven by recent evidence — meet the bar, don't triple it.
+**The requirement checklist is an alternative tool** — used when
+over-qualification or a doubted hard screen is the real risk: 5–7 bullets
+in the posting's phrasing, evidence after the colon. Each bullet's
+evidence proves the opener's EXACT claim. A JD's "N+ years of X" is
+answered with THEIR number ("8+: yes —") proven by recent evidence —
+meet the bar, don't triple it.
 
 ### Rewording for the JD's vocabulary
 

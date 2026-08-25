@@ -4,6 +4,14 @@ What `scripts/check_stories.py` verifies, plus the shapes it cannot see
 but the files must still hold. Read this when writing or editing a story
 record.
 
+## `storybank.md` — the index
+
+- `## Coverage` — the competency map the bank is measured against, each row with its source and its story coverage
+- `## Stories` — the index table
+- `## Narrative identity` — optional
+- `## Rounds` — optional; inlined round record `| date | story | round | what changed | scored |`
+- `## Other notes` — optional
+
 ## Index row — `storybank.md § Stories`
 
 | Column | Description |
@@ -56,7 +64,7 @@ making · Communication · Technical depth · Strategic thinking ·
 Ambiguity navigation · Conflict resolution · Customer focus · Innovation ·
 Execution/delivery · Mentorship · Influence without authority
 
-## The round record — `storybank-history.md`
+## The round record — `storybank-history.md` *(or inlined under `storybank.md ## Rounds`)*
 
 Append-only, one row per improve round, header exact:
 

@@ -30,3 +30,7 @@ def test_stale_plan_fails():
 def test_missing_plan_fails():
     code, out = run(None, "--stage", "applying")
     assert code == 1 and "does not exist" in out
+
+def test_stage_auto_inferred():
+    code, out = run(PLAN, "--asked", "which mutual to Flo", "--asked", "your comp floor")
+    assert code == 0 and "clean" in out and "stage groundwork" in out

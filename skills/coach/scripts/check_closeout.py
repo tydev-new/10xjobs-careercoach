@@ -50,13 +50,34 @@ def keywords(s):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--workspace", required=True)
-    ap.add_argument("--stage", required=True, help="one of: " + " / ".join(STAGES))
+    ap.add_argument("--stage", default=None, help="one of: " + " / ".join(STAGES) + " (auto-inferred from workspace if omitted)")
     ap.add_argument("--asked", action="append", default=[], help="a question this reply asks the candidate (repeatable)")
     ap.add_argument("--minutes", type=int, default=30, help="plan.md must have been written within this many minutes")
     a = ap.parse_args()
     findings = []
-    if a.stage.lower() not in STAGES:
-        findings.append(("FAIL", f'stage "{a.stage}" is not one of {", ".join(STAGES)} — name the stage the search is in'))
+    
+    stage = a.stage
+    if stage is None:
+        # Infer stage from jobs.md if present
+        jp = os.path.join(a.workspace, "jobs.md")
+        if os.path.exists(jp):
+            jtext = open(jp, encoding="utf-8").read().lower()
+            if "| offer" in jtext or "| deciding" in jtext:
+                stage = "deciding"
+            elif "| interview" in jtext:
+                stage = "interviewing"
+            elif "| applied" in jtext or "| tailoring" in jtext:
+                stage = "applying"
+            elif "| screen" in jtext or "| lead" in jtext or "| match" in jtext:
+                stage = "searching"
+            else:
+                stage = "groundwork"
+        else:
+            stage = "groundwork"
+    
+    if stage.lower() not in STAGES:
+        findings.append(("FAIL", f'stage "{stage}" is not one of {", ".join(STAGES)} — name the stage the search is in'))
+    a.stage = stage
     p = os.path.join(a.workspace, "plan.md")
     if not os.path.exists(p):
         findings.append(("FAIL", "plan.md does not exist — the plan is written in the same reply"))

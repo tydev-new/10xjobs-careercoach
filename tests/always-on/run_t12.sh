@@ -60,7 +60,7 @@ for case_name in $CASES; do
     [ -d "$CASE/ws-extra" ] && cp -r "$CASE/ws-extra/." "$WS/"
     cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/prep" "$REPO/skills/practice" "$REPO/skills/profile" \
+    cp -r "$REPO/skills/interview" "$REPO/skills/profile" \
           "$REPO/skills/storybank" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
     : > "$out.err"

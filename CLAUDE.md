@@ -14,7 +14,7 @@ Always-on interrupts (full versions + receipts in PROCESS.md):
 
 - Patch, grep-verify, and commit in ONE command block — a commit that
   claims an unverified change is a lie.
-- Verify disk, not narration: grep before believing any "written/fixed".
+- Verify the file, not narration: grep before believing any "written/fixed".
 - Never test or solo-review a skill you authored; spawn an independent
   reviewer against the precedence chain.
 - New rules bind to their trigger moment, name the failure they prevent,

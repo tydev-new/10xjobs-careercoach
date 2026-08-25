@@ -35,7 +35,7 @@ for trial in $(seq 1 "$TRIALS"); do
     cp -r "$CASE/ws-extra/." "$WS/"
     cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/outreach" "$REPO/skills/profile" "$REPO/skills/positioning" "$WS/.claude/skills/"
+    cp -r "$REPO/skills/outreach" "$REPO/skills/profile" "$WS/.claude/skills/"
     echo "=== t13-ceiling / trial $trial -> $WS"
     : > "$out.err"
     ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \

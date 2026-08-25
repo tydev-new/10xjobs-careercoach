@@ -11,7 +11,7 @@ shape (docs/skill-shape.md).
 import os
 
 SKILLS = os.path.join(os.path.dirname(__file__), "..", "skills")
-CONVERTED = ["storybank", "profile", "positioning", "search", "evaluate", "apply", "outreach", "prep", "practice", "learn", "coach"]
+CONVERTED = ["storybank", "profile", "search", "evaluate", "apply", "outreach", "interview", "learn", "coach"]
 
 
 def _read(*parts):
@@ -51,7 +51,7 @@ def test_loop_skills_score_as_a_count():
     # the loop-alignment design (founder 2026-08-21): the three persisting
     # loops score N/M held, read the rows before scoring, and the ceiling
     # is two equal rows — the SKILL states it, the schema declares the form
-    for skill in ("profile", "positioning", "apply"):
+    for skill in ("profile", "apply"):
         body = _read(skill, "SKILL.md")
         assert "N/M held" in body, skill
         assert "same count" in body, skill
@@ -67,7 +67,7 @@ def test_loop_skills_carry_the_evidence_law_verbatim():
     # tier-1 loop exit (founder 2026-08-20: improvement-loop.md dissolves;
     # the law is door-guard-pattern duplication, guarded here)
     LAW = "a claim-name without its number is not the claim"
-    for skill in ("profile", "positioning", "apply", "outreach"):
+    for skill in ("profile", "apply", "outreach"):
         assert LAW in _read(skill, "SKILL.md"), skill
 
 

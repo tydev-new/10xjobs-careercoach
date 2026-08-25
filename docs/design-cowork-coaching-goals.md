@@ -7,10 +7,10 @@ not a second constitution. Each traces to the rules it applies:
 
 | Goal | Derives from PRINCIPLES *(P1.x = Part 1 promise x; P2.x = Part 2 rule x)* |
 |---|---|
-| 1 — model owns the path, skill owns the destination | P1.4 (you bring you) · P2.11 (every rule derivable or earned) |
-| 2 — knowledge on demand, guardrails always-on or code | P1.7 (unmissable moments) · P1.8 (honest or silent) |
-| 3 — every session leaves a file behind | P2.9 (believe the disk) · P2.10 (one of everything) |
-| 4 — skills small enough to read, safe to edit | P2.13 (plain language) · P2.11 (earned rules → the deletion valve) |
+| 1 — model owns the path, skill owns the destination | P1.4 (you bring you) · P2.13 (every rule derivable or earned) |
+| 2 — knowledge on demand, guardrails always-on or code | P1.7 (unmissable moments) · P1.8 (honest, in your voice, or silent) · P2.14 (match the checker) |
+| 3 — every session leaves a file behind | P1.9 (local and yours) · P2.11 (believe the file) · P2.12 (one of everything) |
+| 4 — skills small enough to read, safe to edit | P2.18 (plain language) · P2.13 (earned rules → the deletion valve) · P2.15 (context is scarce) |
 
 **Precedence:** `PRINCIPLES.md` → this doc → `design-cowork-coaching.md`.
 A conflict anywhere in the chain means one of them is wrong — fix the

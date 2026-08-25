@@ -18,6 +18,11 @@ revision is where inflation creeps in.
 also governs concessions and corrections. This is its marked echo at the
 drafting moment.)*
 
+**Clean typography (zero decorative scaffolding).** All candidate-facing
+artifacts (résumés, letters, outreach messages, bios) use clean semantic
+markdown only. Never inject horizontal rules (`---`, `***`), ASCII boxes,
+raw HTML (`<hr>`, `<br>`), or decorative emojis into candidate prose.
+
 Read `voice.md` alongside — it holds how this candidate actually writes.
 Rules for one kind of artifact (letter structure, channel limits, ATS
 openers) live with that artifact.

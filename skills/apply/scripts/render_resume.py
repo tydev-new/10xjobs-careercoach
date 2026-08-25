@@ -31,20 +31,20 @@ CHROME = ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
           "google-chrome", "chromium", "chromium-browser")
 
 CSS = """
-@page { size: Letter; margin: 0.45in 0.55in; }
-body { font-family: Helvetica, Arial, sans-serif; font-size: 10.5pt;
-       line-height: 1.3; color: #000; margin: 0; }
-h1 { font-size: 19pt; letter-spacing: .5px; margin: 0 0 2pt; }
-h1 + p { font-size: 10pt; margin: 0 0 9pt; }
-h2 { font-size: 11pt; text-transform: uppercase; letter-spacing: .6px;
-     border-bottom: 1px solid #000; padding-bottom: 2pt; margin: 10pt 0 5pt; }
-h3 { font-size: 11pt; margin: 8pt 0 1pt; }
-h3 + p { margin: 0 0 3pt; font-size: 9.8pt; }
-p { margin: 0 0 5pt; }
-ul { margin: 2pt 0 5pt; padding-left: 15pt; }
-li { margin: 0 0 3pt; }
+@page { size: Letter; margin: 0.4in 0.5in; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+       font-size: 10pt; line-height: 1.25; color: #111; margin: 0; }
+h1 { font-size: 18pt; letter-spacing: .5px; margin: 0 0 2pt; }
+h1 + p { font-size: 9.5pt; margin: 0 0 7pt; }
+h2 { font-size: 10.5pt; text-transform: uppercase; letter-spacing: .6px;
+     border-bottom: 1px solid #222; padding-bottom: 2pt; margin: 8pt 0 4pt; }
+h3 { font-size: 10.5pt; margin: 7pt 0 1pt; }
+h3 + p { margin: 0 0 2pt; font-size: 9.3pt; }
+p { margin: 0 0 4pt; }
+ul { margin: 2pt 0 4pt; padding-left: 14pt; }
+li { margin: 0 0 2.5pt; }
 h2, h3, li { page-break-inside: avoid; }
-h2, h3 { page-break-after: avoid; }
+h2, h3, h3 + p { page-break-after: avoid; }
 """
 
 

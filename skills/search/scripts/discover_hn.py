@@ -46,10 +46,28 @@ def http_json(url):
 
 
 def load_criteria(workspace):
-    path = os.path.join(workspace, "criteria.json")
-    if os.path.exists(path):
-        return json.load(open(path))
-    return {}
+    crit = {}
+    md_path = os.path.join(workspace, "criteria.md")
+    if os.path.exists(md_path):
+        text = open(md_path, encoding="utf-8").read()
+        targets = []
+        for line in text.splitlines():
+            if re.match(r"^[-*•]\s+", line):
+                clean_l = re.sub(r"^[-*•]\s*", "", line)
+                clean_l = re.sub(r"\[.*?\]", "", clean_l).strip()
+                if clean_l and not clean_l.startswith("TODO"):
+                    role_title = clean_l.split(" — ")[0].split(" - ")[0].strip()
+                    if role_title:
+                        targets.append(role_title.lower())
+        if targets:
+            crit["themes"] = targets
+    json_path = os.path.join(workspace, "criteria.json")
+    if os.path.exists(json_path):
+        try:
+            crit.update(json.load(open(json_path)))
+        except Exception:
+            pass
+    return crit
 
 
 def hiring_threads(limit):

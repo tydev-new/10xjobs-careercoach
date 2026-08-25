@@ -57,12 +57,12 @@ MANIFEST_FILES = {
     "jobs.db.bak": "search (migration backup)",
     "autopilot-log.md": "search (scheduled-run log, append-only)",
     "plan-log.md": "coach (append-only annex)",
-    "practice-log.md": "practice",
-    "question-bank.md": "practice",
-    "composite-target.md": "practice",
-    "linkedin-audit.md": "positioning (regenerated per audit)",
+    "practice-log.md": "interview",
+    "question-bank.md": "interview",
+    "composite-target.md": "interview",
+    "linkedin-audit.md": "profile (regenerated per audit)",
     "base-resume-history.md": "profile (append-only; header checked)",
-    "pitch-history.md": "positioning (append-only; header checked)",
+    "pitch-history.md": "profile (append-only; header checked)",
     "storybank-history.md": "storybank (append-only; header checked)",
 }
 MANIFEST_DIRS = {
@@ -72,11 +72,11 @@ MANIFEST_DIRS = {
     "documents": "the candidate (drop folder — read on sight, captured into the owned files)",
     "applications": "apply", "company": "evaluate", "contacts": "outreach",
     "jd-analysis": "evaluate", "jd-inbox": "search + candidate drops",
-    "prep": "prep", "practice": "practice", "stories": "storybank",
+    "prep": "interview", "practice": "interview", "stories": "storybank",
     "courses": "learn",
-    # stated comp numbers heard in interview rounds; practice's debrief
-    # writes them, prep's day-of sheet reads them for consistency
-    "negotiation": "practice",
+    # stated comp numbers heard in interview rounds; debrief writes them,
+    # prep's day-of sheet reads them for consistency
+    "negotiation": "interview",
 }
 
 
@@ -121,7 +121,10 @@ def check_table(path, header, enums):
         # is not "absent" — it is the altered-header case check_history
         # FAILs on; here it WARNs (2026-08-21 alignment review, L1)
         title = {COVERAGE_HEADER: "## Coverage", SELECTION_HEADER: "## Selection",
-                 ROUNDS_HEADER: "## Rounds", PANEL_HEADER: "## Panel"}.get(header)
+                 ROUNDS_HEADER: "## Rounds", PANEL_HEADER: "## Panel",
+                 HISTORY_HEADERS["base-resume-history.md"]: "## Rounds",
+                 HISTORY_HEADERS["pitch-history.md"]: "## Rounds",
+                 HISTORY_HEADERS["storybank-history.md"]: "## Rounds"}.get(header)
         if title and any(l.startswith(title) for l in all_lines):
             res.append(("WARN", f'{title} present but its header is not exactly "{header}"'))
         return res
@@ -442,6 +445,14 @@ def main():
         for level, msg in check_history(hpath, HISTORY_HEADERS[os.path.basename(hpath)]):
             print(f"{level}  {os.path.basename(hpath)}: {msg}")
             failed += level == "FAIL"
+    for f, hdr in (("base-resume.md", HISTORY_HEADERS["base-resume-history.md"]),
+                   ("pitch.md", HISTORY_HEADERS["pitch-history.md"]),
+                   ("storybank.md", HISTORY_HEADERS["storybank-history.md"])):
+        p = os.path.join(ws, f)
+        if os.path.exists(p):
+            for level, msg in check_table(p, hdr, {}):
+                print(f"{level}  {f}: {msg}")
+                failed += level == "FAIL"
     for apath in sorted(glob.glob(os.path.join(ws, "applications", "*.md"))):
         checked += 1
         for header, enums in ((COVERAGE_HEADER, COVERAGE_ENUMS),

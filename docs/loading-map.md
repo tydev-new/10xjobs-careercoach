@@ -44,19 +44,17 @@ until it was added by hand.
 
 | Skill | description | SKILL.md |
 |---|---|---|
-| profile | 82w | 3,013w |
-| storybank | 60w | 2,097w |
-| apply | 72w | 2,037w |
-| search | 67w | 1,449w |
-| coach | 95w | 1,910w |
-| evaluate | 61w | 1,705w |
-| learn | 76w | 887w |
-| positioning | 63w | 1,462w |
-| practice | 71w | 1,275w |
-| prep | 78w | 1,160w |
-| outreach | 69w | 1,593w |
+| profile | 82w | 1,499w |
+| storybank | 60w | 691w |
+| apply | 72w | 843w |
+| search | 67w | 559w |
+| coach | 95w | 882w |
+| evaluate | 61w | 567w |
+| learn | 76w | 494w |
+| interview | 85w | 932w |
+| outreach | 69w | 704w |
 
-19,277 words total, **one of which loads at a time.** A SKILL.md holds
+7,171 words total, **one of which loads at a time.** A SKILL.md holds
 the destination (what must be true when the work is done), the files the
 skill owns, its modes, and the guardrails that fire only inside its
 work.

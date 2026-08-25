@@ -23,7 +23,7 @@ notation: P1.x = Part 1 promise x, P2.x = Part 2 rule x).
    about the candidate, say where it came from"* survives.
 2. **Write down only what the model can't see from inside the turn** —
    drift across rounds, its own revision spend, whether the work is done.
-3. **A line earns its place only if** *(applies P2.11, derivable-or-earned)*: you can name the moment it fires; a
+3. **A line earns its place only if** *(applies P2.13, derivable-or-earned)*: you can name the moment it fires; a
    strong model does meaningfully worse without it; and it wouldn't
    self-correct across sessions. *(Measured three times by
    2026-08-14, in both directions: the claim-hazard list was needed —
@@ -35,7 +35,7 @@ notation: P1.x = Part 1 promise x, P2.x = Part 2 rule x).
 4. **Load order, not deletion.** Underivable domain content — question
    patterns, negotiation scripts, worked examples — stays whole and opens
    only when the work reaches it.
-5. **Files are the specification** *(applies P2.9, believe the disk)*. What the system keeps determines what
+5. **Files are the specification** *(applies P2.11, believe the file)*. What the system keeps determines what
    it can do. The schemas live with their owning skills, enforced by code.
 6. **Claims carry provenance, and an empty evidence floor is loud**
    *(applies P1.8, honest or silent)*. The

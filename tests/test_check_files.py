@@ -107,7 +107,7 @@ def test_pitch_schema_registered():
     be a pitch.md section."""
     import check_files as cf
     schemas = cf.load_schemas(os.path.join(ROOT, "skills"))
-    assert "pitch.md" in schemas and schemas["pitch.md"]["owner"] == "positioning"
+    assert "pitch.md" in schemas and schemas["pitch.md"]["owner"] == "profile"
     required = {s["name"] for s in schemas["pitch.md"]["sections"] if not s["optional"]}
     assert {"Core statement", "Variants", "Messages rubric"} <= required
     all_sections = {s["name"] for s in schemas["pitch.md"]["sections"]}
@@ -166,7 +166,7 @@ def test_history_header_enforced():
 
 
 def test_heading_form_schema_declaration_parses():
-    """FILE_RE's second form, added 2026-08-20: a references/schema.md may
+    r"""FILE_RE's second form, added 2026-08-20: a references/schema.md may
     declare a file as `## \`file.md\` — ...` heading. The first attempt at
     profile's schema.md put prose on the line after the heading, which ended
     the block before its bullets — five schemas silently vanished and only
@@ -208,7 +208,7 @@ def test_history_header_sync_with_skill_prose():
     # skill's prose must state the SAME header, or this test is the alarm.
     # storybank states its header in a reference, not the body — so search both.
     for skill, hist in (("profile", "base-resume-history.md"),
-                        ("positioning", "pitch-history.md"),
+                        ("profile", "pitch-history.md"),
                         ("storybank", "storybank-history.md")):
         prose = ""
         for root, _, names in os.walk(os.path.join(SKILLS, skill)):
@@ -427,3 +427,16 @@ def test_section_pointers_are_deliberately_not_checked():
         open(os.path.join(root, "apply", "SKILL.md"), "w").write(
             "See `base-resume.md § Claim rules` and § Nowhere At All.\n")
         assert cf.check_skill_prose(root) == []
+
+
+def test_inlined_rounds_table_enforced():
+    """Rounds inlined inside base-resume.md, pitch.md, or storybank.md are validated."""
+    with tempfile.TemporaryDirectory() as ws:
+        p = os.path.join(ws, "base-resume.md")
+        open(p, "w").write("# Base\n## Experience\n- Staff Eng\n## Claim rules\n- x\n## Rounds\n" + TIER1 + "\n|---|---|---|---|---|\n| 2026-08-24 | 1 | improve | 5/5 held | trimmed intro |\n")
+        rc, out = run({"base-resume.md": open(p).read()})
+        assert rc == 0, out
+        
+        bad = open(p).read() + "| 2026-08-24 | 2 | improve | short row |\n"
+        rc, out = run({"base-resume.md": bad})
+        assert "WARN" in out and "cells" in out

@@ -83,8 +83,8 @@ movement is the ceiling, whatever the absolute score.
 
 ## Bars that are not ours
 
-Prep's health heuristic (8–12 confirmed, ≥60% at 4+, in
-`../../prep/references/patterns.md § The brief — getting there`) answers *is this bank ready to build a
-brief from*. Practice's drill bar (8+ confirmed)
+Interview's health heuristic (8–12 confirmed, ≥60% at 4+, in
+`../../interview/references/patterns.md § The brief — construction protocol`) answers *is this bank ready to build a
+brief from*. Interview's drill bar (8+ confirmed)
 answers *can we run a retrieval drill*. Neither is the bank's own
 destination, which is coverage of the map. Do not restate them here.

@@ -33,7 +33,10 @@ def check_table(path, header, enums):
         # is not "absent" — it is the altered-header case check_history
         # FAILs on; here it WARNs (2026-08-21 alignment review, L1)
         title = {COVERAGE_HEADER: "## Coverage", SELECTION_HEADER: "## Selection",
-                 ROUNDS_HEADER: "## Rounds", PANEL_HEADER: "## Panel"}.get(header)
+                 ROUNDS_HEADER: "## Rounds", PANEL_HEADER: "## Panel",
+                 HISTORY_HEADERS["base-resume-history.md"]: "## Rounds",
+                 HISTORY_HEADERS["pitch-history.md"]: "## Rounds",
+                 HISTORY_HEADERS["storybank-history.md"]: "## Rounds"}.get(header)
         if title and any(l.startswith(title) for l in all_lines):
             res.append(("WARN", f'{title} present but its header is not exactly "{header}"'))
         return res

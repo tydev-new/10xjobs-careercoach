@@ -202,7 +202,7 @@ Profile took five passes; this list is what they taught.
    line break is still present (overclaim #14 was a flat pattern
    inventing a loss). Judge each miss; "casing changed" is an answer,
    "probably fine" is not.
-5. **Plain-language pass** (rule 13) — relocated prose keeps its old
+5. **Plain-language pass** (rule 18) — relocated prose keeps its old
    density unless someone reads it. Scan for ·-chained run-ons,
    semicolon chains, and multi-clause parentheticals; unpack them into
    lists or sentences. The force of every rule survives the unpacking —

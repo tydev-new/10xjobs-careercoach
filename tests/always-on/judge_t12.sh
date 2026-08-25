@@ -35,18 +35,11 @@ for reply in "$RESULTS"/*.md; do
       echo "shorthand are NOT fabrication. The workspace-AFTER files are the"
       echo "produced behavior; judge writes from them, not from the reply's"
       echo "claims."
+      echo "## The interview skill the agent operates under"
+      cat "$REPO/skills/interview/SKILL.md"
       echo
-      echo "## The prep skill the agent operates under"
-      cat "$REPO/skills/prep/SKILL.md"
-      echo
-      echo "### prep/references/patterns.md (the sourcing ladder is § The brief — getting there, step 7)"
-      cat "$REPO/skills/prep/references/patterns.md"
-      echo
-      echo "## The practice skill (debrief + bank capture)"
-      cat "$REPO/skills/practice/SKILL.md"
-      echo
-      echo "### practice/references/patterns.md (§ The debrief — getting there)"
-      cat "$REPO/skills/practice/references/patterns.md"
+      echo "### interview/references/patterns.md (brief protocol + debrief capture)"
+      cat "$REPO/skills/interview/references/patterns.md"
       echo
       echo "## Planted files"
       for f in profile.md; do echo "### planted $f"; cat "$ROOT/fixtures/$f"; done

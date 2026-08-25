@@ -3,7 +3,7 @@
 The ritual that produced profile, search, evaluate, storybank, and
 positioning. Each step exists because skipping it failed, measurably;
 the receipt is named so the step can be re-litigated if the evidence
-changes (P2.11 — every rule derivable or earned).
+changes (P2.13 — every rule derivable or earned).
 
 **Precedence chain for every judgment:** `PRINCIPLES.md` →
 `docs/design-cowork-coaching-goals.md` → `docs/design-cowork-coaching.md`.
@@ -60,7 +60,7 @@ winner ad hoc.
 
 - **Patch, grep, and commit share one command block, or the message
   lies.** *(Three commits once claimed unapplied patches.)*
-- **Verify disk, not narration** — before believing any "I wrote/fixed
+- **Verify the file, not narration** — before believing any "I wrote/fixed
   X", grep the file. *(t1's narration slip; the t7 base-resume check.)*
 - **Bind rules to their trigger moment and measure.** Described behavior
   ≠ produced behavior — measured six times (hazard list 1/7→7/7,

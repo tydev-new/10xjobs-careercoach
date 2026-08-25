@@ -9,7 +9,7 @@ copying them by hand — and so a fix lands once.
 
 | Piece | Lives at | In the kit as |
 |---|---|---|
-| The build rules (Part 2 of the principles: believe the disk, one of everything, every rule derivable or earned, evidence decides, plain language) | `../PRINCIPLES.md § Part 2` | `PRINCIPLES-core.md` — a verbatim extract, guarded by `tests/test_kit.py` |
+| The build rules (Part 2 of the principles: believe the file, one of everything, every rule derivable or earned, match the checker, context is scarce, bounded loops, evidence decides, plain language) | `../PRINCIPLES.md § Part 2` | `PRINCIPLES-core.md` — a verbatim extract, guarded by `tests/test_kit.py` |
 | The shape — five files, the loop skeleton, the alignment rules, how to convert a skill | `../docs/skill-shape.md` | not copied; read it there |
 | The process — design gate → review → dogfood → harness → closing review | `../docs/PROCESS.md` | not copied; read it there |
 | The checker core — schema parser, section check, declared tables, round-record check, the link rung | `../skills/profile/scripts/check_files.py` | `shapecheck.py` — the domain-neutral functions, guarded byte-identical by `tests/test_kit.py` |

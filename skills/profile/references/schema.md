@@ -46,6 +46,7 @@ they fire while you work rather than while you write a record.
 
 - *(résumé body at full altitude — the candidate's own headings)*
 - `## Claim rules` — ⚠ hazards + per-audience renderings, seeded at intake from the hazard table (`references/patterns.md`); also holds **intake rulings** — one line per declined proposal ("declined at intake: <value> from <source>, <date>"), read before proposing so a re-run never re-asks what was refused. **Internal, never ships.**
+- `## Rounds` — optional; append-only round record `| date | round | driver | scored vs FIXED | what changed |` (inlined directly into the base résumé)
 
 The single source of truth for every fact. Read by positioning, apply,
 outreach, storybank. The audit lives in `eval.md § The résumé audit`.
@@ -68,7 +69,7 @@ not permission to generate one.
 - `## FIXED`
 - `## LIVING`
 
-## `base-resume-history.md` — the round record
+## `base-resume-history.md` — the round record *(or inlined as `## Rounds` in `base-resume.md`)*
 
 Append-only rows `| date | round | driver | scored vs FIXED | what changed |`;
 the header row and cell counts are checker-enforced. `scored vs FIXED`
@@ -95,3 +96,28 @@ Read wherever candidate-voiced text is generated, together with the
 do/never table in the workspace `CLAUDE.md` (always loaded; voice.md =
 this candidate's register, the table = the craft for every candidate) and
 the trace rule in `candidate-voice.md`.
+
+## `pitch.md` — the positioning record
+
+- `## Core statement` — atomic positioning line, substitution-tested
+- `## Variants` — the five variants as bold labels inside the section
+- `## Messages rubric` — the pinned message-priority table
+- `## Diagnostics` — optional; scores + primary weakness
+- `## Consistency notes` — optional; per-surface mismatches and rewrites
+- `## Rounds` — optional; append-only round record `| date | round | driver | scored vs FIXED | what changed |`
+- `## Other notes` — optional
+
+## `pitch-brief.md` — the pitch loop's brief
+
+- `## FIXED`
+- `## LIVING`
+
+## `pitch-history.md` — the pitch round record *(or inlined as `## Rounds` in `pitch.md`)*
+
+Append-only rows `| date | round | driver | scored vs FIXED | what changed |`. Header and row cell counts checked.
+
+## `linkedin-audit.md` — the LinkedIn profile review
+
+- `## Profile review` — headline, about, and experience section audits and concrete rewrites
+- `## Consistency notes` — alignment with base résumé and pitch
+- `## Other notes` — optional

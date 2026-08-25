@@ -73,32 +73,89 @@ CRITERIA_TYPES = {"themes": list, "seniority_regex": str, "geo_include": list,
                   "comp_floor": int, "min_mgmt_yoe": int}
 
 
-def load_criteria(workspace):
-    """criteria.json is a VALIDATED seam (the drift guard for model-written
-    criteria): unknown keys and wrong types are hard errors, the regex must
-    compile. Absent file -> defaults, silently."""
-    path = os.path.join(workspace, "criteria.json")
-    crit = dict(DEFAULT_CRITERIA)
+def parse_criteria_md(workspace):
+    """Directly parse criteria.md into criteria filters."""
+    path = os.path.join(workspace, "criteria.md")
     if not os.path.exists(path):
-        return crit, "defaults"
-    cmd = os.path.join(workspace, "criteria.md")
-    if os.path.exists(cmd) and os.path.getmtime(cmd) > os.path.getmtime(path):
-        print("⚠ criteria.md is NEWER than criteria.json — the projection is stale; "
-              "regenerate it from criteria.md before trusting these filters "
-              "(preserve widened_by unless criteria.md itself changed)", file=sys.stderr)
-    raw = json.load(open(path))
-    unknown = set(raw) - set(CRITERIA_TYPES)
-    if unknown:
-        sys.exit(f"criteria.json: unknown keys {sorted(unknown)} — allowed: {sorted(CRITERIA_TYPES)}")
-    for k, v in raw.items():
-        if not isinstance(v, CRITERIA_TYPES[k]):
-            sys.exit(f"criteria.json: {k} must be {CRITERIA_TYPES[k].__name__}")
-    try:
-        re.compile(raw.get("seniority_regex", crit["seniority_regex"]))
-    except re.error as e:
-        sys.exit(f"criteria.json: seniority_regex does not compile: {e}")
-    crit.update(raw)
-    return crit, "criteria.json" + (f" (widened_by: {', '.join(crit['widened_by'])})" if crit["widened_by"] else "")
+        return {}
+    text = open(path, encoding="utf-8").read()
+    sections = {}
+    cur_sec = None
+    for line in text.splitlines():
+        m = re.match(r"^##\s+(.+)$", line.strip())
+        if m:
+            cur_sec = m.group(1).lower().strip()
+            sections[cur_sec] = []
+        elif cur_sec and line.strip():
+            sections[cur_sec].append(line.strip())
+    
+    parsed = {}
+    targets = []
+    for k, lines in sections.items():
+        if "target" in k and "compan" not in k:
+            for l in lines:
+                clean_l = re.sub(r"^[-*•]\s*", "", l)
+                clean_l = re.sub(r"\[.*?\]", "", clean_l).strip()
+                if clean_l and not clean_l.startswith("TODO"):
+                    role_title = clean_l.split(" — ")[0].split(" - ")[0].strip()
+                    if role_title:
+                        targets.append(role_title.lower())
+    if targets:
+        parsed["themes"] = targets
+    
+    for k, lines in sections.items():
+        if "target compan" in k or ("compan" in k and "note" not in k):
+            comps = []
+            for l in lines:
+                clean_l = re.sub(r"^[-*•]\s*", "", l).strip()
+                if clean_l and not clean_l.startswith("TODO"):
+                    comps.append(clean_l)
+            if comps:
+                parsed["target_companies"] = comps
+
+    for k, lines in sections.items():
+        if "geo" in k or "location" in k:
+            geos = []
+            for l in lines:
+                clean_l = re.sub(r"^[-*•]\s*", "", l).strip().lower()
+                if "remote" in clean_l:
+                    geos.append("remote")
+                if any(x in clean_l for x in ("san francisco", "sf", "bay area", "palo alto", "mountain view")):
+                    geos.extend(["san francisco", "bay area", "palo alto", "mountain view", "san jose", "sunnyvale"])
+            if geos:
+                parsed["geo_include"] = list(set(geos))
+
+    for k, lines in sections.items():
+        if "comp" in k or "pay" in k:
+            for l in lines:
+                nums = re.findall(r"\$?\s*(\d{2,3})[,\s]?000|\$(\d{2,3})k", l.lower())
+                for n1, n2 in nums:
+                    val = int(n1 or n2) * 1000
+                    if val >= 50000:
+                        parsed["comp_floor"] = val
+                        break
+    return parsed
+
+
+def load_criteria(workspace):
+    """Load criteria from criteria.md (direct SSOT) or legacy criteria.json."""
+    crit = dict(DEFAULT_CRITERIA)
+    md_crit = parse_criteria_md(workspace)
+    crit.update(md_crit)
+    
+    json_path = os.path.join(workspace, "criteria.json")
+    if os.path.exists(json_path):
+        try:
+            raw = json.load(open(json_path))
+            for k, v in raw.items():
+                if k in CRITERIA_TYPES and isinstance(v, CRITERIA_TYPES[k]):
+                    crit[k] = v
+            return crit, "criteria.md + criteria.json" + (f" (widened_by: {', '.join(crit['widened_by'])})" if crit["widened_by"] else "")
+        except Exception:
+            pass
+    if md_crit:
+        return crit, "criteria.md"
+    return crit, "defaults"
 
 
 

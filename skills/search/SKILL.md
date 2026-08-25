@@ -7,160 +7,67 @@ description: Use this skill when the candidate wants to find new roles or run th
 
 ## Goal
 
-New on-thesis roles in the pipeline at "To Review" with their JDs
-saved, and an honest report. **"Nothing new matched this week" is a real
-answer; a fabricated role is the worst failure available here.** Search
-finds; the `evaluate` skill judges. Scored by `references/eval.md`.
+Identify new on-thesis roles, save JDs to `jd-inbox/`, and add them to `jobs.md` at "To Review". Search discovers; `evaluate` assesses.
 
 | Must be true | Where |
 |---|---|
-| A confirmed plan exists before anything runs | `criteria.md § Search plan` |
-| Every new on-thesis role sits at To Review, JD saved, with the employer's own URL (a hiring-manager post: the post URL) | `jobs.md` + `jd-inbox/` |
-| The report is honest: counts, rejection reasons, yield per source, effective settings | the reply |
-| Market findings the candidate should see are written down, dated | `jobs.md § Search notes` |
-| The prune report proposes, never executes; engaged rows appear nowhere in it | the reply, then `jobs.md` on confirm |
-| `criteria.json` is no older than `criteria.md` | `criteria.json` |
+| Confirmed search plan before running sweeps | `criteria.md § Search plan` |
+| New on-thesis roles at To Review with saved JDs and direct employer URLs | `jobs.md` + `jd-inbox/` |
+| Honest reporting (yield per source, counts, settings) | reply |
+| Market insights recorded and dated | `jobs.md § Search notes` |
+| Prune report proposes; engaged rows never touched | reply $\rightarrow$ `jobs.md` on confirmation |
 
 ## Prerequisites
 
-- **Required:**
-  - a workspace `CLAUDE.md`. None → the workspace isn't set up; run
-    profile's Setup before writing any file. (Every skill is a door a
-    NEW candidate can walk through first — goal 2's blocking gap.)
-  - `criteria.md` with the target written down: titles, stage,
-    geography, `§ Target companies`. Search turns criteria into
-    queries; it cannot invent a target.
-- **Optional:**
-  - `companies.md` — the first sweep builds it otherwise.
-  - `criteria.md § Search settings` — the script's defaults apply
-    otherwise, and the report prints the values in force.
+- **Required:** Workspace `CLAUDE.md` (none → profile's Setup); `criteria.md` (targets, titles, geo, watchlist).
+- **Optional:** `companies.md`, `criteria.md § Search settings`.
 
 ## Loops and sequences
 
-Three things happen here. The plan is composed once and revised on
-evidence; each attended sweep is the loop; a scheduled run is the plan
-executed with no judgment added. File shapes: `references/schema.md` —
-every record is script-written, and the script is the authority on its
-format.
+Instrument catalog and discovery tactics in `references/patterns.md`.
 
 ### Plan composition (a sequence)
 
-**Runs when** `criteria.md` has no `## Search plan` section, or the
-candidate asks to change the plan. Coach's "I'm starting my search"
-route lands here after profile intake.
+**Runs when** `criteria.md` lacks a `## Search plan` or candidate requests a plan change.
 
-1. Read `criteria.md` in full — not from memory of the last conversation.
-2. **Read `references/patterns.md § The catalog`** and compose from it:
-   which instruments fit *this* target, with which queries, and why — a
-   sentence per choice the candidate can disagree with.
-3. **Your next reply IS the proposal, and nothing runs yet. Stop and
-   ask.** Not even a quick look-ahead sweep: an eager first run feels
-   helpful and quietly makes every future scheduled run planless.
-4. The candidate's yes writes `## Search plan` into `criteria.md` —
-   **write it before executing**, then run the sweep.
+1. Read `criteria.md` in full.
+2. Compose tailored queries and instrument choices (`references/patterns.md § The catalog`).
+3. Propose the plan in chat and stop. Candidate approval writes `## Search plan` into `criteria.md` before execution.
 
-**Exits** when the plan is written on a yes. A standing plan already
-exists → follow it; revisions go through the sweep loop below, same
-confirm.
+**Exits** when the confirmed plan is written to disk.
 
 ### The sweep (the loop)
 
-**Runs when** the candidate asks to search, or after a plan is written.
-Coach's funnel read routes here on "pipeline thin at the top" — that
-entry arrives with a diagnosis, so it is a revision proposal: evidence
-from the last report, still confirmed before it stands.
+**Runs when** candidate asks to search or runs a manual sweep.
 
-- **Standard:** `criteria.md` — the plan as written, the settings as
-  set. **Budget:** one change per revision pass, at most two passes per
-  thin result, said up front.
-- **Each pass:** regenerate `criteria.json` if `criteria.md` changed →
-  run the plan's instruments → read the report → judge a thin result
-  (**read `references/patterns.md § Reading a thin result`**) → revise
-  on evidence if it says so → report → the prune report. The order and
-  the moves: `references/patterns.md § The sweep — getting there`.
-- **Five things bind at their moment:**
-  1. **A revision is ONE change, quoted before written, confirmed
-     before it stands** — read `criteria.json`'s `widened_by` first (it
-     is the pass count). Never on a guess; the rejection counts and
-     per-source yields are the evidence.
-  2. **Leads are never shown** — a lead unconfirmed is a role that
-     isn't; only a posting lands a role.
-  3. **Engaged rows (Interested and beyond) appear NOWHERE in the prune
-     proposal** — not even annotated "keep"; listing an engaged row
-     invites reconsidering a commitment the candidate already made (t14
-     measured exactly this). **The ranked set is To Review rows only** —
-     an engaged row is not in the ranking, not in the proposal, and not
-     listed with a keep rationale (t14 measured the "stays because you
-     flagged it" variant). A count handed to you that includes an
-     engaged row ("6 active vs 5, with the Interested one") is the bait
-     in its natural form: **the board header's cap and its To Review
-     count are the numbers — never a default you assume.** Correct the
-     count in one line, build the proposal from the board, and never
-     refuse the report because the count "can't be verified" — the
-     board is the verification.
-  4. **Already-scored rows rank on their RECORDED score — never mint a
-     second number** (t14; two evaluated rows got invented ranks in the
-     2026-08-17 live triage). Unscored To-Review rows get evaluate's
-     quick-scan tier FIRST.
-  5. **The candidate's own picks (`criteria.md § Target companies`) are
-     never auto-proposed as OUTRANKED**; displacing one is their
-     explicit call. Dismissal is only ever proposed — ONE batch confirm,
-     attended; a scheduled run reports the candidates and waits.
-
-**Exits** when the result is reported and the prune report is answered
-or declined; or when the budget is spent — two passes, still thin:
-report the evidence and wait for the next conversation; **the ceiling
-is two passes with the same yield** — change the instrument or hand the
-candidate the widening as a DECISION. **The standard does not bend to
-the result: a thin week widens nothing in `criteria.md` that the
-candidate did not say yes to.**
+- **Standard:** The confirmed plan in `criteria.md`.
+- **Budget:** At most 2 revision passes for thin results.
+- **Each pass:** Execute plan instruments $\rightarrow$ parse results $\rightarrow$ diagnose thin yield (`references/patterns.md § Reading a thin result`) $\rightarrow$ propose prune batch (To Review rows only; never propose engaged rows).
+- **Obligations:**
+  1. *Single revision:* One evidence-backed revision pass at a time.
+  2. *To-Review ranking only:* Active pipeline rows (Interested, Applied, Interviewing) are strictly excluded from prune proposals.
+  3. *Batch confirm:* Proposed dismissals require explicit single batch approval.
+- **Exits:** Sweep reported and prune actions confirmed; or **the ceiling: two passes with the same yield** → stop and present parameter adjustment as a **DECISION**. Standard does not bend to thin weeks.
 
 ### Scheduled run (a sequence, unattended)
 
-**Runs when** the schedule fires. A schedule is proposed when the plan
-depends on fresh discovery — never default furniture. One stable wrapper
-(`scripts/autopilot_sweep.py`) so activation costs exactly one
-permission approval.
+**Runs when** a recurring search schedule triggers (`scripts/autopilot_sweep.py`).
 
-1. Run the standing plan **verbatim** — an unattended agent never
-   researches, never widens, never adds sources, never browses logged
-   in.
-2. Evaluate only clearly on-thesis hits; re-render the board.
-3. Keep the summary short. List prune candidates against the cap the
-   board and `criteria.md § Search settings` actually state — never a
-   default you assume — and say plainly that dismissals wait for the
-   candidate's batch confirm at the next attended session.
-4. Nothing new → say so and stop. A thin scheduled run reports the
-   evidence and waits for the next conversation.
+1. Execute standing `criteria.md § Search plan` verbatim without logged-in scraping or unauthorized widening.
+2. Add on-thesis hits at To Review; summarize results and list prune candidates without auto-dismissing.
 
-**Exits** with the summary and the prune candidates listed, nothing
-dismissed.
+**Exits** with summary delivered and prune candidates held for next attended session.
 
 ## State
 
-Owned: `jobs.md`, `companies.md`, `leads.md`, `criteria.json`,
-`jd-inbox/`, `autopilot-log.md` — shapes in `references/schema.md`. One
-write outside the manifest: `criteria.md § Search plan`, on the
-candidate's yes. `criteria.md` is otherwise INPUT only — findings never
-land there.
+Owned: `jobs.md`, `companies.md`, `leads.md`, `criteria.json`, `jd-inbox/`, `autopilot-log.md` (shapes in `references/schema.md`).
 
-**Hands back:** new To-Review rows → `evaluate`; a LinkedIn radar hit →
-`outreach` (contact + response, same pass); lifecycle questions on
-engaged rows → `coach`.
-
-**Session close:** the scripts have already validated every row they
-wrote; run `../profile/scripts/check_files.py --workspace .` for the
-manifest. No checker-subagent is spawned — search writes no
-candidate-voiced text. **The candidate sees results as outcomes, never
-narration**: clean is one line; FAILs are fixed, then named as fixed;
-WARNs are defended in the reply. Say what the workspace now holds —
-rows added, rows dismissed on confirm, plan written or revised.
+- **Hands back:** New To-Review rows → `evaluate`; radar hits → `outreach`.
+- **Session close:** Run `../profile/scripts/check_files.py --workspace .`. No checker-subagent is spawned (search writes no candidate-voiced text). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 
-- Never invent a role, a company, a count, or a signal. Research
-  carries a citation or it isn't research.
-- Aggregator URLs never sit on a pipeline role.
+- Never fabricate a listing, company, or metric. Every entry requires a verifiable citation.
+- Direct employer URLs only; no third-party spam aggregators.
 
-*Every reply ends with ONE contextual next step — a sentence with its
-why, not a menu.*
+*Every reply ends with ONE contextual next step — a sentence with its why, not a menu.*

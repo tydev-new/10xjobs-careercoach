@@ -1,9 +1,9 @@
 # Installing in Claude Code / Claude Cowork
 
 The repo is an installable plugin: the full skill pack (`profile`,
-`coach`, `search`, `evaluate`, `apply`, `outreach`, `positioning`,
-`storybank`, `prep`, `practice`, `learn`). All candidate data stays in a
-folder on your machine.
+`coach`, `search`, `evaluate`, `apply`, `outreach`, `storybank`,
+`interview`, `learn`). All candidate data stays in a folder on your
+machine.
 
 ## Option A — plugin marketplace
 

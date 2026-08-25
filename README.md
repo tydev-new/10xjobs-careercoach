@@ -11,17 +11,15 @@ Install: [`INSTALL.md`](INSTALL.md). Then, in a folder you choose:
 
 ## How it works
 
-Eleven skills, one workspace. Each skill owns a few files; the coach owns
+Unified skills, one workspace. Each skill owns a few files; the coach owns
 the plan. You never need to know the skills exist — three moves cover
 everything: **"what's next?"** (the coach reads the workspace and
 prescribes), **"do it"**, and **"here's what happened"**.
 
 ```
-groundwork ──── searching ──── applying ──── interviewing
-(profile,       (search,       (apply,       (prep, practice,
- storybank,      evaluate)      outreach)      storybank, learn)
- positioning,
- learn)
+groundwork ──── searching ──── applying ──── interviewing ──── deciding
+(profile,       (search,       (apply,       (interview,        (Rule 10
+ storybank)      evaluate)      outreach)      learn)           boundaries)
 ```
 
 What makes it a coach rather than a generator:

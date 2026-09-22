@@ -19,7 +19,8 @@ three:
 
 - in C, it runs in the browser tab
 - in A, its tools are exposed as the remote MCP server
-- in B, it runs headless in Node against any model OpenRouter serves
+- in B2, it runs headless in Node against any model OpenRouter serves (B1 needs
+  none of this; it uses the existing harness)
 - later, it runs on a server for scheduled search
 
 ---
@@ -257,10 +258,13 @@ conversation** (rule 12).
 1 ──┬── 2 ─────────┐
     ├── 3 ── 4 ────┼── 5b ── 6
     └── 5a ────────┘
+B1 ═══════════════════════════════ (from now; merges re-run step 4's parity)
+                   4 ── B2
 ```
 
-Steps 2, 3, and 5a run in parallel once step 1 exits. The critical path is
-1 → 3 → 4 → 5b → 6.
+Steps 2, 3, and 5a run in parallel once step 1 exits. B1 starts now. The
+critical path is 1 → 3 → 4 → 5b → 6. B1 is not on it, but every word it cuts
+lowers the cost per turn the MVP pays.
 
 ### Later steps
 
@@ -279,14 +283,55 @@ exposed as a remote MCP server (an Edge Function) and packaged per host.
 - [ ] for each host: it installs, authenticates, the scripted journey passes, and
       a conduct subset passes on that host's own model
 
-**Step B - Measured simplification.** The rule inventory can start now; the
-model matrix starts after step 4.
+**Step B1 - Simplify the skills on Claude models** · Ar (classify), Te
+(ablate), an independent reviewer per change · **starts now, in parallel with
+everything**
 
-- [ ] a rule inventory (Code / Policy / Capability / Craft) with receipts
-- [ ] per-rule ablation over the OpenRouter model matrix, judge pinned, at least 3
-      trials
-- [ ] an eval record in `docs/evals/`; rules deleted only where the **weakest
-      shipped model** still passes
+Uses the existing `tests/always-on` harness (`claude -p`). The runner is the
+MVP's default model; the judge stays pinned.
+
+1. **Inventory:** every rule in `SKILL.md` and `references/patterns.md` is
+   classified Code / Policy / Capability / Craft, with its receipt, in
+   `docs/evals/rule-inventory.md`. Only Capability and Craft go forward.
+2. **Run budget before running:** the inventory sizes the runs (rules × cases ×
+   3 trials) and **O approves the spend** (rule 5).
+3. **Ablate:** remove one rule (or one Craft section) and run its cases at
+   least 3 trials each. Delete it only if the pass rate without it is at least
+   the pass rate with it.
+4. **Goal-only arm:** each skill's `SKILL.md` cut down to the Goal table plus
+   exits. This gives the upper bound on how much can go.
+5. **Land in batches**, one skill at a time, each through the PROCESS ritual
+   (independent review, harness before and after).
+
+**Guardrails, so B1 cannot break steps 3 to 5 while they run in parallel:**
+
+- B1 diffs touch **only** `SKILL.md` and `references/patterns.md`. They never
+  touch `scripts/`, `schema.md`, `eval.md`, or Policy text: gates, rule 10,
+  honest numbers, and the Tier 0 interrupts that carry a data-safety receipt. A
+  check in `tests/run.py` fails a B1 branch that crosses this line.
+- Step 3 ports scripts, so it is unaffected.
+- Step 4's conduct parity compares the web runtime and `claude -p` **on the same
+  skills commit**. Every B1 batch merge re-runs that parity.
+
+**Exit:**
+
+- [ ] the rule inventory is done and the spend is approved
+- [ ] every Capability and Craft rule has an ablation result recorded in
+      `docs/evals/`
+- [ ] words loaded per turn (`python3 tests/word_report.py`) are measured
+      before and after
+- [ ] the falsifiable hypothesis (Part B) is marked held or failed, with numbers
+- [ ] `tests/run.py` is green and the invariants hold after every batch
+
+**Step B2 - Re-check on other models** · after step 4 (the headless runner) and
+per host in step A
+
+The B1-simplified skills run through the headless runner on the OpenRouter
+models you plan to offer, and through step A on each host's own model.
+
+- [ ] every model we ship to passes the conduct subset. A failure restores the
+      rule with a receipt naming that model, or drops the model. There are no
+      per-model skill copies (rule 12)
 
 **Step M - Migrate the existing WebUI users** (after step 6).
 

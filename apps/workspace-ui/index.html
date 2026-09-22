@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4efe4" />
+    <title>Ten Workspace</title>
+  </head>
+  <body>
+    <div id="root">
+      <main class="file-launch" hidden>
+        <span>Ten workspace preview</span>
+        <h1>Start the local preview first.</h1>
+        <p>This React source file cannot run directly through <code>file://</code>.</p>
+        <pre>cd apps/workspace-ui
+npm run preview</pre>
+        <p>Then open <strong>http://127.0.0.1:5173</strong>.</p>
+      </main>
+    </div>
+    <style>
+      .file-launch { max-width: 620px; margin: 12vh auto; padding: 48px; border: 1px solid #d9d0c0; border-radius: 18px 18px 18px 5px; background: #fbf8f1; color: #1f2925; box-shadow: 0 20px 60px rgba(45,43,36,.1); font-family: Georgia, serif; }
+      .file-launch > span { color: #bd6c34; font: 600 11px sans-serif; letter-spacing: .14em; text-transform: uppercase; }
+      .file-launch h1 { margin: 10px 0 14px; font-size: 38px; line-height: 1.08; }
+      .file-launch p { color: #657069; font: 15px/1.6 sans-serif; }
+      .file-launch pre { margin: 24px 0; padding: 18px; overflow-x: auto; border-radius: 9px; background: #23342e; color: #f3ead9; font: 14px/1.7 monospace; }
+      .file-launch code { font-family: monospace; }
+      @media (max-width: 680px) { .file-launch { margin: 5vh 16px; padding: 30px 24px; } .file-launch h1 { font-size: 30px; } }
+    </style>
+    <script>
+      if (window.location.protocol === "file:") {
+        document.querySelector(".file-launch").hidden = false;
+      }
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

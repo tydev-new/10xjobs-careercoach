@@ -1,0 +1,23 @@
+{
+  "name": "careercoach-codex",
+  "version": "0.1.0",
+  "description": "Use CareerCoach workspace context in Codex tasks.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "CareerCoach",
+    "shortDescription": "Review the active CareerCoach item in Codex.",
+    "longDescription": "Connects Codex tasks to the active item in a local CareerCoach workspace.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": [
+      "Review the CareerCoach item I just launched.",
+      "Prepare the active CareerCoach interview item.",
+      "Work on the active CareerCoach plan item."
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}

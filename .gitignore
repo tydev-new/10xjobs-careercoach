@@ -3,3 +3,5 @@ __pycache__/
 .DS_Store
 .claude/
 tests/always-on/results/
+node_modules/
+dist/

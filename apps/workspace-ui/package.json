@@ -1,0 +1,32 @@
+{
+  "name": "@10xjobs/workspace-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "preview": "vite --host 127.0.0.1",
+    "local": "TEN_WORKSPACE_ROOT=$HOME/job-search vite --host 127.0.0.1",
+    "mcp": "TEN_WORKSPACE_ROOT=$HOME/job-search node server/mcp-server.mjs",
+    "host:setup": "node scripts/print-host-setup.mjs",
+    "build": "vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "^5.2.6",
+    "@fontsource/fraunces": "^5.2.6",
+    "@modelcontextprotocol/server": "^2.0.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^25.0.1",
+    "vite": "^6.0.7",
+    "vitest": "^4.1.11"
+  }
+}

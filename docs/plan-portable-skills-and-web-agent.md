@@ -99,9 +99,9 @@ The contracts, written by Ar in `docs/design-web-agent.md`:
 - the MVP tool list
 - the list of checkers to port
 
-The design, by De: fixture-backed screens for chat plus workspace, the gate
-moment, the balance and cost-estimate display, empty and error states, and
-mobile.
+The design, by De: a wireframe of *The UI* (below), plus the **chat transport
+interface** and card fixture shapes, agreed with Ar, so 5a can start the moment
+this step exits.
 
 **Exit:**
 
@@ -157,11 +157,29 @@ same runner is what B needs.
 - [ ] a turn loads roughly the same words as `loading-map.md`'s ~3,000 (no
       bloat from the new loader)
 
-### Step 5 - The web app · De, Co, Te
+### Step 5a - The UI on a mock agent · De, Co, Te · starts once step 1's contracts are approved, runs in parallel with 2, 3, and 4
 
-The fixture screens from step 1 wired to the agent package in the browser; the
-Edge Function that mints and raises keys; the balance display; the cost estimate
-before big runs.
+The simplest functional UI (see *The UI* below), built against a **mock chat
+transport**. The mock replays scripted fixture conversations as the same AI SDK
+UI message stream the real agent emits: text, tool-call lines, cards, and a gate.
+The mock and the real transport implement one interface, so swapping them in 5b
+is a one-line change.
+
+**Exit:**
+
+- [ ] the whole MVP journey can be clicked through on the mock, on desktop and a
+      375px phone
+- [ ] every card type renders from fixtures: verdict, plan, document, checker
+      result, gate, cost estimate, error
+- [ ] the status indicator shows all five states from the stream (idle,
+      thinking, working, needs you, done)
+- [ ] the gate card cannot be approved by a button, only by a typed yes (rule 7)
+- [ ] **O approves** the look and flow on the mock
+
+### Step 5b - Wire to the real agent · Co, Te · after steps 2, 4, and 5a
+
+Swap the mock transport for the in-tab agent transport; add the Edge Function
+that mints and raises keys; the balance chip; the cost estimate before big runs.
 
 **Exit:**
 
@@ -169,10 +187,58 @@ before big runs.
       persona: sign up → upload résumé → profile intake → paste a job URL or text
       → evaluate verdict → tailored résumé and cover letter with the checker
       clean → download PDF → "what's next" written to `plan.md`
+- [ ] the diff from 5a is the transport swap plus key and balance wiring: no
+      screen rework
 - [ ] the client bundle holds no secret except the user's own OpenRouter key
 - [ ] going over the limit shows a clear message, not a broken loop
 - [ ] cost per journey is measured and written down (this sets pricing)
-- [ ] the screens match the approved fixtures (De signs off)
+
+### The UI - simplest functional, inspired by Grok Bot
+
+What to take from Grok Bot's published design: few core objects, one status
+indicator on the avatar instead of scattered spinners, structured cards in the
+transcript instead of prose-only replies, a pinned side panel that previews the
+agent's work without leaving the chat, and a record of what ran.
+
+What not to take: its roster of many bots. We have **one coach and one
+conversation** (rule 12).
+
+**One screen, two panes:**
+
+```
+┌───────────────────────────────────────────────┬──────────────────────────┐
+│ ◉ Ten · working            balance $4.20  ⋯   │  Side panel (pinned)     │
+├───────────────────────────────────────────────┤  the file Ten is on:     │
+│ you: here's the Acme posting (URL)            │  résumé · letter · plan  │
+│ ▸ ran evaluate · read jobs.md · web search ×3 │  · jobs · any workspace  │
+│ ┌ Verdict card ───────────────┐                │  file                    │
+│ │ Apply · 3 reasons · 1 risk  │                │                          │
+│ └─────────────────────────────┘                │  [Download PDF] [Export] │
+│ ┌ Document card: Acme résumé ─┐  → opens in side panel                    │
+│ │ checker ✓ clean · 2 pages   │                │                          │
+│ └─────────────────────────────┘                │                          │
+│ ┌ Needs your word ────────────┐                │                          │
+│ │ the complete thing + one sentence of what happens; type "yes"         │
+│ └─────────────────────────────┘                │                          │
+├───────────────────────────────────────────────┤                          │
+│ [ + ]  Message Ten…   /skills   paste a link   │                          │
+└───────────────────────────────────────────────┴──────────────────────────┘
+```
+
+- **Header:** the avatar with its five states (idle, thinking, working, needs
+  you, done; hover shows the current action), a balance chip, and a `⋯` menu for
+  export, sign out, and key.
+- **Transcript:** replies in plain prose, **cards** for structured results, and
+  collapsed **"ran …" lines** for tool calls that expand to show what ran and
+  what it returned (rule 11: the file, not the narration).
+- **Composer:** attach a file, `/` to pick a skill (optional; plain language
+  works), paste a link.
+- **Side panel:** views whichever workspace file the last card points at, with a
+  download button. On a phone it becomes a full-screen sheet.
+- **Nothing else in the MVP:** no settings pages, no dashboards, no separate
+  jobs or interview screens. The richer `apps/workspace-ui` views (jobs table,
+  interview prep) come back after the MVP, and only if dogfooding shows chat plus
+  cards isn't enough.
 
 ### Step 6 - Dogfood, closing review, private beta · L, Ar, O
 
@@ -181,9 +247,20 @@ before big runs.
 - [ ] **O completes the journey on real data** in their own account, with issues
       logged and fixed or accepted
 - [ ] Ar's closing drift review against the precedence chain is clean
-- [ ] every exit from steps 2 to 5 is still green
+- [ ] every exit from steps 2 to 5b is still green
 - [ ] the beta runs behind a flag; a migration plan for existing WebUI users is
       written (not run)
+
+### Order
+
+```
+1 ──┬── 2 ─────────┐
+    ├── 3 ── 4 ────┼── 5b ── 6
+    └── 5a ────────┘
+```
+
+Steps 2, 3, and 5a run in parallel once step 1 exits. The critical path is
+1 → 3 → 4 → 5b → 6.
 
 ### Later steps
 

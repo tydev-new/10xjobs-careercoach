@@ -504,14 +504,14 @@ usage, which equals the live key's remaining limit.
 |---|---|---|
 | `mint` | user session | if a key is live: disable it, read its usage, subtract it, delete it. Then create a key with `limit = balance_usd` and return it once |
 | `revoke` | user session | disable, read usage, subtract, delete (sign-out) |
-| `delete_account` | user session | `revoke`; delete everything under `users/{uid}/`; delete the rows and the auth user |
+| `delete_account` | user session | `revoke`; delete everything under `users/{uid}/`; delete the rows and the auth user. Unused beta credit is forfeited (owner, 2026-09-22); the confirmation says so plainly |
 | `raise` | **service role only** | add to `balance_usd`, and `PATCH` the live key's `limit` up by the same amount |
 
 - Endpoints: `POST`/`PATCH`/`DELETE /api/v1/keys[/{hash}]`. Row `accounts`:
   `user_id` · `balance_usd` · `key_hash` · `updated_at` (own row readable;
   only the function writes).
-- **Beta funding (PENDING OWNER):** an admin-set starter credit through
-  `raise`. There is no payment page. The first-run greeting is static UI text,
+- **Beta funding (owner, 2026-09-22):** a $5.00 starter credit per new user,
+  set by an admin through `raise`. There is no payment page. The first-run greeting is static UI text,
   not a `UIMessage`, and is never sent to the model. It says when the balance
   is $0.
 - **The browser holds** the user's key in memory only (fetched at run time,

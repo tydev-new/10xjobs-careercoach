@@ -33,10 +33,10 @@ Decoding lenses, fit algebra, and company research craft live in `references/pat
 **Runs when** candidate asks about a role or company, or other skills route for a missing analysis.
 
 1. **Near-match check:** Match against existing `jobs.md` rows before creating duplicates.
-2. **Dealbreaker gate:** Evaluate against `criteria.md § Dealbreakers` / `§ Compensation` / `§ Geo`. Hard hit $\rightarrow$ record DQ immediately (`../search/scripts/update_job.py dismiss --reason "dq: <quoted dealbreaker>"`) and stop before research spend.
+2. **Dealbreaker gate:** Evaluate against `criteria.md § Dealbreakers` / `§ Compensation` / `§ Geo`. Hard hit $\rightarrow$ record the DQ immediately (no row yet → create it first; exact commands in `references/patterns.md` step 2, "Dealbreakers") and stop before research spend.
 3. **Track assignment:** Assign track from `criteria.md § Targets` before judging.
 4. **Company research & Decode:** Research company signals and decode JD across the 6 lenses (`references/patterns.md`).
-5. **Verdict & Record:** Combine into final verdict tier (Strong / Solid / Stretch / Long-Shot / Weak). Record via `scripts/record_verdict.py`.
+5. **Verdict & Record:** Combine into final verdict tier — Strong Fit (`strong`) / Investable Stretch (`investable_stretch`) / Long-Shot Stretch (`long_shot`) / Weak Fit (`weak`). Record via `scripts/record_verdict.py --verdict <value>`.
 6. **Deliver summary card:** Present the evaluation card in chat (`references/schema.md § The summary card`).
 
 **Exits** with `jobs.md` row updated, analyses persisted to disk, and summary card delivered.

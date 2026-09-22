@@ -10,9 +10,12 @@ that a decode without it matches an unskilled read.
 1. **Intake.** The JD and the company name. A swept role's JD is
    already in `jd-inbox/` — read it from the row's `jd_file`.
 2. **Dealbreakers** (the sequence's rule 2). Two steps for a pasted
-   role with no row: `record_verdict.py` with verdict `weak`, score 0,
-   reasons `dq: <quote>` (creates the row), then `update_job.py
-   dismiss`, same reason — the script's four tiers stay untouched.
+   role with no row: `scripts/record_verdict.py --workspace . --company
+   <company> --title <title> --verdict weak --score 0 --reasons
+   "dq: <quote>"` (creates the row), then `../../search/scripts/update_job.py
+   --workspace . --company <company> --title <title> --dismiss --reason
+   "dq: <quote>"`, same reason — the script's four tiers stay untouched.
+   An existing row (already swept) skips straight to the second command.
 3. **Assign the track** (rule 3): judge against that track's lens — a
    Track-B transformation role is not scored on the Track-A template.
 4. **Company research.** `company/<slug>.md` exists → staleness: under

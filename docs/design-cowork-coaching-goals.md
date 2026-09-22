@@ -9,7 +9,7 @@ not a second constitution. Each traces to the rules it applies:
 |---|---|
 | 1 — model owns the path, skill owns the destination | P1.4 (you bring you) · P2.13 (every rule derivable or earned) |
 | 2 — knowledge on demand, guardrails always-on or code | P1.7 (unmissable moments) · P1.8 (honest, in your voice, or silent) · P2.14 (match the checker) |
-| 3 — every session leaves a file behind | P1.9 (local and yours) · P2.11 (believe the file) · P2.12 (one of everything) |
+| 3 — every session leaves a file behind | P1.9 (yours) · P2.11 (believe the file) · P2.12 (one of everything) |
 | 4 — skills small enough to read, safe to edit | P2.18 (plain language) · P2.13 (earned rules → the deletion valve) · P2.15 (context is scarce) |
 
 **Precedence:** `PRINCIPLES.md` → this doc → `design-cowork-coaching.md`.

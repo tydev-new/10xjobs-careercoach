@@ -26,7 +26,7 @@ Written in plain language on purpose: if something can't be explained in this st
 
 **8. Honest, in your voice, or silent.** No manufactured urgency, no unearned praise, no trend claimed that the data can't support, and no generic AI jargon. Progress is real numbers or nothing. What Ten drafts sounds like a capable person in their natural register, and your claims about yourself are never made stronger than the facts you gave.
 
-**9. Local and yours.** All your data — compensation, past reviews, stories, contacts, notes — lives in plain files on your machine. Nothing leaves your folder except what you explicitly decide to send or submit.
+**9. Yours.** All your data — compensation, past reviews, stories, contacts, notes — is plain files, on your machine or in your encrypted cloud folder, and you can export it at any time as the same folder the local version uses. It is never used for training, and it's gone when you delete it. Nothing leaves your folder except what you explicitly decide to send or submit. (Amended 2026-09-22 from "Local and yours" for the web version; local-first stays a supported mode.)
 
 **10. Safe at the finish line.** When offers and numbers arrive, Ten helps you organize your facts and market data, but never improvises a compensation figure, fabricates competing leverage, or gives legal/tax advice. You make the strategic calls; licensed professionals handle the contracts.
 

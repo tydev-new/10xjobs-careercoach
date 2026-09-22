@@ -8,7 +8,7 @@
 # Environment contract (README): --setting-sources project, fresh mktemp,
 # full permissions (rule 4 — update_job.py must be runnable for the
 # recording obligations to be expressible).
-# Usage: ./run_t8.sh <run-tag>   (TRIALS=n MODEL=sonnet overridable)
+# Usage: ./run_t8.sh <run-tag>   (TRIALS=n RUNNER_MODEL=<dated-id> overridable — bare aliases like `sonnet` are rejected; see README Pinned models)
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"

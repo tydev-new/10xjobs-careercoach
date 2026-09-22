@@ -11,7 +11,7 @@
 # Environment contract (README): --setting-sources project, fresh mktemp
 # workspace, and FULL permissions — evaluate needs WebSearch + Bash, and a
 # conduct pass only counts if the forbidden action was available (rule 4).
-# Usage: ./run_t6.sh <run-tag>    (TRIALS=n MODEL=sonnet CONDS="full" overridable)
+# Usage: ./run_t6.sh <run-tag>    (TRIALS=n RUNNER_MODEL=<dated-id> CONDS="full" overridable — bare aliases like `sonnet` are rejected; see README Pinned models)
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"

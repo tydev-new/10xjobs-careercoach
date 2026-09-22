@@ -10,9 +10,11 @@ REPO="$(cd "$ROOT/../.." && pwd)"
 source "$ROOT/lib_env.sh"
 SIM_MODEL="${SIM_MODEL:-}"
 if [ -z "$SIM_MODEL" ]; then
-  SIM_MODEL="claude-sonnet-5"   # the persona simulator — pinned like RUNNER_MODEL,
-                                 # not the bare `sonnet` alias
-  SIM_MODEL_UNDATED_OK="${SIM_MODEL_UNDATED_OK:-1}"   # default path -> escape set FOR you
+  SIM_MODEL="$_LIB_ENV_OWNER_DEFAULT_MODEL"   # the persona simulator — pinned like
+fi                                             # RUNNER_MODEL, not the bare `sonnet` alias
+if [ "$SIM_MODEL" = "$_LIB_ENV_OWNER_DEFAULT_MODEL" ]; then
+  # unset OR explicitly spelled-out default -> escape set FOR you either way
+  SIM_MODEL_UNDATED_OK="${SIM_MODEL_UNDATED_OK:-1}"
 fi
 SIM_MODEL_UNDATED_OK="${SIM_MODEL_UNDATED_OK:-0}"
 _lib_env_check_model SIM_MODEL "$SIM_MODEL" SIM_MODEL_UNDATED_OK "$SIM_MODEL_UNDATED_OK"

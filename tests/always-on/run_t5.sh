@@ -6,7 +6,7 @@
 #
 # Fresh-session isolation per the environment contract (README):
 # --setting-sources project + only the search skill, project-local.
-# Usage: ./run_t5.sh <run-tag>     (TRIALS=n, MODEL=sonnet overridable)
+# Usage: ./run_t5.sh <run-tag>     (TRIALS=n, RUNNER_MODEL=<dated-id> overridable — bare aliases like `sonnet` are rejected; see README Pinned models)
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"

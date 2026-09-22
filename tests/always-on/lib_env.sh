@@ -91,13 +91,34 @@ _lib_env_check_model() {
   exit 2
 }
 
+# The owner-named default. Spelling this out explicitly must be treated
+# EXACTLY like leaving RUNNER_MODEL/SIM_MODEL unset — both get the escape
+# set FOR you and recorded as undated_ok=1. Any OTHER undated id still needs
+# the caller's own explicit *_UNDATED_OK=1.
+_LIB_ENV_OWNER_DEFAULT_MODEL="claude-sonnet-5"
+
+# Caller is a judge script (judge_*.sh) if true. Judges don't use
+# RUNNER_MODEL/MODEL at all (they only ever pass $JUDGE_MODEL to `claude`),
+# so they must not be forced through its dated-or-escape validation.
+_lib_env_caller_is_judge() {
+  case "$(basename "${0:-}")" in
+    judge_*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 RUNNER_MODEL="${RUNNER_MODEL:-${MODEL:-}}"
 if [ -z "$RUNNER_MODEL" ]; then
-  RUNNER_MODEL="claude-sonnet-5"
-  RUNNER_MODEL_UNDATED_OK="${RUNNER_MODEL_UNDATED_OK:-1}"   # default path -> escape set FOR you
+  RUNNER_MODEL="$_LIB_ENV_OWNER_DEFAULT_MODEL"
+fi
+if [ "$RUNNER_MODEL" = "$_LIB_ENV_OWNER_DEFAULT_MODEL" ]; then
+  # unset OR explicitly spelled-out default -> escape set FOR you either way
+  RUNNER_MODEL_UNDATED_OK="${RUNNER_MODEL_UNDATED_OK:-1}"
 fi
 RUNNER_MODEL_UNDATED_OK="${RUNNER_MODEL_UNDATED_OK:-0}"
-_lib_env_check_model RUNNER_MODEL "$RUNNER_MODEL" RUNNER_MODEL_UNDATED_OK "$RUNNER_MODEL_UNDATED_OK"
+if ! _lib_env_caller_is_judge; then
+  _lib_env_check_model RUNNER_MODEL "$RUNNER_MODEL" RUNNER_MODEL_UNDATED_OK "$RUNNER_MODEL_UNDATED_OK"
+fi
 MODEL="$RUNNER_MODEL"   # back-compat: every existing script reads $MODEL
 
 RUNNER_SKILLS_DIR="${RUNNER_SKILLS_DIR:-$REPO/skills}"
@@ -191,10 +212,14 @@ snapshot_and_record_run_info() {
 
   prev="$(last_record "$results/run-info.txt")"
   if [ -n "$prev" ]; then
-    local prev_model prev_dir prev_hash
+    local prev_model prev_dir prev_hash prev_judge_dir
     prev_model="$(_field "$prev" runner_model)"
     prev_dir="$(_field "$prev" runner_skills_dir)"
     prev_hash="$(_field "$prev" skills_hash)"
+    # the OLD snapshot's REAL path: read from the previous record's own
+    # judge_skills_dir field, never rebuilt from THIS invocation's commit —
+    # a rebuilt path silently gives the wrong path across a commit change.
+    prev_judge_dir="$(_field "$prev" judge_skills_dir)"
     if [ "$prev_model" != "$RUNNER_MODEL" ] || [ "$prev_dir" != "$RUNNER_SKILLS_DIR" ]; then
       echo "WARN: $results is a REUSED tag whose runner config just changed:" >&2
       echo "      was runner_model=$prev_model runner_skills_dir=$prev_dir" >&2
@@ -204,8 +229,28 @@ snapshot_and_record_run_info() {
     if [ "$prev_hash" != "$hash" ]; then
       echo "WARN: $results is a REUSED tag whose skills content just changed" >&2
       echo "      (was skills_hash=$prev_hash, now skills_hash=$hash) — a NEW snapshot" >&2
-      echo "      was taken. Earlier trials in this tag were judged against the OLD" >&2
-      echo "      snapshot ($results/_skills-snapshot-$commit-$prev_hash), not this one." >&2
+      echo "      was taken at $snap." >&2
+      echo "      The OLD snapshot earlier trials in this tag were judged against is" >&2
+      echo "      ${prev_judge_dir:-<unknown: no judge_skills_dir on the previous record>}." >&2
+      echo "      From here on, a judge run against $results grades ALL trials in the" >&2
+      echo "      tag — including the earlier ones — against the NEW snapshot, not the" >&2
+      echo "      one they actually ran under. Pick a fresh tag for a clean measurement." >&2
+    fi
+    # Any OTHER extra field (e.g. t19's sim_model) that differs from the
+    # previous record's own value WARNs the same way the fields above do —
+    # a reused tag mixing two simulator models is just as mixed a config.
+    if [ -n "$extra" ]; then
+      local kv k v pv
+      for kv in $extra; do
+        k="${kv%%=*}" v="${kv#*=}"
+        pv="$(_field "$prev" "$k")"
+        if [ -n "$pv" ] && [ "$pv" != "$v" ]; then
+          echo "WARN: $results is a REUSED tag whose $k just changed:" >&2
+          echo "      was $k=$pv" >&2
+          echo "      now  $k=$v" >&2
+          echo "      Existing case results in this tag came from the OLD config." >&2
+        fi
+      done
     fi
   fi
   printf 'ts=%s commit=%s dirty=%s skills_hash=%s runner_model=%s runner_model_undated_ok=%s runner_skills_dir=%s judge_skills_dir=%s%s\n' \
@@ -266,27 +311,67 @@ resolve_and_record_judge_info() {
     "$(now)" "$JUDGE_MODEL" "${JUDGE_MODEL_UNDATED_OK:-0}" "$JUDGE_SKILLS_DIR" >> "$results/judge-info.txt"
 }
 
-# Best-effort: record the `model` field the Claude CLI's stream-json/json
-# output actually says it served, next to each result — a served id can
-# differ from what was requested (fallback, alias resolution). UNTESTED
+# Best-effort: record the model the Claude CLI's stream-json output actually
+# SERVED, next to each result — a served id can differ from what was
+# requested (fallback, alias resolution). The SERVED model is read from
+# `message.model` on "type":"assistant" lines (the last one, so a mid-stream
+# fallback wins over an earlier value) — that is what the API actually
+# returned content from. If no assistant line carries a model (e.g. an
+# errored/empty stream), falls back to the init line's `model` field,
+# labelled `configured:` so it is never presented as served. UNTESTED
 # against a real API response in this fix (no spend) — implemented
-# defensively: any parse miss writes UNKNOWN rather than failing the run.
-#   $1 = glob prefix for this case's *.stream.json files, e.g. "$out"
-#        matches "$out.stream.json", "$out.turn1.stream.json", etc.
+# defensively: any parse miss (bad JSON, missing field, python3 crash)
+# writes UNKNOWN rather than failing the run, and this is safe to call
+# under `set -euo pipefail` (no unguarded pipeline; the python3 call's exit
+# status is caught explicitly, not left to propagate).
+#   $1 = prefix for this case's *.stream.json files, e.g. "$out" matches
+#        "$out.stream.json" and "$out.turnN.stream.json" — NOT a longer
+#        sibling tag's files (a bare "$prefix"*.stream.json glob would also
+#        match "${prefix}0.stream.json", so e.g. prefix ".../a-t1" would
+#        wrongly sweep up ".../a-t10.stream.json"; the separating "." is
+#        required between the prefix and whatever follows).
 # Judge scripts do NOT call this: they invoke `claude -p` with the default
 # text output (their prompt asks the model to print a bare JSON verdict,
 # captured as-is), not --output-format json/stream-json, so no CLI-level
 # `model` field is present to extract without changing that capture shape
 # — out of scope for this fix.
 record_served_models() {
-  local prefix="$1" f m dest
+  local prefix="$1" f out dest
   dest="${prefix}.served-model.txt"
   : > "$dest"
-  for f in "$prefix"*.stream.json; do
+  for f in "$prefix.stream.json" "$prefix".*.stream.json; do
     [ -f "$f" ] || continue
-    m="$(grep -o '"model"[[:space:]]*:[[:space:]]*"[^"]*"' "$f" 2>/dev/null | head -1 \
-          | sed -E 's/.*"([^"]+)"$/\1/')"
-    printf '%s: %s\n' "$(basename "$f")" "${m:-UNKNOWN}" >> "$dest"
+    out="$(python3 -c '
+import json, sys
+model = None
+configured = None
+for line in open(sys.argv[1], encoding="utf-8"):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        ev = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    if not isinstance(ev, dict):
+        continue
+    t = ev.get("type")
+    if t == "assistant":
+        m = (ev.get("message") or {}).get("model")
+        if m:
+            model = m   # last assistant line wins
+    elif t == "system" and configured is None:
+        m = ev.get("model")
+        if m:
+            configured = m
+if model:
+    print("served:" + model)
+elif configured:
+    print("configured:" + configured)
+else:
+    print("UNKNOWN")
+' "$f" 2>/dev/null)" || out="UNKNOWN"
+    printf '%s: %s\n' "$(basename "$f")" "${out:-UNKNOWN}" >> "$dest"
   done
 }
 

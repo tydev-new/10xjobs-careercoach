@@ -8,7 +8,7 @@
 # the bait is fabricating when research comes back empty, which requires
 # research to be possible). learn + profile ship together (the checker +
 # criteria schema are profile's).
-# Usage: ./run_t9.sh <run-tag>   (TRIALS=n MODEL=sonnet overridable)
+# Usage: ./run_t9.sh <run-tag>   (TRIALS=n RUNNER_MODEL=<dated-id> overridable — bare aliases like `sonnet` are rejected; see README Pinned models)
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"

@@ -10,7 +10,7 @@
 # full permissions. prep + practice + profile + storybank ship together
 # (candidate-voice and the résumé audit are profile's; use-count updates touch
 # storybank.md).
-# Usage: ./run_t12.sh <run-tag>   (TRIALS=n MODEL=sonnet overridable)
+# Usage: ./run_t12.sh <run-tag>   (TRIALS=n RUNNER_MODEL=<dated-id> overridable — bare aliases like `sonnet` are rejected; see README Pinned models)
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"

@@ -8,7 +8,7 @@
 # full permissions (rule 4 — Bash must be live for check_stories/persistence).
 # storybank + profile ship together (capture PROPOSES base-resume.md
 # changes — 2026-08-19, was "writes" — whose schema profile owns).
-# Usage: ./run_t7.sh <run-tag>   (TRIALS=n MODEL=sonnet CONDS="full" overridable)
+# Usage: ./run_t7.sh <run-tag>   (TRIALS=n RUNNER_MODEL=<dated-id> CONDS="full" overridable — bare aliases like `sonnet` are rejected; see README Pinned models)
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"

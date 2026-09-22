@@ -1,8 +1,9 @@
 {
   "meta": {
     "persona": "none yet — a brand-new sign-in with no workspace files",
-    "description": "The empty / first-run state per design-web-ui.md § 1.5: one plain-text agent message, no cards, idle avatar (statusOf returns idle because nothing has run yet this session), empty side panel. No manufactured welcome enthusiasm."
+    "description": "The empty / first-run state per design-web-ui.md § 1.5: one plain-text agent message, no cards, idle avatar (statusOf returns idle because nothing has run yet this session), empty side panel. No manufactured welcome enthusiasm. Round 4: fixture is {meta, files, messages} (N5) — files is empty, since no workspace exists yet."
   },
+  "files": {},
   "messages": [
     {
       "id": "m1",

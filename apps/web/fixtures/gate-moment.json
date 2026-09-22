@@ -1,9 +1,9 @@
 {
   "meta": {
     "persona": "Priya Nakamura (invented) — priya.nakamura.demo@example.com, 555-0177",
-    "description": "Round 3 (coordinator fix, citing design-web-agent.md § 3 and gate-grammar.md:12): the spend gate line is now copied word for word from gate-grammar.md with the amount filled in from estimate_cost's highUsd (the upper end of the range, per § 4). Two scenarios: (1) a spend that FITS inside the candidate's balance and is over the (still owner-open) threshold — the only kind of spend a gate can actually approve, since a spend over the balance would just be stopped mid-run by the per-user key's own credit limit regardless of a yes; exercises the no-button path (a non-yes reply leaves the gate pending) and the typed yes that approves it, each shown as its own data-gate-status part per § 3's 'status lives in the gate_log row, not the message'. (2) A cost that exceeds the balance — shown as a cost card plus a data-error (over_balance), never as a gate, consistent with over-limit-error.json.",
-    "spendGateUsd_placeholder": "$0.50 — LABELLED PLACEHOLDER ONLY, used to decide needsGate in this fixture's own math; design-web-agent.md § 4 states the real spendGateUsd is PENDING OWNER. Never shown to the candidate as policy."
+    "description": "Round 4 (docs/reviews/step1-rereview.md, lead decisions settled by the coordinator): fixture is {meta, files, messages} (N5); request_gate is merged into estimate_cost — there is no separate tool-request_gate call, code opens the spend gate itself the moment estimate_cost returns needsGate: true, with label = the tool's own `action` input. The invented over-balance pre-check path (a cost that exceeds the balance skipping straight to a data-error before anything ran) is deleted (N3) — the contract has no such rule; a real over-balance data-error only ever comes from an actual OpenRouter rejection mid-run, which is what over-limit-error.json now shows instead. Also removed: the claim that the agent 'can look at their LinkedIn pages' (N2 — the app has no browsing tool and every step costs money)."
   },
+  "files": {},
   "messages": [
     {
       "id": "m1",
@@ -26,16 +26,13 @@
           "highUsd": 0.70,
           "balanceUsd": 4.20
         } } },
-        { "type": "tool-request_gate", "toolCallId": "call-2", "state": "output-available",
-          "input": { "kind": "spend", "amountUsd": 0.70, "label": "Evaluate 6 saved roles", "text": "Evaluate the 6 roles you saved this week: JD decode plus company research for each, verdict recorded in jobs.md." },
-          "output": { "gateId": "gate-priya-1" } },
         { "type": "data-gate", "data": {
           "gateId": "gate-priya-1",
           "kind": "spend",
-          "label": "Evaluate 6 saved roles",
-          "text": "Evaluate the 6 roles you saved this week: JD decode plus company research for each, verdict recorded in jobs.md. Estimated cost: $0.50–$0.70.",
-          "textHash": "sha256:3c9e1f6a7b2d4c5e8f0916273a4b5c6d7e8f0916273a4b5c6d7e8f0916273a4",
-          "gateLine": "This spends $0.70 — confirm before I commit it.",
+          "label": "evaluate 6 saved roles",
+          "text": "evaluate 6 saved roles. Estimated cost: $0.50–$0.70.",
+          "textHash": "sha256:9ffe1334bb19e8c6c3640ba9d22dabae6240773832d877b793d9cb14728bc1ed",
+          "gateLine": "This costs up to $0.70 — nothing starts until you say yes.",
           "amountUsd": 0.70
         } },
         { "type": "data-gate-status", "data": { "gateId": "gate-priya-1", "status": "pending" } }
@@ -46,15 +43,25 @@
       "role": "user",
       "metadata": { "origin": "typed" },
       "parts": [
-        { "type": "text", "text": "actually can you check their LinkedIn pages before you start?" }
+        { "type": "text", "text": "wait, what if I only did 5 of them instead of 6?" }
       ]
     },
     {
       "id": "m4",
       "role": "assistant",
       "parts": [
-        { "type": "text", "text": "That wasn't a yes, so gate-priya-1 is still pending and nothing started — good, since it was actually a different request. I can look at their LinkedIn pages without spending from this run. Want me to do that first, or say yes to start the $0.70 evaluation?" },
-        { "type": "data-gate-status", "data": { "gateId": "gate-priya-1", "status": "pending" } }
+        { "type": "text", "text": "That wasn't a yes, so gate-priya-1 is still pending and nothing started." },
+        { "type": "data-gate-status", "data": { "gateId": "gate-priya-1", "status": "pending" } },
+        { "type": "tool-estimate_cost", "toolCallId": "call-2", "state": "output-available",
+          "input": { "steps": 15, "webSearches": 15, "action": "evaluate 5 saved roles" },
+          "output": { "lowUsd": 0.35, "highUsd": 0.48, "balanceUsd": 4.20, "needsGate": false, "method": "steps × per-step cost measured so far this chat (median for lowUsd, highest for highUsd); web searches at the plugin's listed price" } },
+        { "type": "data-card", "data": { "card": "cost", "props": {
+          "action": "evaluate 5 saved roles",
+          "lowUsd": 0.35,
+          "highUsd": 0.48,
+          "balanceUsd": 4.20
+        } } },
+        { "type": "text", "text": "5 comes to $0.35–$0.48, under the threshold, so that one needs no gate at all. The 6-role gate above is still open if you want all 6 — say yes to that one, or tell me to go ahead with 5." }
       ]
     },
     {
@@ -70,36 +77,7 @@
       "role": "assistant",
       "parts": [
         { "type": "data-gate-status", "data": { "gateId": "gate-priya-1", "status": "approved" } },
-        { "type": "text", "text": "Starting on the 6 roles now." }
-      ]
-    },
-    {
-      "id": "m7",
-      "role": "user",
-      "metadata": { "origin": "typed" },
-      "parts": [
-        { "type": "text", "text": "and once that's done, can you also prepare full applications for my top 5 roles?" }
-      ]
-    },
-    {
-      "id": "m8",
-      "role": "assistant",
-      "parts": [
-        { "type": "tool-estimate_cost", "toolCallId": "call-3", "state": "output-available",
-          "input": { "steps": 40, "webSearches": 15, "action": "prepare 5 applications" },
-          "output": { "lowUsd": 1.80, "highUsd": 2.10, "balanceUsd": 0.90, "needsGate": true, "method": "steps × per-step cost measured so far this chat (median for lowUsd, highest for highUsd); web searches at the plugin's listed price" } },
-        { "type": "data-card", "data": { "card": "cost", "props": {
-          "action": "prepare 5 applications",
-          "lowUsd": 1.80,
-          "highUsd": 2.10,
-          "balanceUsd": 0.90
-        } } },
-        { "type": "data-error", "data": {
-          "code": "over_balance",
-          "message": "Your balance is $0.90 — this run is estimated at $1.80–$2.10, more than you have.",
-          "retryable": false
-        } },
-        { "type": "text", "text": "I didn't open a spend gate for this one — even with a yes, a run over your balance would just stop mid-way once your key hits its limit. Add funds and I'll pick up from here." }
+        { "type": "text", "text": "Starting on the 6 roles now — that's the gate your yes confirmed. Say so if you'd rather I stopped at 5." }
       ]
     }
   ]

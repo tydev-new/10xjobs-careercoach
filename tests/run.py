@@ -11,7 +11,9 @@ sys.path.insert(0, os.path.join(HERE, "..", "skills", "profile", "scripts"))
 
 passed = failed = 0
 KIT = os.path.join(HERE, "..", "kit", "tests")
-sys.path.insert(0, KIT)
+# append, never insert: kit/tests has its own test_invariants.py, and a
+# front-of-path KIT silently shadowed this repo's (found 2026-09-22).
+sys.path.append(KIT)
 paths = sorted(glob.glob(os.path.join(HERE, "test_*.py")))
 paths += [os.path.join(KIT, "test_kit.py")]          # the kit's guarded copies
 for path in paths:

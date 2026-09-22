@@ -113,3 +113,46 @@ def test_no_reference_restates_a_loop_rule_verbatim():
         refs = " ".join(" ".join(read(skill, "references", r).split()) for r in ("eval.md", "schema.md", "patterns.md"))
         dupes = [s for s in sentences if s in refs]
         assert not dupes, f"{skill}: restated in a reference: {dupes[0][:90]!r}"
+
+
+# Shipped code holds no candidate data (CLAUDE.md: "candidate data never
+# enters the repo"). The failure it prevents: one-off agent scripts with a
+# hardcoded workspace path and the candidate's contact block were left
+# untracked under skills/*/scripts/ on 2026-09-22, one `git add -A` from a
+# public push and one `cp -r skills/*` from the deployed copy.
+PII = re.compile(
+    r"/Users/[A-Za-z]|/home/[a-z]+/"                           # a real home path
+    r"|[A-Za-z0-9._%+-]+@(?!example\.)[A-Za-z0-9.-]+\.[a-z]{2,}"  # an email
+    r"|\(?\b\d{3}\)?[-. ]\d{3}[-. ]\d{4}\b"                   # a phone number
+    r"|linkedin\.com/in/[A-Za-z0-9-]+"                        # a profile URL
+)
+SHIPPED = ("skills", "plugins", "kit", ".claude-plugin", "apps")
+SKIP_DIRS = {"node_modules", "dist", "__pycache__"}
+
+
+def pii_hits(text):
+    return [m.group(0) for m in PII.finditer(text)]
+
+
+def test_pii_pattern_catches_the_known_shapes():
+    for bad in ('WORKSPACE = "/Users/someone/job-search"', "jane.doe@gmail.com",
+                "212.555.0143", "(415) 555-0100", "linkedin.com/in/janedoe"):
+        assert pii_hits(bad), bad
+    assert not pii_hits("jane@example.com, $HOME/job-search, 2026-09-22")
+
+
+def test_no_candidate_data_in_shipped_files():
+    hits = []
+    for top in SHIPPED:
+        for dirpath, dirs, files in os.walk(os.path.join(ROOT, top)):
+            dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+            for f in files:
+                if f == "package-lock.json" or f == ".DS_Store":
+                    continue
+                p = os.path.join(dirpath, f)
+                try:
+                    text = open(p, encoding="utf-8").read()
+                except (UnicodeDecodeError, OSError):
+                    continue
+                hits += [f"{os.path.relpath(p, ROOT)}: {h}" for h in pii_hits(text)]
+    assert not hits, "candidate data in shipped files:\n" + "\n".join(hits[:20])

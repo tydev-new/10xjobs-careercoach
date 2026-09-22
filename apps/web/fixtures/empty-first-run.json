@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "persona": "none yet — a brand-new sign-in with no workspace files",
+    "description": "The empty / first-run state per design-web-ui.md § 1.5: one plain-text agent message, no cards, idle avatar (statusOf returns idle because nothing has run yet this session), empty side panel. No manufactured welcome enthusiasm."
+  },
+  "messages": [
+    {
+      "id": "m1",
+      "role": "assistant",
+      "parts": [
+        { "type": "text", "text": "I don't have anything of yours yet. Drop in a resume, or tell me the job you're going for, and I'll start your workspace." }
+      ]
+    }
+  ]
+}

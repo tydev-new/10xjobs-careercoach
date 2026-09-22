@@ -1,0 +1,19 @@
+{
+  "name": "spike-1-browser-loop",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "ai": "7.0.111",
+    "@openrouter/ai-sdk-provider": "3.1.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.0",
+    "playwright": "1.63.0"
+  }
+}

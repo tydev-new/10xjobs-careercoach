@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "persona": "Deshawn Whitfield (invented) — deshawn.whitfield.demo@example.com, 555-0163",
+    "description": "The tailored resume fails check_materials.py on the first pass (a non-verbatim bullet). Shows the document card in a failed state plus the checker card detail, and the agent fixing it on its own next turn without asking the candidate to act (rule 3). Round 2: both check_materials.py runs and the render_resume.py run below are REAL stdout/exitCode, captured by running the actual scripts against a temp workspace with this invented persona (B8) — the FAIL message, the word count, and the 'no page count' behavior (render_resume prints only words, since --pdf is ignored) are exactly what the scripts print, not invented text.",
+    "note_round4": "Coordinator fix: card props now match design-web-agent.md § 6.2 field for field. The FAIL round gets ONLY a checker card (label/name/status/failCount/warnCount/findings) — no document card, because § 6.2 says a document card only exists once render_resume.py has actually run, exit 0; the bad version never got rendered. The clean round gets a checker card (status pass) plus a document card ({words, htmlPath, checker} only — no title/filePath/kind/checkerSummary, none of which the table sources)."
+  },
+  "messages": [
+    {
+      "id": "m1",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "tailor my resume for the Brightline Data Eng Lead role" }
+      ]
+    },
+    {
+      "id": "m2",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-read_file", "toolCallId": "call-1", "state": "output-available",
+          "input": { "path": "base-resume.md" },
+          "output": { "path": "base-resume.md", "content": "# Deshawn Whitfield…", "version": "1", "readOnly": false } },
+        { "type": "tool-read_file", "toolCallId": "call-2", "state": "output-available",
+          "input": { "path": "jd-analysis/brightline-data-eng-lead.md" },
+          "output": { "path": "jd-analysis/brightline-data-eng-lead.md", "content": "…", "version": "1", "readOnly": false } },
+        { "type": "tool-write_file", "toolCallId": "call-3", "state": "output-available",
+          "input": { "path": "applications/brightline-data-eng-lead-resume.md", "content": "# Deshawn Whitfield\n\ndeshawn.whitfield.demo@example.com · 555-0163\n\n## Summary\nData engineering lead with 7 years scaling pipelines for consumer analytics platforms.\n\n## Selected Experience\n\n### Data Engineering Lead, Nightfall Analytics (2020-2026)\n- Scaled the data platform to 4x throughput while cutting infra spend by consolidating pipelines\n- Cut warehouse spend by consolidating four redundant ETL jobs into one\n\n## Education\nBS Computer Science, State University" },
+          "output": { "path": "applications/brightline-data-eng-lead-resume.md", "version": "1" } },
+        { "type": "tool-bash", "toolCallId": "call-4", "state": "output-available",
+          "input": { "command": "python3 apply/scripts/check_materials.py --workspace . --resume applications/brightline-data-eng-lead-resume.md --base base-resume.md" },
+          "output": { "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME brightline-data-eng-lead-resume.md: FAIL (1 fail, 0 warn)\n  [FAIL] Experience bullet not verbatim from base: \"Scaled the data platform to 4x throughput while cutting infra spend by…\" — patterns.md: selection is the tailoring. A JD-vocabulary rewording is allowed only when the candidate approved it and it is declared in § Reworded (base: / tailored: pair)\n\n✘ fix the FAILs before delivering", "stderr": "", "exitCode": 1, "changed": [] } },
+        { "type": "data-card", "data": { "card": "checker", "ref": "applications/brightline-data-eng-lead-resume.md", "props": {
+          "label": "RESUME",
+          "name": "brightline-data-eng-lead-resume.md",
+          "status": "FAIL",
+          "failCount": 1,
+          "warnCount": 0,
+          "findings": [
+            { "level": "FAIL", "message": "Experience bullet not verbatim from base: \"Scaled the data platform to 4x throughput while cutting infra spend by…\" — patterns.md: selection is the tailoring. A JD-vocabulary rewording is allowed only when the candidate approved it and it is declared in § Reworded (base: / tailored: pair)" }
+          ]
+        } } },
+        { "type": "text", "text": "First pass didn't hold — I reworded a bullet without your sign-off. Fixing it myself, no need to look yet." },
+        { "type": "tool-write_file", "toolCallId": "call-5", "state": "output-available",
+          "input": { "path": "applications/brightline-data-eng-lead-resume.md", "content": "# Deshawn Whitfield\n\ndeshawn.whitfield.demo@example.com · 555-0163\n\n## Summary\nData engineering lead with 7 years scaling pipelines for consumer analytics platforms.\n\n## Selected Experience\n\n### Data Engineering Lead, Nightfall Analytics (2020-2026)\n- Rebuilt the ingestion pipeline to handle 3x the event volume without adding headcount\n- Cut warehouse spend by consolidating four redundant ETL jobs into one\n\n## Education\nBS Computer Science, State University" },
+          "output": { "path": "applications/brightline-data-eng-lead-resume.md", "version": "2" } },
+        { "type": "tool-bash", "toolCallId": "call-6", "state": "output-available",
+          "input": { "command": "python3 apply/scripts/check_materials.py --workspace . --resume applications/brightline-data-eng-lead-resume.md --base base-resume.md" },
+          "output": { "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME brightline-data-eng-lead-resume.md: pass (0 fail, 0 warn)\n\n✔ mechanical checks clean", "stderr": "", "exitCode": 0, "changed": [] } },
+        { "type": "tool-bash", "toolCallId": "call-7", "state": "output-available",
+          "input": { "command": "python3 apply/scripts/render_resume.py --md applications/brightline-data-eng-lead-resume.md --html applications/brightline-data-eng-lead-resume.html" },
+          "output": { "stdout": "words: 56  ->  applications/brightline-data-eng-lead-resume.html", "stderr": "", "exitCode": 0, "changed": ["applications/brightline-data-eng-lead-resume.html"] } },
+        { "type": "data-card", "data": { "card": "checker", "ref": "applications/brightline-data-eng-lead-resume.md", "props": {
+          "label": "RESUME",
+          "name": "brightline-data-eng-lead-resume.md",
+          "status": "pass",
+          "failCount": 0,
+          "warnCount": 0,
+          "findings": []
+        } } },
+        { "type": "data-card", "data": { "card": "document", "ref": "applications/brightline-data-eng-lead-resume.md", "props": {
+          "words": 56,
+          "htmlPath": "applications/brightline-data-eng-lead-resume.html",
+          "checker": "clean"
+        } } },
+        { "type": "text", "text": "Clean now — selection-only, nothing reworded without your say-so. Ready when you are." }
+      ]
+    }
+  ]
+}

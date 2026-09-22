@@ -1,0 +1,76 @@
+{
+  "meta": {
+    "persona": "Sam Okafor (invented) — sam.okafor.demo@example.com, 555-0119",
+    "description": "A batch evaluation run stops mid-way because the prepaid balance runs out. Exercises the cost card followed by a data-error part with code over_balance, without a broken loop (design-web-agent.md § 8). Round 2: record_verdict tool-bash outputs are REAL stdout, captured by running the real script against a temp workspace (B8). The data-error message no longer invents '2 of 8 roles' (that number isn't something the loop's code can know — docs/reviews/step1-review.md NIT); the count now comes from the model's own next plain-text turn instead.",
+    "note_round3": "Cost card props updated to match design-web-agent.md's actual estimate_cost/cost-card shape (lowUsd/highUsd/balanceUsd/action, no estimate/balanceAfter/goAheadInstruction strings — § 6.2 states goAheadInstruction has no source and is dropped)."
+  },
+  "messages": [
+    {
+      "id": "m1",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "can you evaluate all 8 roles I saved this week?" }
+      ]
+    },
+    {
+      "id": "m2",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-read_file", "toolCallId": "call-1", "state": "output-available",
+          "input": { "path": "jobs.md" },
+          "output": { "path": "jobs.md", "content": "8 undecided rows", "version": "9", "readOnly": false } },
+        { "type": "tool-estimate_cost", "toolCallId": "call-2", "state": "output-available",
+          "input": { "steps": 24, "webSearches": 24, "action": "evaluate 8 roles" },
+          "output": { "lowUsd": 0.60, "highUsd": 0.90, "balanceUsd": 1.00, "needsGate": false, "method": "steps × per-step cost measured so far this chat (median for lowUsd, highest for highUsd); web searches at the plugin's listed price" } },
+        { "type": "data-card", "data": { "card": "cost", "props": {
+          "action": "evaluate 8 roles",
+          "lowUsd": 0.60,
+          "highUsd": 0.90,
+          "balanceUsd": 1.00
+        } } }
+      ]
+    },
+    {
+      "id": "m3",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "go" }
+      ]
+    },
+    {
+      "id": "m4",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-web_search", "toolCallId": "call-3", "state": "output-available",
+          "input": { "query": "Meridian Labs funding stage", "maxResults": 3 },
+          "output": { "results": [
+            { "url": "https://news.example.com/meridian-labs", "title": "Meridian Labs raises Series B", "excerpt": "Meridian Labs closed a Series B in early 2026." }
+          ] } },
+        { "type": "tool-bash", "toolCallId": "call-4", "state": "output-available",
+          "input": { "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Meridian Labs\" --title \"Product Lead\" --verdict investable_stretch --score 64 --reasons \"Series B stage matches target; one leveling gap\"" },
+          "output": { "stdout": "recorded (created NEW role): Meridian Labs — Product Lead → investable_stretch (64)", "stderr": "", "exitCode": 0, "changed": ["jobs.md"] } },
+        { "type": "text", "text": "Meridian Labs – Product Lead: Investable Stretch. Moving to the next one." },
+        { "type": "tool-web_search", "toolCallId": "call-5", "state": "output-available",
+          "input": { "query": "Solterra Robotics company reviews", "maxResults": 5 },
+          "output": { "results": [
+            { "url": "https://reviews.example.com/solterra-robotics", "title": "Solterra Robotics employee reviews", "excerpt": "Hardware-heavy roadmap, long build cycles." }
+          ] } },
+        { "type": "tool-bash", "toolCallId": "call-6", "state": "output-available",
+          "input": { "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Solterra Robotics\" --title \"Group PM\" --verdict weak --score 31 --reasons \"Hardware-heavy roadmap, little overlap with candidate's SaaS background\"" },
+          "output": { "stdout": "recorded (created NEW role): Solterra Robotics — Group PM → weak (31)", "stderr": "", "exitCode": 0, "changed": ["jobs.md"] } },
+        { "type": "text", "text": "Solterra Robotics – Group PM: Weak Fit, noted with alternatives. Moving to the next one." },
+        { "type": "tool-web_search", "toolCallId": "call-7", "state": "output-error",
+          "input": { "query": "Cascadia Freight leadership team", "maxResults": 5 },
+          "errorText": "OpenRouter request rejected: credit limit reached (402)" },
+        { "type": "data-error", "data": {
+          "code": "over_balance",
+          "message": "You're out of balance for now.",
+          "retryable": false
+        } },
+        { "type": "text", "text": "I got through 2 of the 8 roles before running out — Meridian Labs and Solterra Robotics are recorded; the other 6 are still queued. Add funds and I'll pick up right where I stopped." }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "meta": {
+    "persona": "Jordan Alvarez (invented) — jordan.alvarez.demo@example.com, 555-0142",
+    "description": "Full MVP journey: sign up -> upload resume -> profile intake -> paste job URL -> verdict -> tailored resume + cover letter with checker clean -> download -> what's next plan. Round 2 (docs/reviews/step1-review.md): every checker/script tool-bash output below is the REAL stdout/exitCode from running the actual script (skills/{profile,evaluate,apply,coach}/scripts/*.py) against an invented-persona `mktemp -d` workspace, never ~/job-search (B8). fetch_job now uses a URL shape design-web-agent.md § 4 actually accepts (boards.greenhouse.io). No send/submit gate (lead decision pending owner: the web MVP has no send/submit tool yet — design-web-agent.md § 3) — sending the letter and submitting the application are now plan to-dos, done by the candidate outside the app. Plan card holds 3 items (owner decision: PRINCIPLES rule 6 says 2-4, not coach SKILL.md's 'at most 3'). whyReasons no longer contradicts the base resume's own '8 years' figure and drops the unsupported 'similar reqs this quarter' claim (B9).",
+    "note_round4": "Coordinator fix: every data-card's props now match design-web-agent.md § 6.2's card-build table field for field. verdict is now {company, title, verdict, score, track, reason, dealbreakers?} read off the jobs.md row (no more whyReasons/flags/verifyWithRecruiter/companyAnalysisRef, none of which the table sources). The cover letter no longer gets a document card (§ 6.2: only a rendered .md gets one) — it gets a checker card instead, and the resume's single combined check_materials call now produces TWO checker cards (one per checked file, per the table), not folded into the document card's own checkerSummary (dropped, no source)."
+  },
+  "messages": [
+    {
+      "id": "m1",
+      "role": "assistant",
+      "parts": [
+        { "type": "text", "text": "I don't have anything of yours yet. Drop in a resume, or tell me the job you're going for, and I'll start your workspace." }
+      ]
+    },
+    {
+      "id": "m2",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "hi, here's my resume" },
+        { "type": "file", "mediaType": "application/pdf", "filename": "jordan-alvarez-resume.pdf", "url": "blob:fixture/jordan-alvarez-resume.pdf" }
+      ]
+    },
+    {
+      "id": "m3",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-read_file", "toolCallId": "call-1", "state": "output-available",
+          "input": { "path": "jordan-alvarez-resume.pdf" },
+          "output": { "path": "jordan-alvarez-resume.pdf", "text": "Jordan Alvarez — Senior Product Manager… (extracted text)", "extracted": true } },
+        { "type": "tool-write_file", "toolCallId": "call-2", "state": "output-available",
+          "input": { "path": "base-resume.md", "content": "# Jordan Alvarez\n\njordan.alvarez.demo@example.com · 555-0142\n\n## Summary\n8 years of B2B SaaS product management, most recently leading platform and partner ecosystem roadmaps. Grew partner API revenue from 2% to 40% of new-logo bookings in 18 months by treating partners as a first-class segment.\n\n## Selected Experience\n\n### Senior Product Manager, Fernbridge Data (2021-2026)\n- Took the partner API from an internal afterthought to 40% of new-logo revenue in 18 months\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n- Led a cross-functional team of 6 engineers and 2 designers on the ecosystem roadmap\n\n### Product Manager, Cascade Systems (2018-2021)\n- Owned the core billing platform used by 400+ enterprise customers\n- Cut onboarding time from 6 weeks to 9 days by redesigning the setup flow\n\n## Education\nBS Computer Science, State University\n\n## Skills\nRoadmapping, API strategy, partner ecosystems, SQL, Figma\n\n## Claim rules\n- \"40% of new-logo revenue\" — verified from Fernbridge Data internal dashboards, safe to state as-is\n- \"400+ enterprise customers\" — verified from Cascade Systems CRM export" },
+          "output": { "path": "base-resume.md", "version": "1" } },
+        { "type": "tool-bash", "toolCallId": "call-3", "state": "output-available",
+          "input": { "command": "python3 profile/scripts/check_files.py --workspace ." },
+          "output": { "stdout": "\n1 file(s) checked against 11 schema(s); 0 failure(s).", "stderr": "", "exitCode": 0, "changed": [] } },
+        { "type": "text", "text": "Got it — I pulled your experience into base-resume.md. Before I can tailor anything, I need a few things: your target roles, a budget, and a goal date. Got a few minutes now?" }
+      ]
+    },
+    {
+      "id": "m4",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "sure — I'm targeting senior/staff PM roles at B2B SaaS companies, remote US. Goal: offer by end of November. I can do about 45 min a day." }
+      ]
+    },
+    {
+      "id": "m5",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-write_file", "toolCallId": "call-4", "state": "output-available",
+          "input": { "path": "criteria.md", "content": "## Targets\nSenior/Staff PM, B2B SaaS\n\n## Level\nSenior to Staff\n\n## Geo\nRemote US\n\n## Compensation\nFloor not yet captured\n\n## Dealbreakers\nNone captured yet\n\n## Target companies\nNone yet\n\n## Retired\n(none)" },
+          "output": { "path": "criteria.md", "version": "1" } },
+        { "type": "tool-write_file", "toolCallId": "call-5", "state": "output-available",
+          "input": { "path": "plan.md", "content": "Goal: an offer by 2026-11-30\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n\nTo do\n\nDoing\n\nDone" },
+          "output": { "path": "plan.md", "version": "1" } },
+        { "type": "tool-bash", "toolCallId": "call-6", "state": "output-available",
+          "input": { "command": "python3 profile/scripts/check_files.py --workspace ." },
+          "output": { "stdout": "\n3 file(s) checked against 11 schema(s); 0 failure(s).", "stderr": "", "exitCode": 0, "changed": [] } },
+        { "type": "text", "text": "Saved. Goal: offer by Nov 30, budget: 45 min/day. Paste a job posting whenever you've got one, or I can start finding roles for you." }
+      ]
+    },
+    {
+      "id": "m6",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "found this one: https://boards.greenhouse.io/acme/jobs/4102938" }
+      ]
+    },
+    {
+      "id": "m7",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-fetch_job", "toolCallId": "call-7", "state": "output-available",
+          "input": { "url": "https://boards.greenhouse.io/acme/jobs/4102938" },
+          "output": { "board": "greenhouse", "company": "Acme", "title": "Staff PM", "location": "Remote (US)", "url": "https://boards.greenhouse.io/acme/jobs/4102938", "text": "Acme is looking for a Staff PM to own our partner ecosystem… occasional travel required." } },
+        { "type": "tool-web_search", "toolCallId": "call-8", "state": "output-available",
+          "input": { "query": "Acme Series C funding 2026", "maxResults": 4 },
+          "output": { "results": [
+            { "url": "https://news.example.com/acme-series-c", "title": "Acme raises Series C", "excerpt": "Acme announced a Series C round in 2026, its first outside funding since 2023." }
+          ] } },
+        { "type": "tool-web_search", "toolCallId": "call-9", "state": "output-available",
+          "input": { "query": "Acme engineering blog culture", "maxResults": 5 },
+          "output": { "results": [
+            { "url": "https://eng.acme.example.com/blog", "title": "How we ship at Acme", "excerpt": "Small teams, weekly releases, and a partner-first roadmap review." }
+          ] } },
+        { "type": "tool-web_search", "toolCallId": "call-10", "state": "output-available",
+          "input": { "query": "Acme Staff PM leveling", "maxResults": 3 },
+          "output": { "results": [
+            { "url": "https://levels.example.com/acme", "title": "Acme PM levels", "excerpt": "Staff PM sits above Senior PM, below Principal; leveling guide does not state whether it carries reports." }
+          ] } },
+        { "type": "tool-write_file", "toolCallId": "call-11", "state": "output-available",
+          "input": { "path": "jd-analysis/acme-staff-pm.md", "content": "## Decode\nCore ask: own the partner ecosystem roadmap end to end. Seniority signal: Staff, ambiguous IC-vs-lead. Competencies: API strategy, partner GTM, cross-functional leadership.\n\n## Fit (5-dim)\nStrong match on ecosystem/API experience and team leadership; unclear on people-management scope." },
+          "output": { "path": "jd-analysis/acme-staff-pm.md", "version": "1" } },
+        { "type": "tool-write_file", "toolCallId": "call-12", "state": "output-available",
+          "input": { "path": "company/acme.md", "content": "## Signals\n- Series C, 2026 (verified: news.example.com/acme-series-c)\n- Engineering culture: small teams, weekly releases (verified: eng.acme.example.com/blog)\n- Staff PM leveling guide does not state whether the role carries direct reports (unknown)" },
+          "output": { "path": "company/acme.md", "version": "1" } },
+        { "type": "tool-bash", "toolCallId": "call-13", "state": "output-available",
+          "input": { "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company Acme --title \"Staff PM\" --verdict strong --score 82 --track A --reasons \"8 years of B2B SaaS platform PM experience matches the core ask; partner-API story lines up with their stated ecosystem priority\" --url https://boards.greenhouse.io/acme/jobs/4102938 --location \"Remote (US)\"" },
+          "output": { "stdout": "recorded (created NEW role): Acme — Staff PM → strong (82)", "stderr": "", "exitCode": 0, "changed": ["jobs.md"] } },
+        { "type": "data-card", "data": { "card": "verdict", "ref": "jd-analysis/acme-staff-pm.md", "props": {
+          "company": "Acme",
+          "title": "Staff PM",
+          "verdict": "strong",
+          "score": 82,
+          "track": "A",
+          "reason": "8 years of B2B SaaS platform PM experience matches the core ask; partner-API story lines up with their stated ecosystem priority"
+        } } },
+        { "type": "text", "text": "Strong Fit, recorded in jobs.md. Want me to tailor a resume and cover letter for this one?" }
+      ]
+    },
+    {
+      "id": "m8",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "yes please" }
+      ]
+    },
+    {
+      "id": "m9",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-read_file", "toolCallId": "call-14", "state": "output-available",
+          "input": { "path": "base-resume.md" },
+          "output": { "path": "base-resume.md", "content": "# Jordan Alvarez…", "version": "1", "readOnly": false } },
+        { "type": "tool-read_file", "toolCallId": "call-15", "state": "output-available",
+          "input": { "path": "jd-analysis/acme-staff-pm.md" },
+          "output": { "path": "jd-analysis/acme-staff-pm.md", "content": "## Decode…", "version": "1", "readOnly": false } },
+        { "type": "tool-write_file", "toolCallId": "call-16", "state": "output-available",
+          "input": { "path": "applications/acme-staff-pm-resume.md", "content": "# Jordan Alvarez\n\njordan.alvarez.demo@example.com · 555-0142\n\n## Summary\n8 years of B2B SaaS product management, most recently leading platform and partner ecosystem roadmaps. Grew partner API revenue from 2% to 40% of new-logo bookings in 18 months by treating partners as a first-class segment.\n\n## Selected Experience\n\n### Senior Product Manager, Fernbridge Data (2021-2026)\n- Took the partner API from an internal afterthought to 40% of new-logo revenue in 18 months\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n- Led a cross-functional team of 6 engineers and 2 designers on the ecosystem roadmap\n\n## Education\nBS Computer Science, State University\n\n## Skills\nRoadmapping, API strategy, partner ecosystems, SQL, Figma" },
+          "output": { "path": "applications/acme-staff-pm-resume.md", "version": "1" } },
+        { "type": "tool-write_file", "toolCallId": "call-17", "state": "output-available",
+          "input": { "path": "applications/acme-staff-pm-cover-letter.md", "content": "Dear Acme Hiring Team,\n\nI lead platform roadmaps for B2B SaaS products where the ecosystem, not any single feature, is the moat, which is the bet your Staff PM posting is making. Over the last five years I have watched the same pattern play out at two different companies: the product that wins is the one whose partners can build on it without waiting for a roadmap slot, and the team that gets there first is the team that treats the partner surface as its own product from day one.\n\nAt Fernbridge Data I took our partner API from an internal afterthought to 40% of new-logo revenue in 18 months. The turn came from instrumenting the partner funnel before writing a line of new API surface, so every build decision traced back to where partners were actually stuck, not where we assumed they were stuck. That same discipline carried into the billing platform work earlier in my career at Cascade Systems, where a redesigned onboarding flow cut time-to-value from six weeks to nine days for over 400 enterprise customers.\n\nYour posting describes the same inflection point Acme is at with its own ecosystem: real usage, an unclear next layer, and a decision about whether the partner experience gets a dedicated roadmap or stays a side project. I would bring the same approach: instrument first, then build only what the data says partners are blocked on, and keep the roadmap honest about the tradeoff between platform depth and shipping speed.\n\nI would welcome the chance to talk about where Acme's ecosystem strategy stands today and where a Staff PM could move it fastest.\n\nJordan Alvarez\njordan.alvarez.demo@example.com · 555-0142" },
+          "output": { "path": "applications/acme-staff-pm-cover-letter.md", "version": "1" } },
+        { "type": "tool-bash", "toolCallId": "call-18", "state": "output-available",
+          "input": { "command": "python3 apply/scripts/check_materials.py --workspace . --resume applications/acme-staff-pm-resume.md --letter applications/acme-staff-pm-cover-letter.md --base base-resume.md" },
+          "output": { "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME acme-staff-pm-resume.md: pass (0 fail, 0 warn)\n\nLETTER acme-staff-pm-cover-letter.md: pass (0 fail, 0 warn)\n\n✔ mechanical checks clean", "stderr": "", "exitCode": 0, "changed": [] } },
+        { "type": "tool-bash", "toolCallId": "call-19", "state": "output-available",
+          "input": { "command": "python3 apply/scripts/render_resume.py --md applications/acme-staff-pm-resume.md --html applications/acme-staff-pm-resume.html" },
+          "output": { "stdout": "words: 109  ->  applications/acme-staff-pm-resume.html", "stderr": "", "exitCode": 0, "changed": ["applications/acme-staff-pm-resume.html"] } },
+        { "type": "data-card", "data": { "card": "checker", "ref": "applications/acme-staff-pm-resume.md", "props": {
+          "label": "RESUME",
+          "name": "acme-staff-pm-resume.md",
+          "status": "pass",
+          "failCount": 0,
+          "warnCount": 0,
+          "findings": []
+        } } },
+        { "type": "data-card", "data": { "card": "checker", "ref": "applications/acme-staff-pm-cover-letter.md", "props": {
+          "label": "LETTER",
+          "name": "acme-staff-pm-cover-letter.md",
+          "status": "pass",
+          "failCount": 0,
+          "warnCount": 0,
+          "findings": []
+        } } },
+        { "type": "data-card", "data": { "card": "document", "ref": "applications/acme-staff-pm-resume.md", "props": {
+          "words": 109,
+          "htmlPath": "applications/acme-staff-pm-resume.html",
+          "checker": "clean"
+        } } },
+        { "type": "tool-write_file", "toolCallId": "call-20", "state": "output-available",
+          "input": { "path": "applications/acme-staff-pm-application.md", "content": "# Acme — Staff PM\n\n## Standard\n- Partner ecosystem / platform PM experience, stated plainly\n- Cross-functional team leadership at 5+ people\n- Quantified revenue or efficiency impact\n- 2-page target\n- check_materials.py clean\n- language checker clean\n\n## Coverage\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| partner ecosystem experience | have | Fernbridge Data partner API work | answered |\n| cross-functional leadership | have | led 6 engineers, 2 designers | answered |\n| enterprise billing platform experience | shown-but-unnamed | Cascade Systems billing platform bullet exists but doesn't use the word \"billing\" in the Summary | answered |\n\n## Selection\n| # | role | bullet | in/out | source | words | why |\n|---|---|---|---|---|---|---|\n| 1 | Fernbridge Data | Took the partner API from an internal afterthought to 40% of new-logo revenue in 18 months | in | base | 17 | strongest match to the JD's ecosystem ask |\n| 2 | Fernbridge Data | Instrumented the partner funnel and shipped only what the data showed partners were blocked on | in | base | 16 | shows the same data-first approach the JD's culture section describes |\n| 3 | Fernbridge Data | Led a cross-functional team of 6 engineers and 2 designers on the ecosystem roadmap | in | base | 14 | answers the leadership requirement directly |\n| 4 | Cascade Systems | Owned the core billing platform used by 400+ enterprise customers | out | base | 11 | weakest fit for this JD; page budget cut here first |\n| 5 | Cascade Systems | Cut onboarding time from 6 weeks to 9 days by redesigning the setup flow | out | base | 13 | second-weakest fit; earlier role, less ecosystem-relevant |" },
+          "output": { "path": "applications/acme-staff-pm-application.md", "version": "1" } },
+        { "type": "tool-bash", "toolCallId": "call-21", "state": "output-available",
+          "input": { "command": "python3 apply/scripts/proposal_block.py --workspace . --application applications/acme-staff-pm-application.md --base base-resume.md" },
+          "output": { "stdout": "**Cut — 2 of 5 bullets, weakest first.** Say \"keep <bullet>\" and it comes back.\n1. Cascade Systems — Owned the core billing platform used by 400+ enterprise customers — *weakest fit for this JD; page budget cut here first*\n2. Cascade Systems — Cut onboarding time from 6 weeks to 9 days by redesigning the setup… — *second-weakest fit; earlier role, less ecosystem-relevant*\n\n**Their words, placed** — say \"Summary\" / \"Skills\" / \"leave it out\" to move any of these:\n- **enterprise billing platform experience** — true of you (Cascade Systems billing platform bullet exists but doesn't u…); placed where the document shows it\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nWARN  `have` row \"cross-functional leadership\": their word(s) ['leadership'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move", "stderr": "", "exitCode": 0, "changed": [] } },
+        { "type": "text", "text": "Both are checker-clean — 109-word résumé, 277-word letter. Here's what I cut and placed:\n\n**Cut — 2 of 5 bullets, weakest first.** Say \"keep <bullet>\" and it comes back.\n1. Cascade Systems — Owned the core billing platform used by 400+ enterprise customers — *weakest fit for this JD; page budget cut here first*\n2. Cascade Systems — Cut onboarding time from 6 weeks to 9 days by redesigning the setup… — *second-weakest fit; earlier role, less ecosystem-relevant*\n\n**Their words, placed** — say \"Summary\" / \"Skills\" / \"leave it out\" to move any of these:\n- **enterprise billing platform experience** — true of you; placed where the document shows it\n\nOtherwise this is the version. Nothing here needs your word yet — that's only for a send, a submit, or a run over your spend limit." }
+      ]
+    },
+    {
+      "id": "m10",
+      "role": "user",
+      "metadata": { "origin": "typed" },
+      "parts": [
+        { "type": "text", "text": "great, what's next?" }
+      ]
+    },
+    {
+      "id": "m11",
+      "role": "assistant",
+      "parts": [
+        { "type": "tool-read_file", "toolCallId": "call-22", "state": "output-available",
+          "input": { "path": "jobs.md" },
+          "output": { "path": "jobs.md", "content": "## To Review\n\n### Acme — Staff PM\n- Verdict: strong\n- Score: 82", "version": "1", "readOnly": false } },
+        { "type": "tool-write_file", "toolCallId": "call-23", "state": "output-available",
+          "input": { "path": "plan.md", "content": "Goal: an offer by 2026-11-30\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n\nTo do\n- Send the Acme cover letter (5 min) — checker-clean and ready; the posting is fresh\n- Submit the Acme application yourself on Acme's careers site, then tell me so I can log it (10 min) — nothing is submitted until you do it\n- Tell me if you want me to keep looking for more Track A roles (2 min) — one application in flight isn't a pipeline yet\n\nDoing\n\nDone" },
+          "output": { "path": "plan.md", "version": "2" } },
+        { "type": "tool-bash", "toolCallId": "call-24", "state": "output-available",
+          "input": { "command": "python3 coach/scripts/check_closeout.py --workspace . --stage applying" },
+          "output": { "stdout": "close-out clean: stage applying; plan.md written; 0 question(s) each have a row", "stderr": "", "exitCode": 0, "changed": [] } },
+        { "type": "data-card", "data": { "card": "plan", "ref": "plan.md", "props": {
+          "stage": "applying",
+          "items": [
+            {
+              "title": "Send the Acme cover letter",
+              "why": "Checker-clean and ready; the posting is fresh",
+              "minutes": 5,
+              "filePath": "applications/acme-staff-pm-cover-letter.md"
+            },
+            {
+              "title": "Submit the Acme application yourself on Acme's careers site, then tell me so I can log it",
+              "why": "Nothing is submitted until you do it — I don't have a submit tool yet",
+              "minutes": 10,
+              "filePath": "applications/acme-staff-pm-application.md"
+            },
+            {
+              "title": "Tell me if you want me to keep looking for more Track A roles",
+              "why": "One application in flight isn't a pipeline yet",
+              "minutes": 2
+            }
+          ]
+        } } },
+        { "type": "text", "text": "That's the plan for today — send the letter, submit the application yourself when you're ready, and let me know if you want me to keep searching." }
+      ]
+    }
+  ]
+}

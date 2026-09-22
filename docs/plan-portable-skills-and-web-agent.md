@@ -1,7 +1,7 @@
 # Plan - Portable skills, model-native simplification, and the web agent MVP
 
 **Status:** Phase 0 decided; phase 1 next
-**Date:** 2026-09-22
+**Date:** 2026-09-22 (revised the same day: loop moved to the browser)
 **Owner:** Yong
 **Builds on:** `docs/plan-cross-host-workspace-interface.md` (workspace UI,
 resource contract, `get_active_context`), `docs/design-cross-host-active-context.md`
@@ -10,267 +10,276 @@ Three goals:
 
 - **A.** The skills work in Claude Cowork, Grok, ChatGPT Work, and Gemini Spark.
 - **B.** As models improve, the skills get smaller, and every deletion is measured.
-- **C.** Our own website runs the agent with files in cloud object storage. A team
-  of subagents builds the MVP.
+- **C.** Our own website runs the agent loop in the browser, keeps state in
+  Supabase, and can add a server loop later (scheduled search) with minimal
+  change. A team of subagents builds the MVP.
 
-How they connect: C runs `skills/` unchanged on the Claude Agent SDK. A exposes
-C's workspace service and scripts to other hosts as a remote MCP server. B needs
-no new runner, because Claude models run through the existing harness and every
-other model is measured on its own host. So C goes first; A and B follow and do
-not block C.
+**How they connect:** C's shared **agent package** is the foundation for all
+three:
 
----
-
-## Phase 0 - Decisions that come before any code
-
-The precedence chain has to agree first. Picking a winner ad hoc is not allowed
-(CLAUDE.md).
-
-1. **Rule 9: decided 2026-09-22, amended.** "Local and yours" became "Yours":
-   data you can export as the same plain-file folder, encrypted, never trained
-   on, gone when you delete it. Local-first stays a supported mode.
-2. **Where the loop runs: decided 2026-09-22, in the cloud on the Claude Agent
-   SDK.** The owner's criterion was "the simplest way to develop and maintain."
-   See C.1.
-3. **How C relates to the existing cloud WebUI: decided 2026-09-22, a new app
-   that replaces the old one later.** Beta users move over only after C.4 passes
-   and a migration (per-user machine files → object storage) has been tested.
-   Phase 5 of the existing plan (OpenClaw integration) is superseded.
-4. **Storage vendor: open.** Default is Supabase Storage (already in the stack and
-   paired with Supabase auth). R2 or S3 if cost or egress says otherwise. The
-   architect decides in phase 1.
-
-**Exit:** decisions recorded in a GitHub issue.
+- in C, it runs in the browser tab
+- in A, its tools are exposed as the remote MCP server
+- in B, it runs headless in Node against any model OpenRouter serves
+- later, it runs on a server for scheduled search
 
 ---
 
-## Part A - One core, many hosts
+## Phase 0 - Decisions (done 2026-09-22)
 
-### Finding
+| # | Decision | Why |
+|---|---|---|
+| 1 | Rule 9 amended from "Local and yours" to **"Yours"**: exportable as the same plain-file folder, encrypted, never trained on, deletable; local-first still supported | cloud storage needed the precedence chain fixed first |
+| 2 | **Loop runs in the browser** on the Vercel AI SDK. The server loop comes later, reusing the same package | the owner accepts no background search in the MVP; the job-board APIs (Greenhouse, Lever, Ashby, SmartRecruiters) allow browser requests (tested 2026-09-22); the AI SDK runs in browsers, Node, and Deno |
+| 3 | **Models through OpenRouter**, default a Claude model | one API for all models (it also serves B); per-user provisioned keys with spending limits give prepaid billing without a proxy; web search runs on OpenRouter's servers |
+| 4 | **State in Supabase**: auth, Storage for the workspace files, rows only for accounts, balances, and the gate log | already in the stack; per-user access rules; no DB copies of career facts (rule 12) |
+| 5 | **New app, replaces the existing WebUI later**; beta users migrate after phase 6 | owner's call; Phase 5 of the earlier plan (OpenClaw integration) is superseded |
+| 6 | Checkers: **ported to JavaScript**, with a parity test against Python until the local plugin switches over. Pyodide is the fallback | one runtime for the browser, a later server, and the MCP server. A temporary duplicate is allowed only with a loud-fail parity test (PROCESS step 4) |
 
-As of September 2026, every target host reads the `SKILL.md` format and can
-connect to a custom remote MCP server:
+---
+
+## Architecture (Part C)
+
+```
+Browser tab
+ ├─ web app ── apps/workspace-ui components + chat pane
+ └─ packages/agent  (no window/DOM/localStorage imports; everything injected)
+      ├─ AI SDK loop ── OpenRouter model (per-user key, spending limit = balance)
+      ├─ skills/ bundled read-only at build time; loaded in stages:
+      │    descriptions always → SKILL.md when a skill is activated → references on demand
+      ├─ just-bash: in-memory workspace + custom commands
+      │    `python3 …/check_materials.py` → the JS port (so skill prose is unchanged)
+      ├─ tools: file read/write · checkers · web search (OpenRouter) ·
+      │    ATS fetch (a Greenhouse/Lever/Ashby job URL → that board's public API)
+      └─ gate: send/submit/spend → "needs your word" → the typed yes in chat gets logged
+          │
+Supabase ─┼─ Auth
+          ├─ Storage: users/{uid}/ws/{path}, versioned writes, per-user access rules
+          ├─ Rows: account, balance, gate log
+          └─ Edge Function: mint/raise the user's OpenRouter key (the only server code in the MVP)
+
+Later, the server loop: same packages/agent + a server entry + deferGate
+(refuses every side effect and leaves it in plan.md) + pg_cron/queue.
+```
+
+**Page fetching:** OpenRouter documents no equivalent of Anthropic's
+`webFetch`. A job URL on a supported board goes through that board's public
+API; for anything else, the candidate pastes the text. That is what the skills
+already assume.
+
+---
+
+## The steps (each with exit criteria)
+
+Owners: **L** lead (main session) · **Ar** architect · **De** designer ·
+**Co** coder · **Te** tester · **O** owner (Yong). Every step also has to pass
+the standing checks: `python3 tests/run.py` green, no fixtures made from real
+candidate data, and the tester is never the author.
+
+### Step 1 - Spikes, contracts, and design · Ar ∥ De, Co for spikes · ~1 week
+
+The four spikes, each written up as a one-page pass/fail note in `docs/spikes/`:
+
+1. The AI SDK plus `@openrouter/ai-sdk-provider` runs **in the browser**: it
+   streams, calls tools in a loop, and a cache read shows up on turn 2 with a
+   Claude model.
+2. just-bash custom commands: running `python3 skills/apply/scripts/check_materials.py <file>`
+   inside just-bash reaches a JS function, and its output and exit code match the
+   Python script's.
+3. Supabase Storage isolation: user A's token cannot list, read, or write
+   `users/B/…`.
+4. OpenRouter: a provisioned key with a credit limit is rejected once over the
+   limit, and a provider filter restricts calls to providers that keep no data.
+
+The contracts, written by Ar in `docs/design-web-agent.md`:
+
+- the `packages/agent` interface (`createCoach(deps)`, with `Deps` covering
+  model, workspace, gate, and fetch)
+- the workspace store interface (the existing versioned-write contract)
+- the gate protocol and gate-log row
+- the MVP tool list
+- the list of checkers to port
+
+The design, by De: fixture-backed screens for chat plus workspace, the gate
+moment, the balance and cost-estimate display, empty and error states, and
+mobile.
+
+**Exit:**
+
+- [ ] all 4 spike notes say pass. A fail changes the design before step 2 (a
+      fail on spike 2 triggers the Pyodide fallback)
+- [ ] **O approves** the contracts and the fixture screens
+- [ ] a GitHub issue opened with the steps as checkboxes
+
+### Step 2 - Workspace and auth on Supabase · Co, Te
+
+The Supabase project, auth, the Storage bucket with per-user access rules, the
+versioned write (a stale version is rejected), **export as a zip** of the same
+folder shape, and import.
+
+**Exit:**
+
+- [ ] isolation tests pass (spike 3 turned into CI)
+- [ ] a stale write is rejected; a concurrent-write test passes
+- [ ] a round trip (import a fixture workspace → export) is byte-identical
+- [ ] an exported fixture workspace works in local Claude Code with the local
+      skills, unchanged (the rule 9 portability proof)
+
+### Step 3 - Port the MVP checkers to JavaScript · Co, Te
+
+The scripts the MVP journey uses: `check_materials`, `check_files`,
+`proposal_block`, `record_verdict`, `jobs_md`/`update_job`, `check_closeout`.
+`render_resume` becomes HTML plus the browser's print-to-PDF.
+
+**Exit:**
+
+- [ ] a parity test runs every existing Python test fixture through both
+      versions: **100% identical** output and exit codes
+- [ ] the parity test is wired into `tests/run.py`, so drift fails loudly
+- [ ] the ports have no Node-only or browser-only imports (they run in both)
+
+### Step 4 - The agent package, headless first · Co ×2 (loader+tools ∥ just-bash+commands), Te
+
+`createCoach`, the staged skill loader, just-bash with the checker commands, the
+tools (files, checkers, OpenRouter web search, ATS fetch), the gate interface, a
+step cap, and the cost estimate. It is built and tested **in Node first** against
+an in-memory workspace. That proves it doesn't depend on the browser, and the
+same runner is what B needs.
+
+**Exit:**
+
+- [ ] package tests pass in Node with no DOM available
+- [ ] a lint rule or test fails on any `window`/`document`/`localStorage` use in
+      `packages/agent`
+- [ ] conduct cases **t4, t6, t10, t15, t8** run through the headless runner on
+      the default Claude model and do **at least as well as the `claude -p`
+      baseline** (majority of 3 trials), recorded in `docs/evals/`
+- [ ] a gate test: no send, submit, or spend happens without a logged typed yes
+- [ ] a turn loads roughly the same words as `loading-map.md`'s ~3,000 (no
+      bloat from the new loader)
+
+### Step 5 - The web app · De, Co, Te
+
+The fixture screens from step 1 wired to the agent package in the browser; the
+Edge Function that mints and raises keys; the balance display; the cost estimate
+before big runs.
+
+**Exit:**
+
+- [ ] the **MVP journey passes end to end in a real browser** with a fixture
+      persona: sign up → upload résumé → profile intake → paste a job URL or text
+      → evaluate verdict → tailored résumé and cover letter with the checker
+      clean → download PDF → "what's next" written to `plan.md`
+- [ ] the client bundle holds no secret except the user's own OpenRouter key
+- [ ] going over the limit shows a clear message, not a broken loop
+- [ ] cost per journey is measured and written down (this sets pricing)
+- [ ] the screens match the approved fixtures (De signs off)
+
+### Step 6 - Dogfood, closing review, private beta · L, Ar, O
+
+**Exit:**
+
+- [ ] **O completes the journey on real data** in their own account, with issues
+      logged and fixed or accepted
+- [ ] Ar's closing drift review against the precedence chain is clean
+- [ ] every exit from steps 2 to 5 is still green
+- [ ] the beta runs behind a flag; a migration plan for existing WebUI users is
+      written (not run)
+
+### Later steps
+
+**Step 7 - Scheduled search (the server loop)** · Co, Te. A server entry for
+`packages/agent`, `deferGate`, `pg_cron` plus a queue running one short job per
+company batch, and the `search_ats` port.
+
+- [ ] a nightly run adds on-target roles to `jobs.md` with **zero side effects**
+- [ ] a concurrent browser-plus-cron write test passes
+- [ ] **the diff to `packages/agent` is empty or trivial.** This is the test of
+      "minimal change"
+
+**Step A - Other hosts** (can start after step 4). `packages/agent` tools are
+exposed as a remote MCP server (an Edge Function) and packaged per host.
+
+- [ ] for each host: it installs, authenticates, the scripted journey passes, and
+      a conduct subset passes on that host's own model
+
+**Step B - Measured simplification.** The rule inventory can start now; the
+model matrix starts after step 4.
+
+- [ ] a rule inventory (Code / Policy / Capability / Craft) with receipts
+- [ ] per-rule ablation over the OpenRouter model matrix, judge pinned, at least 3
+      trials
+- [ ] an eval record in `docs/evals/`; rules deleted only where the **weakest
+      shipped model** still passes
+
+**Step M - Migrate the existing WebUI users** (after step 6).
+
+- [ ] a dry run on a copy of the data is byte-identical after import
+- [ ] O approves before any real user moves
+
+---
+
+## Part A - One core, many hosts (unchanged in substance)
+
+Every target host reads `SKILL.md` and connects to a custom remote MCP server
+(September 2026):
 
 | Host | Skills | Custom MCP | Notes |
 |---|---|---|---|
 | Claude Cowork | plugin (skills + MCP) | yes | the existing `.claude-plugin/` package |
-| ChatGPT Work | plugins bundle skills + apps (July 2026 rename) | yes | the existing plan routes it through a secure tunnel |
+| ChatGPT Work | plugins bundle skills + apps (July 2026 rename) | yes | the earlier plan routes it through a secure tunnel |
 | Grok | skills + connectors, "Bring your own MCP" (May 2026) | yes | xAI says it reads Claude Code plugins with no configuration; must be verified |
-| Gemini Spark | can be taught skills; MCP connections | yes | runs in cloud VMs; how it loads skills must be verified |
+| Gemini Spark | can be taught skills; MCP connections | yes | how it loads skills must be verified |
 
-The prose ports almost as-is. **The scripts do not.** Consumer hosts cannot be
-relied on to run local Python against a folder that persists. Rule 14 puts the
-invariants in code, so that code must run somewhere every host can reach.
+The prose ports; the scripts don't, because consumer hosts can't be relied on to
+run local Python against a folder that persists. The remote MCP server serves the
+same JS tools as the web app: workspace files, checkers, and
+`get_active_context`. **No MCP tool sends or submits anything** (rule 7).
 
-### Design
-
-Ship two things:
-
-1. **The skill pack.** `skills/*/SKILL.md` and `references/`, unchanged in
-   substance.
-2. **The CareerCoach MCP server (remote, authenticated).** The same tool layer
-   the web runtime uses (C.2):
-   - workspace file tools: list, read, and versioned write
-   - each deterministic script as a tool: `check_materials`, `check_files`,
-     `check_stories`, `check_messages`, `update_job`, `record_verdict`,
-     `render_resume`, `search_ats`, ...
-   - `get_active_context`
-
-Skills currently name script paths directly, such as
-`../search/scripts/update_job.py`. Replace these with **tool names**
-(`update_job`), bound either to the local script (Claude Code or Cowork with a
-local folder) or to the MCP tool (every other host). There is one implementation:
-the MCP tool wraps the same Python script. Add an invariant test: every tool a
-skill names has both bindings.
-
-**No MCP tool sends or submits anything** (rule 7). Hosts prepare, and the
-candidate clicks.
-
-### Exit, per host (the existing rule: a host is supported only once verified end to end)
-
-- installs through that host's plugin or skills mechanism
-- authenticates to the remote MCP server
-- one scripted journey passes: intake, evaluate, tailor, checker clean
-- a conduct-harness subset passes when run on the host's own model (needs B's runner)
-
----
-
-## Part B - Hand more to the model, measured
-
-Rule 13 already requires this: "every rule is derivable or earned." What's
-missing is a way to measure it on each new model and each host.
-
-### What moves and what never does
+## Part B - Hand more to the model, measured (unchanged in substance)
 
 | Class | Examples | As models improve |
 |---|---|---|
-| **Code**: one right answer | schemas, checkers, pipeline writes, dedupe | **Never moves** (rule 14). A smarter model is still not deterministic. |
-| **Policy**: product promises | gates (rule 7), claims no stronger than the facts, rule 10 boundaries, honest numbers | **Never moves.** These are choices, not capability gaps. |
-| **Capability**: moment rules earned against older models | loop rules, Tier 0 interrupts, exit ceilings | **Candidate to delete.** Re-measure on each new model. |
-| **Craft**: world knowledge | most of `references/patterns.md` (résumé craft, interview frameworks) | **Strong candidate.** Frontier models already know it. |
+| **Code** | schemas, checkers, pipeline writes | **never moves** (rule 14) |
+| **Policy** | gates, claims no stronger than the facts, rule 10, honest numbers | **never moves**; these are choices |
+| **Capability** | moment rules earned against older models | re-measure and delete when earned no longer |
+| **Craft** | most of `references/patterns.md` | strong candidate; frontier models already know it |
 
-### Method: an ablation harness
-
-1. **Inventory.** A script tags every rule in `SKILL.md` and `patterns.md` with its
-   class and receipt, and writes a table.
-2. **Model matrix.** The latest frontier models (Claude Opus 5.5, Claude Fable 5.1),
-   each host's own model from Part A, and today's baseline (Sonnet). **The judge
-   stays pinned** to one model and version so scores stay comparable.
-3. **Per-rule ablation.** For each Capability or Craft rule, run its harness cases
-   with the rule removed, at least 3 trials. **Delete the rule only if every model
-   we ship to passes without it.** Otherwise keep it and record
-   "earned on <model> as of <date>".
-4. **Goal-only arm.** For each skill, run `SKILL.md` cut down to the Goal table plus
-   exits. This gives the upper bound on how much can go.
-5. **Metrics.** Pass rate, words loaded per turn (from `loading-map.md`),
-   tokens and cost per task, latency.
-6. **Re-run on every model release.** The "earned" column gets re-checked
-   automatically.
-
-**The tension with Part A:** the bar for deleting a rule is the **weakest model we
-ship to**, not the strongest. No per-model scaffold files, because rule 12 allows
-one of everything. If a host needs scaffolding the frontier doesn't, that is a
-reason to drop the host, not to fork the skills.
-
-**Hypothesis (falsifiable):** `patterns.md` loses at least 40% of its words and
-`SKILL.md` Capability rules lose at least 25%, with no pass-rate drop on Opus 5.5.
-If Opus 5.5 regresses on the Craft ablation, the hypothesis is wrong and the craft
-stays.
-
-**Dependency:** `tests/always-on/run_*.sh` calls `claude -p`, which already
-covers the Claude models in the matrix. **Non-Claude models are measured on
-their own hosts** (Part A's per-host exit), not through a runner we build. That
-matches how candidates will actually use them, and it keeps us from owning a
-multi-provider loop.
-
----
-
-## Part C - Web agent MVP
-
-### C.1 Where the loop runs
-
-**Decision: in the cloud, on the Claude Agent SDK.** The criterion is least
-code to write and maintain. The Agent SDK loads `SKILL.md` natively, discloses
-references on demand, and runs Bash and Python. So `skills/` runs **unchanged**,
-exactly as in Claude Code. We don't build a loop, a skill loader, or a sandbox
-runtime. We build auth, storage sync, gates, metering, and the UI.
-
-A buttercup.sh-style browser loop was rejected for the MVP. It still needs a
-server for object storage and for fetching career sites (CORS), and it would
-force the Python checkers to be ported to Pyodide or JavaScript, which means two
-implementations of every invariant (rule 12). It can come back later as a "try it
-free" mode if usage asks for it.
-
-Rule 14 still holds in the sandbox: checkers run as scripts, not as prose.
-
-Reasons for cloud, each traced to a promise:
-
-- **Rule 3 ("finding happens without you").** Scheduled search and the Monday
-  briefing need a worker that runs while the tab is closed.
-- **Rule 5 (prepaid balance).** Provider keys and cost metering have to live on
-  the server.
-- **Rule 7 (gates).** Confirmation and logging must be enforced where the client
-  can't skip them.
-- **Practical limits.** `search_ats` fetches employer career sites, which browsers
-  block (CORS), and the checkers are Python.
-
-### C.2 Architecture
-
-```
-Browser ── web app (apps/workspace-ui components + chat pane)
-   │        auth: Supabase
-   ▼
-API ─┬─ Workspace service ── object storage: users/{uid}/ws/{path}
-     │    (the existing versioned-write resource contract; no DB copies of career facts, rule 12)
-     └─ Session worker ── one isolated container per active session
-          ├─ Claude Agent SDK, with skills/ mounted read-only (the same files as the plugin)
-          ├─ workspace: synced from object storage at session start, written back
-          │    with version checks on every file write (a stale write fails loudly)
-          ├─ gate hook: send/submit/spend actions stop with "needs your word"; the
-          │    candidate's typed yes in chat, not a button (rule 7), gets logged
-          ├─ metering: SDK usage per turn against the prepaid balance; estimate before big runs
-          └─ network: model API + the search_ats allowlist only
-```
-
-The **tool layer** Part A needs is the thin HTTP/MCP wrapper around the same
-scripts and workspace service. The web app doesn't need it. It is built in
-phase A, not on the MVP's critical path.
-
-### C.3 MVP scope
-
-**In:** one journey, end to end. Sign up → upload résumé → profile intake →
-paste a job description → evaluate verdict → tailored résumé and cover letter
-(the checker passes) → download PDF → "what's next" plan. That needs the
-`profile`, `evaluate`, `apply`, and `coach` skills.
-
-**Out:** automated search, scheduling, outreach, interview practice, filling
-forms in the browser, the browser loop, multi-host launch.
-
-### C.4 MVP acceptance
-
-- The journey passes end to end with a fixture persona (never real data).
-- The conduct cases for those skills (t4, t6, t10, t15, t8) pass through the web
-  runtime at least as well as the Claude Code baseline (majority over 3 trials).
-- Isolation: user A can never read or write user B's workspace (contract test).
-- **Portability proof:** an exported workspace opens in Claude Code with the local
-  skills and works unchanged.
-- Gate test: no side effect happens without a logged, typed yes.
+The bar for deleting a rule is the **weakest model we ship to**. No per-model
+scaffold files (rule 12). **Falsifiable hypothesis:** `patterns.md` loses at
+least 40% of its words and Capability rules lose at least 25%, with no pass-rate
+drop on the default model.
 
 ---
 
 ## The team
 
-The main session is the **lead**: it holds the GitHub issue and runs the ritual
-in `docs/PROCESS.md`. Four subagents, defined as `.claude/agents/*.md`.
-`.gitignore` currently excludes `.claude/`, so the definitions either live in a
-tracked `agents/` directory and get copied in, or `.claude/agents/` gets
-un-ignored.
+The main session is the **lead**: it holds the issue and runs the ritual in
+`docs/PROCESS.md`. The subagents are defined as `.claude/agents/*.md`.
+`.claude/` is gitignored, so either un-ignore `.claude/agents/` or keep the
+definitions in a tracked `agents/` directory.
 
-| Agent | Owns | Produces | May not |
-|---|---|---|---|
-| **architect** | design gate, contracts (tool layer, storage, gates, auth), decision records, closing drift review | contract docs + interface stubs, review findings with file:line | write feature code |
-| **designer** | flows, screens, gate UX, mobile | fixture-backed screens in `apps/workspace-ui` (the existing gate: design approved on fixtures before live data) | wire live data |
-| **coder** | one slice per issue, in its own worktree | code + unit tests for that code | grade its own slice |
-| **tester** | acceptance, e2e, isolation, and conduct tests written **from the spec, not the code**; independent verification | tests + a verdict with evidence | fix what it reviews (CLAUDE.md: never test what you authored) |
+| Agent | Owns | May not |
+|---|---|---|
+| **architect** | contracts, design gates, spike write-ups, closing drift review | write feature code |
+| **designer** | fixture screens, gate and balance UX, mobile | wire live data |
+| **coder** | one slice per issue, in its own worktree, with unit tests | grade its own slice |
+| **tester** | acceptance, parity, isolation, e2e, and conduct tests written **from the spec**; independent verification | fix what it reviews |
 
-### How a slice flows (PROCESS.md mapped onto the team)
-
-1. The architect writes the design gate → the lead opens the issue.
-2. The designer builds fixtures **in parallel with** the architect's contracts →
-   **the owner approves**.
-3. The coder builds in a worktree **while** the tester writes tests from the same
-   spec.
-4. The tester runs everything, and the reviewer verifies the fixes (PROCESS
-   step 5).
-5. The architect does the closing drift review → the owner dogfoods → merge.
-
-Coders run in parallel only on disjoint modules: workspace service, runtime,
-sandbox, web wiring.
-
-### Phases
-
-| # | Work | Lead agents | Exit |
-|---|---|---|---|
-| 0 | Decisions + PRINCIPLES rule 9 amendment | lead, owner | **done 2026-09-22** except storage vendor |
-| 1 | Contracts (storage sync, gate hook, metering, auth) + fixture design | architect ∥ designer | owner approves both |
-| 2 | Workspace service on object storage (plus a local-folder adapter for tests) + sync | coder, tester | contract tests pass; isolation test passes; a round trip is byte-identical |
-| 3 | Session worker: Agent SDK container, skills mounted, gate hook, metering | coder, tester | the harness subset passes through the worker at least as well as `claude -p` |
-| 4 | Web app wired to live data | designer, coder, tester | the C.3 journey passes; C.4 isolation and gate tests pass |
-| 5 | Founder dogfood, closing review, private beta behind a flag | lead, architect | C.4 all green; drift review clean |
-| A | Tool layer (scripts + workspace service) exposed as a remote MCP server; per-host packaging | coder, tester | the Part A exit, host by host |
-| B | Ablation mode for `tests/always-on` + rule inventory; Claude-model matrix | tester, architect | eval record in `docs/evals/` |
-
-B can start now, because it only needs the existing harness. A starts after
-phase 2, once the workspace service exists. Neither blocks phases 3 to 5.
+**How a slice flows:** Ar gate → L opens the issue → De fixtures ∥ Ar contracts
+→ **O approves** → Co builds ∥ Te writes tests from the spec → Te verifies,
+including the fixes → Ar closing review → O dogfoods → merge.
 
 ## Risks
 
-- **Prompt injection through job descriptions and web pages** reaching tools. The
-  mitigation is structural: no tool sends or submits anything, gates are enforced
-  on the server, and the sandbox has no network.
-- **Cost per session** with about 3,000 loaded words per turn plus references. B's
-  word-count metric tracks it; metering enforces the limit.
-- **Concurrent writes** from the web plus external hosts. The existing optimistic
-  versions reject stale edits.
-- **Trust.** Moving data off the candidate's machine is a change in promise. Keep
-  local-first mode, and make export a first-class feature, not a footnote.
+- **Prompt injection** from job descriptions and web pages. No tool sends or
+  submits; the gate runs in the tab, and only the candidate's own typed yes gets
+  through.
+- **A user-held OpenRouter key** can be used outside the app. It is capped at
+  that user's own balance, so the exposure is the user's own money. Rotate it
+  on logout.
+- **OpenRouter drift** (new provider features arrive late, e.g. provider bug
+  #494). Pin the provider version; spike 1 re-runs on each upgrade.
+- **Data processors:** OpenRouter plus the model provider. Enforce the
+  no-data-kept provider filter (spike 4) and name them in the privacy terms.
+- **Cost per session:** measured in step 5; the cost estimate runs before big
+  runs.

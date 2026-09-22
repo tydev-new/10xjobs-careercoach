@@ -30,7 +30,7 @@ Budget: <N min/day | N min per session, cadence>   (the floor, captured at intak
   candidate ("waiting on recruiter reply"). Written IN THE SAME TURN as
   the question; never silently dropped by a refresh; persists until
   resolved either way (answered in chat, or the owning file edited).
-- *To do* — at most 3 items, ranked, each fully prepared, each with its
+- *To do* — 2–4 items, ranked, each fully prepared, each with its
   why + minutes, fitting the budget. **Only candidate-only work** —
   reviews, sends, submissions, decisions. Agent work never appears; it
   is done or under Doing.

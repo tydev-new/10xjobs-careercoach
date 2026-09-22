@@ -9,6 +9,7 @@
    - Sends: "⚠ This sends as YOU. I never send — copy it, send it yourself, then tell me so I log it."
    - Submits: "Ready to submit. Say the word and I click — nothing is sent until you do."
    - Numbers/offers: "This number goes to the employer the moment you say it — confirm it's the one."
+   - Spends: "This spends $<amount> — confirm before I commit it."
 3. **The report-back** — after the human fires (or declines), the agent logs the outcome (date, follow-up cadence, pipeline stage) and confirms in one line what was recorded.
 
 ## Rules

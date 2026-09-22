@@ -37,7 +37,7 @@ reached, and who checks.
   chain was said in one line and its first step done; a prescription's
   blockers were checked before it was issued.
 - **The prescription was prepared down to the candidate's minutes**: the
-  only part left is theirs; it fits the budget; 1–3 items, ranked, each
+  only part left is theirs; it fits the budget; 2–4 items, ranked, each
   with its why.
 
 ## The mirror — the round, scored

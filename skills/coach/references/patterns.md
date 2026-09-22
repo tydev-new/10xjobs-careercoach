@@ -19,7 +19,7 @@ knowledge map's track-scoped gaps are named with plans (role-scoped
 gaps wait for their role to go live); the pitch and LinkedIn match the
 storybank. Read those files — don't ask the candidate what exists. Name
 what's missing and what it weakens; groundwork rarely earns more than
-one of the 1–3 slots — the next piece, prepared.
+one of the 2–4 slots — the next piece, prepared.
 
 - **Sense** (agent work — costs the candidate nothing): read the whole workspace — funnel state, thread ages, posting ages, scoreboard, inbox, plan actuals.
 - **Prepare** (agent work): do ALL the preparation now, in THIS conversation — the rare item only the candidate can resolve goes on the plan as exactly that (readiness is the sequence's rule).

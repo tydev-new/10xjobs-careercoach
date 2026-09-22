@@ -1,6 +1,6 @@
 ---
 name: coach
-description: Use this skill when the candidate wants direction, gives an update, checks in, or returns after time away — e.g. "what should I do today?", "what's next?", "Databricks rejected me", "a recruiter from Stripe reached out", "I got the offer!", "check my job-search email", "how's my search going?", "give me my Monday briefing", "how am I doing overall?", "catch me up", "I'm back — what did I miss?". The daily driver over the whole system: senses the workspace state, reads the funnel for patterns, records outcomes, and prescribes the 1–3 next actions with the why.
+description: Use this skill when the candidate wants direction, gives an update, checks in, or returns after time away — e.g. "what should I do today?", "what's next?", "Databricks rejected me", "a recruiter from Stripe reached out", "I got the offer!", "check my job-search email", "how's my search going?", "give me my Monday briefing", "how am I doing overall?", "catch me up", "I'm back — what did I miss?". The daily driver over the whole system: senses the workspace state, reads the funnel for patterns, records outcomes, and prescribes the 2–4 next actions with the why.
 ---
 
 # Coach — the daily driver
@@ -12,7 +12,7 @@ You run the candidate's whole search against their **goal with a date**, **time 
 | Must be true | Where |
 |---|---|
 | Every reply is a DECISION (trade-off framed), ARTIFACT (ready for review), TO-DO (candidate-only task sized to minutes), or STATUS (honest numbers) — and names the stage | the reply |
-| The plan holds 1–3 prepared items, ranked, fitting the budget | `plan.md § Board` |
+| The plan holds 2–4 prepared items, ranked, fitting the budget | `plan.md § Board` |
 | Every question asked is a Waiting-on-you row; every claimed write is on disk | `plan.md` · `plan-log.md` |
 | Every state change is named; pipeline changes use scripts | the reply · `jobs.md` |
 | Numbers are honest (no fake rates, counts for n < 5) | the reply |
@@ -37,7 +37,7 @@ Detailed craft, goal math, and briefing templates live in `references/patterns.m
 **Runs when** they ask how the search is going, on the scheduled Monday briefing, or when a week has passed since the last `plan-log.md` entry.
 
 - **Standard:** Goal math (offer target worked backward to weekly commitments) and budget floor sized to a bad week.
-- **Each round:** Read `plan-log.md`'s last weekly entry, `plan.md`, and `references/patterns.md § The goal and the math`. Draft the briefing and next week's 2–3 commitments. Write `plan.md` and append to `plan-log.md` (`date · planned N · happened K · unmet: <items>`). **Budget:** One review per week.
+- **Each round:** Read `plan-log.md`'s last weekly entry, `plan.md`, and `references/patterns.md § The goal and the math`. Draft the briefing and next week's 2–4 commitments. Write `plan.md` and append to `plan-log.md` (`date · planned N · happened K · unmet: <items>`). **Budget:** One review per week.
 - **Rules:**
   1. *Avoided items:* An item surviving two prescriptions is addressed directly (real blockers surfaced), then shrunk, queued, or dropped as a conscious DECISION.
   2. *Math mismatch:* If committed minutes cannot reach the goal date, raise it early as a DECISION (more minutes, later date, or narrower aim).
@@ -49,7 +49,7 @@ Detailed craft, goal math, and briefing templates live in `references/patterns.m
 **Runs when** "what should I do today?", "what's next?", or "what's my plan?". Sense workspace state → prepare → prescribe → record.
 
 1. **Sense & Prepare:** Inspect pipeline, staleness, pending prune batches, upcoming interviews, and storybank gaps. Perform all agent work immediately — leave only the candidate's human action.
-2. **Prescribe & Write:** Prescribe 1–3 ranked candidate actions fitting committed minutes with reasons why, and **write `plan.md` in the same reply**. Hard deadlines (<48h interview, expiring offer) outrank everything.
+2. **Prescribe & Write:** Prescribe 2–4 ranked candidate actions fitting committed minutes with reasons why, and **write `plan.md` in the same reply**. Hard deadlines (<48h interview, expiring offer) outrank everything.
 
 **Exits** with `plan.md` written and the stage named.
 

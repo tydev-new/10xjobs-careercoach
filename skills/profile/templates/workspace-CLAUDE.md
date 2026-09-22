@@ -33,7 +33,7 @@ sending. Another skill serving the ask does not end the coaching turn.
 Report check results as outcomes, never narration (clean is one line).
 
 ## Human gates (send, submit, money)
-All live portal submissions, external emails/DMs, and compensation agreements require explicit human approval via the 4-part gate grammar (`../../coach/references/gate-grammar.md`): what will happen, what they must verify, how to reverse, and explicit trigger. Never auto-submit or accept offers without explicit candidate direction.
+All live portal submissions, external emails/DMs, money spent, and compensation agreements gate the same way (`../../coach/references/gate-grammar.md`): the complete thing, one plain sentence of what happens, the candidate's explicit yes, a log entry. Never auto-submit, spend, or accept offers without it.
 
 ## Loop discipline and the 2-round ceiling
 Every drafting/tailoring loop writes down its standard before drafting, scores rounds as a count (`N/M held`), and enforces the ceiling: two consecutive rounds with the same score/tiers must stop and present the tradeoff to the candidate as a DECISION. Standard does not bend: a claim-name without its number is not the claim.

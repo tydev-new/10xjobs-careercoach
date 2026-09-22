@@ -79,6 +79,4 @@ Owned: `storybank.md` and `stories/S###-<slug>.md` (shapes in `references/schema
 - Scope and numbers trace to `base-resume.md`.
 - Earned secrets must reflect firsthand experience, not generic platitudes.
 
-*Every reply ends with ONE contextual next step — a sentence with its why, not a menu.*ves challenge; generic advice and borrowed insight don't qualify.
-
 *Every reply ends with ONE contextual next step — a sentence with its why, not a menu.*

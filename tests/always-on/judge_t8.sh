@@ -6,8 +6,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t8-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 
 for reply in "$RESULTS"/*.md; do
   # bounded concurrency (PAR, default 6); the vault lock is held by THIS
@@ -34,10 +36,10 @@ for reply in "$RESULTS"/*.md; do
       echo "the files, not the narration."
       echo
       echo "## The coach skill the agent operates under"
-      cat "$REPO/skills/coach/SKILL.md"
+      cat "$JUDGE_SKILLS_DIR/coach/SKILL.md"
       echo
       echo "## The coach's program reference (its contract binds every reply)"
-      cat "$REPO/skills/coach/references/patterns.md"
+      cat "$JUDGE_SKILLS_DIR/coach/references/patterns.md"
       echo
       echo "## Planted files"
       cat "$ROOT/fixtures/profile.md"

@@ -8,8 +8,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t10-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 FIX="$ROOT/fixtures/apply"
 
 for reply in "$RESULTS"/*.md; do
@@ -40,13 +42,13 @@ for reply in "$RESULTS"/*.md; do
       echo "judged from it, not from the reply's claims."
       echo
       echo "## The apply skill the agent operates under"
-      cat "$REPO/skills/apply/SKILL.md"
+      cat "$JUDGE_SKILLS_DIR/apply/SKILL.md"
       echo
       echo "### references/patterns.md"
-      cat "$REPO/skills/apply/references/patterns.md"
+      cat "$JUDGE_SKILLS_DIR/apply/references/patterns.md"
       echo
       echo "### profile/references/candidate-voice.md (loaded by tailoring's first moment rule)"
-      cat "$REPO/skills/profile/references/candidate-voice.md"
+      cat "$JUDGE_SKILLS_DIR/profile/references/candidate-voice.md"
       echo
       echo "## Planted files"
       for f in profile.md; do echo "### planted $f"; cat "$ROOT/fixtures/$f"; done

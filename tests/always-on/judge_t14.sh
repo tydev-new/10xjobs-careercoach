@@ -3,8 +3,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t14-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 FIX="$ROOT/fixtures/eval14"
 for reply in "$RESULTS"/*.md; do
   # bounded concurrency (PAR, default 6): cases are independent processes;
@@ -29,10 +31,10 @@ for reply in "$RESULTS"/*.md; do
       echo "recorded or dismissed."
       echo
       echo "## The evaluate skill (the DQ gate is § Full evaluation step 2; § The quick-scan tier follows)"
-      cat "$REPO/skills/evaluate/SKILL.md"
+      cat "$JUDGE_SKILLS_DIR/evaluate/SKILL.md"
       echo
       echo "## The search skill (§ The sweep — the prune report)"
-      cat "$REPO/skills/search/SKILL.md"
+      cat "$JUDGE_SKILLS_DIR/search/SKILL.md"
       echo
       echo "## Planted files"
       echo "### criteria.md"; cat "$FIX/criteria.md"

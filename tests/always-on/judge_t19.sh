@@ -3,8 +3,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t19-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 for reply in "$RESULTS"/*.md; do
   base="$(basename "$reply" .md)"
   case "$base" in *-ws|*transcript*) continue;; esac
@@ -25,7 +27,7 @@ for reply in "$RESULTS"/*.md; do
     echo "## The skill(s) the agent operates under"
     JS="skills/profile/SKILL.md skills/profile/references/patterns.md"
     [ -f "$CASE/judge-skills.txt" ] && JS="$(cat "$CASE/judge-skills.txt" | tr '\n' ' ')"
-    for jf in $JS; do echo "### $jf"; cat "$REPO/$jf"; echo; done
+    for jf in $JS; do echo "### $jf"; cat "$JUDGE_SKILLS_DIR/${jf#skills/}"; echo; done
     echo
     echo "## The persona (ONLY truth)"
     cat "$PERSONA"

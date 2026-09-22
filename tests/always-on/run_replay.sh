@@ -10,11 +10,13 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
-TEMPLATE="$REPO/skills/profile/templates/workspace-CLAUDE.md"
+source "$ROOT/lib_env.sh"
+TEMPLATE="$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md"
 RESULTS="$ROOT/results/run-$1"   # $1 = a run tag, e.g. a date
 mkdir -p "$RESULTS"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 
-MODEL="${MODEL:-sonnet}"
 # --setting-sources project excludes ~/.claude/skills. Without it the
 # user's globally-installed skills (notably the old interview-coach) leak
 # into every condition — that confounded the 2026-08-13 run. Do not remove.
@@ -41,6 +43,7 @@ for case_dir in "$ROOT"/cases/*/; do
     # snapshot the workspace: did it write/change files? (hand-them-the-thing)
     mkdir -p "$out-ws"
     cp "$WS"/*.md "$out-ws/" 2>/dev/null
+    record_served_models "$out"
     rm -rf "$WS"
   done
 done

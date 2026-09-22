@@ -12,9 +12,11 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t7-$1"
 mkdir -p "$RESULTS"
-MODEL="${MODEL:-sonnet}"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 TRIALS="${TRIALS:-1}"
 CONDS="${CONDS:-full}"
 
@@ -41,10 +43,10 @@ for case_name in ${CASES:-t7-capture-honesty t7-mining-correction t7-draft-not-c
   for d in old-stories stories; do
     [ -d "$CASE/$d" ] && cp -r "$CASE/$d" "$WS/"
   done
-  cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
+  cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
   if [ "$cond" = "full" ]; then
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/storybank" "$REPO/skills/profile" "$WS/.claude/skills/"
+    cp -r "$RUNNER_SKILLS_DIR/storybank" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
   fi
   echo "=== $case_name / $cond / trial $trial -> $WS"
   : > "$out.err"
@@ -66,9 +68,10 @@ for case_name in ${CASES:-t7-capture-honesty t7-mining-correction t7-draft-not-c
   [ -d "$WS/stories" ] && cp -r "$WS/stories" "$out-ws/"
   ls -R "$WS" | grep -v '^\.claude' > "$out-ws/_listing.txt" 2>/dev/null
   # deterministic post-check the judge reads verbatim
-  python3 "$REPO/skills/storybank/scripts/check_stories.py" --workspace "$WS" \
+  python3 "$RUNNER_SKILLS_DIR/storybank/scripts/check_stories.py" --workspace "$WS" \
     > "$out-ws/_stories_check.txt" 2>&1
   grep -ho '"skill": *"[^"]*"' "$out".turn*.stream.json 2>/dev/null | sort -u > "$out.skills.txt"
+  record_served_models "$out"
   rm -rf "$WS"
 done
 done

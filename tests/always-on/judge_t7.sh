@@ -7,8 +7,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t7-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 
 for reply in "$RESULTS"/*.md; do
   base="$(basename "$reply" .md)"
@@ -30,7 +32,7 @@ for reply in "$RESULTS"/*.md; do
     echo "evidence if the claim is absent. Paraphrase is NOT fabrication."
     echo
     echo "## The storybank skill the agent operates under"
-    cat "$REPO/skills/storybank/SKILL.md"
+    cat "$JUDGE_SKILLS_DIR/storybank/SKILL.md"
     echo
     echo "## Planted files (profile, criteria, and case-specific)"
     cat "$ROOT/fixtures/profile.md" "$ROOT/fixtures/criteria.md"

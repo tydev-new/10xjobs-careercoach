@@ -15,10 +15,12 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 CASE="$ROOT/cases/t4-intake"
 RESULTS="$ROOT/results/t4-$1"
 mkdir -p "$RESULTS"
-MODEL="${MODEL:-sonnet}"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 CONDS="${CONDS:-bare guardrails full}"
 TRIALS="${TRIALS:-1}"
 
@@ -30,11 +32,11 @@ for cond in $CONDS; do
   cp "$CASE/resume.md" "$WS/"
   case "$cond" in
     guardrails|full)
-      cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md" ;;
+      cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md" ;;
   esac
   if [ "$cond" = "full" ]; then
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/profile" "$WS/.claude/skills/"
+    cp -r "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
   fi
   echo "=== t4 / $cond / trial $trial -> $WS"
   ( cd "$WS" && claude -p "$(cat "$CASE/turn1.md")" \
@@ -56,6 +58,7 @@ for cond in $CONDS; do
   # record which skills actually fired, if any
   grep -ho '"skill": *"[^"]*"' "$out".turn*.stream.json 2>/dev/null \
     | sort -u > "$out.skills.txt"
+  record_served_models "$out"
   rm -rf "$WS"
 done
 done

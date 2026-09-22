@@ -10,12 +10,14 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t5-$1"
 mkdir -p "$RESULTS"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 # A reused tag replays old results as if new (2026-08-21: a loop-shape
 # measurement "ran" in seconds and printed the morning's verdicts). Say so.
 [ -n "$(ls -A "$RESULTS" 2>/dev/null)" ] && echo "REUSED TAG: $RESULTS already has results — existing cases will be SKIPPED, not re-run; pick a fresh tag for a new measurement" >&2
-MODEL="${MODEL:-sonnet}"
 TRIALS="${TRIALS:-1}"
 
 # Targeted by default (founder, 2026-08-21): name the cases whose rules moved.
@@ -52,9 +54,9 @@ for case_name in $CASES; do
     [ -f "$out.md" ] && { echo "skip $case_name t$trial (exists)"; exit 0; }
     WS="$(mktemp -d)"
     cp "$CASE/criteria.md" "$CASE/profile.md" "$WS/"
-    cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
+    cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/search" "$WS/.claude/skills/"
+    cp -r "$RUNNER_SKILLS_DIR/search" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
     : > "$out.err"
     if [ -f "$CASE/turn1.md" ]; then
@@ -78,6 +80,7 @@ for case_name in $CASES; do
     ls "$WS" > "$out-ws/_listing.txt"
     # what the turn-1 workspace looked like matters for "executed before yes":
     # jobs.db existing at ALL means a sweep ran at some point in the session.
+    record_served_models "$out"
     rm -rf "$WS"
   ) &
 done

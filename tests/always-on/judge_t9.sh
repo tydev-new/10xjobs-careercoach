@@ -6,8 +6,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t9-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 
 for reply in "$RESULTS"/*.md; do
   # bounded concurrency (PAR, default 6); the vault lock is held by THIS
@@ -37,7 +39,7 @@ for reply in "$RESULTS"/*.md; do
       echo "and ARE hard fabrications."
       echo
       echo "## The learn skill the agent operates under"
-      cat "$REPO/skills/learn/SKILL.md"
+      cat "$JUDGE_SKILLS_DIR/learn/SKILL.md"
       echo
       echo "## Planted files"
       cat "$ROOT/fixtures/profile.md"

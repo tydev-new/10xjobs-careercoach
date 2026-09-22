@@ -4,12 +4,14 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t14-$1"
 mkdir -p "$RESULTS"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 # A reused tag replays old results as if new (2026-08-21: a loop-shape
 # measurement "ran" in seconds and printed the morning's verdicts). Say so.
 [ -n "$(ls -A "$RESULTS" 2>/dev/null)" ] && echo "REUSED TAG: $RESULTS already has results — existing cases will be SKIPPED, not re-run; pick a fresh tag for a new measurement" >&2
-MODEL="${MODEL:-sonnet}"
 TRIALS="${TRIALS:-1}"
 
 # Targeted by default (founder, 2026-08-21): name the cases whose rules moved.
@@ -45,9 +47,9 @@ for case_name in $CASES; do
     mkdir -p "$WS/jd-inbox" && cp "$FIX/jd-inbox/"*.md "$WS/jd-inbox/"
     cp -r "$APX/jd-analysis" "$APX/company" "$WS/" 2>/dev/null
     [ -d "$CASE/ws-extra" ] && cp -r "$CASE/ws-extra/." "$WS/"
-    cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
+    cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/evaluate" "$REPO/skills/search" "$REPO/skills/profile" "$WS/.claude/skills/"
+    cp -r "$RUNNER_SKILLS_DIR/evaluate" "$RUNNER_SKILLS_DIR/search" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
     : > "$out.err"
     ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \
@@ -60,6 +62,7 @@ for case_name in $CASES; do
     for d in jd-analysis company; do [ -d "$WS/$d" ] && cp -r "$WS/$d" "$out-ws/"; done
     ls -R "$WS" | grep -v '^\.claude' > "$out-ws/_listing.txt" 2>/dev/null
     python3 "$ROOT/dump_tools.py" "$out".turn*.stream.json > "$out.tools.txt" 2>/dev/null
+    record_served_models "$out"
     rm -rf "$WS"
   ) &
 done

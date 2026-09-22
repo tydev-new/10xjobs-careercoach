@@ -6,8 +6,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t12-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 FIX="$ROOT/fixtures/apply"
 
 for reply in "$RESULTS"/*.md; do
@@ -36,10 +38,10 @@ for reply in "$RESULTS"/*.md; do
       echo "produced behavior; judge writes from them, not from the reply's"
       echo "claims."
       echo "## The interview skill the agent operates under"
-      cat "$REPO/skills/interview/SKILL.md"
+      cat "$JUDGE_SKILLS_DIR/interview/SKILL.md"
       echo
       echo "### interview/references/patterns.md (brief protocol + debrief capture)"
-      cat "$REPO/skills/interview/references/patterns.md"
+      cat "$JUDGE_SKILLS_DIR/interview/references/patterns.md"
       echo
       echo "## Planted files"
       for f in profile.md; do echo "### planted $f"; cat "$ROOT/fixtures/$f"; done

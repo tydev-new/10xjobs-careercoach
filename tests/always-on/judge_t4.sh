@@ -5,9 +5,12 @@
 # Usage: ./judge_t4.sh <run-tag>
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 CASE="$ROOT/cases/t4-intake"
 RESULTS="$ROOT/results/t4-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 
 for reply in "$RESULTS"/*.md; do
   [ -f "$reply" ] || continue

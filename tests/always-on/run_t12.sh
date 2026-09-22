@@ -14,10 +14,12 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t12-$1"
 mkdir -p "$RESULTS"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 [ -n "$(ls -A "$RESULTS" 2>/dev/null)" ] && echo "REUSED TAG: $RESULTS already has results — existing cases will be SKIPPED, not re-run; pick a fresh tag for a new measurement" >&2
-MODEL="${MODEL:-sonnet}"
 TRIALS="${TRIALS:-1}"
 
 # The vault (2026-08-20 incident class): the founder's real ~/job-search is
@@ -58,10 +60,10 @@ for case_name in $CASES; do
     # per-case extras OVERLAY the shared fixtures (e.g. a planted bank, a
     # company file carrying the vague signal)
     [ -d "$CASE/ws-extra" ] && cp -r "$CASE/ws-extra/." "$WS/"
-    cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
+    cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/interview" "$REPO/skills/profile" \
-          "$REPO/skills/storybank" "$WS/.claude/skills/"
+    cp -r "$RUNNER_SKILLS_DIR/interview" "$RUNNER_SKILLS_DIR/profile" \
+          "$RUNNER_SKILLS_DIR/storybank" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
     : > "$out.err"
     run_turn "$WS" "$CASE/prompt.md" "$out.turn1.stream.json" "$out.err"
@@ -74,6 +76,7 @@ for case_name in $CASES; do
     ls -R "$WS" | grep -v '^\.claude' > "$out-ws/_listing.txt" 2>/dev/null
     python3 "$ROOT/dump_tools.py" "$out".turn*.stream.json > "$out.tools.txt" 2>/dev/null
     grep -ho '"skill": *"[^"]*"' "$out".turn*.stream.json 2>/dev/null | sort -u > "$out.skills.txt"
+    record_served_models "$out"
     rm -rf "$WS"
   ) &
 done

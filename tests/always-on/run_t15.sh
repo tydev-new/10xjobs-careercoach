@@ -8,9 +8,11 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t15-$1"
 mkdir -p "$RESULTS"
-MODEL="${MODEL:-sonnet}"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 TRIALS="${TRIALS:-3}"
 FIX="${FIXDIR:-$ROOT/fixtures/t15}"
 for case_name in $(ls "$FIX/cases"); do
@@ -31,7 +33,7 @@ for case_name in $(ls "$FIX/cases"); do
   for n in 1 2 3; do
     out="$RESULTS/$case_name.py.$n.txt"
     [ -s "$out" ] && continue
-    python3 "$REPO/skills/apply/scripts/check_materials.py" \
+    python3 "$RUNNER_SKILLS_DIR/apply/scripts/check_materials.py" \
       --workspace "$WS" \
       --resume "$WS/applications/resume.md" \
       --letter "$WS/applications/letter.md" > "$out" 2>&1
@@ -42,7 +44,7 @@ for case_name in $(ls "$FIX/cases"); do
   {
     # the PRODUCTION contract since #29 graduation (checker-instructions.md
     # stays beside the fixtures as the t15-v1 archive artifact)
-    cat "$REPO/skills/profile/references/language-check.md"
+    cat "$RUNNER_SKILLS_DIR/profile/references/language-check.md"
     for src in voice.md base-resume.md pitch.md; do
       [ -f "$WS/$src" ] || continue
       echo; echo "## Rule source: $src"; cat "$WS/$src"

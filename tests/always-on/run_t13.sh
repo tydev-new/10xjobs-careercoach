@@ -4,12 +4,14 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t13-$1"
 mkdir -p "$RESULTS"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 # A reused tag replays old results as if new (2026-08-21: a loop-shape
 # measurement "ran" in seconds and printed the morning's verdicts). Say so.
 [ -n "$(ls -A "$RESULTS" 2>/dev/null)" ] && echo "REUSED TAG: $RESULTS already has results — existing cases will be SKIPPED, not re-run; pick a fresh tag for a new measurement" >&2
-MODEL="${MODEL:-sonnet}"
 TRIALS="${TRIALS:-1}"
 
 # The vault (2026-08-20 incident class): the founder's real ~/job-search is
@@ -33,9 +35,9 @@ for trial in $(seq 1 "$TRIALS"); do
     cp "$FIX"/base-resume.md "$FIX"/voice.md "$FIX"/storybank.md "$FIX"/jobs.md "$WS/"
     cp -r "$FIX/stories" "$FIX/jd-inbox" "$FIX/jd-analysis" "$FIX/company" "$WS/"
     cp -r "$CASE/ws-extra/." "$WS/"
-    cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
+    cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$REPO/skills/outreach" "$REPO/skills/profile" "$WS/.claude/skills/"
+    cp -r "$RUNNER_SKILLS_DIR/outreach" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
     echo "=== t13-ceiling / trial $trial -> $WS"
     : > "$out.err"
     ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \
@@ -46,9 +48,10 @@ for trial in $(seq 1 "$TRIALS"); do
     mkdir -p "$out-ws"
     cp "$WS"/*.md "$out-ws/" 2>/dev/null
     cp -r "$WS/contacts" "$out-ws/" 2>/dev/null
-    python3 "$REPO/skills/outreach/scripts/check_messages.py" --workspace "$WS" \
+    python3 "$RUNNER_SKILLS_DIR/outreach/scripts/check_messages.py" --workspace "$WS" \
       --contacts "$WS/contacts/nimbus.md" > "$out-ws/_messages_check.txt" 2>&1
     python3 "$ROOT/dump_tools.py" "$out".turn*.stream.json > "$out.tools.txt" 2>/dev/null
+    record_served_models "$out"
     rm -rf "$WS"
   ) &
 done

@@ -15,12 +15,14 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t6-$1"
 mkdir -p "$RESULTS"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 # A reused tag replays old results as if new (2026-08-21: a loop-shape
 # measurement "ran" in seconds and printed the morning's verdicts). Say so.
 [ -n "$(ls -A "$RESULTS" 2>/dev/null)" ] && echo "REUSED TAG: $RESULTS already has results — existing cases will be SKIPPED, not re-run; pick a fresh tag for a new measurement" >&2
-MODEL="${MODEL:-sonnet}"
 TRIALS="${TRIALS:-1}"
 
 # Targeted by default (founder, 2026-08-21): name the cases whose rules moved.
@@ -56,10 +58,10 @@ for case_name in $CASES; do
     cp "${CASE}/criteria.md" "$WS/" 2>/dev/null || cp "$ROOT/fixtures/criteria.md" "$WS/"
     cp "$CASE/jobs.md" "$WS/"
     cp -r "$CASE/jd-inbox" "$WS/"
-    cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
+    cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     if [ "$cond" = "full" ]; then
       mkdir -p "$WS/.claude/skills"
-      cp -r "$REPO/skills/evaluate" "$REPO/skills/search" "$WS/.claude/skills/"
+      cp -r "$RUNNER_SKILLS_DIR/evaluate" "$RUNNER_SKILLS_DIR/search" "$WS/.claude/skills/"
     fi
     echo "=== $case_name / $cond / trial $trial -> $WS"
     ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \
@@ -77,6 +79,7 @@ for case_name in $CASES; do
     # company after the run (2+ = the duplicate-key failure happened)
     grep -c '^### Quorvex\|^### Datagrid' "$WS/jobs.md" > "$out-ws/_rowcount.txt" 2>/dev/null
     grep -ho '"skill": *"[^"]*"' "$out.stream.json" 2>/dev/null | sort -u > "$out.skills.txt"
+    record_served_models "$out"
     rm -rf "$WS"
   ) &
 done

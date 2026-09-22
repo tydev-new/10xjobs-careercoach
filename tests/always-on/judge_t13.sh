@@ -5,8 +5,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t13-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 for reply in "$RESULTS"/*.md; do
   base="$(basename "$reply" .md)"
   case "$base" in *-ws) continue;; esac
@@ -25,10 +27,10 @@ for reply in "$RESULTS"/*.md; do
     echo "reply's claims."
     echo
     echo "## The skill the agent operates under (the Draft loop and its exits are inline since 2026-08-21)"
-    cat "$REPO/skills/outreach/SKILL.md"
+    cat "$JUDGE_SKILLS_DIR/outreach/SKILL.md"
     echo
     echo "### The exit moment (outreach SKILL.md § Draft — the ceiling and the law)"
-    EXC="$(grep -B2 -A6 "^\*\*Exits\*\* when the draft clears the standard" "$REPO/skills/outreach/SKILL.md")"
+    EXC="$(grep -B2 -A6 "^\*\*Exits\*\* when the draft clears the standard" "$JUDGE_SKILLS_DIR/outreach/SKILL.md")"
     # judge-inputs-are-inputs: a moved anchor must fail loudly, never
     # silently empty this section (the t19-v1 empty-persona class)
     [ -n "$EXC" ] || { echo "FATAL: exit-moment anchor not found in outreach SKILL.md" >&2; rm -f "$P"; exit 1; }

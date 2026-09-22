@@ -7,8 +7,22 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
+SIM_MODEL="${SIM_MODEL:-}"
+if [ -z "$SIM_MODEL" ]; then
+  SIM_MODEL="claude-sonnet-5"   # the persona simulator — pinned like RUNNER_MODEL,
+                                 # not the bare `sonnet` alias
+  SIM_MODEL_UNDATED_OK="${SIM_MODEL_UNDATED_OK:-1}"   # default path -> escape set FOR you
+fi
+SIM_MODEL_UNDATED_OK="${SIM_MODEL_UNDATED_OK:-0}"
+_lib_env_check_model SIM_MODEL "$SIM_MODEL" SIM_MODEL_UNDATED_OK "$SIM_MODEL_UNDATED_OK"
 RESULTS="$ROOT/results/t19-$1"
 mkdir -p "$RESULTS"
+# sim_model rides in the SAME record line as everything else (never a bare
+# extra line — see lib_env.sh's file-header note on why that broke tail -1
+# readers, including the judge's snapshot lookup, for every t19 tag).
+snapshot_and_record_run_info "$RESULTS" "sim_model=$SIM_MODEL sim_model_undated_ok=$SIM_MODEL_UNDATED_OK"
+maybe_dry_run runner "$RESULTS" && exit 0
 # ── The vault (2026-08-20, third absolute-path breakout): the founder's real
 # ~/job-search is made IMMUTABLE for the duration of the run. A sandboxed
 # agent that constructs the real path (unix file ownership leaks the
@@ -19,8 +33,6 @@ vault_unlock() { find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/nu
 vault_lock()   { find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null; }
 trap vault_unlock EXIT INT TERM
 vault_unlock; vault_lock
-MODEL="${MODEL:-sonnet}"
-SIM_MODEL="${SIM_MODEL:-sonnet}"
 TRIALS="${TRIALS:-1}"
 MAX_TURNS="${MAX_TURNS:-8}"
 for trial in $(seq 1 "$TRIALS"); do
@@ -60,7 +72,7 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
   # per-case skill list (one name per line); the intake pair otherwise
   CASE_SKILLS="profile storybank"
   [ -f "$CASE/skills.txt" ] && CASE_SKILLS="$(cat "$CASE/skills.txt" | tr '\n' ' ')"
-  for sk in $CASE_SKILLS; do cp -r "$REPO/skills/$sk" "$WS/.claude/skills/"; done
+  for sk in $CASE_SKILLS; do cp -r "$RUNNER_SKILLS_DIR/$sk" "$WS/.claude/skills/"; done
   echo "=== $case_name / trial $trial -> $WS"
   # Tripwire (2026-08-20: a trial overwrote the founder's REAL ~/job-search
   # through an absolute path): fingerprint the real workspace; any change
@@ -121,6 +133,7 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
   # what the agent did in its (fake) home is part of the record
   ls -RA "$FAKEHOME" 2>/dev/null | grep -v '^\.' | head -50 > "$out-ws/_fakehome.txt"
   python3 "$ROOT/dump_tools.py" "$out".turn*.stream.json > "$out.tools.txt" 2>/dev/null
+  record_served_models "$out"
   rm -rf "$WS" "$SIMD" "$FAKEHOME"
 done
 done

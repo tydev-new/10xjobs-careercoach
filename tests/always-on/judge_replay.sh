@@ -7,8 +7,11 @@
 # parse apostrophes inside a heredoc nested in $( ), so no nesting here.
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/run-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 
 for case_dir in "$ROOT"/cases/*/; do
   case_name="$(basename "$case_dir")"

@@ -37,6 +37,152 @@ python3 score_t15.py <tag>     #   deterministic scorer vs truth.json)
 Results land in `results/<tag>/` (gitignored). Verdicts are JSON, one per
 run. Re-running skips work that already exists, so a crashed run resumes.
 
+## Pinned models
+
+Every runner and judge sources `lib_env.sh`, which resolves two models and
+refuses to guess either:
+
+A **dated** model id ends in `-20YYMMDD` (e.g. `-20250514`) — a bare
+version number (`claude-opus-4`) is not enough, a bare alias (`opus`) is
+worse. Every model variable below is checked against that pattern and
+rejected (exit 2) unless it matches or its own `..._UNDATED_OK=1` escape is
+set (which gets recorded, so the record shows a measurement knowingly ran
+undated rather than silently):
+
+- **`RUNNER_MODEL`** (alias: `MODEL`, kept for back-compat) — the model
+  under test. Default `claude-sonnet-5` (Sonnet 5), the owner's stated web
+  default; this is what the `sonnet` alias resolved to in the August runs
+  (`docs/evals/rule-inventory.md` item 8). Sonnet 5 may have no dated id,
+  so the DEFAULT path sets `RUNNER_MODEL_UNDATED_OK=1` for you. An
+  *explicit* override to something undated needs that escape set
+  explicitly too, e.g. `RUNNER_MODEL=claude-sonnet-5-custom
+  RUNNER_MODEL_UNDATED_OK=1 ./run_t6.sh <tag>` — without the escape it
+  exits 2.
+- **`JUDGE_MODEL`** — the grading model. **Required, no default**, and
+  rejected if it's a bare alias (`opus`, `sonnet`, `haiku`, `fable`) or
+  undated, unless `JUDGE_MODEL_UNDATED_OK=1` is set explicitly. This repo
+  could not resolve the current dated Opus id without live `claude` CLI
+  auth (not available while this fix was built). Find it once, per
+  environment:
+  ```bash
+  claude -p "hi" --model opus --output-format json --setting-sources project \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["model"])'
+  ```
+  and export the printed id (e.g. `export JUDGE_MODEL=<dated-opus-id>`)
+  in your shell profile or CI config.
+- **`SIM_MODEL`** (t19's persona simulator only) — same dated-or-escape
+  rule as `RUNNER_MODEL`, default `claude-sonnet-5` with
+  `SIM_MODEL_UNDATED_OK=1` auto-set on that default path.
+
+Both models are recorded in every run's results dir, one **appended,
+timestamped line per invocation** (a reused tag can legitimately be re-run
+under a different model or skills dir, so this is a log, not a single
+write-once summary): `run-info.txt` (written by the runner: timestamp,
+commit, dirty flag, skills content hash, `runner_model`,
+`runner_model_undated_ok`, `runner_skills_dir`, `judge_skills_dir`, plus
+any per-runner extra fields — t19 folds in `sim_model` and
+`sim_model_undated_ok` here) and `judge-info.txt` (written by the judge:
+timestamp, `judge_model`, `judge_model_undated_ok`, `judge_skills_dir`).
+Every record line starts with `ts=`; **readers must select on that**
+(`grep '^ts=' | tail -1`, never a bare `tail -1`) — a 2026-09-22 fix round
+appended a bare, non-`ts=` `sim_model=` line after t19's record, which a
+naive `tail -1` reader (including the judge's own snapshot lookup) walked
+past, silently falling back to the live tree for every t19 tag. Extra
+per-runner fields now ride inside the single `ts=...` line instead (see
+`snapshot_and_record_run_info`'s second argument).
+
+If a same-tag invocation's runner (or judge) model, skills dir, **or
+skills content hash** differs from the immediately preceding record, both
+scripts print a loud `WARN` — the tag's results now mix two configurations
+(a hash-only change means a new snapshot was silently taken mid-tag, and
+earlier trials were judged against the old one — the WARN names both
+snapshot paths).
+
+## Skills snapshot — judges never grade against the live tree
+
+Before this fix, 10 of 12 judge scripts `cat`ed `$REPO/skills/...` straight
+from the working tree. In an ablation arm this means the judge grades
+against the *ablated* text too, so a removed rule silently also vanishes
+from the judge's own standard — the exact hole `docs/evals/rule-inventory.md`
+item 8 flags.
+
+Every runner now snapshots the **real, unablated** `skills/` tree into
+`results/<tag>/_skills-snapshot-<commit>-<content-hash>/` at the start of
+the run, and every judge reads that snapshot instead of the live tree. The
+directory name carries BOTH the commit and a content hash of `skills/`,
+not the commit alone — a dirty working tree can change between two
+invocations at the same commit, and a snapshot is identified by what it
+actually contains. If `skills/` has uncommitted changes when a runner
+snapshots it, it prints a loud `WARN` ("the unablated baseline includes
+uncommitted edits") — the snapshot still goes ahead (it's the real tree at
+that moment), but the record (`dirty=1` in `run-info.txt`) makes that
+visible.
+
+The content hash is computed with paths **relative to `skills/`** (it `cd`s
+in first), so it does not depend on where the repo checkout lives on disk
+— two clones at different absolute paths hash identically. `__pycache__/`,
+`*.pyc`, and `.DS_Store` are excluded from both the hash and the snapshot
+copy itself — build/OS litter that carries no skill content and must not
+perturb either.
+
+Two variables control which tree is used for what:
+
+- **`RUNNER_SKILLS_DIR`** — what gets copied into the agent-under-test's
+  workspace. Default `$REPO/skills` (today's behaviour). Point it at an
+  ablated tree to change what the RUNNER operates under.
+- **`JUDGE_SKILLS_DIR`** — what a judge reads when it quotes "the skill
+  says X". Default: the frozen snapshot this run took at start — always a
+  copy of the real `$REPO/skills`, **never** of `RUNNER_SKILLS_DIR` — so
+  an ablation never also erases the judge's standard. Set this explicitly
+  to override (e.g. to re-grade against a different snapshot).
+
+So: an ablation run looks like
+`RUNNER_SKILLS_DIR=/path/to/ablated-skills JUDGE_MODEL=<dated-opus-id> ./run_t6.sh <tag>`,
+and `./judge_t6.sh <tag>` grades it against the real, unablated text with
+no further flags needed.
+
+A results dir made *before* this fix has no `run-info.txt`; a judge run
+against it falls back to the live tree (today's pre-fix behaviour) with a
+loud `WARN` on stderr.
+
+## Dry runs (no model calls)
+
+`DRY_RUN=1` on any runner or judge prints the resolved commit, dirty flag,
+models, and skills dirs and exits 0 before making any `claude` call —
+useful for proving the wiring without spending anything. The judge's
+`runner_skills_dir` line is the RECORDED value from `run-info.txt` (what
+the runner actually shipped), not this invocation's own default. Example:
+
+```
+$ JUDGE_MODEL=<dated-opus-id> DRY_RUN=1 ./run_t6.sh proof
+== runner dry run ==
+commit=4791788
+dirty=1
+runner_model=claude-sonnet-5 (undated_ok=1)
+runner_skills_dir=/Users/you/10xjobs-careercoach/skills
+judge_skills_dir=(snapshot target) /Users/you/10xjobs-careercoach/tests/always-on/results/t6-proof/_skills-snapshot-4791788-<content-hash>
+results=/Users/you/10xjobs-careercoach/tests/always-on/results/t6-proof
+== end dry run (no model calls made) ==
+$ JUDGE_MODEL=<dated-opus-id> DRY_RUN=1 ./judge_t6.sh proof
+== judge dry run ==
+commit=4791788
+dirty=1
+runner_model=claude-sonnet-5 (undated_ok=1)
+judge_model=<dated-opus-id> (undated_ok=0)
+runner_skills_dir=/Users/you/10xjobs-careercoach/skills
+judge_skills_dir=/Users/you/10xjobs-careercoach/tests/always-on/results/t6-proof/_skills-snapshot-4791788-<content-hash>
+results=/Users/you/10xjobs-careercoach/tests/always-on/results/t6-proof
+== end dry run (no model calls made) ==
+```
+(`dirty=1`/the `WARN` above it are real for this checkout mid-fix, with
+uncommitted `skills/` edits; a clean tree prints `dirty=0` and no WARN.)
+
+The runner's `DRY_RUN` still creates the results dir, snapshot, and a
+`run-info.txt` record (so a follow-up dry-run judge call has something to
+resolve) — it only skips the `claude` calls, which is where spend happens.
+The judge's `DRY_RUN` validates `JUDGE_MODEL` and fails BEFORE creating
+anything if it's missing or a bare alias.
+
 ## The environment contract
 
 **A condition's behaviour must come from what that condition provides and
@@ -98,6 +244,19 @@ was found. Every runner uses `--output-format stream-json --verbose` and
 reassembles the full text with `extract_text.py`. Each run also snapshots
 the workspace afterwards (`<run>-ws/`) and records which skills actually
 fired (`<run>.skills.txt`).
+
+Each runner also writes `<run>.served-model.txt`, one `<file>: <model>`
+line per `*.stream.json` output, parsed from the CLI's own `"model"` field
+— the model actually SERVED can differ from what was requested (fallback,
+alias resolution). Best-effort/defensive: a parse miss writes `UNKNOWN`
+rather than failing the run. **UNTESTED against a real API response** —
+this fix was built with no spend and no live auth, so the parser has only
+been exercised against synthetic fixtures, never a real `claude` reply.
+Judge scripts do not have an equivalent: they invoke `claude -p` with the
+default text output (their prompt asks for a bare JSON verdict, captured
+as-is), not `--output-format json`/`stream-json`, so there is no CLI-level
+`model` field to extract without changing that capture shape — out of
+scope for this fix.
 
 ## Scoring
 

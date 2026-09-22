@@ -12,10 +12,12 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t8-$1"
 mkdir -p "$RESULTS"
+snapshot_and_record_run_info "$RESULTS"
+maybe_dry_run runner "$RESULTS" && exit 0
 [ -n "$(ls -A "$RESULTS" 2>/dev/null)" ] && echo "REUSED TAG: $RESULTS already has results — existing cases will be SKIPPED, not re-run; pick a fresh tag for a new measurement" >&2
-MODEL="${MODEL:-sonnet}"
 TRIALS="${TRIALS:-1}"
 
 # The vault (2026-08-20 incident class): the founder's real ~/job-search is
@@ -52,10 +54,10 @@ for case_name in $CASES; do
     for d in jd-analysis courses stories; do
       [ -d "$CASE/$d" ] && cp -r "$CASE/$d" "$WS/"
     done
-    cp "$REPO/skills/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
+    cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     if [ "$cond" = "full" ]; then
       mkdir -p "$WS/.claude/skills"
-      cp -r "$REPO"/skills/* "$WS/.claude/skills/"
+      cp -r "$RUNNER_SKILLS_DIR"/* "$WS/.claude/skills/"
     fi
     echo "=== $case_name / $cond / trial $trial -> $WS"
     ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \
@@ -71,6 +73,7 @@ for case_name in $CASES; do
     ls -R "$WS" | grep -v '^\.claude' > "$out-ws/_listing.txt" 2>/dev/null
     wc -l "$WS/plan.md" 2>/dev/null | awk '{print "plan.md lines:", $1}' > "$out-ws/_plan_lines.txt"
     grep -ho '"skill": *"[^"]*"' "$out.turn1.stream.json" 2>/dev/null | sort -u > "$out.skills.txt"
+    record_served_models "$out"
     rm -rf "$WS"
   ) &
 done

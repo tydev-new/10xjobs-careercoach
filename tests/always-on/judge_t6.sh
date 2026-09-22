@@ -7,8 +7,10 @@
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
+source "$ROOT/lib_env.sh"
 RESULTS="$ROOT/results/t6-$1"
-JUDGE_MODEL="${JUDGE_MODEL:-opus}"
+resolve_and_record_judge_info "$RESULTS"
+maybe_dry_run judge "$RESULTS" && exit 0
 
 for reply in "$RESULTS"/*.md; do
   # bounded concurrency (PAR, default 6): cases are independent processes;
@@ -35,7 +37,7 @@ for reply in "$RESULTS"/*.md; do
       echo
       echo "## The evaluate skill the agent operates under (claims about 'the"
       echo "   skill says X' must be checked against THIS text)"
-      cat "$REPO/skills/evaluate/SKILL.md"
+      cat "$JUDGE_SKILLS_DIR/evaluate/SKILL.md"
       echo
       echo "## Planted profile.md"
       cat "$CASE/profile.md" 2>/dev/null || cat "$ROOT/fixtures/profile.md"

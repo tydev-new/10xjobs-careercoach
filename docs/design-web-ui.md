@@ -54,8 +54,8 @@ job, post-MVP only if dogfooding shows chat + cards isn't enough).
 
 - **Header:** avatar with its five states (§ 1.2), a balance chip
   (reads the candidate's own key limit directly — C § 8, not the
-  envelope), a `⋯` menu (export workspace, sign out, manage the
-  OpenRouter key).
+  envelope), a `⋯` menu (export workspace, sign out, manage your usage
+  key — C § 8's own user-facing term, never "OpenRouter key").
 - **Transcript:** prose interleaved with collapsed "ran …" lines
   (§ 3) and cards (§ 2), oldest first, autoscroll.
 - **Composer:** attach, free text, `/` opens a skill picker (optional
@@ -76,8 +76,8 @@ targets ≥ 44px.
 
 Five states, derived by C's `statusOf(messages, chatStatus)` (§ 6.1) —
 there is no status part in the envelope, so the header never sends
-one, only reads the pure function's result: `idle` (nothing run this
-session) · `thinking` (text streaming) · `working` (a tool part not
+one, only reads the pure function's result: `idle` (no turn yet in
+this chat) · `thinking` (text streaming) · `working` (a tool part not
 yet done — hover text is that tool's one-line label, a small UI-owned
 lookup by tool name) · `needs-you` (an open `data-gate`, per the
 `data-gate-status` stream C § 3 defines) · `done`. Motion: still/glow
@@ -199,14 +199,12 @@ part itself never changes once emitted. **The composer is the only way
 a gate closes**: the candidate types `yes`, and `matchGateReply(text,
 origin)` (C § 3) — trimmed, lowercased, at most one trailing `.`/`!`,
 exactly `yes`, and `metadata.origin === "typed"` — decides before the
-model ever sees the reply. No button, ever. **A spend that would
-exceed the balance never gets a gate at all** — it would just fail
-mid-run against the key's own credit limit regardless of a yes, so the
-agent's prose says a top-up is needed, and the `cost` card (§ 2.6)
-already shows `balanceUsd` beside the range. There is no separate
-over-balance pre-check part; the only `data-error over_balance` comes
-from the loop after OpenRouter actually rejects a call (C § 8) — see
-`over-limit-error.json`.
+model ever sees the reply. No button, ever. Code opens a gate whenever
+`needsGate` is true, regardless of balance — the model cannot hold it
+back, and the `cost` card (§ 2.6) always shows `balanceUsd` beside the
+range so the candidate can judge it themselves. The only
+`data-error over_balance` comes from the loop after OpenRouter
+actually rejects a call mid-run (C § 8) — see `over-limit-error.json`.
 
 ### 2.6 `cost`
 

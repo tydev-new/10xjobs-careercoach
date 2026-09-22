@@ -53,7 +53,7 @@
           "message": "You're out of balance for now.",
           "retryable": false
         } },
-        { "type": "text", "text": "I got through 2 roles — Meridian Labs and Solterra Robotics, both recorded in jobs.md — before OpenRouter rejected the next call over your balance. Add funds and I'll pick up on the rest of what you sent." }
+        { "type": "text", "text": "I got through 2 roles — Meridian Labs and Solterra Robotics, both recorded in jobs.md — before OpenRouter rejected the next call over your balance. My estimate was wrong: I said $0.60–$0.90 against your $1.00 balance, and it ran out after 2 of 8. Add funds and I'll pick up on the rest of what you sent." }
       ]
     }
   ]

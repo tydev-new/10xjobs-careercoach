@@ -8,7 +8,17 @@
 // (D) in addition to the original mock tool-loop (A) and provider
 // construction (C) checks, and reads all keys at RUNTIME (E) — see
 // src/runtime-key.ts.
-import { generateText, streamText, tool, jsonSchema, stepCountIs, simulateReadableStream } from "ai";
+import {
+  generateText,
+  streamText,
+  tool,
+  jsonSchema,
+  stepCountIs,
+  simulateReadableStream,
+  toUIMessageStream,
+  createUIMessageStream,
+  readUIMessageStream,
+} from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { getRuntimeInterceptKey, getRuntimeRealKey } from "./runtime-key";
@@ -166,14 +176,26 @@ function runProviderConstruction() {
   }
 }
 
+// The no-data-kept provider filter (plan risk section, C:48/496,
+// "Step-1 spikes": "the `provider` filter in the intercepted request").
+// Field names are the installed @openrouter/ai-sdk-provider's own types
+// (node_modules/@openrouter/ai-sdk-provider/dist/index.d.ts): the `provider`
+// settings on OpenRouterChatSettings carry `data_collection?: DataCollection`
+// ('deny' | 'allow') and `zdr?: boolean` ("restrict routing to only ZDR
+// (Zero Data Retention) endpoints"). Confirmed these serialize verbatim
+// into the request body's top-level `provider` object (see
+// docs/spikes/spike-1-browser-loop.md "Surprises" for the direct probe).
+const NO_DATA_KEPT_PROVIDER_FILTER = { data_collection: "deny" as const, zdr: true };
+
 // ---------------------------------------------------------------------
 // D. REQUEST BUILT (rework item 2): wrap globalThis.fetch, make the
 //    OpenRouter provider actually ISSUE its HTTP request for a Claude
 //    model with one tool, and assert URL / method / JSON body / the
-//    Authorization header — using a canned streamed response so no real
-//    network call or key is needed. The key comes from a RUNTIME global
-//    (rework item 3) set by the test harness AFTER the bundle loaded —
-//    never from import.meta.env, so it cannot be baked into dist/.
+//    Authorization header AND the provider routing filter — using a
+//    canned streamed response so no real network call or key is needed.
+//    The key comes from a RUNTIME global (rework item 3) set by the test
+//    harness AFTER the bundle loaded — never from import.meta.env, so it
+//    cannot be baked into dist/.
 // ---------------------------------------------------------------------
 async function runRequestBuilt() {
   const runtimeKey = getRuntimeInterceptKey();
@@ -196,7 +218,11 @@ async function runRequestBuilt() {
 
   try {
     const openrouter = createOpenRouter({ apiKey: runtimeKey });
-    const model = openrouter.chat(MODEL_ID);
+    // Provider settings, per OpenRouterChatSettings — this is the "spike-4
+    // provider filter" the contract (C:48, C § 8) says the entry point
+    // builds the model with, proved here without needing spike 4's live
+    // account/key infrastructure.
+    const model = openrouter.chat(MODEL_ID, { provider: NO_DATA_KEPT_PROVIDER_FILTER });
     const echoTool = tool({
       description: "Echo a string back",
       inputSchema: jsonSchema<{ text: string }>({
@@ -219,6 +245,8 @@ async function runRequestBuilt() {
       hasTool: Array.isArray(body.tools) && body.tools.some((t: any) => t.function?.name === "echoTool"),
       stream: body.stream === true,
       authFromRuntime: (captured as any).headers["authorization"] === `Bearer ${runtimeKey}`,
+      providerDataCollectionDeny: body.provider?.data_collection === NO_DATA_KEPT_PROVIDER_FILTER.data_collection,
+      providerZdr: body.provider?.zdr === NO_DATA_KEPT_PROVIDER_FILTER.zdr,
     };
     const allPass = Object.values(checks).every(Boolean);
     write(
@@ -286,11 +314,91 @@ async function runRealCallIfKeyed() {
   }
 }
 
+// ---------------------------------------------------------------------
+// F. THE UI MESSAGE STREAM (rework item 2, second half): run the loop's
+//    result through the AI SDK's own UI-message-stream conversion
+//    (`toUIMessageStream`, merged via `createUIMessageStream`, exactly
+//    the functions the installed ai@7 package exports) in the page, and
+//    assert the reconstructed message's parts are the contract's § 6.1
+//    kinds: `text`, `tool-<name>`, and one `data-card` part WRITTEN BY
+//    CODE (never by the model — § 6.2's "the model never writes a card").
+// ---------------------------------------------------------------------
+async function runUiMessageStream() {
+  const echoTool = tool({
+    description: "Echo a string back",
+    inputSchema: jsonSchema<{ text: string }>({
+      type: "object",
+      properties: { text: { type: "string" } },
+      required: ["text"],
+    }),
+    execute: async ({ text }) => ({ text }),
+  });
+
+  // The chunks the MOCK MODEL emits — no "data-card" anywhere in them.
+  // The data-card that ends up in the final message comes ONLY from the
+  // writer.write() call below (code), which is the assertion that matters
+  // for § 6.2's "the model never writes a card".
+  const modelChunks = [
+    { type: "stream-start", warnings: [] },
+    { type: "text-start", id: "t1" },
+    { type: "text-delta", id: "t1", delta: "Checking order A100." },
+    { type: "text-end", id: "t1" },
+    { type: "tool-input-start", id: "c1", toolName: "echoTool" },
+    { type: "tool-input-delta", id: "c1", delta: JSON.stringify({ text: "A100" }) },
+    { type: "tool-input-end", id: "c1" },
+    { type: "tool-call", toolCallId: "c1", toolName: "echoTool", input: JSON.stringify({ text: "A100" }) },
+    { type: "finish", finishReason: { unified: "tool-calls", raw: "tool-calls" }, usage: { inputTokens: 6, outputTokens: 4, totalTokens: 10 } },
+  ] as const;
+  const model = new MockLanguageModelV4({
+    doStream: async () => ({ stream: simulateReadableStream({ chunks: modelChunks as any }) }),
+  });
+
+  const result = streamText({ model, prompt: "check order A100", tools: { echoTool } });
+
+  // The model's own stream is converted with the SDK's OWN function
+  // (`toUIMessageStream`) — nothing hand-rolled. The `data-card` part is
+  // written separately by `writer.write(...)`, i.e. by CODE, after the
+  // model's stream is merged — never something the model itself emitted,
+  // matching § 6.2's card-source rule.
+  const uiStream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      await writer.merge(toUIMessageStream({ stream: result.fullStream, tools: { echoTool } }));
+      writer.write({
+        type: "data-card",
+        data: { card: "checker", props: { ok: true }, ref: "resume.md" },
+      } as any);
+    },
+  });
+
+  const messages: any[] = [];
+  for await (const msg of readUIMessageStream({ stream: uiStream })) {
+    messages.push(msg);
+  }
+  const last = messages[messages.length - 1];
+  const partTypes: string[] = last.parts.map((p: any) => p.type);
+  const dataCardPart = last.parts.find((p: any) => p.type === "data-card");
+
+  const checks = {
+    hasText: partTypes.includes("text"),
+    hasToolPart: partTypes.some((t) => t === "tool-echoTool" || t.startsWith("tool-")),
+    hasDataCard: partTypes.includes("data-card"),
+    dataCardFromCode: dataCardPart?.data?.card === "checker" && dataCardPart?.data?.ref === "resume.md",
+    // the model's own chunk script (what the "model" actually emitted)
+    // contains no data-card of any kind — the one in the final message
+    // came only from the writer.write() call above.
+    modelNeverEmittedCard: !modelChunks.some((c: any) => c.type === "data-card"),
+  };
+  const allPass = Object.values(checks).every(Boolean);
+  write("result-ui-stream", (allPass ? "PASS " : "FAIL ") + JSON.stringify({ checks, partTypes }));
+  return allPass;
+}
+
 async function main() {
   const a = await runMockLoop();
   const b = await runStreamingLoop();
   const c = runProviderConstruction();
   const d = await runRequestBuilt();
+  const f = await runUiMessageStream();
   const e = await runRealCallIfKeyed();
   const done = $("done");
   done.setAttribute("data-done", "true");
@@ -298,8 +406,9 @@ async function main() {
   done.setAttribute("data-stream-pass", String(b));
   done.setAttribute("data-provider-pass", String(c));
   done.setAttribute("data-request-pass", String(d));
+  done.setAttribute("data-ui-stream-pass", String(f));
   done.setAttribute("data-real", String(e));
-  done.textContent = `done mock=${a} stream=${b} provider=${c} request=${d} real=${e}`;
+  done.textContent = `done mock=${a} stream=${b} provider=${c} request=${d} uiStream=${f} real=${e}`;
 }
 
 main();

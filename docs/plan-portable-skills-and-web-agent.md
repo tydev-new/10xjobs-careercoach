@@ -51,7 +51,7 @@ Browser tab
       │    `python3 …/check_materials.py` → the JS port (so skill prose is unchanged)
       ├─ tools: file read/write · checkers · web search (OpenRouter) ·
       │    ATS fetch (a Greenhouse/Lever/Ashby job URL → that board's public API)
-      └─ gate: send/submit/spend → "needs your word" → the typed yes in chat gets logged
+      └─ gate: spend only (owner, 2026-09-22) → "needs your word" → the typed yes gets logged
           │
 Supabase ─┼─ Auth
           ├─ Storage: users/{uid}/ws/{path}, versioned writes, per-user access rules
@@ -155,8 +155,8 @@ same runner is what B needs.
       the default Claude model and do **at least as well as the `claude -p`
       baseline** (majority of 3 trials), recorded in `docs/evals/`
 - [ ] a gate test: no send, submit, or spend happens without a logged typed yes
-- [ ] a turn loads roughly the same words as `loading-map.md`'s ~3,000 (no
-      bloat from the new loader)
+- [ ] a turn loads at most ~3,300 words of instructions (owner, 2026-09-22;
+      was `loading-map.md`'s ~3,000), so the new loader adds no bloat
 
 ### Step 5a - The UI on a mock agent · De, Co, Te · starts once step 1's contracts are approved, runs in parallel with 2, 3, and 4
 

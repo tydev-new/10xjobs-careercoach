@@ -538,7 +538,7 @@ groundwork ──── searching ──── applying ──── interviewin
 search-ready — profile, storybank populated, pitch + LinkedIn
 (positioning). It is a **state coach senses, not a skill**: no interviews
 scheduled + no pitch file + a thin storybank = groundwork, and coach
-prescribes the 1–3 next actions and routes to the owning skill. This
+prescribes the 2–4 next actions and routes to the owning skill. This
 resolves the "prep" naming trap (2026-08-14: the founder read "prep" as
 search-readiness; the skill means one scheduled interview): prep stays
 narrow — one interview, one brief — and the campaign-readiness umbrella

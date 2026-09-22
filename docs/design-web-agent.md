@@ -29,7 +29,7 @@ export interface Deps {
   fetch: typeof fetch;           // ATS fetch and the price list only
   clock: { now(): Date };        // every timestamp and mtime check reads this
   logger?: { info(e: object): void; warn(e: object): void; error(e: object): void };
-  limits?: { maxSteps?: number /* 25 */; spendGateUsd?: number /* PENDING OWNER */; windowWords?: number /* 4000 */ };
+  limits?: { maxSteps?: number /* 25 */; spendGateUsd?: number /* 1.00, owner 2026-09-22 */; windowWords?: number /* 4000 */ };
 }
 
 export interface Coach {
@@ -133,7 +133,7 @@ Rule 7: show the complete thing, then one plain sentence of what happens, then
 the candidate's typed yes, then a log entry. The wording comes from
 `gate-grammar.md`.
 
-**One kind on the web: `spend`** (PENDING OWNER). No tool sends or submits.
+**One kind on the web: `spend`** (owner decision, 2026-09-22). No tool sends or submits.
 The candidate's sends and submits go in `plan.md § To do` with the prepared
 file (the host note, § 7).
 
@@ -141,7 +141,8 @@ file (the host note, § 7).
 `needsGate: true`, code opens the spend gate and ends the turn:
 
 - `label` is the tool's `action` input (6 words or fewer, checked).
-- `text` is `action` plus the code-built cost line.
+- `text` is `action`, then each of `items` (the roles or files the run
+  covers) on its own line, then the code-built cost line.
 - `amountUsd` is `highUsd`.
 - `gateLine` is the spend line from the bundled `gate-grammar.md`, word for
   word, with `$<amount>` filled from `amountUsd` to two decimals. If the
@@ -155,7 +156,7 @@ The loop's own mid-run stop (§ 4) opens a gate the same way, with the action
 ```ts
 export interface GateRequest {   // data of the data-gate part; carries no status
   gateId: string; kind: "spend"; label: string; text: string;
-  textHash: string;              // sha256 of text as shown
+  textHash: string;              // "sha256:" + hex sha256 of text as shown (UTF-8)
   gateLine: string; amountUsd: number;
 }
 export interface Gate {
@@ -224,8 +225,8 @@ Nothing is thrown into the stream.
 | `bash` | `{ command }` | `{ stdout, stderr, exitCode, changed: string[] }` |
 | `web_search` | `{ query, maxResults? (≤ 5) }` | `{ results: [{ url, title, excerpt }] }` |
 | `fetch_job` | `{ url, saveTo? }` | `{ board, company, title, location, url, text, compensation?, savedTo? }` or `unsupported_url` |
-| `estimate_cost` | `{ action (≤ 6 words), steps, webSearches }` | `{ lowUsd, highUsd, balanceUsd, needsGate, method }`; opens the gate when `needsGate` (§ 3) |
-| `check_language` | PENDING OWNER: `{ files }` → `{ report, usd }` | or deferred (see Decision log) |
+| `estimate_cost` | `{ action (≤ 6 words), steps, webSearches, items? (≤ 8, each ≤ 12 words) }` | `{ lowUsd, highUsd, balanceUsd, needsGate, method }`; opens the gate when `needsGate` (§ 3) |
+| `check_language` | `{ files }` → `{ report, usd }` | adopted by the owner, 2026-09-22 |
 
 - **Versions are tracked by the package.** Per chat, it keeps the last version
   it saw for each path, from `read_file`, `write_file`, and `bash`
@@ -270,8 +271,8 @@ Nothing is thrown into the stream.
   - `needsGate` = `highUsd > spendGateUsd`;
   - it emits a `cost` card.
 
-  There is no pre-emptive over-balance error. The card shows the balance, and
-  the key's own limit stops the run (§ 8).
+  Past the threshold, code always opens the gate, even when the spend exceeds
+  the balance; the key's 402 (§ 8) is the only over-balance stop.
 - **Allowance.** Each turn may spend `spendGateUsd`, or the amount of a gate
   approved by the message that started the turn. After each step the loop adds
   up the measured cost. If the next step would pass the allowance, the loop
@@ -465,9 +466,8 @@ approves on a click.
 4. **Never loaded:** scripts run through `bash`, and only their output enters
    context.
 
-**Target: ~3,300 words of instructions per turn** (PROPOSED by the lead on
-2026-09-22 because Tier 0 grew; **pending owner decision**. The plan's step 4
-exit says ~3,000 until the owner decides). That is the always-on block plus one `SKILL.md`.
+**Target: ~3,300 words of instructions per turn** (owner decision,
+2026-09-22, because Tier 0 grew). That is the always-on block plus one `SKILL.md`.
 
 **Window:** the package re-sends at most `windowWords` (4,000) of history,
 dropping whole older turns first and always keeping the latest user message.
@@ -507,16 +507,16 @@ usage, which equals the live key's remaining limit.
 | `delete_account` | user session | `revoke`; delete everything under `users/{uid}/`; delete the rows and the auth user |
 | `raise` | **service role only** | add to `balance_usd`, and `PATCH` the live key's `limit` up by the same amount |
 
-- OpenRouter endpoints: `POST /api/v1/keys` (`name`, `limit`),
-  `PATCH /api/v1/keys/{hash}`, `DELETE /api/v1/keys/{hash}`.
-- The `accounts` row: `user_id` · `balance_usd` · `key_hash` · `updated_at`.
-  The user can read their own row; only the function writes it.
+- Endpoints: `POST`/`PATCH`/`DELETE /api/v1/keys[/{hash}]`. Row `accounts`:
+  `user_id` · `balance_usd` · `key_hash` · `updated_at` (own row readable;
+  only the function writes).
 - **Beta funding (PENDING OWNER):** an admin-set starter credit through
   `raise`. There is no payment page. The first-run greeting is static UI text,
   not a `UIMessage`, and is never sent to the model. It says when the balance
   is $0.
 - **The browser holds** the user's key in memory only (fetched at run time,
-  never from a build variable) and the Supabase session.
+  never from a build variable) and the Supabase session. User-facing text
+  calls it **"your usage key"**.
 - **One tab:** a Web Locks lock. A second tab shows "Ten is open in another
   tab" and does not mint. A reload mints again, which rotates the key.
 - **`deps.balance()`** is `GET /api/v1/key` → `data.limit_remaining` with the
@@ -552,8 +552,7 @@ The pass criteria are the plan's (step 1). Status:
 
 - Only a spend gate on the web: nothing there sends or submits (PENDING
   OWNER; the local plugin keeps send and submit).
-- The gate opens from `estimate_cost`: one way to open a gate, and one fewer
-  tool in every turn's context.
+- The gate opens from `estimate_cost`: one way in, one tool fewer.
 - Cards are built by code: a card the model wrote would be narration
   presented as a file (rule 11).
 - The verdict card is a receipt, not a summary: evaluate's summary card
@@ -566,7 +565,5 @@ The pass criteria are the plan's (step 1). Status:
 - Tier 0 comes from the bundle: a writable system prompt is a persistent
   injection path.
 - Versions tracked by the package; status derived, not sent (no second copy).
-- `check_language` (PENDING OWNER): either one fresh-context model call per
-  document set (about $0.015–$0.02 a call, to be measured), or defer it and
-  record the gap in step 4's t15 results, with the reply saying the check did
-  not run.
+- `check_language` (owner: adopt, 2026-09-22): one fresh-context model call
+  per document set (about $0.015–$0.02 a call, to be measured in step 4).

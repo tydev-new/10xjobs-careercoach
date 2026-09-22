@@ -68,12 +68,14 @@ const done = await page.$eval("#done", (el) => ({
   streamPass: el.getAttribute("data-stream-pass"),
   providerPass: el.getAttribute("data-provider-pass"),
   requestPass: el.getAttribute("data-request-pass"),
+  uiStreamPass: el.getAttribute("data-ui-stream-pass"),
   real: el.getAttribute("data-real"),
 }));
 const resultMock = await page.$eval("#result-mock", (el) => el.textContent);
 const resultStream = await page.$eval("#result-stream", (el) => el.textContent);
 const resultProvider = await page.$eval("#result-provider", (el) => el.textContent);
 const resultRequest = await page.$eval("#result-request", (el) => el.textContent);
+const resultUiStream = await page.$eval("#result-ui-stream", (el) => el.textContent);
 const resultReal = await page.$eval("#result-real", (el) => el.textContent);
 
 console.log("DOM #done:", done);
@@ -81,6 +83,7 @@ console.log("DOM #result-mock:", resultMock);
 console.log("DOM #result-stream:", resultStream);
 console.log("DOM #result-provider:", resultProvider);
 console.log("DOM #result-request:", resultRequest);
+console.log("DOM #result-ui-stream:", resultUiStream);
 console.log("DOM #result-real:", resultReal);
 if (consoleErrors.length) console.log("console errors:", consoleErrors);
 
@@ -127,6 +130,7 @@ const ok =
   done.streamPass === "true" &&
   done.providerPass === "true" &&
   done.requestPass === "true" &&
+  done.uiStreamPass === "true" &&
   leaks.length === 0;
 console.log(ok ? "VERIFY PASS" : "VERIFY FAIL");
 process.exit(ok ? 0 : 1);

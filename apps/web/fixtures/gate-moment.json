@@ -1,7 +1,7 @@
 {
   "meta": {
     "persona": "Priya Nakamura (invented) — priya.nakamura.demo@example.com, 555-0177",
-    "description": "Round 4 (docs/reviews/step1-rereview.md, lead decisions settled by the coordinator): fixture is {meta, files, messages} (N5); request_gate is merged into estimate_cost — there is no separate tool-request_gate call, code opens the spend gate itself the moment estimate_cost returns needsGate: true, with label = the tool's own `action` input. The invented over-balance pre-check path (a cost that exceeds the balance skipping straight to a data-error before anything ran) is deleted (N3) — the contract has no such rule; a real over-balance data-error only ever comes from an actual OpenRouter rejection mid-run, which is what over-limit-error.json now shows instead. Also removed: the claim that the agent 'can look at their LinkedIn pages' (N2 — the app has no browsing tool and every step costs money)."
+    "description": "The one gate kind the web MVP has: a spend gate, opened directly by code from estimate_cost when needsGate is true (no separate request_gate tool call). estimate_cost's optional items list (the roles being researched) is included and shown in the gate's text under the action, so the candidate sees which six roles, not just a count. A non-yes reply leaves the gate pending; the typed yes approves it. No internal gate id appears in candidate-facing text."
   },
   "files": {},
   "messages": [
@@ -18,7 +18,14 @@
       "role": "assistant",
       "parts": [
         { "type": "tool-estimate_cost", "toolCallId": "call-1", "state": "output-available",
-          "input": { "steps": 18, "webSearches": 18, "action": "evaluate 6 saved roles" },
+          "input": { "steps": 18, "webSearches": 18, "action": "evaluate 6 saved roles", "items": [
+            "Solace Metrics — Senior PM",
+            "Northwind Analytics — Staff PM",
+            "Vantage Cloud — Group PM",
+            "Bright Harbor Software — Senior PM",
+            "Cedar Peak Data — Staff PM",
+            "Fernline Logistics — Senior PM"
+          ] },
           "output": { "lowUsd": 0.50, "highUsd": 0.70, "balanceUsd": 4.20, "needsGate": true, "method": "steps × per-step cost measured so far this chat (median for lowUsd, highest for highUsd); web searches at the plugin's listed price" } },
         { "type": "data-card", "data": { "card": "cost", "props": {
           "action": "evaluate 6 saved roles",
@@ -30,8 +37,8 @@
           "gateId": "gate-priya-1",
           "kind": "spend",
           "label": "evaluate 6 saved roles",
-          "text": "evaluate 6 saved roles. Estimated cost: $0.50–$0.70.",
-          "textHash": "sha256:9ffe1334bb19e8c6c3640ba9d22dabae6240773832d877b793d9cb14728bc1ed",
+          "text": "evaluate 6 saved roles\nSolace Metrics — Senior PM\nNorthwind Analytics — Staff PM\nVantage Cloud — Group PM\nBright Harbor Software — Senior PM\nCedar Peak Data — Staff PM\nFernline Logistics — Senior PM\nEstimated cost: $0.50–$0.70.",
+          "textHash": "sha256:35f69724742c81ff95e5abfcac4c5f99f538139988635df37c7b2a3ab36b0e25",
           "gateLine": "This costs up to $0.70 — nothing starts until you say yes.",
           "amountUsd": 0.70
         } },
@@ -50,10 +57,16 @@
       "id": "m4",
       "role": "assistant",
       "parts": [
-        { "type": "text", "text": "That wasn't a yes, so gate-priya-1 is still pending and nothing started." },
+        { "type": "text", "text": "That wasn't a yes, so the gate above is still pending and nothing started." },
         { "type": "data-gate-status", "data": { "gateId": "gate-priya-1", "status": "pending" } },
         { "type": "tool-estimate_cost", "toolCallId": "call-2", "state": "output-available",
-          "input": { "steps": 15, "webSearches": 15, "action": "evaluate 5 saved roles" },
+          "input": { "steps": 15, "webSearches": 15, "action": "evaluate 5 saved roles", "items": [
+            "Solace Metrics — Senior PM",
+            "Northwind Analytics — Staff PM",
+            "Vantage Cloud — Group PM",
+            "Bright Harbor Software — Senior PM",
+            "Cedar Peak Data — Staff PM"
+          ] },
           "output": { "lowUsd": 0.35, "highUsd": 0.48, "balanceUsd": 4.20, "needsGate": false, "method": "steps × per-step cost measured so far this chat (median for lowUsd, highest for highUsd); web searches at the plugin's listed price" } },
         { "type": "data-card", "data": { "card": "cost", "props": {
           "action": "evaluate 5 saved roles",
@@ -61,7 +74,7 @@
           "highUsd": 0.48,
           "balanceUsd": 4.20
         } } },
-        { "type": "text", "text": "5 comes to $0.35–$0.48, under the threshold, so that one needs no gate at all. The 6-role gate above is still open if you want all 6 — say yes to that one, or tell me to go ahead with 5." }
+        { "type": "text", "text": "5 comes to $0.35–$0.48, under the threshold, so that one needs no gate at all. The gate for all 6 is still open above if you want them all — say yes to that one, or tell me to go ahead with 5." }
       ]
     },
     {

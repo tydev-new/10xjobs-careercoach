@@ -421,3 +421,182 @@ admin credit; `spendGateUsd`; accepting spike 2 on the mechanism; the
 `gate_log` as the one status owner, no saved chat, the balance as one
 number. It needs no redesign. What remains is making the fixtures and
 the UI doc match it, then cutting it back.
+
+---
+
+## Verification of fixes (a03363f)
+
+**Checked:** `0f9a16a`, `c46028f` (gate-grammar and coach lines only),
+`6478755` (gate-grammar only) and `a03363f`. I read each file myself and
+did not rely on the commit messages. The harness changes in `c46028f` and
+`6478755` are out of scope and not reviewed here.
+
+**Spot checks, run on a `mktemp -d` workspace built from each fixture's
+own `files` (never `~/job-search`):**
+
+- `mvp-journey`:
+  - `check_materials` (résumé + letter + base): stdout matches, exit 0.
+  - `render_resume`: prints `words: 109`, and the HTML is byte-identical
+    to the fixture's `.html`.
+  - `proposal_block`: its WARN tail matches.
+  - `check_closeout --stage applying`: stdout matches, exit 0.
+  - `record_verdict … --jd-file … --company-file`: writes the same
+    `JD:` / `Company file:` lines as the fixture's `jobs.md`.
+- `checker-failure`: I rebuilt the first-pass résumé (the final file with
+  the "Scaled … 4x" bullet put back). `check_materials` stdout is
+  byte-identical to the fixture's FAIL output, exit 1.
+- Every fixture is `{ meta, files, messages }`. Every `data-card.ref`,
+  plan item `ref`, and `read_file`/`write_file` path exists in `files`
+  (checked by script over all five fixtures).
+- Word counts (`wc -w`): the contract is **4,786** (target ≤ 4,800 met);
+  the UI doc is **2,304** (target ≤ 3,500 met).
+- `python3 tests/run.py`: 112 passed, 0 failed.
+
+### Re-review findings
+
+| item | status | evidence |
+|---|---|---|
+| **N1** plan and verdict cards from the builder | **RESOLVED** | `parsePlanTodo` is exported and specified (C:44, 420-429), with its test (C:438-439). The fixture card's `text` matches the `plan.md` lines word for word, and each `ref` is the backticked path. `record_verdict` passes `--jd-file`, and `jobs.md` carries `JD: jd-analysis/acme-staff-pm.md`. Residual: V3. |
+| **N2** unsupported claims | **RESOLVED**, one residual | The letter word count, "checker-clean", "the posting is fresh", "pipeline", the send/submit gate talk and the LinkedIn claim are all gone. The reply says the language check has not run (mvp-journey m9). Residual: the internal id "gate-priya-1" still appears in candidate-facing text (gate-moment.json:53), and "I have no submit tool **yet**" (`plan.md` item 2) implies a promise (NIT). |
+| **N3** invented over-balance path | **RESOLVED** in C and the fixtures | C:273-274. gate-moment.json has no `data-error`. over-limit-error.json shows only the loop's real rejection. Residual in the UI doc: V4. |
+| **N4** skill edits committed | **RESOLVED** | Spend line in `0f9a16a`; four steps plus the new spend line in `6478755`; coach 2–4 in `0f9a16a`. The stale C:26-27 and UI "at most 3" text is gone. Residuals: V5 (a precedence-chain doc still says 1–3); `docs/README.md` is still uncommitted (` M`). |
+| **N5** one fixture format with files | **RESOLVED** | C:380-387 and UI:242-252 agree. All five fixtures follow it, and every path resolves (checked above). |
+| **S1** Tier 0 injection | **RESOLVED** in C | Path rule C:89-90; bash write-back refusal C:240-243; bundle-only Tier 0 C:449-452; tests C:485-488. NIT: the fixtures' `files` have no `CLAUDE.md`, but C:450-451 says code writes it at sign-up. |
+| **S2** spend line wording and fill rule | **RESOLVED** | `gate-grammar.md:12`, "This costs up to $<amount> — nothing starts until you say yes.", equals C:149 and gate-moment.json `gateLine` "This costs up to $0.70 — nothing starts until you say yes." word for word. The fill rule is C:146-148. |
+| **S3** UI copied contract types | **RESOLVED** | The UI now points to C instead of copying it (UI:11-17). The `statusOf` `ready` guard is in C:375; polling, "eight tools", `check_files` cards and "fewer than 2" are all gone. |
+| **S4** apply's three artifacts | **PARTLY** | The host note says it (C:455-456). The mvp-journey delivery reply (m9) never says the outreach plan and PDF are not made here. |
+| **S5** first-run greeting | **PARTLY** | C:515-517 says it is static text, not a `UIMessage`, and names the $0 balance. But UI:98-107 claims its sample names the $0 balance, and the sample doesn't. `empty-first-run.json` m1 and `mvp-journey.json` m1 still carry the greeting as an assistant `UIMessage`. |
+| **S6** keyless half of spike 1 | **OPEN** | Now listed as still to do (C:543-544). `docs/spikes/spike-1-browser-loop.md` is unchanged since `4791788`. |
+| **S7** UNVERIFIEDs settled from docs | **RESOLVED** | C:522-527. |
+| **S8** versions in fixture outputs | **RESOLVED** | Outputs are `{ path, written: true }` / `{ path, content, readOnly }`, matching C:221-222. |
+| NIT-1 revision history in data | **PARTLY** | The `note_round*` and `todo_b*` keys are gone. The `meta.description` fields still narrate review rounds. |
+| NIT-2 wireframe | **RESOLVED** | UI:28-52 |
+| NIT-3 checker-failure description | **RESOLVED** | UI:280-282 |
+| NIT-4 3,300 vs 3,000 words | **RESOLVED as an owner decision** | C:468-470 |
+| NIT-5 re-emit without a write | **RESOLVED** | C:186 |
+| NIT-6 spike-1 stale line refs | **OPEN** | spike note unchanged |
+| NIT-7 idle "session" vs "chat" | **OPEN** | UI:79 vs C:378 |
+
+### First-review items that were PARTLY
+
+| R1 | status | evidence |
+|---|---|---|
+| B5 language checker | **RESOLVED** pending the owner decision | The reply and `plan.md` say it did not run (mvp-journey m9, `plan.md`). C:228, 569-572. |
+| B8 invented output | **RESOLVED**, one NIT | Script stdout re-run as above, and `jobs.md` is the real script format. NIT: `write_file` inputs and `read_file` outputs are cut short with "…" (e.g. checker-failure `"# Deshawn Whitfield…\n- Scaled …"`). UI:236-238 promises the expanded "ran" row shows the literal input, so the fixture shows an input that was never written. `files` already holds the full text, so use it. |
+| B11 spike 1 | **PARTLY** | unchanged; see S6 above |
+| S1 cost / "go" | **RESOLVED** | over-limit-error.json m2 now says "no gate needed — starting now"; the candidate never types "go". |
+| S3 uploads | **OPEN in the fixture** | The file part is still `url: "blob:fixture/…"`, and the PDF sits at the workspace root. The fixture now builds on that: the `check_files` WARN is real, and the agent offers to move the file. C:92-96 says the upload lands in `documents/` with a `workspace:` URL. See V2. |
+| S7 plan card | **RESOLVED** (N1), with V3 | |
+| S9 plain words | **PARTLY** | "gate-priya-1" is still in candidate text (gate-moment.json:53). "self-passes" is gone. |
+| S15 parity denominator | **RESOLVED** | `test_e2e_lifecycle` added (C:329-331). |
+| NIT hash | **PARTLY** | Now 64 hex digits, but it is not sha256 of the gate's `text` (checked). The builder will compute it, so give the fixture the real hash. |
+| NIT "OpenRouter key" jargon | **OPEN** | UI:57-58 "manage the OpenRouter key" |
+| NIT over-limit estimate | **OPEN** | $0.60–$0.90 estimated against a $1.00 balance; out after 2 of 8 roles; the final reply doesn't say the estimate was wrong (rule 8). |
+
+### New findings the fixes introduced
+
+No BLOCKERs.
+
+**SHOULD**
+
+- **V1. The spend gate shows less of "the complete thing" after the merge (rule 7, Part 1).**
+  - `text` is now the ≤ 6-word `action` plus the cost line (C:143-144).
+    In the fixture that is "evaluate 6 saved roles. Estimated cost:
+    $0.50–$0.70." (gate-moment m2). The candidate cannot see *which* six
+    roles.
+  - `gate-grammar.md:7` says of the artifact: "Never a description of it;
+    the thing itself."
+  - **Smallest fix:** `estimate_cost` takes an optional `items: string[]`
+    (the roles or files the run covers, 10 at most). Code lists them in
+    `text` under the action. `label` stays the action. This is an owner
+    decision because it touches the merge (decision 6 below).
+- **V2. Save locations: `documents/` for uploads, `jd-inbox/` for fetched posts (C § 2 and § 4; rule 12).**
+  - mvp-journey uploads to the root (a `blob:` URL). `fetch_job`
+    `saveTo` writes `jd-acme-staff-pm.txt` at the root.
+  - Running `check_files` on the fixture's final `files` prints **two**
+    stray WARNs (both files).
+  - The search schema already names the place: `jd-inbox/<company>-<title>.md`
+    (`skills/search/references/schema.md:45`).
+  - **Fix:**
+    - C § 4 says `saveTo` defaults to `jd-inbox/<company>-<title>.md`.
+    - The fixture uploads to `documents/jordan-alvarez-resume.pdf` with a
+      `workspace:` URL, which removes the WARN and the "move it?" line.
+    - Its session close runs `check_files` (C:311 lists it for "every MVP
+      skill at close").
+- **V3. The fixture's `plan.md` items have no minutes (coach `schema.md:33-34`, rule 6).**
+  - The schema says each To do item is "fully prepared, each with its why
+    + minutes". C's decision log (C:561-562) keeps lines word for word *on
+    the grounds that* each line already carries why and minutes.
+  - All three fixture items lack minutes, and item 3 has no why either.
+    The approval screen shows a plan the coach schema forbids.
+  - **Fix:** the fixture's lines. The card is unaffected.
+- **V4. The UI doc says an over-balance spend gets no gate, but code always opens one when `needsGate` (seam, rule 12).**
+  - UI:202-206: "A spend that would exceed the balance never gets a gate
+    at all … the agent's prose says a top-up is needed."
+  - In C, code opens the gate whenever `highUsd > spendGateUsd`
+    (C:140-141, 270). The model cannot hold it back.
+  - **Fix:** delete that sentence. The `cost` card already shows the
+    balance next to the range, and the key's limit is the backstop
+    (C:273-274).
+- **V5. A precedence-chain document still says "1–3" (chain conflict, CLAUDE.md precedence).**
+  - `docs/design-cowork-coaching.md:541`: "prescribes the 1–3 next
+    actions". PRINCIPLES rule 6 and the committed coach skill say 2–4.
+  - The chain is wrong at this line. Fix the doc; don't pick a winner.
+
+**NIT**
+
+- `apps/workspace-ui/` is **untracked** (`git ls-files` is empty), yet C
+  builds on `workspace-core.mjs` (C:6, 62, 421-422).
+  `docs/design-cross-host-active-context.md` is also untracked. An
+  approved contract should cite committed files.
+- The fixtures' `meta.description` fields narrate review rounds
+  ("Round 4 (docs/reviews/…)"). Keep a one-line description.
+
+### Verdict
+
+**The contracts (`docs/design-web-agent.md`) are ready for owner approval.**
+This excludes spikes 3 and 4 and spike 1's live call, which wait on
+owner accounts and keys. No blocker remains. What is left is SHOULDs and
+NITs.
+
+**The fixture screens should get one more small pass before O approves
+them.** Step 5a starts the moment step 1 exits, and it builds from these
+fixtures. The pass:
+
+1. V2: save locations.
+2. V3: minutes in the `plan.md` lines.
+3. V4: delete the UI sentence.
+4. S5: the greeting as static text that names $0.
+5. S4: the delivery reply says no outreach plan or PDF.
+6. The "gate-priya-1" id in candidate text.
+
+These are fixture and UI-doc edits. None touches the contract.
+
+Also before step 1 closes:
+- V5: fix the chain doc.
+- S6: the keyless half of spike 1.
+- Commit `docs/README.md`, and settle where `apps/workspace-ui` lives in
+  the repo.
+
+**Owner decisions to record at approval:**
+
+1. The web MVP has **only the spend gate**. Sends and submits are
+   candidate to-dos in `plan.md`, and the local plugin keeps its send and
+   submit gates.
+2. **`check_language`:** adopt it (one fresh-context model call per
+   document set, about $0.015–$0.02 a call, to be measured), or defer it
+   (the reply says the check did not run; the gap is recorded in step 4's
+   t15). Step 4 needs this answer.
+3. **Beta funding** is an admin-set starter credit through `raise`, with
+   no payment page.
+4. **`spendGateUsd`:** the per-turn spend threshold.
+5. **Accept spike 2 on the mechanism.** File-name dispatch and
+   `check_materials` parity become step 3's first task.
+6. **The gate opens from `estimate_cost`** (the `request_gate` merge),
+   including V1: whether the spend gate lists the run's items.
+7. **The per-turn target is ~3,300 words of instructions**, instead of
+   the plan's ~3,000. If approved, update plan:158-159.
+8. **On the web, Tier 0 always comes from the bundle, and `CLAUDE.md` is
+   not writable.** A candidate's own edits to `CLAUDE.md` (for example, a
+   folder imported from local use) are kept and exported, but the web
+   ignores them.

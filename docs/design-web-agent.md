@@ -562,9 +562,12 @@ invited you for access."
    reads the other copy to the end (parsing only the last `data:` line) and
    writes one `ten_usage_ledger` row keyed by the response `id`, from the
    final chunk's `usage.cost` and token counts, error endings included. The
-   cost is used only if it is a finite number from 0 to the ceiling; if it is
-   missing or invalid, or the meter passes its ~360 s deadline, the row
-   records the **ceiling**, computed from the formula (64k input tokens ×
+   cost is used if it is a finite number from 0 to 10× the ceiling (a cost
+   above the ceiling is recorded as reported, never undercounted, and
+   logged as an anomaly; the caps make it unexpected); if it is missing,
+   non-finite, negative or beyond 10×, or the meter passes its ~360 s
+   deadline (timed from the request's start), the row records the
+   **ceiling**, computed from the formula (64k input tokens ×
    input price + 4,096 × output price + one search; about $0.18 today). One
    metering path only.
 6. **Failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx,

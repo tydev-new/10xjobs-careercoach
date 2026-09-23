@@ -1,259 +1,322 @@
-# Spike 3 — Supabase Storage isolation
+# Spike 3 — Supabase isolation, re-run against the applied migration
 
 **Code:** `spikes/3-supabase-isolation/` · **Date:** 2026-09-23 · **Node:** v25.6.0
 **Versions:** `@supabase/supabase-js@2.58.0`
 
-**Run against:** the owner's production Supabase project (owner decision
-2026-09-23). Credentials came only from the repo's git-ignored `.env.local`:
-`SUPABASE_URL`, `SUPABASE_ANON_KEY` (publishable, `sb_publishable_…`),
-`SUPABASE_SERVICE_ROLE_KEY` (secret, `sb_secret_…`). No other Supabase
-credential exists in this environment (confirmed: `.env.local` has exactly
-these three Supabase lines, no DB password, no Management API personal
-access token; no Supabase CLI is installed or linked).
+**Run against:** the owner's production Supabase project `career-coach-nextgen`
+(ref `ivunfotoggdxbjouumdk`), immediately after
+`supabase/migrations/20260923000000_ten_beta_init.sql` was applied (owner,
+2026-09-23) — this is the OWNER CHECKLIST's step 3 in that file: "Re-run spike
+3's isolation tests against the real project." Credentials came only from the
+repo's git-ignored `.env.local`: `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+(publishable, `sb_publishable_…`), `SUPABASE_SERVICE_ROLE_KEY` (secret,
+`sb_secret_…`).
 
-## Status: BLOCKED on one piece — the RLS policies could not be created
+## Status: PASS
 
-Everything that does **not** require executing SQL ran for real against
-production and is reported PASS/FAIL below, with real output. The one piece
-that needs SQL — creating the per-user-folder Storage RLS policies — is
-**BLOCKED**: Supabase only exposes `CREATE POLICY` through the SQL editor,
-the Management API (needs a personal access token, `sbp_…`), or a direct
-Postgres connection (needs the project's DB password). None of those exist
-in `.env.local`, which this spike was scoped to. See "The blocker" below.
+Every isolation test below is a real **PASS** against the live project, on
+the real `ten-workspaces` bucket, `ten_ws_files`, `ten_usage_ledger`,
+`ten_gate_log` tables and the `ten_*` RPC functions the migration created —
+not a throwaway bucket, not a draft policy file. This supersedes the first
+pass (2026-09-23, earlier the same day), which was **BLOCKED** because the
+migration had not been applied yet and this spike had no path to run
+`CREATE POLICY` itself (see git history for that run's output; its
+UNVERIFIED-item findings on `If-Match`/`updated_at` are unchanged and
+restated below since they came from the service-role client, independent of
+the per-user policies).
 
-Because the policies were never created, the bucket sat at Storage's
-**default** state for a private bucket with zero policies: deny every
-request except the service role. The per-user isolation tests (A writes,
-B cannot list/read/overwrite/delete A's object, B can write its own, A
-cannot read B's) ran anyway, against that default state, so the real
-denials are recorded — but they are reported **BLOCKED**, not PASS, because
-they prove "nobody can do anything without a policy," not "the per-user
-folder rule holds." The rule under test was never actually installed.
+Unlike the first pass, this run creates **nothing** structural: the bucket,
+tables, functions and policies all already exist from the migration. This
+run only creates 3 throwaway auth users, a $5 credit ledger row each for two
+of them, and a handful of rows/objects under those 3 users — all removed in
+`cleanup()`, verified by re-querying afterward.
 
-## Pass criteria (plan step 1, spike 3) and results
+## Scope
 
-| # | Criterion | Result |
-|---|---|---|
-| — | Create the bucket, fail if it exists | **PASS** |
-| — | Create two auth users via the admin API | **PASS** |
-| — | Add the per-user-folder Storage RLS policies | **BLOCKED** — no SQL execution path available (see below); exact policies drafted in `policies.sql` |
-| 1 | A writes `users/A/ws/plan.md` | **BLOCKED** — refused by the RLS default-deny (no policy exists yet), not by the per-user rule |
-| 2 | B cannot list `users/A/ws` | **BLOCKED** — same reason; B's list also returns nothing, but so would A's own |
-| 3 | B cannot read A's object | **BLOCKED** — same reason |
-| 4 | B cannot overwrite A's object | **BLOCKED** — same reason |
-| 5 | B cannot delete A's object | **BLOCKED** — same reason (and A's object never existed to delete, since A's own write above was also refused) |
-| 6 | B can write its own object | **BLOCKED** — refused by the same default-deny that blocks everyone until the policies exist |
-| 7 | A cannot read B's object | **BLOCKED** — same reason |
-| — | Cleanup: objects, bucket, policies, both users deleted; re-list proves it | **PASS** — no policies were created, so nothing to drop there; objects, bucket, and both users are confirmed gone (see output) |
+Exactly 3 throwaway auth users, created via the admin API:
 
-## Design contract's UNVERIFIED items (`docs/design-web-agent.md` § 2)
+- **A** (`spike3-a+<rand>@example.com`) — given a $5 `credit` ledger row (service role): a beta member.
+- **B** (`spike3-b+<rand>@example.com`) — given a $5 `credit` ledger row (service role): a beta member.
+- **N** (`spike3-n+<rand>@example.com`) — no ledger row: **not** a member.
 
-These do **not** depend on the per-user policies — they were tested for
-real, using the service-role client (which bypasses RLS) writing to its own
-throwaway path inside the bucket.
+No table, function, policy or bucket was created or altered. All three tests
+below run with each user's **own session** (`signInWithPassword`, publishable
+key) except the credit-row insert, the pre/post-cleanup verification, and the
+service-role reads used only to prove another user's row was untouched
+(never used to perform the action under test).
 
-| # | Question | Result |
-|---|---|---|
-| 1 | Does an upload honor `If-Match` (conditional write / version check)? | **NO.** A `POST … x-upsert: true` with a deliberately wrong `If-Match` value still returned `200` and overwrote the object. Supabase Storage has no native conditional-write / optimistic-concurrency support (confirmed independently: Supabase staff, [GitHub Discussion #40482](https://github.com/orgs/supabase/discussions/40482) — "Storage-level locks or conditional writes — not on the immediate roadmap"; the recommended pattern is application-level version tracking in Postgres, which matches design-web-agent.md § 4's "versions are tracked by the package," not by Storage). |
-| 2 | Does `updated_at` change on overwrite? | **YES.** `2026-09-23T19:52:43.474Z` → `2026-09-23T19:52:44.053Z` after the overwrite (and the ETag changed too, `4f98f59e…` → `b252903f…`), so `FileInfo.updatedAt`/`version` (§ 2) can key off it. |
-| 3 | Create-only semantics (no `x-upsert`) on an existing key | A second `POST` with no `x-upsert` on the same key is refused: `409 Duplicate` / `KeyAlreadyExists`. This is the mechanism `WorkspaceStore.write(path, content, null)` (create) should rely on — not a conditional header. |
+## Results — `ten_ws_files` (RPC `ten_ws_write` + table select)
 
-**What this means for the design:** the workspace store's `expectedVersion`
-compare-and-swap (§ 2) cannot be implemented as a Storage-level conditional
-write (no `If-Match` support). Per design-web-agent.md § 2's own fallback —
-*"If they don't, step 2 brings a compare-and-swap design to the architect
-before building it. A read-then-upload does not meet this contract."* — this
-spike confirms that fallback is needed: step 2 needs an architect-approved
-compare-and-swap design (e.g., store the version/ETag in a small Postgres
-table and gate the Storage write behind a `WHERE version = X` update, the
-same pattern Supabase staff recommend) before writing `WorkspaceStore.write`.
+| Test | Result |
+|---|---|
+| A creates `plan.md` (`ten_ws_write`, create) | **PASS** — `200`, returns `path/version/updated_at` |
+| B's select of A's row returns 0 rows | **PASS** — `200`, `[]` |
+| B's write to `plan.md` creates B's own row, not A's; A's row unchanged | **PASS** — B's write `200` (its own `user_id, path` row); service-role read of A's row afterward: unchanged content |
+| Stale `expectedVersion` → PT409 `version_conflict` | **PASS** — `409 {"message":"version_conflict"}` |
+| Missing file with an `expectedVersion` → PT404 `resource_missing` | **PASS** — `404 {"message":"resource_missing"}` |
+| Create twice (no `expectedVersion` on an existing path) → PT409 `already_exists` | **PASS** — `409 {"message":"already_exists"}` |
+| Path rule: `skills/x.md` → PT403 `not_editable` | **PASS** |
+| Path rule: `claude.md` in a subfolder → PT403 `not_editable` | **PASS** |
+| Path rule: `../x.md` → PT400 `invalid_ref` | **PASS** |
+| Path rule: `.hidden.md` → PT400 `invalid_ref` | **PASS** |
+| Path rule: a zero-width char (U+200B) → PT400 `invalid_ref` | **PASS** |
+| Path rule: an NFD-normalized path (`e` + combining acute, not precomposed) → PT400 `invalid_ref` | **PASS** |
+| N (non-member): write → PT403 `not_a_member` | **PASS** |
+| N (non-member): select → 0 rows | **PASS** |
+| anon (publishable key, no session): write refused | **PASS** — `401`, `42501 permission denied for function ten_ws_write` (no `execute` grant to `anon`) |
+| anon (publishable key, no session): select refused | **PASS** — `401`, `42501 permission denied for table ten_ws_files` (no `select` grant to `anon`) |
 
-## The blocker
+## Results — Storage (`ten-workspaces` bucket, Storage API)
 
-Creating `CREATE POLICY` statements on `storage.objects` requires running
-SQL against the project's Postgres database. Supabase exposes exactly three
-ways to do that, and none is reachable with the credentials in
-`.env.local`:
+| Test | Result |
+|---|---|
+| A uploads `users/{A}/ws/documents/cv.pdf` (tiny valid PDF) | **PASS** |
+| B cannot list `users/{A}/ws/documents` | **PASS** — 0 entries |
+| B cannot download A's `cv.pdf` | **PASS** — error |
+| B cannot overwrite A's `cv.pdf` | **PASS** — "new row violates row-level security policy" (also: no update policy exists at all, create-only for everyone) |
+| B uploading a new file into A's folder is refused | **PASS** — same RLS error |
+| A uploading a `.md` file to the bucket is refused (binaries only) | **PASS** — "mime type text/markdown is not supported" (bucket's `allowed_mime_types`) |
+| N (non-member) cannot upload to their own folder | **PASS** — RLS error (`ten_is_member()` false in the insert policy) |
+| anon cannot list `users/{A}/ws/documents` | **PASS** — 0 entries |
+| anon cannot download A's `cv.pdf` | **PASS** — error |
+| A can read their own `cv.pdf` | **PASS** — downloaded size matches the uploaded bytes (188 bytes) |
 
-1. **Studio SQL editor** — a human, logged into the dashboard; not scriptable from here.
-2. **Management API** (`POST /v1/projects/{ref}/database/query`) — needs a
-   **personal access token** (`sbp_…`), a different credential from
-   `SUPABASE_SERVICE_ROLE_KEY`. Not present in `.env.local`.
-3. **Direct Postgres connection** (`postgres-js`, `pg`, `supabase db push`) —
-   needs the project's **database password**, also a different credential.
-   Not present in `.env.local`, and no Supabase CLI is linked in this
-   environment (`supabase --version` → not found; no `~/.supabase` project
-   link; no `supabase/config.toml` in the repo).
+## Results — the ledger
 
-`SUPABASE_SERVICE_ROLE_KEY`/`SUPABASE_ANON_KEY` only authenticate the
-**PostgREST, Storage, and GoTrue HTTP APIs**, which do CRUD on existing
-tables/objects and call existing RPC functions — they do not expose a "run
-arbitrary DDL" endpoint (verified against Supabase's own docs and the
-Storage security guide: uploads are blocked "unless you create an RLS
-policy on the storage.objects table," and that policy is created "either
-through the Studio UI (Policies section) or by directly executing SQL").
-Fabricating a workaround (e.g., installing a general-purpose SQL-exec RPC
-function in production to bootstrap the policies) would itself be a new,
-security-sensitive capability out of this spike's scope, so it was not
-done.
+| Test | Result |
+|---|---|
+| A sees only their own `ten_usage_ledger` rows | **PASS** — 1 row, `user_id = A` |
+| `ten_balance()` = 5 for A | **PASS** |
+| `ten_balance()` = 0 for N | **PASS** |
+| A cannot call `ten_balance_for` (service-role only) | **PASS** — `403`, `42501 permission denied for function ten_balance_for` |
+| A cannot call `ten_beta_spend_today` (service-role only) | **PASS** — `403`, `42501 permission denied for function ten_beta_spend_today` |
+| A cannot insert a ledger row directly | **PASS** — `403`, `42501 permission denied for table ten_usage_ledger` |
 
-**The exact policies to apply are ready** in
-[`spikes/3-supabase-isolation/policies.sql`](../../spikes/3-supabase-isolation/policies.sql)
-— four policies (`select`/`insert`/`update`/`delete`), each scoped to
-`bucket_id = 'spike3-isolation'` and to `(storage.foldername(name))[1] =
-'users' and (storage.foldername(name))[2] = auth.uid()::text`, matching
-`users/{uid}/ws/{path}`. They are untested against a live database. **Ask:**
-either hand this spike (or step 2) a Postgres connection string / DB
-password, or a Management API personal access token, so these can actually
-be applied and the seven BLOCKED rows above can be re-run for real; or the
-owner runs `policies.sql` once by hand through the Studio SQL editor and
-that becomes step 2's starting point.
+## Results — the gate
+
+| Test | Result |
+|---|---|
+| A can `ten_gate_open` their own | **PASS** — `204` |
+| B cannot decide A's gate | **PASS** — `ten_gate_decide` returns `false`; the row is confirmed still `pending` (service-role read) before A decides it |
+| A can `ten_gate_decide` their own | **PASS** — returns `true` |
+| N (non-member) gets `not_a_member` on `ten_gate_open` | **PASS** — `403 {"message":"not_a_member"}` |
+
+## Cleanup
+
+Verified by re-listing/re-querying, not by trusting the in-memory record of
+what this script wrote:
+
+- **Objects:** the uploaded `cv.pdf` (the only object that ever existed —
+  every refused upload attempt, being refused, left nothing to clean) removed
+  via the Storage API with the service role; re-`list()` of `users/{A,B,N}/ws`
+  and `.../documents` afterward: **0 objects**.
+- **Users:** the 3 auth users deleted via the admin API; `ten_ws_files`,
+  `ten_usage_ledger`, `ten_gate_log` rows are FK `on delete cascade` from
+  `auth.users`, confirmed by a direct service-role count of rows for those 3
+  `user_id`s afterward: **0 rows** across all three tables.
+- **Users gone:** `listUsers()` filtered to the 3 throwaway emails afterward:
+  **0 remaining**.
+
+Run twice, independently, back to back (fresh random emails/uids each time,
+same masking): both runs produced the identical PASS shape for every one of
+the 40 test assertions plus the 7 cleanup/verification checks (47 total).
+
+## Findings carried over from the first (BLOCKED) pass — unchanged
+
+These came from the service-role client bypassing RLS, so they never
+depended on the migration being applied, and are unchanged by this re-run
+(not re-verified here; see the first pass in git history for the raw output):
+
+- Supabase Storage does not honor `If-Match` — a stale `If-Match` on an
+  `x-upsert: true` overwrite still succeeds. Confirmed independently
+  ([GitHub Discussion #40482](https://github.com/orgs/supabase/discussions/40482)).
+  This is why `ten_ws_write`'s compare-and-swap lives in SQL (`version =
+  expected`), not Storage headers — and why binaries in `ten-workspaces` are
+  **create-only** (no update policy at all; § 2's `WorkspaceStore.upload` is
+  never asked to overwrite).
+- `updated_at` changes on a service-role overwrite, and the object's ETag
+  changes with it.
+- Create-only semantics (no `x-upsert`) on an existing key are enforced by
+  Storage itself: a second `POST` with no `x-upsert` is refused `409
+  Duplicate` / `KeyAlreadyExists`, independent of any RLS policy.
 
 ## Commands and real output
 
 ```
 $ cd spikes/3-supabase-isolation && npm install
-added 15 packages, and audited 16 packages in 4s
+added 15 packages, and audited 16 packages in 567ms
 found 0 vulnerabilities
 
 $ set -a; . ../../.env.local; set +a
-$ node verify.mjs   # (masked: any sb_secret_/sb_publishable_/eyJ…/*.supabase.co would be <masked>; none appeared)
+$ node verify.mjs 2>&1 | sed -E 's/(sb_(secret|publishable)_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9_.-]{20,}|https:\/\/[a-z0-9]+\.supabase\.co)/<masked>/g'
 
-[PASS] bucket-create — create private bucket "spike3-isolation"
-    {"name":"spike3-isolation"}
-[PASS] users-create — create two auth users via the admin API
-    A=ef5b93d4… B=2de6b152… (uids only, no keys)
-[BLOCKED] policies-create — add per-user-folder Storage RLS policies scoped to bucket_id = 'spike3-isolation'
-    requires SQL DDL (CREATE POLICY on storage.objects); no DB connection string and no Management API personal access token are in .env.local (only SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY). Exact policies drafted in ./policies.sql.
-[PASS] signin — A and B each sign in with their own session (publishable key)
-[BLOCKED] a-writes-own — A writes users/{A}/ws/plan.md with A's own session
-    new row violates row-level security policy
-[BLOCKED] b-cannot-list-a — B cannot list users/{A}/ws with B's own session
-    returned 0 entries (pathA existed: false)
-[BLOCKED] b-cannot-read-a — B cannot read A's object with B's own session
+[PASS] precondition-bucket-exists — bucket "ten-workspaces" already exists (from the migration, not created here)
+    {"id":"ten-workspaces","public":false}
+[PASS] users-create — create 3 throwaway auth users via the admin API
+    A=a8ba23ac… B=e0e13efa… N=8010fbea… (uids only, no keys)
+[PASS] credit-rows — insert a $5 credit row for A and B (service role); N stays non-member
     {}
-[BLOCKED] b-cannot-overwrite-a — B cannot overwrite A's object with B's own session
-    new row violates row-level security policy
-[BLOCKED] b-cannot-delete-a — B cannot delete A's object with B's own session
-    remove() returned no error, data=[] (pathA existed: false, so this proves nothing either way)
-[BLOCKED] b-writes-own — B can write its own users/{B}/ws/plan.md with B's own session
-    new row violates row-level security policy
-[BLOCKED] a-cannot-read-b — A cannot read B's object with A's own session
+[PASS] signin — A, B, N each sign in with their own session (publishable key)
+[PASS] ws-a-create — A creates plan.md via ten_ws_write (create)
+    status=200 body=[{"path":"plan.md","version":"9fe20831caa2d735","updated_at":"2026-09-23T22:05:45.956064+00:00"}]
+[PASS] ws-b-cannot-select-a — B's select of A's ten_ws_files row returns 0 rows
+    status=200 rows=[]
+[PASS] ws-b-write-own-not-a — B's write to 'plan.md' creates B's own row; A's row unchanged
+    bStatus=200 bBody=[{"path":"plan.md","version":"e8b7f057815e1b59","updated_at":"2026-09-23T22:05:46.361753+00:00"}] aRowNow=[{"user_id":"a8ba23ac-92b0-4ce7-9108-de2bb22dddee","path":"plan.md","content":"# A's plan\n"}]
+[PASS] ws-stale-version — A stale expectedVersion -> PT409 version_conflict
+    status=409 body={"code":"PT409","details":null,"hint":null,"message":"version_conflict"}
+[PASS] ws-missing-file — A writes a missing file with an expectedVersion -> PT404 resource_missing
+    status=404 body={"code":"PT404","details":null,"hint":null,"message":"resource_missing"}
+[PASS] ws-create-twice — A creates 'plan.md' again (no expectedVersion) -> PT409 already_exists
+    status=409 body={"code":"PT409","details":null,"hint":null,"message":"already_exists"}
+[PASS] ws-path-rule-skills-x-md — path rule: skills/x.md -> PT403 not_editable
+    status=403 body={"code":"PT403","details":null,"hint":null,"message":"not_editable"}
+[PASS] ws-path-rule-claude-md-in-a-subfolder — path rule: claude.md in a subfolder -> PT403 not_editable
+    status=403 body={"code":"PT403","details":null,"hint":null,"message":"not_editable"}
+[PASS] ws-path-rule--x-md — path rule: ../x.md -> PT400 invalid_ref
+    status=400 body={"code":"PT400","details":null,"hint":null,"message":"invalid_ref"}
+[PASS] ws-path-rule--hidden-md — path rule: .hidden.md -> PT400 invalid_ref
+    status=400 body={"code":"PT400","details":null,"hint":null,"message":"invalid_ref"}
+[PASS] ws-path-rule-a-zero-width-char — path rule: a zero-width char -> PT400 invalid_ref
+    status=400 body={"code":"PT400","details":null,"hint":null,"message":"invalid_ref"}
+[PASS] ws-path-rule-NFD-normalized-path — path rule: NFD-normalized path -> PT400 invalid_ref
+    status=400 body={"code":"PT400","details":null,"hint":null,"message":"invalid_ref"}
+[PASS] ws-n-write — N (non-member) write -> PT403 not_a_member
+    status=403 body={"code":"PT403","details":null,"hint":null,"message":"not_a_member"}
+[PASS] ws-n-select — N (non-member) select -> 0 rows
+    status=200 rows=[]
+[PASS] ws-anon-write — anon (no session) write is refused
+    status=401 body={"code":"42501","details":null,"hint":null,"message":"permission denied for function ten_ws_write"}
+[PASS] ws-anon-select — anon (no session) select is refused or returns 0 rows
+    status=401 body={"code":"42501","details":null,"hint":"Grant the required privileges to the current role with: GRANT SELECT ON public.ten_ws_files TO anon;","message":"permission denied for table ten_ws_files"}
+[PASS] st-a-upload — A uploads users/{A}/ws/documents/cv.pdf (tiny valid PDF)
+    {"path":"users/a8ba23ac-92b0-4ce7-9108-de2bb22dddee/ws/documents/cv.pdf","id":"897896a1-e0f4-4957-b9ea-7cb943bf7caf","fullPath":"ten-workspaces/users/a8ba23ac-92b0-4ce7-9108-de2bb22dddee/ws/documents/cv.pdf"}
+[PASS] st-b-cannot-list-a — B cannot list users/{A}/ws/documents
+    entries=0
+[PASS] st-b-cannot-download-a — B cannot download A's cv.pdf
     {}
-[PASS] etag-create — service-role create (POST, no x-upsert)
-    status=200 body={"Key":"spike3-isolation/users/ef5b93d4-76ec-4865-8230-4b0d79d194cd/ws/etag-test.md","Id":"afa19611-de14-4a38-9d3d-c6735b8174b8"}
-[INFO] etag-meta-after-create — metadata after create
-    {"updated_at":"2026-09-23T19:52:43.474Z","eTag":"\"4f98f59e877ecb84ff75ef0fab45bac5\""}
-[PASS] create-only-conflict — a second create (no x-upsert) on the same path is refused
-    status=400 body={"statusCode":"409","error":"Duplicate","message":"The resource already exists","code":"KeyAlreadyExists"}
-[INFO] if-match-conditional-write — overwrite sent with a deliberately stale If-Match header (contract's UNVERIFIED item)
-    status=200 body={"Key":"spike3-isolation/users/ef5b93d4-76ec-4865-8230-4b0d79d194cd/ws/etag-test.md","Id":"afa19611-de14-4a38-9d3d-c6735b8174b8"} — If-Match with a WRONG value was NOT honored: the overwrite succeeded anyway.
-[INFO (changed)] updated-at-on-overwrite — updated_at after the overwrite, compared to after create (contract's UNVERIFIED item)
-    {"before":"2026-09-23T19:52:43.474Z","after":"2026-09-23T19:52:44.053Z","etag_before":"\"4f98f59e877ecb84ff75ef0fab45bac5\"","etag_after":"\"b252903fe0406836d33cc339b9c747b5\""}
+[PASS] st-b-cannot-overwrite-a — B cannot overwrite A's cv.pdf
+    new row violates row-level security policy
+[PASS] st-b-cannot-upload-into-a — B uploading a new file into A's folder is refused
+    new row violates row-level security policy
+[PASS] st-md-refused — A uploading a .md file to the bucket is refused (binaries only)
+    mime type text/markdown is not supported
+[PASS] st-n-cannot-upload — N (non-member) cannot upload to their own folder
+    new row violates row-level security policy
+[PASS] st-anon-cannot-list — anon cannot list users/{A}/ws/documents
+    entries=0
+[PASS] st-anon-cannot-download — anon cannot download A's cv.pdf
+    {}
+[PASS] st-a-can-read-own — A can read their own cv.pdf
+    size=188
+[PASS] ledger-a-own-rows — A sees only their own ten_usage_ledger rows
+    status=200 rows=[{"user_id":"a8ba23ac-92b0-4ce7-9108-de2bb22dddee","kind":"credit","usd":5}]
+[PASS] ledger-balance-a — ten_balance() = 5 for A
+    status=200 body=5
+[PASS] ledger-balance-n — ten_balance() = 0 for N
+    status=200 body=0
+[PASS] ledger-a-cannot-balance-for — A cannot call ten_balance_for (service-role only)
+    status=403 body={"code":"42501","details":null,"hint":null,"message":"permission denied for function ten_balance_for"}
+[PASS] ledger-a-cannot-spend-today — A cannot call ten_beta_spend_today (service-role only)
+    status=403 body={"code":"42501","details":null,"hint":null,"message":"permission denied for function ten_beta_spend_today"}
+[PASS] ledger-a-cannot-insert — A cannot insert a ten_usage_ledger row directly
+    status=403 body={"code":"42501","details":null,"hint":"Grant the required privileges to the current role with: GRANT INSERT ON public.ten_usage_ledger TO authenticated;","message":"permission denied for table ten_usage_ledger"}
+[PASS] gate-a-open — A can ten_gate_open
+    status=204 body=""
+[PASS] gate-b-cannot-decide-a — B cannot decide A's gate (returns false; gate stays pending)
+    decideStatus=200 decideBody=false rowNow=[{"status":"pending"}]
+[PASS] gate-a-decide — A can ten_gate_decide their own gate
+    status=200 body=true
+[PASS] gate-n-not-a-member — N (non-member) ten_gate_open -> PT403 not_a_member
+    status=403 body={"code":"PT403","details":null,"hint":null,"message":"not_a_member"}
 
 --- cleanup ---
-[PASS] cleanup-objects — remove 1 object(s)
-    users/ef5b93d4-76ec-4865-8230-4b0d79d194cd/ws/etag-test.md
-[PASS] cleanup-bucket — delete bucket "spike3-isolation"
+[PASS] cleanup-objects — remove 1 object(s) from ten-workspaces
+    users/a8ba23ac-92b0-4ce7-9108-de2bb22dddee/ws/documents/cv.pdf
 [PASS] cleanup-user-a — delete user A
 [PASS] cleanup-user-b — delete user B
-[PASS] verify-bucket-gone — getBucket() now errors (bucket does not exist)
-    Bucket not found
-[PASS] verify-users-gone — listUsers() no longer contains spike3-a/spike3-b
+[PASS] cleanup-user-n — delete user N
+[PASS] verify-objects-gone — 0 objects left in ten-workspaces for A/B/N
+    remaining=0
+[PASS] verify-ten-rows-gone — 0 ten_ rows left for A/B/N (cascade on user delete)
+    remaining=0
+[PASS] verify-users-gone — the 3 throwaway users are gone
     0 remaining
 
 --- summary ---
-PASS      bucket-create
-PASS      users-create
-BLOCKED   policies-create
-PASS      signin
-BLOCKED   a-writes-own
-BLOCKED   b-cannot-list-a
-BLOCKED   b-cannot-read-a
-BLOCKED   b-cannot-overwrite-a
-BLOCKED   b-cannot-delete-a
-BLOCKED   b-writes-own
-BLOCKED   a-cannot-read-b
-PASS      etag-create
-INFO      etag-meta-after-create
-PASS      create-only-conflict
-INFO      if-match-conditional-write
-INFO (changed) updated-at-on-overwrite
-PASS      cleanup-objects
-PASS      cleanup-bucket
-PASS      cleanup-user-a
-PASS      cleanup-user-b
-PASS      verify-bucket-gone
-PASS      verify-users-gone
+PASS   precondition-bucket-exists
+PASS   users-create
+PASS   credit-rows
+PASS   signin
+PASS   ws-a-create
+PASS   ws-b-cannot-select-a
+PASS   ws-b-write-own-not-a
+PASS   ws-stale-version
+PASS   ws-missing-file
+PASS   ws-create-twice
+PASS   ws-path-rule-skills-x-md
+PASS   ws-path-rule-claude-md-in-a-subfolder
+PASS   ws-path-rule--x-md
+PASS   ws-path-rule--hidden-md
+PASS   ws-path-rule-a-zero-width-char
+PASS   ws-path-rule-NFD-normalized-path
+PASS   ws-n-write
+PASS   ws-n-select
+PASS   ws-anon-write
+PASS   ws-anon-select
+PASS   st-a-upload
+PASS   st-b-cannot-list-a
+PASS   st-b-cannot-download-a
+PASS   st-b-cannot-overwrite-a
+PASS   st-b-cannot-upload-into-a
+PASS   st-md-refused
+PASS   st-n-cannot-upload
+PASS   st-anon-cannot-list
+PASS   st-anon-cannot-download
+PASS   st-a-can-read-own
+PASS   ledger-a-own-rows
+PASS   ledger-balance-a
+PASS   ledger-balance-n
+PASS   ledger-a-cannot-balance-for
+PASS   ledger-a-cannot-spend-today
+PASS   ledger-a-cannot-insert
+PASS   gate-a-open
+PASS   gate-b-cannot-decide-a
+PASS   gate-a-decide
+PASS   gate-n-not-a-member
+PASS   cleanup-objects
+PASS   cleanup-user-a
+PASS   cleanup-user-b
+PASS   cleanup-user-n
+PASS   verify-objects-gone
+PASS   verify-ten-rows-gone
+PASS   verify-users-gone
 
-All runnable checks PASS/INFO; the policy step is BLOCKED (see above). Cleanup verified.
+All checks PASS. Cleanup verified.
 ```
 
-Exit code `0` (no hard FAIL, no cleanup error; the run intentionally treats
-a documented BLOCKED as distinct from a FAIL — see `verify.mjs`'s summary
-logic).
-
-Also run clean from a second, independent pass before this doc was
-finalized (same script, same masking, re-verifying cleanup leaves nothing
-behind twice in a row) — output identical in shape, new random uids/emails
-each time; both runs' `verify-bucket-gone` / `verify-users-gone` were PASS.
-
-## The exact policies used (for step 2)
-
-See [`policies.sql`](../../spikes/3-supabase-isolation/policies.sql) in
-full. Summary: four policies on `storage.objects`, each `to authenticated`,
-each scoped with `bucket_id = 'spike3-isolation' and
-(storage.foldername(name))[1] = 'users' and (storage.foldername(name))[2] =
-(select auth.uid()::text)` — one each for `select`, `insert`, `update`
-(`using` + `with check`), and `delete`. Policy names are prefixed `spike3_`
-so they're unambiguous to find and drop. **These are drafted, not applied**
-— see "The blocker."
-
-## Surprises
-
-- Supabase's newer key format is in use on this project:
-  `sb_publishable_…` / `sb_secret_…`, not the older `eyJ…` JWT-style anon /
-  service-role keys. Functionally they behave the same for this spike
-  (publishable = anon-equivalent, secret = service-role-equivalent).
-- A private bucket with **zero** Storage policies denies even the bucket
-  owner's own writes with an RLS error — "no policy" is not "public read,
-  scoped write" or any other reasonable-sounding default; it's deny-all
-  except the service role. This matches the docs ("By default Storage does
-  not allow any uploads to buckets without RLS policies") but is worth
-  restating because it means step 2 cannot ship *any* working upload until
-  the SQL is applied — there's no degraded-but-functional middle state.
-- `remove()` on a path that was never created returns success with an empty
-  array, not an error — a reminder that a "B cannot delete A's object"
-  test is only meaningful if A's object provably exists first (this spike's
-  script logs `pathA existed: <bool>` next to that result for exactly this
-  reason).
-- The create-only / overwrite distinction on Supabase Storage's HTTP API is
-  driven entirely by the `x-upsert` request header, not by
-  `If-None-Match`/`If-Match` — those standard HTTP conditional headers are
-  accepted (no error) but silently ignored.
+Exit code `0`. Run a second, independent time immediately after (fresh
+random emails/uids), same command, same masking — identical PASS shape for
+all 47 lines; both runs' `verify-objects-gone` / `verify-ten-rows-gone` /
+`verify-users-gone` were PASS.
 
 ## What is NOT done
 
-- The four RLS policies in `policies.sql` are **not applied** to the
-  project. No compare-and-swap design for `WorkspaceStore.write`'s
-  `expectedVersion` has been proposed to the architect yet (this spike only
-  establishes that Storage itself can't do it).
-- The seven per-user isolation assertions (A writes; B blocked on
-  list/read/overwrite/delete; B writes own; A blocked reading B) have not
-  actually been proven against the real per-user rule — only against the
-  default deny-all state. They need to be re-run once the policies exist.
-- CI wiring ("isolation tests turned into CI," step 2's exit) is out of this
-  spike's scope.
+- Step 2 (building `WorkspaceStore` against Supabase, wiring `ten-model-proxy`
+  end to end, CI-wiring these isolation tests) is out of this spike's scope.
+- This run did not re-verify the `If-Match`/`updated_at`/create-only Storage
+  behavior from the first pass (unaffected by the migration, so not repeated
+  here; see "Findings carried over" above).
+- `policies.sql` (the first pass's drafted, hand-written policy set) was
+  **not** what got applied — the real policies are in the migration
+  (`ten_ws_objects_select_own`, `ten_ws_objects_insert_own`, the two
+  restrictive pins), which additionally enforce `ten_is_member()`, the binary
+  extension, the path rules, no-clash, and the 50-object cap; `policies.sql`
+  is left as-is in this directory as prior-art context for
+  `docs/reviews/proxy-change-review.md`, not as the source of truth.
 
 ## Blockers / open questions for the lead
 
-1. **Need one of:** a Postgres connection string (DB password) for this
-   project, or a Supabase Management API personal access token (`sbp_…`),
-   so `policies.sql` can actually be applied and the isolation tests
-   re-run for real — or have the owner apply `policies.sql` by hand via the
-   Studio SQL editor.
-2. **Design follow-up, not a blocker for this spike but flagged per § 2's
-   own instruction:** since `If-Match` is not honored, step 2 needs an
-   architect-approved compare-and-swap design for `WorkspaceStore.write`'s
-   `expectedVersion` before it's built (design-web-agent.md § 2 already
-   anticipates this exact outcome and names this as the next step).
+None. Every isolation test in this spike's scope passed against the real
+project with real policies. No policy, function, or table needed changing to
+make a test pass.

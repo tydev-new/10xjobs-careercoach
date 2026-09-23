@@ -53,6 +53,80 @@ else:
     else:
         passed += 1
 
+# packages/checkers: the JS ports' own unit tests, plus the parity test
+# against the real Python scripts (docs/design-web-agent.md § 5, step 3).
+# Skips loudly (not silently) when node isn't on PATH, same pattern as
+# tests/web above.
+CHECKERS = os.path.join(HERE, "..", "packages", "checkers")
+if not node:
+    print("\nSKIPPED packages/checkers (unit + parity): no `node` on PATH")
+else:
+    print("\n--- node --test packages/checkers/test/unit/*.test.mjs ---")
+    unit_tests = sorted(glob.glob(os.path.join(CHECKERS, "test", "unit", "*.test.mjs")))
+    result = subprocess.run([node, "--test", *unit_tests], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL packages/checkers/test/unit (node --test) — see output above")
+    else:
+        passed += 1
+
+    print("\n--- node packages/checkers/test/parity.mjs ---")
+    result = subprocess.run([node, os.path.join(CHECKERS, "test", "parity.mjs")], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL packages/checkers/test/parity.mjs — see output above")
+    else:
+        passed += 1
+
+    print("\n--- node packages/checkers/test/coverage-gate.mjs ---")
+    result = subprocess.run([node, os.path.join(CHECKERS, "test", "coverage-gate.mjs")], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL packages/checkers/test/coverage-gate.mjs — see output above")
+    else:
+        passed += 1
+
+# tests/checkers-parity/: the INDEPENDENT tester's own suite for
+# packages/checkers (plan step 3, fix round 2 item 4; fix round 3 brought
+# it to 156/156 both engines) — separate from packages/checkers/test/
+# (the coder's own tests, above).
+CHECKERS_PARITY = os.path.join(HERE, "checkers-parity")
+if not node:
+    print("\nSKIPPED tests/checkers-parity: no `node` on PATH")
+else:
+    print("\n--- node --test tests/checkers-parity/dispatch.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(CHECKERS_PARITY, "dispatch.test.mjs")], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers-parity/dispatch.test.mjs — see output above")
+    else:
+        passed += 1
+
+    print("\n--- node tests/checkers-parity/extra.mjs ---")
+    result = subprocess.run([node, os.path.join(CHECKERS_PARITY, "extra.mjs")], cwd=CHECKERS_PARITY)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers-parity/extra.mjs — see output above")
+    else:
+        passed += 1
+
+    # tests/checkers-parity/e2e_both.py: the independent tester's own
+    # replay of test_e2e_lifecycle.py's fixtures through BOTH engines (fix
+    # round 3, item "wire e2e_both.py into tests/run.py"). It's a
+    # standalone script, not a test_*.py module of test_*() functions
+    # (importing it runs the whole thing immediately, including its own
+    # sys.exit) — so it's run as a subprocess here, the same pattern as
+    # the other node-based suites above, not imported like tests/test_*.py.
+    # It also shells out to `node` itself (to run packages/checkers/bin/),
+    # so it's gated on `node` being on PATH, same as its siblings here.
+    print("\n--- python3 tests/checkers-parity/e2e_both.py ---")
+    result = subprocess.run([sys.executable, os.path.join(CHECKERS_PARITY, "e2e_both.py")])
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers-parity/e2e_both.py — see output above")
+    else:
+        passed += 1
+
 # packages/agent's own suite (node --test) — plan step 4. Run with cwd
 # set to packages/agent so its own node_modules (ai,
 # @openrouter/ai-sdk-provider) resolve; `node --test` with no path args

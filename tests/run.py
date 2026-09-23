@@ -86,5 +86,72 @@ else:
     else:
         passed += 1
 
+# tests/checkers-parity/: the INDEPENDENT tester's own suite for
+# packages/checkers (plan step 3, fix round 2, item 4) — separate from
+# packages/checkers/test/ (the coder's own tests, above). Wired in now
+# that extra.mjs is green under the lead's uncaught-exception ruling
+# (round 1) and the one remaining diff is a reasoned, documented case
+# (packages/checkers/README.md "Known, sanctioned divergences" —
+# `cf-default-skills-as-the-skill-prose-calls-it`, superseded by round 2's
+# more accurate `r2-cf-default-skills-design-mount`; extra.mjs itself
+# can't be told this, so this block's own pass/fail still reflects it).
+CHECKERS_PARITY = os.path.join(HERE, "checkers-parity")
+if not node:
+    print("\nSKIPPED tests/checkers-parity: no `node` on PATH")
+else:
+    print("\n--- node --test tests/checkers-parity/dispatch.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(CHECKERS_PARITY, "dispatch.test.mjs")], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers-parity/dispatch.test.mjs — see output above")
+    else:
+        passed += 1
+
+    print("\n--- node tests/checkers-parity/extra.mjs ---")
+    result = subprocess.run([node, os.path.join(CHECKERS_PARITY, "extra.mjs")], cwd=CHECKERS_PARITY)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers-parity/extra.mjs — see output above")
+    else:
+        passed += 1
+
+# packages/agent's own suite (node --test) — plan step 4. Run with cwd
+# set to packages/agent so its own node_modules (ai,
+# @openrouter/ai-sdk-provider) resolve; `node --test` with no path args
+# auto-discovers everything under packages/agent/test/. Skips loudly (not
+# silently) when node isn't on PATH.
+agent_dir = os.path.join(HERE, "..", "packages", "agent")
+if not node:
+    print("\nSKIPPED packages/agent tests: no `node` on PATH")
+elif not os.path.isdir(agent_dir):
+    print("\nSKIPPED packages/agent tests: packages/agent not found")
+else:
+    print("\n--- node --test (packages/agent) ---")
+    result = subprocess.run([node, "--test"], cwd=agent_dir)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL packages/agent tests (node --test) — see output above")
+    else:
+        passed += 1
+
+# tests/agent/*.test.ts — the INDEPENDENT tester's own suite for
+# packages/agent (plan step 4), separate from packages/agent/test/ (the
+# coder's own tests). Run from the repo root; _support.ts resolves the
+# repo root itself from import.meta.url, so cwd doesn't matter to it, but
+# it also imports "ai"/"ai/test" straight from packages/agent/node_modules.
+agent_suite_tests = sorted(glob.glob(os.path.join(HERE, "agent", "*.test.ts")))
+if not node:
+    print("\nSKIPPED tests/agent/*.test.ts: no `node` on PATH")
+elif not agent_suite_tests:
+    print("\nSKIPPED tests/agent/*.test.ts: no test files found")
+else:
+    print(f"\n--- node --test tests/agent/*.test.ts ({len(agent_suite_tests)} file(s)) ---")
+    result = subprocess.run([node, "--test", *agent_suite_tests], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/agent/*.test.ts (node --test) — see output above")
+    else:
+        passed += 1
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

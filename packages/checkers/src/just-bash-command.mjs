@@ -67,5 +67,10 @@ export const python3Command = defineCommand("python3", async (argv, ctx) => {
   // The real clock — never CHECKER_NOW_ISO (that override is a Node-only,
   // parity-harness-only escape hatch; see bin/record_verdict.mjs).
   const now = () => new Date();
-  return dispatchPython3(argv, io, now);
+  // ctx.cwd is where docs/design-web-agent.md § 4 guarantees the skills
+  // bundle is mounted (at "<cwd>/skills") — passed through so
+  // dispatchPython3 can reconstruct check_files.py's --skills default the
+  // way Python derives it from __file__, regardless of what (often
+  // fictional — S12) path argv[0] itself used to reach the script.
+  return dispatchPython3(argv, io, now, ctx.cwd);
 });

@@ -24,6 +24,9 @@ const PY_FILES = [
   "test_render_resume.py",
   "test_jobs_md.py",
   "test_check_closeout.py",
+  // design-web-agent.md § 5: "every `def test_` ... plus test_e2e_lifecycle
+  // (the one that runs record_verdict/update_job)" — fix round 2, item 3.
+  "test_e2e_lifecycle.py",
 ];
 
 // name -> { parity: "<case id substring>" } | { unit: "<test title substring>", file: "<test/unit file>" } | { na: "<reason>" }
@@ -101,6 +104,15 @@ const MANIFEST = {
 
   // ---- test_check_closeout.py
   test_clean: { parity: "test_clean" },
+
+  // ---- test_e2e_lifecycle.py (design-web-agent.md § 5's own name for this file)
+  test_full_candidate_lifecycle_e2e: { parity: "e2e-stage5-writer-application" }, // also covers "creates-new-role" (record_verdict) — the record_verdict/update_job runs § 5 calls out by name
+  test_e2e_pitch_and_linkedin_in_profile: {
+    na: "its own ported-checker call (check_files.py --workspace . --skills SKILLS) exercises the SAME check_files logic the dedicated check_files corpus (35 unit cases, 19 parity cases) already covers byte-for-byte — this test's distinguishing content (pitch/LinkedIn-audit prose, profile intake) has no unported behavior of its own; the checker call inside it is not a NEW code path.",
+  },
+  test_e2e_interview_prep_mock_and_debrief_writes: {
+    na: "calls check_stories.py and check_knowledge.py (both explicitly out of § 5's port list — see README.md \"Not done\") alongside check_files.py, whose logic is already covered as above; nothing here exercises a ported checker's behavior this file doesn't already prove elsewhere.",
+  },
   test_bad_stage_fails: { parity: "bad_stage_fails" },
   test_question_without_row_fails: { parity: "question_without_row_fails" },
   test_stale_plan_fails: { parity: "stale_plan_fails" },

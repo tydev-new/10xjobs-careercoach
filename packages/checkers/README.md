@@ -13,14 +13,18 @@ prose — and the local Claude Code plugin that still runs the real
 Python — never have to fork.
 
 **Fix round 1** (an independent tester's corpus, `tests/checkers-parity/`,
-found 53/102 failures): every item is fixed and documented below. Current
-totals — `tests/checkers-parity/extra.mjs`: **95/102** identical (the
-remaining 7 are documented, not silently diverging — see "Uncaught
-exceptions" and "render_resume's `--html`-omitted path" below);
+found 53/102 failures) and **fix round 2** (the tester's re-verification,
+39 new adversarial cases, found 5/141 failures) are both fixed and
+documented below. Current totals — `tests/checkers-parity/extra.mjs`:
+**141/141** identical py-vs-jsbin, **140/141** identical py-vs-jsbash (the
+one remaining jsbash diff, `cf-default-skills-as-the-skill-prose-calls-it`,
+is a round-1 case whose own mount simulation is superseded by round 2's
+more accurate one — see "check_files.py --skills's default" below);
 `tests/checkers-parity/dispatch.test.mjs`: **6/6**; the tester's browser
-proof (`tests/checkers-parity/browser/`): **9/9**; this package's own
-`test/parity.mjs`: **58/58**; `test/unit/*.test.mjs`: **73/73**;
-`test/coverage-gate.mjs`: **PASS**.
+proof (`tests/checkers-parity/browser/`): **11/11**, including a real repo
+path containing a space; this package's own `test/parity.mjs`: **58/58**;
+`test/unit/*.test.mjs`: **73/73**; `test/coverage-gate.mjs`: **PASS**
+(now including `tests/test_e2e_lifecycle.py`, per § 5's own naming of it).
 
 ## Layout
 
@@ -29,6 +33,7 @@ src/                  the ports (ESM, no Node-only / browser-only imports)
   path-util.mjs        POSIX path helpers (join/normalize/dirname/relative — no node:path)
   py-text.mjs           Python string/regex-semantics helpers — see "Python semantics this
                         file replicates" below (whitespace, splitlines, int(), code points, sort)
+  py-digits.mjs           Unicode decimal-digit (any script) value lookup for pyInt()
   argx.mjs               the shared mini-argparse all 7 CLIs use (see "Argument parsing")
   help-text.mjs           each script's exact `-h`/`--help` output, captured verbatim
   traceback.mjs           the uncaught-exception response shape (see "Uncaught exceptions")
@@ -311,9 +316,15 @@ npm run build:browser       # vite build test/browser
 npm run verify:browser      # playwright: loads the built page, asserts the dispatch worked
 ```
 
-`python3 tests/run.py` (repo root) runs all three too, skipping loudly
-(not silently) if `node` isn't on PATH — the same pattern `tests/web`
-already uses.
+`python3 tests/run.py` (repo root) runs all three too, plus (fix round 2,
+item 4) the INDEPENDENT tester's own `tests/checkers-parity/dispatch.test.mjs`
+and `tests/checkers-parity/extra.mjs` — skipping loudly (not silently) if
+`node` isn't on PATH, the same pattern `tests/web` already uses. Since
+`extra.mjs`'s own exit code can't know about the lead's uncaught-exception
+ruling or the round-1/round-2 mount-convention supersession (see
+"check_files.py --skills's default value" below), `tests/run.py`'s
+`extra.mjs` step currently reports one failure for exactly that one
+documented, reasoned case — not a silent gap.
 
 ## The parity test (`test/parity.mjs`)
 
@@ -365,6 +376,45 @@ tests that assert something about the **Python file itself**
 (`inspect.getsource`/deleted-function checks) rather than the checker's
 runtime behavior, where there is no JS artifact to point a case at.
 
+## Fix round 2 additions to "Python semantics" and "Argument parsing"
+
+Three more items, on top of the nine in "Python semantics this port
+replicates" and the behaviors already listed under "Argument parsing"
+above:
+
+- **`PY_S` was incomplete**: missing 0x1C-0x1F (the "information
+  separator" controls) and 0x85 (NEL) — both members of Python's `\s`
+  that JS's native `\s` doesn't count. `PY_S_CHARS` is now the exact
+  29-code-point set, verified by iterating every BMP code point through
+  CPython's own `str.isspace()` (see `py-text.mjs`'s comment for the
+  full list and how to re-verify it). **A second, subtler bug in the
+  SAME area**: `PY_S` must ALSO match `universalNewlines`'s own
+  U+2028/U+2029 sentinels (not just the real characters, which never
+  survive that far) — a field value like `"Location:  x"` where the
+  second "space" is really a U+2029 needs `\s*`-equivalent parsing (e.g.
+  `jobs_md.load()`'s field-line regex) to consume it as a separator, the
+  way Python's real `\s*` consumes the real U+2029. This was
+  `r2-rv-nel-and-u2028-in-fields`'s failure: without the sentinels in
+  `PY_S`, the substitute character read as ordinary content and stayed
+  glued to the front of the parsed value.
+- **`int(str)`'s Unicode digit values are no longer NFKC-only**: fullwidth
+  digits happen to NFKC-normalize to ASCII, but most other scripts'
+  native digits (Arabic-Indic, Devanagari, ...) don't. `pyInt()` now
+  looks up each digit's VALUE via `py-digits.mjs`'s `unicodeDigitValue()`
+  — a lookup table of every Unicode decimal-digit (category Nd) "zero"
+  code point, generated once from CPython's own `unicodedata.decimal()`
+  — instead of normalizing the whole digit run. `int("٣")` (Arabic-Indic)
+  now correctly gives `3`, the corpus's `r2-rv-unicode-digit-scores` case.
+- **argparse's `--` (end of options)**: every token after a bare `--`
+  is positional — since none of these 7 scripts declare a positional
+  argument, that means every one becomes an unrecognized-argument extra,
+  parsed no further (so a literal `--workspace` appearing after `--` is
+  a STRING, not the flag). **`--help=value`** (or an abbreviation of it,
+  `--hel=value`): argparse's help action is itself boolean (`nargs=0`),
+  so an inline value is the same "ignored explicit argument" error a
+  boolean flag gives — except it names BOTH of the action's registered
+  option strings (`-h/--help`), confirmed against real `python3`.
+
 ## Quirks replicated exactly (beyond "Python semantics" above)
 
 - **`jobs_md.now_iso()`**: `2026-09-23T12:34:56+00:00` — Python's
@@ -392,20 +442,72 @@ future diff against the Python source doesn't "fix" them back:
   its own (`test/unit/render-resume.test.mjs`).
 - **`render_resume.py`'s `--html`-omitted path**: see the dedicated
   section above.
-- **`check_files.py --skills`'s default value**: Python defaults to
-  `os.path.dirname(__file__)/../..` — wherever the script physically sits
-  on disk. This port's default is computed from `import.meta.url` (the one
-  portable, non-Node-only equivalent of `__file__` — it works in a
-  browser too, provided a future bundler keeps this module positioned the
-  same distance from the bundled `skills/` tree that it has in this repo:
-  `packages/checkers/src/check-files.mjs` is always three directories
-  above the `skills/` sibling). **This fixes fix round 1's BLOCKER**: every
-  MVP `SKILL.md`'s session-close line runs `check_files.py --workspace .`
-  with **no** `--skills` (e.g. `skills/apply/SKILL.md:75`), so a default of
-  `"."` was silently wrong, not merely untested — the previous version of
-  this README's claim that "every real caller passes `--skills`
-  explicitly" was false, and has been removed. `cf-default-skills-as-the-skill-prose-calls-it`
-  in the tester's corpus is `[SAME]` now.
+- **`check_files.py --skills`'s default value** (fix round 1 BLOCKER, then
+  fix round 2 item 1 — the round-1 fix was itself wrong): Python's default
+  is `os.path.dirname(__file__) + "/../.."` — wherever check_files.py's
+  OWN file physically sits, go up two directories. Every MVP `SKILL.md`'s
+  session-close line runs `check_files.py --workspace .` with **no**
+  `--skills` (e.g. `skills/apply/SKILL.md:75`), so getting this default
+  right matters.
+
+  Round 1's fix computed the default from `import.meta.url` INSIDE the
+  shared port itself — a **host disk path** (wherever `packages/checkers`
+  happens to be installed on the machine running the code). That's
+  meaningless inside just-bash's in-memory filesystem
+  (`docs/design-web-agent.md` § 4's actual runtime — "the bundle mounted
+  read-only at `skills/`" of the sandboxed workspace), so it only ever
+  passed by ACCIDENT, when a test happened to also mirror the bundle into
+  the sandbox at that same host path. Round 2's tester corpus added
+  `r2-cf-default-skills-design-mount`, which mounts the bundle ONLY where
+  the design doc says it lives (`<workspace>/skills/`) — exposing this.
+
+  The fix (`src/check-files.mjs`'s `skillsRootFromScriptPath()`): the
+  shared port does the SAME two-dirnames-up string arithmetic Python
+  does, but on a value it never computes itself — `invokedScriptPath`, an
+  explicit parameter every caller supplies its own equivalent of
+  Python's `__file__` for:
+
+  - **`src/just-bash-command.mjs`** (the real production dispatcher):
+    `dispatchPython3`'s new `skillsMountRoot` parameter (= `ctx.cwd`,
+    where § 4 GUARANTEES the bundle is mounted) is combined with
+    `dispatch.mjs`'s new `CANONICAL_SKILL_PATH` map (each ported script's
+    own position inside the bundle, e.g. `"profile/scripts/check_files.py"`)
+    to reconstruct `<ctx.cwd>/skills/profile/scripts/check_files.py` —
+    deliberately ignoring argv[0]'s own path (which, per the file-name-only
+    S12 dispatch this whole package is built around, is often fictional
+    and carries no reliable structural information).
+  - **`bin/check_files.mjs`** (Node-only, like `io-node.mjs`): has no
+    `ctx.cwd`/sandbox to ask, so it reconstructs the SAME kind of path
+    using ITS OWN real position on disk (`fileURLToPath(import.meta.url)`,
+    walked up to the repo root, then back down through
+    `skills/profile/scripts/check_files.py`) — `fileURLToPath`, not a raw
+    `new URL(...).pathname`, because the latter percent-encodes a space in
+    the path (`%20`) instead of decoding it; a repo path containing a
+    space was fix round 2's explicit test (verified: `pathname` gives
+    `.../repo%20with%20space/skills`, `fileURLToPath` gives the real
+    `.../repo with space/skills`).
+
+  A second, related fix: with the bundle now genuinely mountable INSIDE
+  the workspace tree (`<ws>/skills/`), `check_strays()` would otherwise
+  WARN about it as an unrecognized stray directory — Python's own
+  `MANIFEST_DIRS` never needed a "skills" entry (no local candidate
+  workspace has ever had a `skills/` subdirectory of its own), but this
+  port's `MANIFEST_DIRS` now has one, matching `docs/design-web-agent.md`
+  § 4's own text a few lines later: "`CLAUDE.md` and `skills/` are
+  refused" by `WorkspaceStore.write` — i.e. `skills/` is ALREADY a
+  recognized, special, read-only directory in the design, the same way
+  `CLAUDE.md` already is (in `MANIFEST_FILES`).
+
+  **One test this leaves un-passable, believed obsolete rather than
+  silently diverged**: round 1's own `cf-default-skills-as-the-skill-prose-calls-it`
+  mounts the bundle at its literal HOST absolute path inside jsbash's
+  in-memory fs (not `<ws>/skills/`) — the same accidental convention the
+  round-1 fix's bug exploited. There is no single deterministic rule that
+  satisfies both that mount convention AND `r2-cf-default-skills-design-mount`'s
+  (design-accurate) one for the exact same "no `--skills` given" input;
+  since design-web-agent.md § 4 is unambiguous about where the bundle
+  really lives, this port follows `r2-cf-default-skills-design-mount`,
+  and round 1's case is treated as superseded, not a target.
 - **`check_files.py --workspace`'s `~` expansion**: Python calls
   `os.path.expanduser()` on the workspace path. The web app never sees a
   real home directory (rule 9: workspace files live in Storage, not on a

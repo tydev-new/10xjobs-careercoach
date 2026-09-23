@@ -1,5 +1,6 @@
 // Small text helpers that reproduce specific Python string/regex semantics
 // the ports rely on, so each port file doesn't have to re-derive them.
+import { unicodeDigitValue } from "./py-digits.mjs";
 //
 // A note on how the comments in this file spell certain characters: a
 // literal BOM, U+2028 (LINE SEPARATOR), or U+2029 (PARAGRAPH SEPARATOR)
@@ -11,17 +12,42 @@
 // actual string/regex literal — never the bare character typed into a
 // comment.
 
-// Python's `\s` / str.isspace() (Unicode, default for str) vs JS's `\s`:
-// both agree on ASCII whitespace, NBSP, the Unicode space separators, and
-// U+2028/U+2029 (Python's isspace() counts Zl/Zp via bidi property "B") —
-// but JS's `\s` (and String.trim()) ALSO treats U+FEFF (BOM / zero-width
-// no-break space) as whitespace, while Python's `\s` does NOT (confirmed
-// against CPython: `"﻿".isspace()` is False). A BOM Python leaves
-// glued to the following character therefore has to stay glued here too
-// — this is the corpus's `cm-bom-letter` case (a BOM'd salutation must
-// NOT be seen as "Hello" with leading whitespace stripped). PY_S is JS's
-// `\s` set minus U+FEFF.
-const PY_S_CHARS = "\\t\\n\\v\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
+// Two Private-Use-Area sentinel code points that stand in for a real
+// U+2028/U+2029 for the whole life of a string inside a checker — see
+// this file's "universalNewlines"/"restoreLineSeparators" comment further
+// down for why. Defined here (ahead of PY_S) because PY_S, matching
+// Python's OWN `\s` (which includes U+2028/U+2029), must ALSO match
+// whatever currently stands in for them: a NATIVE JS `\s` (or an earlier
+// draft of PY_S that forgot this) stops matching a "whitespace" that's
+// actually a sentinel, which is exactly the corpus's
+// `r2-rv-nel-and-u2028-in-fields` case — a field value like
+// "Location:  x" where the second "space" is really a U+2029; Python's
+// `\s*` (operating on the real character) consumes it as part of the
+// label/value separator, so a checker whose OWN `\s*`-equivalent doesn't
+// ALSO consume the sentinel leaves it glued to the front of the captured
+// value instead.
+const U2028_SENTINEL = "";
+const U2029_SENTINEL = "";
+const U2028_CHAR = " ";
+const U2029_CHAR = " ";
+
+// Python's `\s` / str.isspace() (Unicode, default for str) vs JS's `\s`.
+// PY_S_CHARS is the EXACT 29-code-point set (verified by iterating every
+// BMP code point 0x0-0xFFFF through CPython's `str.isspace()`, and
+// confirming `str.split()`/`str.strip()` agree with it): tab, LF, vertical
+// tab, form feed, CR, 0x1C-0x1F (the "information separator" controls —
+// Python counts these; JS's `\s` does not), space, NEL (0x85 — JS's `\s`
+// does not count this either), NBSP, 0x1680, the 0x2000-0x200A run, LINE
+// SEPARATOR and PARAGRAPH SEPARATOR (here as their sentinels — see
+// above; real ones never survive past `universalNewlines`), 0x202F,
+// 0x205F, 0x3000. The one JS `\s` member Python's `\s`/`.isspace()` does
+// NOT count is U+FEFF (BOM / zero-width no-break space; confirmed:
+// `"﻿".isspace()` is False in CPython) — so PY_S is deliberately NOT
+// "JS's `\s` plus a few extras": a BOM Python leaves glued to the
+// following character has to stay glued here too — this is the corpus's
+// `cm-bom-letter` case (a BOM'd salutation must NOT be seen as "Hello"
+// with leading whitespace stripped).
+const PY_S_CHARS = `\\t\\n\\v\\f\\r\\x1c-\\x1f \\x85\\u00a0\\u1680\\u2000-\\u200a${U2028_SENTINEL}${U2029_SENTINEL}\\u202f\\u205f\\u3000`;
 export const PY_S = `[${PY_S_CHARS}]`;
 export const PY_NOT_S = `[^${PY_S_CHARS}]`;
 
@@ -78,15 +104,11 @@ export function pyLstrip(s) {
 // — the two engines then agree there's no separate character to diverge
 // on). 0x2028/0x2029 have no such collapse available (they carry real
 // meaning, must survive byte-for-byte in output), so they're swapped for
-// two Private-Use-Area sentinel code points for the whole life of the
-// string inside a checker, and swapped back with `restoreLineSeparators`
-// at every exit point (a checker's returned stdout/stderr, and anything
-// written back to a file) — see README.md "CRLF, universal newlines, and
-// U+2028/U+2029".
-const U2028_SENTINEL = "";
-const U2029_SENTINEL = "";
-const U2028_CHAR = " ";
-const U2029_CHAR = " ";
+// two Private-Use-Area sentinel code points (defined at the top of this
+// file, alongside PY_S) for the whole life of the string inside a
+// checker, and swapped back with `restoreLineSeparators` at every exit
+// point (a checker's returned stdout/stderr, and anything written back to
+// a file) — see README.md "CRLF, universal newlines, and U+2028/U+2029".
 
 // Python's universal-newlines text-mode read: open(path, encoding="utf-8")
 // (the default, no newline="") translates \r\n AND a bare \r into \n
@@ -132,24 +154,28 @@ export function stripChars(s, chars) {
 // Python's int(str): strips surrounding whitespace (PY_S), allows a single
 // leading sign, allows single underscores between digit groups (PEP 515),
 // and accepts ANY Unicode decimal-digit character (category Nd) — not
-// just ASCII 0-9 (`int("１２")` == 12, fullwidth digits). Returns
-// null (Python: raises ValueError) when the string doesn't parse.
-//
-// Residual gap (documented, not corpus-tested): this normalizes digits via
-// NFKC, which covers fullwidth digits (the corpus's case) and most
-// compatibility forms, but not every Unicode Nd character Python's int()
-// accepts (e.g. Arabic-indic digits are Nd but not NFKC-normalizable to
-// ASCII) — those return null here where Python would successfully parse
-// them. See README.md "Known, sanctioned divergences".
+// just ASCII 0-9 (`int("１２")` == 12, fullwidth digits; `int("٣")` == 3,
+// Arabic-Indic — the corpus's `r2-rv-unicode-digit-scores` case). Returns
+// null (Python: raises ValueError) when the string doesn't parse. Each
+// digit's VALUE comes from `py-digits.mjs`'s `unicodeDigitValue()` (a
+// lookup generated from CPython's own `unicodedata.decimal()`), not
+// `String.normalize("NFKC")` — NFKC covers fullwidth digits but not every
+// script's own native digits (Arabic-Indic, for one, doesn't
+// NFKC-decompose to ASCII).
 export function pyInt(s) {
   if (typeof s !== "string") return null;
   const t = pyStrip(s);
   const m = t.match(/^([+-]?)(\p{Nd}(?:_?\p{Nd})*)$/u);
   if (!m) return null;
   const sign = m[1] === "-" ? -1 : 1;
-  const digits = m[2].replace(/_/g, "").normalize("NFKC");
-  if (!/^[0-9]+$/.test(digits)) return null;
-  return sign * parseInt(digits, 10);
+  const digitChars = cpArray(m[2]).filter((c) => c !== "_");
+  let value = 0;
+  for (const ch of digitChars) {
+    const d = unicodeDigitValue(ch);
+    if (d === null) return null; // \p{Nd} matched but not in our block table — treat as unparseable rather than silently wrong
+    value = value * 10 + d;
+  }
+  return sign * value;
 }
 
 // Code-point-correct length/slice/compare — Python str is a sequence of

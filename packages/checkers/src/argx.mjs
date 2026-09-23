@@ -16,7 +16,12 @@
 // conflict) fires immediately; only once the whole argv is consumed
 // successfully does the parser check individual required flags, then the
 // mutex group's own "one of ... is required", then finally (in the
-// caller, not `parse_known_args`) unrecognized leftover arguments.
+// caller, not `parse_known_args`) unrecognized leftover arguments. Also:
+// `--` (end of options — everything after it is positional, so for these
+// 7 flag-only scripts it's always an unrecognized-argument extra) and
+// `--help=value` (the help action is itself boolean, so an inline value
+// is the same "ignored explicit argument" error a boolean flag gives,
+// naming both of -h/--help's registered forms).
 //
 // options: [{ flag, dest, required, choices, boolean, append, type,
 //             mutexGroup }]
@@ -58,10 +63,27 @@ export function parseFlags(argv, spec) {
 
   const seenGroupMember = new Map(); // groupId -> option
   const extras = [];
+  let afterDoubleDash = false;
 
   for (let i = 0; i < argv.length; i++) {
     const tok = argv[i];
-    if (tok === "-h" || tok === "--help") return { help: true, text: help };
+
+    // "--" (argparse/POSIX end-of-options marker): consumed, never itself
+    // an extra; EVERY token after it is positional — since none of these
+    // 7 scripts declare a positional argument, that means every remaining
+    // token becomes an unrecognized-argument extra, with no further flag
+    // parsing (so a "--workspace" appearing after "--" is a literal
+    // string, not the --workspace flag).
+    if (!afterDoubleDash && tok === "--") {
+      afterDoubleDash = true;
+      continue;
+    }
+    if (afterDoubleDash) {
+      extras.push(tok);
+      continue;
+    }
+
+    if (tok === "-h") return { help: true, text: help };
 
     let flagPart = tok;
     let inlineValue = null;
@@ -89,7 +111,18 @@ export function parseFlags(argv, spec) {
     if (resolved.ambiguous) {
       return { error: `ambiguous option: ${flagPart} could match ${resolved.ambiguous.join(", ")}` };
     }
-    if (resolved.isHelp) return { help: true, text: help };
+    if (resolved.isHelp) {
+      // "--help=foo" (or an abbreviation of it, "--hel=foo"): argparse's
+      // help action is itself a boolean (nargs=0) action, so an explicit
+      // inline value is the SAME "ignored explicit argument" error a
+      // boolean flag gives below — except the message names BOTH of the
+      // action's registered option strings ("-h/--help"), since -h and
+      // --help are registered together as one action.
+      if (inlineValue !== null) {
+        return { error: `argument -h/--help: ignored explicit argument '${inlineValue}'` };
+      }
+      return { help: true, text: help };
+    }
 
     const opt = resolved;
     if (opt.boolean) {

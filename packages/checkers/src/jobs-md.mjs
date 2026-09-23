@@ -5,7 +5,24 @@
 // `() => new Date()`) so the parity test can freeze time exactly the way
 // the real script's `datetime.now(timezone.utc)` is frozen for comparison.
 import { join } from "./path-util.mjs";
-import { pyInt, codePointCompare, pyRstrip, restoreLineSeparators } from "./py-text.mjs";
+import { pyInt, codePointCompare, pyRstrip, pyStrip, restoreLineSeparators, PY_S } from "./py-text.mjs";
+
+// The Python source's `\s` in these patterns is Python's own whitespace
+// set, which INCLUDES U+2028/U+2029 — but by the time text reaches here,
+// `universalNewlines()` has already swapped any real U+2028/U+2029 for
+// PY_S's own sentinel code points (so they survive JS's `^`/`$` as
+// ordinary characters, not LineTerminators — see py-text.mjs). A NATIVE
+// JS `\s` in these regexes would therefore silently stop matching
+// whitespace Python's `\s*` still would (the corpus's
+// `r2-rv-nel-and-u2028-in-fields` case: a field value like
+// "Location:  x" where the second "space" is really a U+2029 — Python's
+// `\s*` consumes it as part of the label/value separator; a bare JS `\s*`
+// would leave the sentinel glued to the front of the captured value
+// instead). PY_S is JS's `\s` set adjusted to match Python's exactly,
+// AND it explicitly includes the two sentinels for this reason.
+const HEADING2_RE = new RegExp(`^##${PY_S}+(.+?)${PY_S}*$`);
+const HEADING3_RE = new RegExp(`^###${PY_S}+(.+?)${PY_S}*$`);
+const FIELD_RE = new RegExp(`^-${PY_S}+([^:]+):${PY_S}*(.*)$`);
 
 export const STAGES = ["To Review", "Interested", "Applied", "Interviewing", "Offer"];
 export const DISMISSED = "Dismissed";
@@ -55,31 +72,31 @@ export async function load(io, workspace) {
   let row = null;
   for (const raw of lines) {
     const line = raw.replace(/\n$/, "");
-    let m = line.match(/^##\s+(.+?)\s*$/);
+    let m = line.match(HEADING2_RE);
     if (m && !line.startsWith("###")) {
-      const name = m[1].trim();
+      const name = pyStrip(m[1]);
       curStage = STAGES.includes(name) || name === DISMISSED ? name : null;
       continue;
     }
-    m = line.match(/^###\s+(.+?)\s*$/);
+    m = line.match(HEADING3_RE);
     if (m && curStage) {
       const head = m[1];
       const sepIdx = head.indexOf(" — ");
       const company = sepIdx === -1 ? head : head.slice(0, sepIdx);
       const title = sepIdx === -1 ? "" : head.slice(sepIdx + 3);
       row = {
-        company: company.trim(),
-        title: title.trim(),
+        company: pyStrip(company),
+        title: pyStrip(title),
         stage: curStage !== DISMISSED ? curStage : null,
         dismissed: curStage === DISMISSED,
       };
       rows.push(row);
       continue;
     }
-    m = line.match(/^-\s+([^:]+):\s*(.*)$/);
+    m = line.match(FIELD_RE);
     if (m && row !== null) {
-      const k = LABEL_TO_KEY.get(m[1].trim());
-      if (k) row[k] = m[2].trim() || null;
+      const k = LABEL_TO_KEY.get(pyStrip(m[1]));
+      if (k) row[k] = pyStrip(m[2]) || null;
     }
   }
   for (const r of rows) {
@@ -99,16 +116,16 @@ export async function loadNotes(io, workspace) {
   const p = path(workspace);
   if (!(await io.exists(p))) return "";
   const text = await io.readFile(p);
-  const m = text.match(/^## Search notes\s*$\n([\s\S]*)$/m);
-  return m ? m[1].trim() : "";
+  const m = text.match(new RegExp(`^## Search notes${PY_S}*$\\n([\\s\\S]*)$`, "m"));
+  return m ? pyStrip(m[1]) : "";
 }
 
 export async function appendNote(io, workspace, text, now = () => new Date()) {
   const notes = await loadNotes(io, workspace);
   const stamp = now().toISOString().slice(0, 10);
-  const block = `### ${stamp}\n\n${text.trim()}`;
+  const block = `### ${stamp}\n\n${pyStrip(text)}`;
   const rows = await load(io, workspace);
-  await save(io, workspace, rows, { notes: notes ? `${notes}\n\n${block}`.trim() : block, now });
+  await save(io, workspace, rows, { notes: notes ? pyStrip(`${notes}\n\n${block}`) : block, now });
 }
 
 export class DuplicateKeyError extends Error {}

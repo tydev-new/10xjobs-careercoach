@@ -4,23 +4,15 @@
 // this change (see supabase/functions/README.md).
 
 import { handleRequest, type DeleteDeps } from "./handler.ts";
-import {
-  deleteOwnRows,
-  envFromDeno,
-  isMember,
-  listAllObjects,
-  removeObjects,
-  verifyUser,
-} from "../_shared/supabase.ts";
+import { deleteOwnRows, envFromDeno, listAllObjects, removeObjects, verifyUser } from "../_shared/supabase.ts";
 
 const env = envFromDeno((name) => Deno.env.get(name));
 
 const deps: DeleteDeps = {
   verifyUser: (token) => verifyUser(env, token),
-  isMember: (token) => isMember(env, token),
   listAllObjects: (bucket, prefix) => listAllObjects(env, bucket, prefix),
   removeObjects: (bucket, paths) => removeObjects(env, bucket, paths),
-  deleteOwnRows: (table, uid) => deleteOwnRows(env, table, uid),
+  deleteOwnRows: (table, uid, extraFilter) => deleteOwnRows(env, table, uid, undefined, extraFilter),
   log: { warn: (e) => console.warn(e) },
 };
 

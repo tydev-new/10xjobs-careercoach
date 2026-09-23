@@ -4,14 +4,7 @@
 
 import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
 import { handleRequest, type DeleteDeps } from "./handler.ts";
-import {
-  deleteOwnRows,
-  isMember,
-  listAllObjects,
-  removeObjects,
-  verifyUser,
-  type SupabaseEnv,
-} from "../_shared/supabase.ts";
+import { deleteOwnRows, listAllObjects, removeObjects, verifyUser, type SupabaseEnv } from "../_shared/supabase.ts";
 import { freshState, startMockSupabase, type MockServer, type MockSupabaseState } from "../_shared/test-support.ts";
 
 const PROD_ORIGIN = "https://ten.example.com";
@@ -37,10 +30,9 @@ async function harness(): Promise<Harness> {
   const env: SupabaseEnv = { url: supabase.url, anonKey: state.anonKey, serviceRoleKey: state.serviceRoleKey };
   const deps: DeleteDeps = {
     verifyUser: (token) => verifyUser(env, token),
-    isMember: (token) => isMember(env, token),
     listAllObjects: (bucket, prefix) => listAllObjects(env, bucket, prefix),
     removeObjects: (bucket, paths) => removeObjects(env, bucket, paths),
-    deleteOwnRows: (table, uid) => deleteOwnRows(env, table, uid),
+    deleteOwnRows: (table, uid, extraFilter) => deleteOwnRows(env, table, uid, undefined, extraFilter),
     log: { warn: () => {} },
   };
   return { supabase, state, deps, stop: () => supabase.stop() };
@@ -66,14 +58,20 @@ Deno.test("401 when the bearer token is the anon key itself", async () => {
   }
 });
 
-Deno.test("403 for a signed-in non-member", async () => {
+// Fix round 1, lead ruling S5/S6/S7: delete-account requires a signed-in
+// user only, NOT membership — a signed-in user with no credit row (never a
+// member, or an ex-member) must still be able to erase their own data.
+Deno.test("200 for a signed-in NON-member (no membership check, per the fix-round-1 ruling)", async () => {
   const h = await harness();
   try {
-    h.state.users["tok-1"] = { id: "u1" };
+    h.state.users["tok-1"] = { id: "u1" }; // never given a credit row
+    h.state.storageObjects.add("users/u1/ws/cv.pdf");
+    h.state.rowCounts["ten_ws_files:u1"] = 2;
     const res = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
-    assertEquals(res.status, 403);
+    assertEquals(res.status, 200, await res.clone().text());
     const body = await res.json();
-    assertEquals(body.error.code, "not_a_member");
+    assertEquals(body.deleted.storageObjects, 1);
+    assertEquals(body.deleted.textFiles, 2);
   } finally {
     await h.stop();
   }
@@ -157,7 +155,75 @@ Deno.test("a workspace with no files/objects still returns a zeroed summary, not
     const res = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(res.status, 200);
     const body = await res.json();
-    assertEquals(body.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, ledgerRows: 0 });
+    assertEquals(body.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, creditRows: 0 });
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("idempotent: a second call finds nothing left and still returns 200 with a zeroed summary", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.storageObjects.add("users/u1/ws/cv.pdf");
+    h.state.rowCounts["ten_ws_files:u1"] = 3;
+    h.state.ledgerRowsByKind["credit"] = { u1: 1 };
+
+    const first = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(first.status, 200);
+    const firstBody = await first.json();
+    assertEquals(firstBody.deleted, { storageObjects: 1, textFiles: 3, gateLogRows: 0, creditRows: 1 });
+
+    const second = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(second.status, 200);
+    const secondBody = await second.json();
+    assertEquals(secondBody.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, creditRows: 0 });
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("keeps 'call' ledger rows, deletes only 'credit' rows (lead ruling, fix round 1)", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.ledgerInserts.push(
+      { user_id: "u1", kind: "call", request_id: "gen-1", usd: 0.02 },
+      { user_id: "u1", kind: "call", request_id: "gen-2", usd: 0.03 },
+      { user_id: "other", kind: "call", request_id: "gen-3", usd: 0.05 },
+    );
+    h.state.ledgerRowsByKind["credit"] = { u1: 1 };
+
+    const res = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.deleted.creditRows, 1);
+
+    const remaining = h.state.ledgerInserts.filter((r) => r.user_id === "u1");
+    assertEquals(remaining.length, 2, "the two 'call' rows must survive");
+    assert(remaining.every((r) => r.kind === "call"));
+    assertEquals(h.state.ledgerInserts.some((r) => r.user_id === "other"), true, "another user's row untouched");
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("pagination (N2): more than one Storage list/remove page (>1000 objects) is fully collected and removed", async () => {
+  // Both listAllObjects and removeObjects page/batch at 1000 (Storage's own
+  // per-call cap), so >1000 objects in one folder needs >1 of each.
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    const total = 1200;
+    for (let i = 0; i < total; i++) {
+      h.state.storageObjects.add(`users/u1/ws/f${String(i).padStart(4, "0")}.pdf`);
+    }
+    const res = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.deleted.storageObjects, total);
+    const left = [...h.state.storageObjects].filter((o) => o.includes("u1"));
+    assertEquals(left, []);
   } finally {
     await h.stop();
   }

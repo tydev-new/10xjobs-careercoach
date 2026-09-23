@@ -5,8 +5,8 @@
 // pass criteria (docs/design-web-agent.md § 8 and Step-1 spikes) that are
 // checkable without a live upstream.
 
-import { assert, assertEquals, assertFalse } from "jsr:@std/assert@1";
-import { MODEL } from "./core.ts";
+import { assert, assertAlmostEquals, assertEquals, assertFalse } from "jsr:@std/assert@1";
+import { CEILING_USD, MODEL } from "./core.ts";
 import { handleRequest, type ProxyDeps } from "./handler.ts";
 import {
   balanceFor,
@@ -385,6 +385,121 @@ dt("web plugin is rewritten to the fixed engine and capped results", async () =>
   }
 });
 
+dt("S2: tools are forwarded only for type:'function'; server-tool types are dropped", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ cost: 0.01 });
+    const fnTool = { type: "function", function: { name: "ok", parameters: { type: "object" } } };
+    const res = await handleRequest(
+      req(
+        {
+          messages: [],
+          tools: [
+            { type: "web_search_20250305", name: "web_search", max_uses: 50 },
+            { type: "openrouter:web_search", parameters: { max_results: 50 } },
+            fnTool,
+          ],
+        },
+        { token: "tok-1" },
+      ),
+      h.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+    const sent = h.lastUpstreamBody as Record<string, unknown>;
+    assertEquals(sent.tools, [fnTool]);
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("N4: max_tokens and web max_results are clamped to positive integers, never rejected", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ cost: 0.01 });
+    const res = await handleRequest(
+      req(
+        { messages: [], max_tokens: -10, plugins: [{ id: "web", max_results: -3 }] },
+        { token: "tok-1" },
+      ),
+      h.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+    const sent = h.lastUpstreamBody as Record<string, unknown>;
+    assertEquals(sent.max_tokens, 1);
+    assertEquals(sent.plugins, [{ id: "web", engine: "exa", max_results: 1 }]);
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("N5: an empty body is 400, not treated as {}", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    const res = await handleRequest(req(undefined, { token: "tok-1", rawBody: "" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 400);
+    await h.drain();
+    assertEquals(h.lastUpstreamBody, undefined, "an empty body must never reach upstream");
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("N1: a down ten_is_member fails closed with 503 model_error and CORS headers, never throws", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.deps.isMember = () => Promise.reject(new Error("ten_is_member: 503"));
+    const res = await handleRequest(
+      req({ messages: [] }, { token: "tok-1", origin: PROD_ORIGIN }),
+      h.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 503);
+    assertEquals(res.headers.get("access-control-allow-origin"), PROD_ORIGIN);
+    const body = await res.json();
+    assertEquals(body.error.code, "model_error");
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("N1: a down ten_balance_for fails closed with 503 model_error, never throws", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.deps.balanceFor = () => Promise.reject(new Error("ten_balance_for: 503"));
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 503);
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("N3: the ceiling is computed from § 8's own formula (64k in + 4,096 out + one search)", async () => {
+  await Promise.resolve(); // pure check; dt() expects an async fn
+  const formula = (64_000 * 2) / 1e6 + (4_096 * 10) / 1e6 + 5 * 0.004;
+  assertAlmostEquals(CEILING_USD, formula, 1e-9);
+  assert(CEILING_USD >= 0.18 && CEILING_USD < 0.2, `CEILING_USD ${CEILING_USD} should read "about $0.18"`);
+});
+
 dt("the model allowlist: a different model is 400 model_not_allowed", async () => {
   const h = await harness();
   try {
@@ -574,7 +689,7 @@ dt("the metering ceiling is recorded when no cost can be read", async () => {
     await h.drain();
 
     assertEquals(h.state.ledgerInserts.length, 1);
-    assertEquals(h.state.ledgerInserts[0].usd, 0.18);
+    assertAlmostEquals(h.state.ledgerInserts[0].usd as number, CEILING_USD, 1e-9);
     assertEquals(h.state.ledgerInserts[0].request_id, "gen-nocost");
   } finally {
     await h.stop();
@@ -594,7 +709,7 @@ dt("the metering ceiling is recorded when the stream carries no usage at all (a 
     await h.drain();
 
     assertEquals(h.state.ledgerInserts.length, 1);
-    assertEquals(h.state.ledgerInserts[0].usd, 0.18);
+    assertAlmostEquals(h.state.ledgerInserts[0].usd as number, CEILING_USD, 1e-9);
     assertEquals(h.state.ledgerInserts[0].request_id, "gen-cutoff");
   } finally {
     await h.stop();
@@ -622,7 +737,7 @@ dt("a client disconnect still meters (the client stream is cancelled, not read)"
   }
 });
 
-dt("a duplicate request_id at the ledger is logged, not thrown, and never retried", async () => {
+dt("a duplicate request_id at the ledger is retried once (S1), then logged as an alert, never thrown", async () => {
   const h = await harness();
   try {
     h.state.users["tok-1"] = { id: "u1" };
@@ -631,15 +746,55 @@ dt("a duplicate request_id at the ledger is logged, not thrown, and never retrie
     h.state.ledgerRequestIds.add("gen-dup"); // pre-seed as already recorded
     h.orOptions.chunks = sseChunks({ id: "gen-dup", cost: 0.05 });
     const warnings: unknown[] = [];
+    const inserts: unknown[] = [];
+    const realInsert = h.deps.insertLedgerCall;
     h.deps.log = { warn: (e) => warnings.push(e) };
+    h.deps.insertLedgerCall = (row) => {
+      inserts.push(row);
+      return realInsert(row);
+    };
 
     const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(res.status, 200); // the client response is unaffected by a metering failure
     await res.body?.cancel();
     await h.drain();
 
-    assertEquals(h.state.ledgerInserts.length, 0); // the mock rejected the dup insert
-    assertEquals(warnings.length, 1);
+    assertEquals(h.state.ledgerInserts.length, 0); // the mock rejected the dup insert, both times
+    assertEquals(inserts.length, 2, "exactly one retry (two attempts total)");
+    assertEquals(warnings.length, 2, "a retry warning, then an alert (no log.error configured here)");
+    assert(JSON.stringify(warnings[1]).includes("ALERT"), "the second failure is logged as an alert: " + JSON.stringify(warnings[1]));
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("S1: a ledger insert that fails once then succeeds on retry writes exactly one row, no alert", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ id: "gen-flaky", cost: 0.02 });
+    const warnings: unknown[] = [];
+    h.deps.log = { warn: (e) => warnings.push(e) };
+    let attempts = 0;
+    const realInsert = h.deps.insertLedgerCall;
+    h.deps.insertLedgerCall = (row) => {
+      attempts++;
+      if (attempts === 1) return Promise.reject(new Error("transient network blip"));
+      return realInsert(row);
+    };
+
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+
+    assertEquals(attempts, 2);
+    assertEquals(h.state.ledgerInserts.length, 1);
+    assertEquals(h.state.ledgerInserts[0].usd, 0.02);
+    assert(warnings.some((w) => JSON.stringify(w).includes("retrying once")));
+    assert(!warnings.some((w) => JSON.stringify(w).includes("ALERT")), "no alert once the retry succeeds");
   } finally {
     await h.stop();
   }

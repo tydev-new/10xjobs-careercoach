@@ -50,6 +50,7 @@ const deps: ProxyDeps = {
   randomId: () => crypto.randomUUID(),
   log: {
     warn: (e) => console.warn(e),
+    error: (e) => console.error(e),
   },
 };
 

@@ -106,6 +106,9 @@ export interface MockSupabaseState {
   betaSpendToday: number;
   ledgerRequestIds: Set<string>;
   ledgerInserts: Array<Record<string, unknown>>;
+  /** kind -> user id -> row count, so tests can plant both 'credit' and
+   * 'call' rows and assert which survive a kind-filtered delete. */
+  ledgerRowsByKind: Record<string, Record<string, number>>;
   storageObjects: Set<string>; // full object paths, e.g. users/u1/ws/documents/resume.pdf
   /** Seeded row counts, key `${table}:${uid}` -> count; a DELETE consumes
    * (zeroes) the matching entry and returns its prior count. */
@@ -123,6 +126,7 @@ export function freshState(overrides: Partial<MockSupabaseState> = {}): MockSupa
     betaSpendToday: 0,
     ledgerRequestIds: new Set(),
     ledgerInserts: [],
+    ledgerRowsByKind: {},
     storageObjects: new Set(),
     rowCounts: {},
     deletedRows: {},
@@ -171,7 +175,10 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
       return new Response(JSON.stringify(state.betaSpendToday), { status: 200 });
     }
 
-    // Table insert: ten_usage_ledger — service role only; unique request_id.
+    // Table insert: ten_usage_ledger — service role only; unique request_id;
+    // the same check constraints as the migration (usd >= 0, int4 tokens
+    // >= 0), so a handler that forwards garbled usage without sanitizing it
+    // fails here exactly like it would against the real project.
     if (url.pathname === "/rest/v1/ten_usage_ledger" && req.method === "POST") {
       if (token !== state.serviceRoleKey) return new Response("forbidden", { status: 403 });
       const row = await req.json().catch(() => ({}));
@@ -179,22 +186,44 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
       if (rid && state.ledgerRequestIds.has(rid)) {
         return new Response(JSON.stringify({ message: "duplicate key value" }), { status: 409 });
       }
+      if (typeof row.usd !== "number" || !Number.isFinite(row.usd) || row.usd < 0) {
+        return new Response(JSON.stringify({ code: "23514", message: "ten_usage_ledger_usd" }), { status: 400 });
+      }
+      const INT4_MAX = 2147483647;
+      for (const k of ["tokens_in", "tokens_out", "tokens_cached"]) {
+        const v = row[k];
+        if (v !== undefined && (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > INT4_MAX)) {
+          return new Response(JSON.stringify({ code: "22P02", message: `invalid integer ${k}` }), { status: 400 });
+        }
+      }
       if (rid) state.ledgerRequestIds.add(rid);
       state.ledgerInserts.push(row);
       return new Response(null, { status: 201 });
     }
 
-    // Table delete: /rest/v1/{table}?user_id=eq.<uid> — service role only.
+    // Table delete: /rest/v1/{table}?[kind=eq.X&]user_id=eq.<uid> — service
+    // role only. Unlike the bulk tester harness this mock DOES honor an
+    // additional `kind=eq.` filter on ten_usage_ledger, so a delete-account
+    // test here can assert 'credit' rows are removed and 'call' rows kept.
     const deleteMatch = url.pathname.match(/^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger)$/);
     if (deleteMatch && req.method === "DELETE") {
       if (token !== state.serviceRoleKey) return new Response("forbidden", { status: 403 });
       const table = deleteMatch[1];
       const uid = url.searchParams.get("user_id")?.replace(/^eq\./, "") ?? "";
+      const kindFilter = url.searchParams.get("kind")?.replace(/^eq\./, "");
       let count = 0;
       if (table === "ten_usage_ledger") {
         const before = state.ledgerInserts.length;
-        state.ledgerInserts = state.ledgerInserts.filter((r) => r.user_id !== uid);
+        state.ledgerInserts = state.ledgerInserts.filter(
+          (r) => !(r.user_id === uid && (!kindFilter || r.kind === kindFilter)),
+        );
         count = before - state.ledgerInserts.length;
+        const seededKind = kindFilter ?? "credit";
+        const seededCount = state.ledgerRowsByKind[seededKind]?.[uid] ?? 0;
+        if (seededCount > 0) {
+          count += seededCount;
+          state.ledgerRowsByKind[seededKind][uid] = 0;
+        }
       } else {
         const key = `${table}:${uid}`;
         count = state.rowCounts[key] ?? 0;
@@ -204,12 +233,17 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
       return new Response(null, { status: 200, headers: { "Content-Range": `*/${count}` } });
     }
 
-    // Storage: POST /storage/v1/object/list/{bucket}
+    // Storage: POST /storage/v1/object/list/{bucket} — pages honestly at
+    // whatever `limit`/`offset` the caller sends (N2), same shape as the
+    // real Storage API: never returns fewer than `limit` entries unless
+    // that's genuinely everything left.
     const listMatch = url.pathname.match(/^\/storage\/v1\/object\/list\/(.+)$/);
     if (listMatch && req.method === "POST") {
       if (token !== state.serviceRoleKey) return new Response("forbidden", { status: 403 });
       const body = await req.json().catch(() => ({}));
       const prefix = (body?.prefix as string) ?? "";
+      const limit = typeof body?.limit === "number" ? body.limit : 100;
+      const offset = typeof body?.offset === "number" ? body.offset : 0;
       const norm = prefix ? prefix.replace(/\/$/, "") + "/" : "";
       const seen = new Map<string, boolean>(); // name -> isFolder
       for (const obj of state.storageObjects) {
@@ -222,19 +256,23 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
           seen.set(rest.slice(0, slash), true);
         }
       }
-      const entries = [...seen.entries()].map(([name, isFolder]) => ({
-        name,
-        id: isFolder ? null : crypto.randomUUID(),
-      }));
+      const entries = [...seen.entries()]
+        .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+        .slice(offset, offset + limit)
+        .map(([name, isFolder]) => ({ name, id: isFolder ? null : crypto.randomUUID() }));
       return new Response(JSON.stringify(entries), { status: 200 });
     }
 
-    // Storage: DELETE /storage/v1/object/{bucket}  { prefixes: [...] }
+    // Storage: DELETE /storage/v1/object/{bucket}  { prefixes: [...] } — at
+    // most 1000 paths per call (N2), mirroring the real Storage API's cap.
     const removeMatch = url.pathname.match(/^\/storage\/v1\/object\/(.+)$/);
     if (removeMatch && req.method === "DELETE") {
       if (token !== state.serviceRoleKey) return new Response("forbidden", { status: 403 });
       const body = await req.json().catch(() => ({}));
       const prefixes = (body?.prefixes as string[]) ?? [];
+      if (prefixes.length < 1 || prefixes.length > 1000) {
+        return new Response(JSON.stringify({ message: "prefixes must have 1..1000 items" }), { status: 400 });
+      }
       for (const p of prefixes) state.storageObjects.delete(p);
       return new Response(JSON.stringify(prefixes.map((name) => ({ name }))), { status: 200 });
     }

@@ -46,7 +46,10 @@ export async function verifyUser(
 /** Beta membership, checked as the user (their own JWT), via the
  * `ten_is_member()` RPC (granted to `authenticated`, security invoker —
  * reads `auth.uid()` from the JWT, so the caller can only ever learn their
- * own membership). */
+ * own membership). N1 (fix round 1): throws on a transport/RPC failure
+ * (a down Supabase) rather than returning `false` — the caller must not
+ * confuse "the service is down" with "you're not a member" (403); the
+ * handler's top-level guard turns the throw into 503 model_error instead. */
 export async function isMember(
   env: SupabaseEnv,
   token: string,
@@ -62,8 +65,8 @@ export async function isMember(
     body: "{}",
   });
   if (!res.ok) {
-    await res.body?.cancel().catch(() => {});
-    return false;
+    const text = await res.text().catch(() => "");
+    throw new Error(`ten_is_member failed: ${res.status} ${text}`);
   }
   const body = await res.json();
   return body === true;
@@ -154,15 +157,22 @@ export async function insertLedgerCall(
 // Deletes every row the caller owns in `table` (service role), returning
 // the count deleted via `Prefer: count=exact` (a `Content-Range: star/N`
 // shaped response header). Used by ten-delete-account for `ten_ws_files`,
-// `ten_gate_log`, `ten_usage_ledger`.
+// `ten_gate_log`, and (kind-filtered) `ten_usage_ledger`.
+//
+// `extraFilter` is an additional PostgREST filter (e.g. `kind=eq.credit`),
+// ANDed with the `user_id` filter. It's placed BEFORE `user_id` in the query
+// string on purpose, not after: every DELETE this function sends must still
+// scope to exactly the caller's uid with nothing else riding along.
 export async function deleteOwnRows(
   env: SupabaseEnv,
   table: string,
   uid: string,
   fetchImpl: typeof fetch = fetch,
+  extraFilter?: string,
 ): Promise<number> {
+  const filters = `${extraFilter ? extraFilter + "&" : ""}user_id=eq.${encodeURIComponent(uid)}`;
   const res = await fetchImpl(
-    `${env.url}/rest/v1/${table}?user_id=eq.${encodeURIComponent(uid)}`,
+    `${env.url}/rest/v1/${table}?${filters}`,
     {
       method: "DELETE",
       headers: {
@@ -187,12 +197,19 @@ export interface StorageEntry {
   id: string | null; // null = a folder
 }
 
+// N2 (fix round 1): the Storage API returns at most this many entries per
+// `list`/`remove` call (Supabase Storage's own per-call cap), so a folder
+// with more objects than this needs multiple pages/batches.
+const STORAGE_PAGE_SIZE = 1000;
+
 /** One page of `POST /storage/v1/object/list/{bucket}` at `prefix` (not
  * recursive — Storage only lists one level per call). */
 async function listOnePage(
   env: SupabaseEnv,
   bucket: string,
   prefix: string,
+  limit: number,
+  offset: number,
   fetchImpl: typeof fetch,
 ): Promise<StorageEntry[]> {
   const res = await fetchImpl(`${env.url}/storage/v1/object/list/${bucket}`, {
@@ -202,7 +219,7 @@ async function listOnePage(
       apikey: env.serviceRoleKey,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prefix, limit: 1000, offset: 0 }),
+    body: JSON.stringify({ prefix, limit, offset }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -213,50 +230,62 @@ async function listOnePage(
 }
 
 /** Recursively lists every object under `prefix` (folders have `id: null`
- * in Supabase Storage's list response), returning full object paths. */
+ * in Supabase Storage's list response), returning full object paths. N2
+ * (fix round 1): pages through `STORAGE_PAGE_SIZE`-sized batches at each
+ * level rather than trusting one `list` call to return everything — a
+ * folder with more than one page of entries used to silently drop the rest. */
 export async function listAllObjects(
   env: SupabaseEnv,
   bucket: string,
   prefix: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string[]> {
-  const page = await listOnePage(env, bucket, prefix, fetchImpl);
   const out: string[] = [];
-  for (const entry of page) {
-    const full = prefix ? `${prefix}/${entry.name}` : entry.name;
-    if (entry.id === null) {
-      out.push(...(await listAllObjects(env, bucket, full, fetchImpl)));
-    } else {
-      out.push(full);
+  let offset = 0;
+  for (;;) {
+    const page = await listOnePage(env, bucket, prefix, STORAGE_PAGE_SIZE, offset, fetchImpl);
+    for (const entry of page) {
+      const full = prefix ? `${prefix}/${entry.name}` : entry.name;
+      if (entry.id === null) {
+        out.push(...(await listAllObjects(env, bucket, full, fetchImpl)));
+      } else {
+        out.push(full);
+      }
     }
+    if (page.length < STORAGE_PAGE_SIZE) break;
+    offset += STORAGE_PAGE_SIZE;
   }
   return out;
 }
 
 /** Bulk-removes objects via the Storage API (never SQL — the migration's
  * header notes `storage.protect_delete` refuses direct SQL deletes and it
- * would orphan the backend files anyway). */
+ * would orphan the backend files anyway). N2 (fix round 1): batches into
+ * `STORAGE_PAGE_SIZE`-sized `prefixes` arrays — the Storage API's remove
+ * call caps how many paths one request can carry. */
 export async function removeObjects(
   env: SupabaseEnv,
   bucket: string,
   paths: string[],
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  if (paths.length === 0) return;
-  const res = await fetchImpl(`${env.url}/storage/v1/object/${bucket}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${env.serviceRoleKey}`,
-      apikey: env.serviceRoleKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ prefixes: paths }),
-  });
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`storage remove failed: ${res.status} ${text}`);
+  for (let i = 0; i < paths.length; i += STORAGE_PAGE_SIZE) {
+    const batch = paths.slice(i, i + STORAGE_PAGE_SIZE);
+    const res = await fetchImpl(`${env.url}/storage/v1/object/${bucket}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${env.serviceRoleKey}`,
+        apikey: env.serviceRoleKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prefixes: batch }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`storage remove failed: ${res.status} ${text}`);
+    }
+    await res.body?.cancel().catch(() => {});
   }
-  await res.body?.cancel().catch(() => {});
 }
 
 export function envFromDeno(getEnv: (name: string) => string | undefined): SupabaseEnv {

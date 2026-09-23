@@ -1,10 +1,18 @@
-// The testable core of ten-delete-account (docs/design-web-agent.md § 8).
-// JWT + membership, then deletes the caller's beta data only: Storage
-// objects under users/{uid}/ (via the Storage API, service role — SQL
-// deletes are refused by `storage.protect_delete` and would orphan the
-// backend files), then `ten_ws_files`, `ten_gate_log`, `ten_usage_ledger`
-// rows. The shared auth user is kept. No `window`/`document`/`localStorage`/
-// `node:` API here, so this runs the same in tests and on the Edge Runtime.
+// The testable core of ten-delete-account (docs/design-web-agent.md § 8,
+// as amended by the fix-round-1 lead ruling S5/S6/S7): requires a
+// SIGNED-IN user only, not membership — an ex-member (their credit spent
+// or removed) must still be able to erase their own beta data. Deletes the
+// caller's beta data: Storage objects under users/{uid}/ (via the Storage
+// API, service role, paged — see N2 in _shared/supabase.ts — SQL deletes
+// are refused by `storage.protect_delete` and would orphan the backend
+// files), then `ten_ws_files`, `ten_gate_log`, and the caller's 'credit'
+// ledger rows only. 'call' ledger rows are KEPT: they are cost records
+// with no file content, and removing them would let a self-delete erase
+// the user's own history from today's beta-wide $5 ceiling (fix-round-1
+// SHOULD). Idempotent: a second call finds nothing left and still returns
+// 200 with a zeroed summary. The shared auth user is kept. No
+// `window`/`document`/`localStorage`/`node:` API here, so this runs the
+// same in tests and on the Edge Runtime.
 
 import { allowedOrigins, corsHeaders } from "../_shared/cors.ts";
 
@@ -15,10 +23,10 @@ export const SUMMARY_MESSAGE =
 
 export interface DeleteDeps {
   verifyUser(token: string): Promise<{ id: string } | null>;
-  isMember(token: string): Promise<boolean>;
   listAllObjects(bucket: string, prefix: string): Promise<string[]>;
   removeObjects(bucket: string, paths: string[]): Promise<void>;
-  deleteOwnRows(table: string, uid: string): Promise<number>;
+  /** `extraFilter`, when given, is ANDed with `user_id` (e.g. `kind=eq.credit`). */
+  deleteOwnRows(table: string, uid: string, extraFilter?: string): Promise<number>;
   log?: { warn(e: unknown): void };
 }
 
@@ -56,16 +64,8 @@ export async function handleRequest(
     return jsonError(401, "not_signed_in", "Sign in required.", cors);
   }
 
-  // Membership.
-  const member = await deps.isMember(token);
-  if (!member) {
-    return jsonError(
-      403,
-      "not_a_member",
-      "Ten is in a private beta. Ask the person who invited you for access.",
-      cors,
-    );
-  }
+  // No membership check (lead ruling, fix round 1): a signed-in user erases
+  // their own beta data whether or not they still hold a credit row.
 
   // 1. Storage first (through the API — see the header note), acting only
   // on this user's own prefix.
@@ -82,13 +82,16 @@ export async function handleRequest(
   }
 
   // 2. Then the beta data rows, acting only on this user's own rows (§ 8).
+  // ten_usage_ledger last, and filtered to 'credit' rows only — 'call' rows
+  // (cost records, no content) are kept so the beta ceiling and the user's
+  // own cost history survive a self-delete.
   let files = 0;
   let gateLog = 0;
-  let ledger = 0;
+  let creditRows = 0;
   try {
     files = await deps.deleteOwnRows("ten_ws_files", user.id);
     gateLog = await deps.deleteOwnRows("ten_gate_log", user.id);
-    ledger = await deps.deleteOwnRows("ten_usage_ledger", user.id);
+    creditRows = await deps.deleteOwnRows("ten_usage_ledger", user.id, "kind=eq.credit");
   } catch (e) {
     deps.log?.warn({ msg: "ten-delete-account: row delete failed", err: String(e) });
     return jsonError(503, "delete_failed", "Could not delete your data. Try again.", cors);
@@ -101,7 +104,7 @@ export async function handleRequest(
         storageObjects: objects.length,
         textFiles: files,
         gateLogRows: gateLog,
-        ledgerRows: ledger,
+        creditRows,
       },
     }),
     { status: 200, headers: { "Content-Type": "application/json", ...cors } },

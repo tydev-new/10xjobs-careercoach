@@ -536,12 +536,16 @@ invited you for access."
 
 1. **Auth:** it resolves a signed-in user (`role = authenticated`, a `sub`),
    otherwise 401. The anon or publishable key alone gets 401.
-2. **Size and membership:** a body over 256 KB gets 413. A non-member gets 403.
+2. **Size and membership:** a body over 256 KB gets 413, counted while the
+   request body streams in (no trusting `Content-Length`). A non-member gets
+   403.
 3. **Balance and ceiling:** if the user's balance is not above 0, 402, shown
    as `over_balance`: "Your beta credit is used up. Ask the person who invited
    you for more." If the beta's spend today is $5 or more, 503 (above).
 4. **Builds** the upstream body from an allowlist. It copies `messages`,
-   `tools`, `tool_choice` and `temperature`. It **sets**:
+   `tools` (function tools only; server tools are dropped, so web search
+   exists only as the fixed plugin below), `tool_choice` and `temperature`.
+   It **sets**:
    - `model` = `anthropic/claude-sonnet-5`, an exact match with no suffix
      (anything else gets 400 `model_not_allowed`);
    - `max_tokens` = min(client, 4,096);
@@ -557,11 +561,15 @@ invited you for access."
 5. **Streams** the response back, teed. Inside `EdgeRuntime.waitUntil` it
    reads the other copy to the end (parsing only the last `data:` line) and
    writes one `ten_usage_ledger` row keyed by the response `id`, from the
-   final chunk's `usage.cost` and token counts, error endings included. If no
-   cost can be read it records the **ceiling**, about $0.18 (64k input tokens
-   at $2/M + 4,096 output at $10/M + one search). One metering path only.
-6. **Upstream failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx becomes
-   a 503, which the loop shows as `model_error`, not `over_balance`.
+   final chunk's `usage.cost` and token counts, error endings included. The
+   cost is used only if it is a finite number from 0 to the ceiling; if it is
+   missing or invalid, or the meter passes its ~360 s deadline, the row
+   records the **ceiling**, computed from the formula (64k input tokens ×
+   input price + 4,096 × output price + one search; about $0.18 today). One
+   metering path only.
+6. **Failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx,
+   a Supabase error, or anything unexpected becomes a 503 with the CORS
+   headers, shown as `model_error`, not `over_balance`.
 
 **`ten_usage_ledger`** is the only money table (`kind` `credit`/`call`,
 `request_id` unique, token counts, `usd numeric(12,6)`; columns in the
@@ -578,14 +586,18 @@ migration). Users select their own rows; only the service role writes.
   only while the balance is above 0. A user's loss is the calls in flight when
   it crosses zero (each ≤ the ceiling); the beta's total by the $5/day
   ceiling plus in-flight calls, and everything by the key's shared $20/day. The one-tab lock had no other use and is removed.
-- **`ten-delete-account`** runs with the service role, acts only on the user
-  its JWT resolves to (anon/publishable key → 401), and deletes **beta data
-  only**, keeping the shared sign-in: it removes `users/{uid}/` objects
-  through the **Storage API** (list, then remove; SQL deletes are refused and
-  would orphan the files), then the `ten_ws_files`, `ten_usage_ledger` and
-  `ten_gate_log` rows. The UI says: "This deletes your
-  Ten beta data. Your sign-in stays because it's shared with the older app.
-  Unused credit is forfeited."
+- **`ten-delete-account`** runs with the service role, needs only a
+  signed-in user (not membership; anon/publishable key → 401), acts only on
+  that user, and is idempotent. It removes `users/{uid}/` objects through the
+  **Storage API** (listed and removed page by page; SQL deletes are refused
+  and would orphan the files), then the `ten_ws_files`, `ten_gate_log` and
+  `credit` ledger rows. It keeps the shared sign-in and the `call` ledger rows:
+  cost records (tokens and USD, no career content), so the daily ceiling and
+  the cost history stay intact. Rule 9 holds: career data is gone; cost
+  metadata is not career data. The UI says: "This deletes your Ten beta data.
+  Your sign-in stays because it's shared with the older app. Unused credit is
+  forfeited. Your usage records, which show only amounts spent and no
+  content, are kept."
 - **CORS:** the proxy allows only the production Vercel origin and
   `http://localhost:5173`.
 - **The browser holds** only the Supabase session. A custom `fetch` sets
@@ -610,8 +622,8 @@ opening beta files.
 functions); 403 non-member; 402 at zero; 413 over 256 KB; 404 `/embeddings`;
 400 `…:online`; a stopped stream still writes a row; duplicate `request_id`
 rejected; users cannot insert ledger rows; unlisted-origin preflight gets no
-allow header; delete leaves the auth user, no beta rows, and a known path
-downloads as not-found; `ten_beta_spend_today()` sums only today's calls and
+allow header; delete (twice: idempotent) leaves the auth user and the `call`
+rows, no other beta rows, and a known path downloads as not-found; `ten_beta_spend_today()` sums only today's calls and
 is service-only; the SQL harness in `tests/sql/` (README there: `run-r2.mjs`,
 `r3-own.mjs`; guard, CAS, codes, caps, paths, membership, pins, teardown after
 the Storage API step) passes.
@@ -658,7 +670,8 @@ spike replaced (owner, 2026-09-23).
   shared; owner, 09-23), and a ledger-derived balance.
 - Text in `ten_ws_files` with a SQL compare-and-swap, binaries create-only in
   Storage: Storage has no conditional write (spike 3); one home per file.
-- A credit row = beta member; delete removes beta data only (shared sign-in).
+- A credit row = beta member; delete removes beta data but keeps the shared
+  sign-in and the `call` cost rows (not career data, rule 9).
 - A $5/day beta-wide ceiling in the proxy (owner, 09-23): the shared key's
   $20/day stays at least $15 for the live app.
 - Restrictive pins on the bucket, plus an allowlist guard at apply time: the

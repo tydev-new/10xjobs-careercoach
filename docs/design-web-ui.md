@@ -149,12 +149,13 @@ typed `yes` standing in for a button the same way it does at a spend
 gate (§ 2.5):
 
 1. **The complete thing** — named, not summarized: "your workspace
-   files, your usage history, and your gate log" (C § 8's three
-   tables: `ten_ws_files` and the Storage bucket, `ten_usage_ledger`,
-   `ten_gate_log`).
+   files, your gate log, and your credit" (C § 8: `ten_ws_files` and the
+   Storage bucket, `ten_gate_log`, the `credit` ledger rows; the `call`
+   rows are kept).
 2. **The one plain sentence** — C § 8's own wording, word for word:
    "This deletes your Ten beta data. Your sign-in stays because it's
-   shared with the older app. Unused credit is forfeited."
+   shared with the older app. Unused credit is forfeited. Your usage
+   records, which show only amounts spent and no content, are kept."
 3. **The candidate's typed yes** — the same composer, the same rule as
    the spend gate: no button fires it, only an exact typed `yes`.
 4. **The report-back** — once `ten-delete-account` returns, one line

@@ -3,7 +3,7 @@
 
     python3 tests/run.py
 """
-import glob, importlib, importlib.util, os, sys, traceback
+import glob, importlib, importlib.util, os, shutil, subprocess, sys, traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -33,5 +33,25 @@ for path in paths:
                 failed += 1
                 print(f"FAIL {mod.__name__}.{name}")
                 traceback.print_exc()
+# apps/web's tester-owned suite (tests/web/*.test.ts) is Node's own test
+# runner, not pytest-shaped — run it here too so one command covers both,
+# rather than a second command the repo has to remember. Skips loudly
+# (not silently) when node isn't on PATH, and its own pass/fail folds into
+# this script's exit code.
+node = shutil.which("node")
+web_tests = sorted(glob.glob(os.path.join(HERE, "web", "*.test.ts")))
+if not node:
+    print("\nSKIPPED tests/web/*.test.ts: no `node` on PATH")
+elif not web_tests:
+    print("\nSKIPPED tests/web/*.test.ts: no test files found")
+else:
+    print(f"\n--- node --test tests/web/*.test.ts ({len(web_tests)} file(s)) ---")
+    result = subprocess.run([node, "--test", *web_tests], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/web/*.test.ts (node --test) — see output above")
+    else:
+        passed += 1
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

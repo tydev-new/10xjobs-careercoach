@@ -165,5 +165,25 @@ else:
     else:
         passed += 1
 
+# Edge Functions (supabase/functions, Deno): the coder's own tests plus the
+# independent tester's adversarial suite (tests/functions). Loopback only;
+# no live OpenRouter or Supabase. Skips loudly when deno isn't installed.
+import shutil as _shutil
+deno = _shutil.which("deno")
+if not deno:
+    print("\nSKIPPED supabase/functions + tests/functions: no `deno` on PATH")
+else:
+    for label, args in (
+        ("supabase/functions", [deno, "test", "--allow-net", os.path.join(HERE, "..", "supabase", "functions")]),
+        ("tests/functions", [deno, "test", "--allow-net=127.0.0.1", os.path.join(HERE, "functions")]),
+    ):
+        print(f"\n--- deno test {label} ---")
+        result = subprocess.run(args, cwd=os.path.join(HERE, ".."))
+        if result.returncode != 0:
+            failed += 1
+            print(f"FAIL deno test {label} — see output above")
+        else:
+            passed += 1
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

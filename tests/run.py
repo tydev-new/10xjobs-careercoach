@@ -185,5 +185,54 @@ else:
         else:
             passed += 1
 
+# tests/sql — the PGlite SQL harness over the APPLIED migration (fix
+# round 1 CI instruction: "spike 3 turned into CI"). Its own package.json
+# "test" script chains all three runners (run.mjs; run-r2.mjs; r3-own.mjs)
+# with plain `;`, not `&&` — run.mjs has 3 KNOWN/expected failures (see
+# tests/sql/README.md: its teardown cases assume the teardown deletes
+# storage.* in SQL, which the applied migration makes impossible on
+# purpose), so only the LAST command's exit code (r3-own.mjs) is the
+# overall pass/fail signal, matching that script's own designed contract.
+# Skips loudly (not silently) when `npm` isn't on PATH or node_modules
+# hasn't been installed there yet (a real download: @electric-sql/pglite).
+npm = shutil.which("npm")
+sql_dir = os.path.join(HERE, "sql")
+if not npm:
+    print("\nSKIPPED tests/sql (PGlite SQL harness): no `npm` on PATH")
+elif not os.path.isdir(os.path.join(sql_dir, "node_modules")):
+    print("\nSKIPPED tests/sql (PGlite SQL harness): node_modules not installed — run `npm install` in tests/sql first")
+else:
+    print("\n--- npm test (tests/sql) ---")
+    result = subprocess.run([npm, "test"], cwd=sql_dir)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/sql (npm test) — see output above")
+    else:
+        passed += 1
+
+# tests/store/*.test.ts — the independent tester's step 2 suite (plan
+# step 2 fix round 1): SupabaseWorkspaceStore driven against a PGlite
+# stand-in that runs the APPLIED migration (not a hand-written fake),
+# export/import adversarial cases (path rules, caps, zip-bomb defense),
+# and auth. Owned by the tester, not this script — don't edit those
+# files. Skips loudly when node_modules isn't installed there yet (a
+# real download: @electric-sql/pglite) or no test files are found.
+store_dir = os.path.join(HERE, "store")
+store_tests = sorted(glob.glob(os.path.join(store_dir, "*.test.ts")))
+if not node:
+    print("\nSKIPPED tests/store/*.test.ts: no `node` on PATH")
+elif not os.path.isdir(os.path.join(store_dir, "node_modules")):
+    print("\nSKIPPED tests/store/*.test.ts: node_modules not installed — run `npm install` in tests/store first")
+elif not store_tests:
+    print("\nSKIPPED tests/store/*.test.ts: no test files found")
+else:
+    print(f"\n--- node --test tests/store/*.test.ts ({len(store_tests)} file(s)) ---")
+    result = subprocess.run([node, "--test", *store_tests], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/store/*.test.ts (node --test) — see output above")
+    else:
+        passed += 1
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

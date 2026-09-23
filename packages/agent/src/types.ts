@@ -146,7 +146,19 @@ export type WorkspaceErrorCode =
   | "not_editable"
   | "content_too_large"
   | "upload_too_large"
-  | "unsupported_type";
+  | "unsupported_type"
+  // Added by the step 2 coder (Supabase workspace store), additive only:
+  // docs/design-web-agent.md § 2's own WorkspaceError.code list already
+  // names these three, and the applied migration
+  // (supabase/migrations/20260923000000_ten_beta_init.sql)'s ten_ws_write
+  // raises them (PT409 path_conflict, PT413 workspace_full, PT403
+  // not_a_member) — the in-memory/local-folder stores never produce them,
+  // only the Supabase-backed one does. Flagged in the coder's hand-back
+  // for the lead's OK, since types.ts is shared outside this slice's
+  // directories.
+  | "path_conflict"
+  | "workspace_full"
+  | "not_a_member";
 
 export class WorkspaceError extends Error {
   code: WorkspaceErrorCode;

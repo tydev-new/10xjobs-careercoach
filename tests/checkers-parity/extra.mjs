@@ -227,8 +227,12 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "cf-duplicate-sections-and-rows", files: { "profile.md": PROFILE + "## Snapshot\n## Snapshot\n", "base-resume-history.md": "| date | round | driver | scored vs FIXED | what changed |\n|---|---|---|---|---|\n| a | 1 | x | y | z |\n| a | 1 | x | y | z |\n| a | 1 | x | y |\n" },
     args: ["--workspace", ".", ...sk] });
   add({ s, id: "cf-very-long-line", files: { "profile.md": PROFILE + `## ${LONG}\n` }, args: ["--workspace", ".", ...sk] });
-  add({ s, id: "cf-default-skills-as-the-skill-prose-calls-it", files: { "profile.md": PROFILE }, args: ["--workspace", "."],
-    note: "every MVP SKILL.md runs `check_files.py --workspace .` with no --skills" });
+  // Rewritten 2026-09-23 per LEAD RULING (round 2): round 1 simulated the
+  // sandbox by mirroring the bundle at its HOST absolute path, which is not
+  // the spec. design-web-agent.md § 4 is: "the bundle mounted read-only at
+  // `skills/`" of the workspace — so this case now uses that mount.
+  add({ s, id: "cf-default-skills-as-the-skill-prose-calls-it", files: { "profile.md": PROFILE }, args: ["--workspace", "."], mount: "design",
+    note: "every MVP SKILL.md runs `check_files.py --workspace .` with no --skills; bundle at <ws>/skills (§ 4)" });
   add({ s, id: "cf-arg-help", files: {}, args: ["-h"] });
   add({ s, id: "cf-arg-unrecognized", files: {}, args: ["--workspace", ".", "--skill", SKILLS, "--x"] });
 }
@@ -330,6 +334,38 @@ const LONG = ("word ".repeat(4000)).trim();
     note: "design-web-agent.md § 4: bundle mounted read-only at `skills/`; skill prose passes no --skills" });
 }
 
+// ------------------------------------------------------------------ round 3
+// Final re-verify (coder's fix round 2): PY_S whitespace set, Unicode Nd
+// digits in int(), argparse `--` / `--help=`, and the --skills default
+// derived from the invoked script path (incl. a cwd below the workspace).
+{
+  const PROFILE = "# P\n## Snapshot\n## Experience\n## Intake findings\n### Positioning strengths\n### Likely interviewer concerns\n" +
+    "### Career-narrative gaps\n### Story seeds\n## Interview history\n## Constraints\n## Application defaults\n";
+  const J = (body) => "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n" + body;
+  const RV = ["--workspace", ".", "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong"];
+  const PLAN = "## Board\nWaiting on you\n- the comp floor\nTo do\n- x\n";
+  // PY_S: \x1c-\x1f and \x85 are whitespace to Python's str.split()/strip()
+  add({ s: "check_materials", id: "r3-cm-info-separators-split", files: { "letter.md": "Dear Hiring Manager,\n\na\x1db\x1ec\x1fd\x85e　f᠎g​h\n" }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s: "record_verdict", id: "r3-rv-strip-info-separators", files: { "jobs.md": J("## To Review\n\n### Beta — PM\n- Reason: \x1cfoo\x1f\n- URL: \x85u\x1d\n- Location: ᠎x​\n\n") }, args: RV });
+  add({ s: "render_resume", id: "r3-rr-info-separators", files: { "r.md": "# A\x1c\n\nw1\x1ew2\x85w3\n\x1f\n- b\x1d\n" }, args: ["--md", "r.md", "--html", "o.html"] });
+  add({ s: "check_closeout", id: "r3-cc-nel-rows", files: { "plan.md": "## Board\nWaiting on you\n\x85- comp floor\x85\n  \x1c\nTo do\n- x\n" }, args: ["--workspace", ".", "--stage", "applying", "--asked", "comp floor"] });
+  // Unicode Nd digits: Python int() accepts any Nd (Devanagari, NKo, math bold, Thai)
+  add({ s: "record_verdict", id: "r3-rv-nd-digit-scores-in-file", files: { "jobs.md": J("## To Review\n\n### A — PM\n- Score: १२\n\n### B — PM\n- Score: ߃\n\n### C — PM\n- Score: 𝟓\n\n### D — PM\n- Score: ๙_๙\n\n### E — PM\n- Score: 1__0\n\n### F — PM\n- Score: ²\n\n") }, args: RV });
+  add({ s: "record_verdict", id: "r3-rv-nd-digit-score-arg", files: {}, args: [...RV, "--score", "٩٠"] });
+  add({ s: "check_closeout", id: "r3-cc-nd-digit-minutes-arg", files: { "plan.md": PLAN }, args: ["--workspace", ".", "--stage", "applying", "--minutes", "३०"] });
+  add({ s: "render_resume", id: "r3-rr-superscript-pages-arg", files: { "r.md": "# A\n" }, args: ["--md", "r.md", "--html", "o.html", "--pages", "²"] });
+  // argparse `--` and --help=
+  add({ s: "update_job", id: "r3-uj-arg-double-dash-tail", files: { "jobs.md": J("## To Review\n\n### Café — Staff\n\n") }, args: ["--workspace", ".", "--company", "Café", "--title", "Staff", "--stage", "Offer", "--", "extra"] });
+  add({ s: "check_materials", id: "r3-cm-arg-double-dash-empty-tail", files: { "r.md": "# A\n" }, args: ["--workspace", ".", "--resume", "r.md", "--"] });
+  add({ s: "check_closeout", id: "r3-cc-arg-help-empty-equals", files: {}, args: ["--help="] });
+  add({ s: "check_files", id: "r3-cf-arg-short-help-equals", files: {}, args: ["-h=x"] });
+  add({ s: "record_verdict", id: "r3-rv-arg-asked-like-empty-equals", files: {}, args: [...RV, "--reasons="] });
+  // --skills default derived from the invoked script path
+  add({ s: "check_files", id: "r3-cf-default-skills-from-subdir-cwd", files: { "profile.md": PROFILE, "applications/a.md": "# a\n" }, cwdRel: "applications", args: ["--workspace", ".."], mount: "design",
+    note: "agent cd's below the workspace; Python still resolves skills from __file__" });
+  add({ s: "check_files", id: "r3-cf-explicit-skills-beats-default", files: { "profile.md": PROFILE }, args: ["--workspace", ".", "--skills", "nowhere"], mount: "design" });
+}
+
 // ------------------------------------------------------------------ engines
 function seed(ws, c) {
   rmSync(ws, { recursive: true, force: true });
@@ -358,13 +394,13 @@ function snapDisk(ws) {
 function runPy(c, ws) {
   const script = join(SKILLS, SCRIPTS[c.s]);
   const env = { ...process.env, FREEZE_ISO: WRITERS.has(c.s) ? FROZEN : "" };
-  const r = spawnSync("python3", ["-c", BOOT, script, ...c.args], { cwd: ws, env, encoding: "utf-8" });
+  const r = spawnSync("python3", ["-c", BOOT, script, ...c.args], { cwd: join(ws, c.cwdRel || "."), env, encoding: "utf-8" });
   return { stdout: r.stdout, stderr: r.stderr, code: r.status, files: snapDisk(ws) };
 }
 function runJsBin(c, ws) {
   const bin = join(PKG, "bin", `${c.s}.mjs`);
   const env = { ...process.env, CHECKER_NOW_ISO: WRITERS.has(c.s) ? FROZEN : "" };
-  const r = spawnSync("node", [bin, ...c.args], { cwd: ws, env, encoding: "utf-8" });
+  const r = spawnSync("node", [bin, ...c.args], { cwd: join(ws, c.cwdRel || "."), env, encoding: "utf-8" });
   return { stdout: r.stdout, stderr: r.stderr, code: r.status, files: snapDisk(ws) };
 }
 let SKILL_FILES = null;
@@ -398,7 +434,7 @@ async function runJsBash(c, ws) {
   const fs = new InMemoryFs(files);
   await fs.mkdir(ws, { recursive: true });
   for (const d of c.dirs || []) await fs.mkdir(join(ws, d), { recursive: true });
-  const bash = new Bash({ fs, cwd: ws, customCommands: [python3Command] });
+  const bash = new Bash({ fs, cwd: join(ws, c.cwdRel || "."), customCommands: [python3Command] });
   const cmd = `python3 ../some/prefix/${SCRIPTS[c.s].split("/").pop()} ${c.args.map(q).join(" ")}`;
   let r;
   try { r = await bash.exec(cmd); } catch (e) { r = { stdout: "", stderr: `THROWN ${e && e.message}\n`, exitCode: -1 }; }

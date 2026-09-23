@@ -120,18 +120,29 @@ upstream body from an explicit allowlist (forces the model, cost cap,
 `plugins: [{ id: "web" }]` to the fixed engine and result cap — everything
 else is dropped); calls the one hard-coded OpenRouter URL with
 `TEN_OPENROUTER_API_KEY` (never logged); streams the response back to the
-client while metering a `tee()`'d copy in the background (`waitUntil`),
-inserting exactly one `ten_usage_ledger` `'call'` row keyed by the response
-id, recording the ~$0.18 ceiling cost if no cost could be parsed. An upstream
-402/5xx maps to 503 `model_error` (the shared key's own limit, not this
-user's balance). CORS is restricted to the production Vercel origin
-(`TEN_APP_ORIGIN`) and `http://localhost:5173`.
+client while metering a `tee()`'d copy in the background (`waitUntil`, a
+360 s deadline timed from the request's start), inserting exactly one
+`ten_usage_ledger` `'call'` row keyed by the response id: a finite reported
+cost from $0 to 10× the ~$0.18 ceiling is recorded **as reported** (a cost
+above the ceiling also logs an anomaly line — no key or content in it); a
+missing, non-finite, negative, or >10×-the-ceiling cost, or the meter
+deadline, records the ceiling instead. An upstream 402/5xx maps to 503
+`model_error` (the shared key's own limit, not this user's balance). CORS is
+restricted to the production Vercel origin (`TEN_APP_ORIGIN`) and
+`http://localhost:5173`.
 
 **`ten-delete-account`** — `POST` only (`OPTIONS` for preflight). Verifies
-the caller's session and membership, then deletes **beta data only** for
-that user: every Storage object under `users/{uid}/` (via the Storage API,
+the caller's session — **signed in only, not membership** (fix round 2: an
+ex-member whose credit is spent or gone must still be able to erase their
+own data) — then deletes that user's beta data: every Storage object under
+`users/{uid}/` (via the Storage API, paged at 1,000 per list/remove call,
 list then remove — SQL deletes are refused by `storage.protect_delete` and
-would orphan the backend files), then their rows in `ten_ws_files`,
-`ten_gate_log`, `ten_usage_ledger`. The shared auth user is never touched.
-Returns a summary `{ message, deleted: { storageObjects, textFiles,
-gateLogRows, ledgerRows } }`.
+would orphan the backend files), their rows in `ten_ws_files` and
+`ten_gate_log`, and their `ten_usage_ledger` rows of kind `'credit'` only.
+**`'call'` rows are kept** — they're cost records with no file content, and
+keeping them holds the beta-wide $5/day ceiling and the user's own cost
+history intact against a self-delete. The shared auth user is never
+touched. Idempotent: a second call finds nothing left and still returns 200
+with a zeroed summary. Returns `{ message, deleted: { storageObjects,
+textFiles, gateLogRows, creditRows } }`; `message` also states that the
+usage records (amounts only, no content) are kept.

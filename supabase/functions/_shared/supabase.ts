@@ -149,7 +149,14 @@ export async function insertLedgerCall(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`ten_usage_ledger insert failed: ${res.status} ${text}`);
+    const err = new Error(`ten_usage_ledger insert failed: ${res.status} ${text}`);
+    if (res.status === 409) {
+      // A unique-constraint conflict on request_id: a row for this call
+      // already exists. handler.ts's retry-once logic (§ round 2, item 6)
+      // reads this flag to log "not lost" rather than an alert.
+      Object.assign(err, { duplicate: true });
+    }
+    throw err;
   }
   await res.body?.cancel().catch(() => {});
 }

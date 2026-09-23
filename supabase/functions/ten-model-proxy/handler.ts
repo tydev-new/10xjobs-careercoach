@@ -25,7 +25,10 @@ export const MESSAGES = {
 // S4 (fix round 1): the meter must not wait past this even if the upstream
 // connection never closes — below the Edge Runtime's 400 s wall-clock limit
 // (§ 8 "Time") so the worker itself never kills the meter mid-flight.
-const METER_DEADLINE_MS = 360_000;
+// Overridable via ProxyDeps.meterDeadlineMs (round 2: tests can shrink it to
+// prove the "timed from the request's start" behavior deterministically,
+// without waiting out the real 360 s).
+const DEFAULT_METER_DEADLINE_MS = 360_000;
 
 export interface ProxyDeps {
   verifyUser(token: string): Promise<{ id: string } | null>;
@@ -50,6 +53,8 @@ export interface ProxyDeps {
   waitUntil(p: Promise<unknown>): void;
   randomId(): string;
   log?: { warn(e: unknown): void; error?(e: unknown): void };
+  /** Overrides `DEFAULT_METER_DEADLINE_MS` (360 s); unset in production. */
+  meterDeadlineMs?: number;
 }
 
 function jsonError(status: number, code: string, message: string, cors: HeadersInit): Response {
@@ -59,19 +64,27 @@ function jsonError(status: number, code: string, message: string, cors: HeadersI
   });
 }
 
-/** Reads an SSE stream to completion (or `METER_DEADLINE_MS`, whichever
- * comes first — S4, fix round 1) and returns whatever text was seen.
+/** Reads an SSE stream to completion, or until `deadlineAt` (a `Date.now()`
+ * timestamp — S4/round 2: timed from the REQUEST's start, not from when
+ * this read began, so a slow auth/balance/upstream-connect phase eats into
+ * the same budget rather than extending it past the Edge Runtime's 400 s
+ * wall clock), whichever comes first. Returns whatever text was seen.
  * Never throws: an upstream reset or a deadline cancel both just stop the
  * read early, and the caller meters from whatever text was collected. */
-async function readStreamWithDeadline(stream: ReadableStream<Uint8Array>, deps: ProxyDeps): Promise<string> {
+async function readStreamWithDeadline(
+  stream: ReadableStream<Uint8Array>,
+  deps: ProxyDeps,
+  deadlineAt: number,
+): Promise<string> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let text = "";
   let timedOut = false;
+  const remainingMs = Math.max(0, deadlineAt - Date.now());
   const timer = setTimeout(() => {
     timedOut = true;
     reader.cancel("meter deadline exceeded").catch(() => {});
-  }, METER_DEADLINE_MS);
+  }, remainingMs);
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -92,20 +105,41 @@ async function readStreamWithDeadline(stream: ReadableStream<Uint8Array>, deps: 
   return text;
 }
 
+/** True when `err` is a duplicate-`request_id` rejection (§ round 2, item 6:
+ * a retry after a lost response — the first attempt's insert actually
+ * landed, only its ack was lost — must not be logged as a lost row: a
+ * duplicate on retry means the row IS there). `insertLedgerCall`
+ * implementations mark this with a `duplicate: true` property so
+ * handler.ts never has to depend on `_shared/supabase.ts`'s concrete error
+ * shape or parse status codes out of a message string. */
+function isDuplicateRequestId(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { duplicate?: unknown }).duplicate === true;
+}
+
 async function meterUsage(
   stream: ReadableStream<Uint8Array>,
   deps: ProxyDeps,
   uid: string,
+  deadlineAt: number,
 ): Promise<void> {
-  const text = await readStreamWithDeadline(stream, deps);
+  const text = await readStreamWithDeadline(stream, deps, deadlineAt);
 
   const parsed = parseUsageFromSSE(text);
-  // S1 (fix round 1): a garbled upstream usage object must never fail the
-  // insert silently — cost and each token count are validated and, if
-  // invalid, replaced (cost -> the ceiling; a bad token count -> 0) rather
-  // than sent on faith or dropped.
+  // S1 (fix round 1) + round 2's contract amendment: a garbled upstream
+  // usage object must never fail the insert silently — cost and each token
+  // count are validated and, if invalid, replaced (cost -> the ceiling; a
+  // bad token count -> 0) rather than sent on faith or dropped. A valid,
+  // in-range cost above the ceiling is now recorded AS REPORTED (never
+  // undercounted) and gets its own anomaly log line — no key, no content.
   const amounts = sanitizeUsageForLedger(parsed);
   const requestId = parsed?.id ?? deps.randomId();
+  if (amounts.costAboveCeiling) {
+    deps.log?.warn({
+      msg: "ten-model-proxy: cost anomaly — a reported cost exceeds the ceiling",
+      usd: amounts.usd,
+      request_id: requestId,
+    });
+  }
   const row = {
     user_id: uid,
     kind: "call" as const,
@@ -118,9 +152,7 @@ async function meterUsage(
   };
 
   // S1 (fix round 1): retry once before giving up, so a transient write
-  // failure doesn't silently lose the row; only log an alert if both
-  // attempts fail (a genuine duplicate request_id will fail both times —
-  // that's expected and still gets the alert, since the row already exists).
+  // failure doesn't silently lose the row.
   try {
     await deps.insertLedgerCall(row);
     return;
@@ -130,6 +162,16 @@ async function meterUsage(
   try {
     await deps.insertLedgerCall(row);
   } catch (e2) {
+    if (isDuplicateRequestId(e2)) {
+      // Round 2, item 6: the retry hit a duplicate request_id, meaning a row
+      // for this exact call already exists (most likely the first attempt's
+      // own insert succeeded and only its response was lost). Nothing lost.
+      deps.log?.warn({
+        msg: "ten-model-proxy: ledger insert retry saw its own row already there (a lost response, not a lost row)",
+        request_id: requestId,
+      });
+      return;
+    }
     const alert = { msg: "ten-model-proxy: ALERT ledger insert failed twice; row lost", err: String(e2) };
     if (deps.log?.error) deps.log.error(alert);
     else deps.log?.warn(alert);
@@ -170,6 +212,11 @@ export async function handleRequest(
   deps: ProxyDeps,
   env: Record<string, string | undefined>,
 ): Promise<Response> {
+  // S4/round 2, item 2: the meter deadline is timed from here — the
+  // request's own start — not from when metering happens to begin, so a
+  // slow auth/balance/upstream-connect phase can't push the total past the
+  // Edge Runtime's 400 s wall clock (360 s leaves 40 s of margin).
+  const meterDeadlineAt = Date.now() + (deps.meterDeadlineMs ?? DEFAULT_METER_DEADLINE_MS);
   const url = new URL(req.url);
   const path = pathTail(url);
   const origin = req.headers.get("origin");
@@ -268,7 +315,7 @@ export async function handleRequest(
     // cancels only the client-facing branch still lets the meter branch run
     // to completion.
     const [clientStream, meterStream] = upstream.body.tee();
-    deps.waitUntil(meterUsage(meterStream, deps, user.id));
+    deps.waitUntil(meterUsage(meterStream, deps, user.id, meterDeadlineAt));
 
     return new Response(clientStream, {
       status: 200,

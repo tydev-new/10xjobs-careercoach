@@ -131,6 +131,8 @@ Deno.test("deletes only this user's storage objects, DB rows, and keeps the auth
     assertEquals(body.deleted.textFiles, 3);
     assertEquals(body.deleted.gateLogRows, 2);
     assert(body.message.includes("Your sign-in stays"));
+    // Round 2, item 4: names what's kept, not just what's deleted.
+    assert(body.message.includes("Your usage records, which show only amounts spent and no content, are kept."));
 
     // user-a's objects are gone; user-b's are untouched.
     assertFalse(h.state.storageObjects.has("users/user-a/ws/resume.pdf"));

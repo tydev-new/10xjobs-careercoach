@@ -671,6 +671,102 @@ dt("one ledger row per call, with the parsed usd cost", async () => {
   }
 });
 
+dt("round 2, item 1: a reported cost above the ceiling is recorded AS REPORTED and logs an anomaly (no key/content)", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    const bigCost = CEILING_USD * 3; // in [ceiling, 10x], so accepted as reported
+    h.orOptions.chunks = sseChunks({ id: "gen-anomaly", cost: bigCost, tokensIn: 50, tokensOut: 10 });
+    const warnings: unknown[] = [];
+    h.deps.log = { warn: (e) => warnings.push(e) };
+
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+
+    assertEquals(h.state.ledgerInserts.length, 1);
+    assertAlmostEquals(h.state.ledgerInserts[0].usd as number, bigCost, 1e-9, "never undercounted to the ceiling");
+
+    const anomaly = warnings.find((w) => JSON.stringify(w).includes("anomaly"));
+    assert(anomaly, "expected an anomaly log line: " + JSON.stringify(warnings));
+    const text = JSON.stringify(anomaly);
+    assertFalse(text.includes("test-openrouter-key"), "no key in the anomaly log");
+    assertFalse(text.toLowerCase().includes("hi"), "no message content in the anomaly log"); // the SSE content chunk text
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("round 2, item 1: an in-range cost at or below the ceiling logs no anomaly", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ id: "gen-normal", cost: CEILING_USD * 0.5 });
+    const warnings: unknown[] = [];
+    h.deps.log = { warn: (e) => warnings.push(e) };
+
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+
+    assertFalse(warnings.some((w) => JSON.stringify(w).includes("anomaly")));
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("round 2, item 2: the meter deadline is timed from the request's start, not from when metering begins", async () => {
+  // A slow phase BEFORE metering starts (auth/balance/upstream-connect —
+  // simulated here as a delay inside fetchUpstream) must eat into the same
+  // budget, not extend it. deps.meterDeadlineMs lets the test shrink the
+  // real 360 s window to something a unit test can actually observe.
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    // The stream itself never completes; only the deadline can end the read.
+    h.orOptions.chunks = [`data: ${JSON.stringify({ id: "gen-slow", choices: [{ delta: { content: "x" } }] })}`];
+    h.orOptions.hang = true;
+
+    h.deps.meterDeadlineMs = 200;
+    const realFetch = h.deps.fetchUpstream;
+    h.deps.fetchUpstream = async (body) => {
+      await new Promise((r) => setTimeout(r, 120)); // the slow pre-metering phase
+      return realFetch(body);
+    };
+
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+
+    const t0 = Date.now();
+    await h.drain(); // resolves once the meter's own deadline timer fires
+    const elapsedAfterConnect = Date.now() - t0;
+    // Correct (timed from the request's start): ~120ms of the 200ms budget
+    // was already spent before metering began, so metering's own wait is
+    // ~80ms. A meter-start-timed bug would instead wait a fresh 200ms here.
+    // The threshold sits well between the two, with margin for test jitter.
+    assert(
+      elapsedAfterConnect < 160,
+      `metering took ${elapsedAfterConnect}ms after the upstream connected — ` +
+        "the deadline must be timed from the request's start, not from when metering began",
+    );
+
+    assertEquals(h.state.ledgerInserts.length, 1);
+    assertAlmostEquals(h.state.ledgerInserts[0].usd as number, CEILING_USD, 1e-9);
+    assertEquals(h.state.ledgerInserts[0].request_id, "gen-slow");
+  } finally {
+    await h.stop();
+  }
+});
+
 dt("the metering ceiling is recorded when no cost can be read", async () => {
   const h = await harness();
   try {
@@ -737,13 +833,17 @@ dt("a client disconnect still meters (the client stream is cancelled, not read)"
   }
 });
 
-dt("a duplicate request_id at the ledger is retried once (S1), then logged as an alert, never thrown", async () => {
+dt("round 2, item 6: a duplicate request_id on the RETRY is logged as 'not lost', never an alert", async () => {
+  // Models "the retry-after-a-lost-response case": whatever caused the
+  // first attempt to fail, a 409 on the retry means a row for this exact
+  // call already exists — nothing was lost, so this must never read as the
+  // ALERT/row-lost outcome.
   const h = await harness();
   try {
     h.state.users["tok-1"] = { id: "u1" };
     h.state.members.add("u1");
     h.state.balances["u1"] = 5;
-    h.state.ledgerRequestIds.add("gen-dup"); // pre-seed as already recorded
+    h.state.ledgerRequestIds.add("gen-dup"); // the row is already there
     h.orOptions.chunks = sseChunks({ id: "gen-dup", cost: 0.05 });
     const warnings: unknown[] = [];
     const inserts: unknown[] = [];
@@ -761,8 +861,33 @@ dt("a duplicate request_id at the ledger is retried once (S1), then logged as an
 
     assertEquals(h.state.ledgerInserts.length, 0); // the mock rejected the dup insert, both times
     assertEquals(inserts.length, 2, "exactly one retry (two attempts total)");
-    assertEquals(warnings.length, 2, "a retry warning, then an alert (no log.error configured here)");
-    assert(JSON.stringify(warnings[1]).includes("ALERT"), "the second failure is logged as an alert: " + JSON.stringify(warnings[1]));
+    assertEquals(warnings.length, 2, "a retry warning, then a 'not lost' note (no log.error configured here)");
+    const last = JSON.stringify(warnings[1]);
+    assertFalse(last.includes("ALERT"), "a duplicate-on-retry must never read as a lost row: " + last);
+    assert(last.includes("not lost") || last.includes("already there"), "expected a 'not lost' note: " + last);
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("round 2, item 6: a genuine ledger outage on both attempts (not a duplicate) still alerts", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ id: "gen-outage", cost: 0.02 });
+    const warnings: unknown[] = [];
+    h.deps.log = { warn: (e) => warnings.push(e) };
+    h.deps.insertLedgerCall = () => Promise.reject(new Error("connection refused"));
+
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+
+    assertEquals(warnings.length, 2);
+    assert(JSON.stringify(warnings[1]).includes("ALERT"), "a non-duplicate failure on both attempts must still alert");
   } finally {
     await h.stop();
   }

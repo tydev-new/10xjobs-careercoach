@@ -112,9 +112,15 @@ export interface ParsedUsage {
   tokensCached?: number;
 }
 
-/** Parses an OpenRouter SSE stream's text for the last `usage` object seen
- * (only the final chunk carries `usage.cost`, per § 8, point 5) and the
- * response `id` shared by every chunk. Tolerates `[DONE]`, keep-alive
+/** Parses an OpenRouter SSE stream's text for cost/tokens (round 2, item 5:
+ * "the meter parses only the final `data:` line carrying usage", per § 8).
+ * `usage` is REPLACED, never merged, each time a line with a `usage` object
+ * is seen, so `cost`/`tokensIn`/`tokensOut`/`tokensCached` always come from
+ * one single line — the last one that carried `usage` — never mixed across
+ * chunks. `id` is read independently (the first chunk that has one; it's
+ * the same value on every chunk in practice, and this keeps a truncated
+ * final `usage` line from losing the key the row is written under — see
+ * the "truncated final line" test). Tolerates `[DONE]`, keep-alive
  * comments, and a stream cut off mid-line (a malformed trailing `data:`
  * line is skipped rather than thrown). */
 export function parseUsageFromSSE(text: string): ParsedUsage | null {
@@ -159,24 +165,34 @@ export interface LedgerAmounts {
   tokensIn: number;
   tokensOut: number;
   tokensCached: number;
+  /** true when `usd` is a reported cost accepted AS REPORTED but above
+   * CEILING_USD (fix round 2) — worth its own anomaly log line, since a
+   * legitimate call is not expected to land there. */
+  costAboveCeiling: boolean;
 }
 
-/** S1 (fix round 1): a garbled upstream `usage` object must never fail the
- * ledger insert silently (and never take the value on faith either —
- * upstream is untrusted input). `cost` is accepted only as a finite number
- * in `[0, CEILING_USD × 10]`; anything else (a string, `null`, negative, or
- * an absurd outlier) records the ceiling cost instead. Each token count is
- * accepted only as a finite non-negative int4 (`ten_usage_ledger`'s column
- * type); anything else (fractional, negative, over int4, or missing)
- * becomes 0 rather than failing the whole row. */
+/** S1 (fix round 1) + the round-2 contract amendment (docs/design-web-agent.md
+ * § 8, "a reported cost above the ceiling is recorded, not capped"): a
+ * garbled upstream `usage` object must never fail the ledger insert
+ * silently, and never be taken on faith either — but a genuine, in-range
+ * report must never be undercounted. `cost` is accepted AS REPORTED for any
+ * finite number in `[0, CEILING_USD × 10]`, `costAboveCeiling` flagging the
+ * `(CEILING_USD, CEILING_USD × 10]` slice for an anomaly log; anything else
+ * (a string, `null`, negative, or beyond 10×) records the ceiling cost
+ * instead. Each token count is accepted only as a finite non-negative int4
+ * (`ten_usage_ledger`'s column type); anything else (fractional, negative,
+ * over int4, or missing) becomes 0 rather than failing the whole row. */
 export function sanitizeUsageForLedger(parsed: ParsedUsage | null): LedgerAmounts {
   const cost = parsed?.cost;
-  const usd =
-    typeof cost === "number" && Number.isFinite(cost) && cost >= 0 && cost <= CEILING_USD * 10 ? cost : CEILING_USD;
+  const reportedInRange =
+    typeof cost === "number" && Number.isFinite(cost) && cost >= 0 && cost <= CEILING_USD * 10;
+  const usd = reportedInRange ? cost : CEILING_USD;
+  const costAboveCeiling = reportedInRange && cost > CEILING_USD;
   const token = (v: unknown): number =>
     typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= INT4_MAX ? v : 0;
   return {
     usd,
+    costAboveCeiling,
     tokensIn: token(parsed?.tokensIn),
     tokensOut: token(parsed?.tokensOut),
     tokensCached: token(parsed?.tokensCached),

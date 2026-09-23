@@ -18,8 +18,11 @@ import { allowedOrigins, corsHeaders } from "../_shared/cors.ts";
 
 export const BUCKET = "ten-workspaces";
 
+// Round 2, item 4: names the one thing this delete deliberately keeps (the
+// 'call' ledger rows), so "beta data" doesn't read as "everything, always".
 export const SUMMARY_MESSAGE =
-  "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited.";
+  "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. " +
+  "Your usage records, which show only amounts spent and no content, are kept.";
 
 export interface DeleteDeps {
   verifyUser(token: string): Promise<{ id: string } | null>;

@@ -1,6 +1,6 @@
 // Unit tests for the pure helpers in core.ts — no network, no mocks.
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { MODEL, buildUpstreamBody, parseUsageFromSSE, pathTail } from "./core.ts";
+import { CEILING_USD, MODEL, buildUpstreamBody, parseUsageFromSSE, pathTail, sanitizeUsageForLedger } from "./core.ts";
 
 Deno.test("buildUpstreamBody: copies the allowlist and forces the rest", () => {
   const r = buildUpstreamBody({
@@ -129,6 +129,26 @@ Deno.test("parseUsageFromSSE: reads the last usage object and the shared id", ()
   assertEquals(parsed?.tokensOut, 3);
 });
 
+Deno.test("parseUsageFromSSE (round 2, item 5): only the final usage-bearing line counts, never merged across lines", () => {
+  const text = [
+    // An earlier, lower/different usage report...
+    `data: ${JSON.stringify({ id: "gen-2", usage: { cost: 0.5, prompt_tokens: 1, completion_tokens: 1 } })}`,
+    // ...superseded entirely by the truly final one. If fields were merged
+    // rather than replaced, tokensCached (absent from the final line) would
+    // leak in from here.
+    `data: ${JSON.stringify({
+      id: "gen-2",
+      usage: { cost: 0.02, prompt_tokens: 200, completion_tokens: 50 },
+    })}`,
+    "data: [DONE]",
+  ].join("\n");
+  const parsed = parseUsageFromSSE(text);
+  assertEquals(parsed?.cost, 0.02);
+  assertEquals(parsed?.tokensIn, 200);
+  assertEquals(parsed?.tokensOut, 50);
+  assertEquals(parsed?.tokensCached, undefined);
+});
+
 Deno.test("parseUsageFromSSE: reads cached tokens from prompt_tokens_details", () => {
   const text = `data: ${JSON.stringify({
     id: "gen-2",
@@ -158,4 +178,63 @@ Deno.test("parseUsageFromSSE: a truncated final line is skipped, not thrown", ()
   const parsed = parseUsageFromSSE(text);
   assertEquals(parsed?.id, "gen-4");
   assertEquals(parsed?.cost, 0.02); // the last *parseable* usage, not the truncated one
+});
+
+// --------------------------------------------------------- sanitizeUsageForLedger ----
+// Round 2's contract amendment (docs/design-web-agent.md § 8): a finite cost
+// from 0 to 10x the ceiling is recorded AS REPORTED (never undercounted); a
+// cost above the ceiling is flagged via costAboveCeiling for the caller's
+// anomaly log; only missing/non-finite/negative/>10x costs record the ceiling.
+
+Deno.test("sanitizeUsageForLedger: a normal in-range cost is recorded as reported, no anomaly", () => {
+  const r = sanitizeUsageForLedger({ cost: 0.05, tokensIn: 10, tokensOut: 5, tokensCached: 0 });
+  assertEquals(r.usd, 0.05);
+  assertEquals(r.costAboveCeiling, false);
+});
+
+Deno.test("sanitizeUsageForLedger: a cost just above the ceiling is recorded as reported, flagged as an anomaly", () => {
+  const cost = CEILING_USD + 0.5;
+  const r = sanitizeUsageForLedger({ cost });
+  assertEquals(r.usd, cost, "must not be undercounted to the ceiling");
+  assertEquals(r.costAboveCeiling, true);
+});
+
+Deno.test("sanitizeUsageForLedger: exactly the ceiling is not flagged as an anomaly", () => {
+  const r = sanitizeUsageForLedger({ cost: CEILING_USD });
+  assertEquals(r.usd, CEILING_USD);
+  assertEquals(r.costAboveCeiling, false);
+});
+
+Deno.test("sanitizeUsageForLedger: exactly 10x the ceiling is recorded as reported, flagged", () => {
+  const cost = CEILING_USD * 10;
+  const r = sanitizeUsageForLedger({ cost });
+  assertEquals(r.usd, cost);
+  assertEquals(r.costAboveCeiling, true);
+});
+
+Deno.test("sanitizeUsageForLedger: beyond 10x the ceiling records the ceiling instead, no anomaly flag", () => {
+  const r = sanitizeUsageForLedger({ cost: CEILING_USD * 10 + 0.0001 });
+  assertEquals(r.usd, CEILING_USD);
+  assertEquals(r.costAboveCeiling, false, "replaced by the ceiling, so it's not a reported-anomaly");
+});
+
+Deno.test("sanitizeUsageForLedger: negative, non-finite, or non-numeric cost records the ceiling, no anomaly flag", () => {
+  for (const cost of [-0.01, NaN, Infinity, -Infinity, "0.5" as unknown as number, null as unknown as number, undefined]) {
+    const r = sanitizeUsageForLedger({ cost });
+    assertEquals(r.usd, CEILING_USD, `cost=${String(cost)}`);
+    assertEquals(r.costAboveCeiling, false, `cost=${String(cost)}`);
+  }
+});
+
+Deno.test("sanitizeUsageForLedger: a null parsed usage records the ceiling", () => {
+  const r = sanitizeUsageForLedger(null);
+  assertEquals(r.usd, CEILING_USD);
+  assertEquals(r.costAboveCeiling, false);
+  assertEquals([r.tokensIn, r.tokensOut, r.tokensCached], [0, 0, 0]);
+});
+
+Deno.test("sanitizeUsageForLedger: token sanitizing is independent of the cost outcome", () => {
+  const r = sanitizeUsageForLedger({ cost: CEILING_USD * 20, tokensIn: -5, tokensOut: 3.5, tokensCached: 2 });
+  assertEquals(r.usd, CEILING_USD);
+  assertEquals([r.tokensIn, r.tokensOut, r.tokensCached], [0, 0, 2]);
 });

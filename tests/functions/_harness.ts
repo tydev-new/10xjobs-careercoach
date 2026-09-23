@@ -95,6 +95,9 @@ export interface SbState {
   /** path-substring -> status: inject a PostgREST/Storage failure */
   fail: Record<string, number>;
   requests: Array<{ method: string; path: string; auth: string; body: string }>;
+  /** Scripted outcomes for successive ledger inserts: "fail" = 503, nothing written;
+   * "commit-then-fail" = the row is written but the response is a 503 (a lost ack). */
+  ledgerPlan: Array<"ok" | "fail" | "commit-then-fail">;
   anonKey: string;
   serviceKey: string;
 }
@@ -128,6 +131,7 @@ export function newState(): SbState {
     now: () => new Date(),
     fail: {},
     requests: [],
+    ledgerPlan: [],
     anonKey: "",
     serviceKey: "",
   };
@@ -222,6 +226,8 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
     }
     if (url.pathname === "/rest/v1/ten_usage_ledger" && req.method === "POST") {
       if (!svc) return pgErr(r.role === "anon" ? 401 : 403, "42501", "permission denied for table ten_usage_ledger");
+      const step = st.ledgerPlan.shift() ?? "ok";
+      if (step === "fail") return pgErr(503, "XX000", "injected: ledger insert failed, nothing written");
       const row = json();
       if (!row || typeof row !== "object") return pgErr(400, "PGRST102", "Empty or invalid json");
       const cols = new Set(["id", "user_id", "kind", "request_id", "model", "tokens_in", "tokens_out", "tokens_cached", "usd", "created_at"]);
@@ -249,6 +255,7 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
         usd: Math.round(row.usd * 1e6) / 1e6,
         created_at: st.now(),
       });
+      if (step === "commit-then-fail") return pgErr(503, "XX000", "injected: committed, response lost");
       return new Response(null, { status: 201 });
     }
     const del = url.pathname.match(/^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger)$/);
@@ -466,7 +473,7 @@ async function build(): Promise<Harness> {
   for (const lvl of ["log", "warn", "error", "info", "debug"] as const) {
     const orig = console[lvl].bind(console);
     (console as any)[lvl] = (...a: unknown[]) => {
-      logs.push(a.map((x) => (typeof x === "string" ? x : Deno.inspect(x, { depth: 8 }))).join(" "));
+      logs.push(`[${lvl}] ` + a.map((x) => (typeof x === "string" ? x : Deno.inspect(x, { depth: 8 }))).join(" "));
       if (Deno.args.includes("--verbose-logs")) orig(...a);
     };
   }

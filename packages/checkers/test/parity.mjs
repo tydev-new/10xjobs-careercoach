@@ -21,6 +21,18 @@ const PKG_ROOT = join(HERE, "..");
 const REPO_ROOT = join(PKG_ROOT, "..", "..");
 const SKILLS = join(REPO_ROOT, "skills");
 
+// Skip loudly (not silently, and not a failure) if python3 isn't on
+// PATH — this harness's whole point is diffing against the REAL Python
+// scripts, so there is nothing to run without it. Mirrors tests/run.py's
+// own "no `node` on PATH" skip for tests/web.
+{
+  const probe = spawnSync("python3", ["--version"]);
+  if (probe.error || probe.status !== 0) {
+    console.log("SKIPPED packages/checkers/test/parity.mjs: no `python3` on PATH");
+    process.exit(0);
+  }
+}
+
 function mkws() {
   return mkdtempSync(join(tmpdir(), "checkers-parity-"));
 }

@@ -1,7 +1,9 @@
 // A faithful JS port of skills/search/scripts/update_job.py. Runs in Node
 // AND in the browser; no node:fs, no node:path.
 import * as jm from "./jobs-md.mjs";
-import { parseFlags, argError } from "./argx.mjs";
+import { parseFlags, argError, argHelp } from "./argx.mjs";
+import { HELP } from "./help-text.mjs";
+import { restoreLineSeparators } from "./py-text.mjs";
 
 const PROG = "update_job.py";
 const USAGE =
@@ -13,26 +15,18 @@ const OPTIONS = [
   { flag: "--workspace", dest: "workspace", required: true },
   { flag: "--company", dest: "company", required: true },
   { flag: "--title", dest: "title", required: true },
-  { flag: "--stage", dest: "stage", choices: jm.STAGES },
-  { flag: "--dismiss", dest: "dismiss", boolean: true },
-  { flag: "--restore", dest: "restore", boolean: true },
+  { flag: "--stage", dest: "stage", choices: jm.STAGES, mutexGroup: "mode" },
+  { flag: "--dismiss", dest: "dismiss", boolean: true, mutexGroup: "mode" },
+  { flag: "--restore", dest: "restore", boolean: true, mutexGroup: "mode" },
   { flag: "--reason", dest: "reason" },
 ];
+const MUTEX_GROUPS = [{ id: "mode", required: true, members: ["--stage", "--dismiss", "--restore"] }];
 
 export async function run(argv, io, now = () => new Date()) {
-  const parsed = parseFlags(argv, { options: OPTIONS });
+  const parsed = parseFlags(argv, { options: OPTIONS, mutexGroups: MUTEX_GROUPS, help: HELP.update_job });
+  if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const a = parsed.args;
-
-  // argparse's mutually-exclusive group: exactly one of --stage/--dismiss/
-  // --restore, checked (and reported) in the order the flags appear on argv.
-  const order = argv.map((t) => t.split("=")[0]).filter((t) => t === "--stage" || t === "--dismiss" || t === "--restore");
-  if (order.length === 0) {
-    return argError(PROG, USAGE, "one of the arguments --stage --dismiss --restore is required");
-  }
-  if (order.length > 1) {
-    return argError(PROG, USAGE, `argument ${order[1]}: not allowed with argument ${order[0]}`);
-  }
 
   const rows = await jm.load(io, a.workspace);
   const hits = jm.find(rows, a.company, a.title);
@@ -61,5 +55,5 @@ export async function run(argv, io, now = () => new Date()) {
     if (e instanceof jm.DuplicateKeyError) return { stdout: "", stderr: e.message + "\n", exitCode: 1 };
     throw e;
   }
-  return { stdout: `updated: ${r.company} — ${r.title} — ${action}\n`, stderr: "", exitCode: 0 };
+  return { stdout: restoreLineSeparators(`updated: ${r.company} — ${r.title} — ${action}\n`), stderr: "", exitCode: 0 };
 }

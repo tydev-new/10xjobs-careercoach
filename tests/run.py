@@ -78,5 +78,13 @@ else:
     else:
         passed += 1
 
+    print("\n--- node packages/checkers/test/coverage-gate.mjs ---")
+    result = subprocess.run([node, os.path.join(CHECKERS, "test", "coverage-gate.mjs")], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL packages/checkers/test/coverage-gate.mjs — see output above")
+    else:
+        passed += 1
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

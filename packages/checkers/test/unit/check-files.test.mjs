@@ -33,7 +33,11 @@ const TIER1 = "| date | round | driver | scored vs FIXED | what changed |";
 // skills dir); --workspace's files come from the fake, in-memory map. This
 // hybrid delegates by path prefix so one io serves both.
 function makeHybridIo(fakeFiles) {
-  const fake = makeFakeIo(fakeFiles);
+  // "/ws" always exists as a directory, even with zero files in it — a
+  // real `--workspace` is a real (if possibly empty) directory the
+  // fixture-setup code already mkdir'd (see runCli below and
+  // fake-io.mjs's `dirs` parameter).
+  const fake = makeFakeIo(fakeFiles, ["/ws"]);
   const isFake = (p) => p.startsWith("/ws");
   return {
     exists: (p) => (isFake(p) ? fake.exists(p) : nodeIo.exists(p)),

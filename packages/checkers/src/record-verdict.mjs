@@ -2,7 +2,9 @@
 // Node AND in the browser; no node:fs, no node:path. See jobs-md.mjs for
 // the shared pipeline record it upserts into.
 import * as jm from "./jobs-md.mjs";
-import { parseFlags, argError } from "./argx.mjs";
+import { parseFlags, argError, argHelp } from "./argx.mjs";
+import { HELP } from "./help-text.mjs";
+import { restoreLineSeparators } from "./py-text.mjs";
 
 const VERDICTS = ["strong", "investable_stretch", "long_shot", "weak"];
 const TRACKS = ["A", "B", "C"];
@@ -37,7 +39,8 @@ const OPTIONS = [
  * @param {() => Date} [now]
  */
 export async function run(argv, io, now = () => new Date()) {
-  const parsed = parseFlags(argv, { options: OPTIONS });
+  const parsed = parseFlags(argv, { options: OPTIONS, help: HELP.record_verdict });
+  if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const a = parsed.args;
   if (a.score !== null && !(a.score >= 0 && a.score <= 100)) {
@@ -72,5 +75,9 @@ export async function run(argv, io, now = () => new Date()) {
   }
   const how = existed ? "updated existing role" : "created NEW role";
   const scoreStr = a.score === null ? "None" : String(a.score);
-  return { stdout: `recorded (${how}): ${row.company} — ${row.title} → ${a.verdict} (${scoreStr})\n`, stderr: "", exitCode: 0 };
+  return {
+    stdout: restoreLineSeparators(`recorded (${how}): ${row.company} — ${row.title} → ${a.verdict} (${scoreStr})\n`),
+    stderr: "",
+    exitCode: 0,
+  };
 }

@@ -5,6 +5,7 @@
 // `() => new Date()`) so the parity test can freeze time exactly the way
 // the real script's `datetime.now(timezone.utc)` is frozen for comparison.
 import { join } from "./path-util.mjs";
+import { pyInt, codePointCompare, pyRstrip, restoreLineSeparators } from "./py-text.mjs";
 
 export const STAGES = ["To Review", "Interested", "Applied", "Interviewing", "Offer"];
 export const DISMISSED = "Dismissed";
@@ -85,8 +86,10 @@ export async function load(io, workspace) {
     if (r.dismissed) r.stage = r.was_stage || "To Review";
     if (!("fit_score" in r)) r.fit_score = null;
     if (r.fit_score) {
-      const n = parseInt(r.fit_score, 10);
-      r.fit_score = Number.isNaN(n) ? null : n;
+      // Python: `int(r["fit_score"])`, ValueError caught -> None. This is
+      // a DIFFERENT int conversion than argparse's type=int (argx.mjs) —
+      // it's a plain `int(str)` with no error surfaced to the caller.
+      r.fit_score = pyInt(r.fit_score);
     }
   }
   return rows;
@@ -146,10 +149,8 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
       if (sa !== sb) return sa - sb;
       const ca = a.company.toLowerCase();
       const cb = b.company.toLowerCase();
-      if (ca !== cb) return ca < cb ? -1 : 1;
-      const ta = a.title.toLowerCase();
-      const tb = b.title.toLowerCase();
-      return ta < tb ? -1 : ta > tb ? 1 : 0;
+      if (ca !== cb) return codePointCompare(ca, cb);
+      return codePointCompare(a.title.toLowerCase(), b.title.toLowerCase());
     });
     for (const r of sorted) out.push(..._block(r, false));
   }
@@ -160,10 +161,8 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
     const sorted = gone.slice().sort((a, b) => {
       const ca = a.company.toLowerCase();
       const cb = b.company.toLowerCase();
-      if (ca !== cb) return ca < cb ? -1 : 1;
-      const ta = a.title.toLowerCase();
-      const tb = b.title.toLowerCase();
-      return ta < tb ? -1 : ta > tb ? 1 : 0;
+      if (ca !== cb) return codePointCompare(ca, cb);
+      return codePointCompare(a.title.toLowerCase(), b.title.toLowerCase());
     });
     for (const r of sorted) {
       r.was_stage = r.stage || "To Review";
@@ -175,7 +174,7 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
   if (finalNotes) {
     out.push("## Search notes", "", finalNotes, "");
   }
-  const text = out.join("\n").replace(/\s+$/, "") + "\n";
+  const text = restoreLineSeparators(pyRstrip(out.join("\n"))) + "\n";
   await io.writeFile(path(workspace), text);
 }
 

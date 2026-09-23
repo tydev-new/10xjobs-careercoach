@@ -6,8 +6,10 @@
 // comments, and message text so a diff against the Python original stays
 // readable, and so the parity test's byte-for-byte comparison has a chance.
 import { join, basename } from "./path-util.mjs";
-import { pySplit, normSpace, pyListRepr } from "./py-text.mjs";
-import { parseFlags, argError } from "./argx.mjs";
+import { pySplit, normSpace, pyListRepr, pySplitlines, restoreLineSeparators, cpSlice, pyStrip, PY_S, PY_B_START, PY_B_END } from "./py-text.mjs";
+import { parseFlags, argError, argHelp } from "./argx.mjs";
+import { HELP } from "./help-text.mjs";
+import { crashToTraceback } from "./traceback.mjs";
 
 const STANDARD_SECTIONS = new Set([
   "summary", "professional experience", "experience", "selected experience",
@@ -25,7 +27,7 @@ const LETTER_MAX_WORDS = 400;
 const LETTER_MAX_BLOCKS = 6;
 
 const YEAR_COUNT = /\b\d{2}\+?\s*(?:\+\s*)?years\b/i;
-const INFORMAL_SALUTATION = /^\s*(hello|hi|hey|greetings)\b[^,]*[—,-]?\s*$/i;
+const INFORMAL_SALUTATION = new RegExp(`^${PY_S}*(hello|hi|hey|greetings)\\b[^,]*[—,-]?${PY_S}*$`, "i");
 const ARROW_GLYPHS = /[→⇒▸►◄←↔]/;
 const FILLER = /\b(passionate|motivated|fast-paced environments?|outside the box)\b/i;
 const CLAIM_NUMBER = /\d+(?:\.\d+)?\s*%|\b\d+(?:\.\d+)?x\b/g;
@@ -46,7 +48,7 @@ function section(text, ...names) {
 
 function blocks(text) {
   const body = text.replace(/^#.*$/gm, "");
-  return body.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  return body.split(/\n\s*\n/).map((b) => pyStrip(b)).filter(Boolean);
 }
 
 export function checkResume(text, baseText = null, appText = null) {
@@ -66,7 +68,7 @@ export function checkResume(text, baseText = null, appText = null) {
       const nbSrc = norm(m[1]);
       const nbOut = norm(m[2]);
       if (!normBase.includes(nbSrc)) {
-        add("FAIL", `§ Reworded declares a base line that is not in the base: "${nbSrc.slice(0, 60)}…" — the exemption cannot be self-issued`);
+        add("FAIL", `§ Reworded declares a base line that is not in the base: "${cpSlice(nbSrc, 60)}…" — the exemption cannot be self-issued`);
       } else {
         approved.add(nbOut);
       }
@@ -77,7 +79,7 @@ export function checkResume(text, baseText = null, appText = null) {
     while ((bm = reBul.exec(exp)) !== null) {
       const nb = norm(bm[1]);
       if (nb && !normBase.includes(nb) && !approved.has(nb)) {
-        add("FAIL", `Experience bullet not verbatim from base: "${nb.slice(0, 70)}…" — patterns.md: selection is the tailoring. A JD-vocabulary rewording is allowed only when the candidate approved it and it is declared in § Reworded (base: / tailored: pair)`);
+        add("FAIL", `Experience bullet not verbatim from base: "${cpSlice(nb, 70)}…" — patterns.md: selection is the tailoring. A JD-vocabulary rewording is allowed only when the candidate approved it and it is declared in § Reworded (base: / tailored: pair)`);
       }
     }
   }
@@ -92,7 +94,7 @@ export function checkResume(text, baseText = null, appText = null) {
   }
 
   const edu = section(text, "education");
-  const yr = edu.match(/\b(19|20)\d{2}\b/);
+  const yr = edu.match(new RegExp(`${PY_B_START}(19|20)\\d{2}${PY_B_END}`, "u"));
   if (yr) {
     add("WARN", `year "${yr[0]}" in Education — no graduation dates`);
   }
@@ -101,7 +103,7 @@ export function checkResume(text, baseText = null, appText = null) {
   const summSentences = normSpace(summ).split(/[.;]\s+/);
   for (const sent of summSentences) {
     if (pySplit(sent).length >= 8 && countOccurrences(expAll, sent) > 1) {
-      add("WARN", `sentence appears in Summary AND Experience: "${sent.slice(0, 60)}…" — Summary carries the number, the role bullet carries the how`);
+      add("WARN", `sentence appears in Summary AND Experience: "${cpSlice(sent, 60)}…" — Summary carries the number, the role bullet carries the how`);
       break;
     }
   }
@@ -151,7 +153,7 @@ export function checkLetter(text) {
     add("WARN", `${bl.length} blocks — max ${LETTER_MAX_BLOCKS} (salutation + hook + 2-3 body + why-us + close)`);
   }
   if (bl.length && INFORMAL_SALUTATION.test(bl[0])) {
-    add("FAIL", `salutation "${bl[0].trim()}" is DM register — patterns.md: "an application letter, not a relationship DM"; never invent a name, use "Dear Hiring Manager"`);
+    add("FAIL", `salutation "${pyStrip(bl[0])}" is DM register — patterns.md: "an application letter, not a relationship DM"; never invent a name, use "Dear Hiring Manager"`);
   }
   shared(text, add);
   return res;
@@ -176,11 +178,6 @@ function shared(text, add) {
   if ((text.match(/\b80\s*%|\b80%/g) || []).length > 1) {
     add("WARN", "more than one 80%-shaped claim on this surface — base-resume.md requires labels (onboarding failures / production defects / test coverage)");
   }
-}
-
-function pySplitlines(s) {
-  if (s === "") return [];
-  return s.split(/\r\n|\r|\n/);
 }
 
 function countOccurrences(haystack, needle) {
@@ -216,43 +213,53 @@ const HEADER =
  * @returns {Promise<{stdout:string, stderr:string, exitCode:number}>}
  */
 export async function run(argv, io) {
-  const parsed = parseFlags(argv, { options: OPTIONS });
+  const parsed = parseFlags(argv, { options: OPTIONS, help: HELP.check_materials });
+  if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const a = parsed.args;
   if (!a.resume && !a.letter) return argError(PROG, USAGE, "pass --resume and/or --letter");
 
-  const basePath = a.base || join(a.workspace, "base-resume.md");
-  const baseText = (await io.exists(basePath)) ? await io.readFile(basePath) : null;
+  let stdout = "";
+  try {
+    const basePath = a.base || join(a.workspace, "base-resume.md");
+    const baseText = (await io.exists(basePath)) ? await io.readFile(basePath) : null;
 
-  let stdout = HEADER.replace("{maybe}", baseText ? ", base résumé loaded for the verbatim check" : "");
+    stdout = HEADER.replace("{maybe}", baseText ? ", base résumé loaded for the verbatim check" : "");
 
-  let failed = false;
-  const jobs = [
-    ["RESUME", a.resume, "resume"],
-    ["LETTER", a.letter, "letter"],
-  ];
-  for (const [label, path, kind] of jobs) {
-    if (!path) continue;
-    if (!(await io.exists(path))) {
-      stdout += `${label}: file not found: ${path}\n`;
-      failed = true;
-      continue;
+    let failed = false;
+    const jobs = [
+      ["RESUME", a.resume, "resume"],
+      ["LETTER", a.letter, "letter"],
+    ];
+    for (const [label, path, kind] of jobs) {
+      if (!path) continue;
+      if (!(await io.exists(path))) {
+        stdout += `${label}: file not found: ${path}\n`;
+        failed = true;
+        continue;
+      }
+      const text = await io.readFile(path);
+      let results;
+      if (kind === "resume") {
+        let appText;
+        const appCand = path.replace(/-resume\.md$/, "-application.md");
+        if (appCand !== path && (await io.exists(appCand))) appText = await io.readFile(appCand);
+        results = checkResume(text, baseText, appText);
+      } else {
+        results = checkLetter(text);
+      }
+      const fails = results.filter((r) => r[0] === "FAIL");
+      stdout += `\n${label} ${basename(path)}: ${fails.length ? "FAIL" : "pass"} (${fails.length} fail, ${results.length - fails.length} warn)\n`;
+      for (const [level, msg] of results) stdout += `  [${level}] ${msg}\n`;
+      failed = failed || fails.length > 0;
     }
-    const text = await io.readFile(path);
-    let results;
-    if (kind === "resume") {
-      let appText;
-      const appCand = path.replace(/-resume\.md$/, "-application.md");
-      if (appCand !== path && (await io.exists(appCand))) appText = await io.readFile(appCand);
-      results = checkResume(text, baseText, appText);
-    } else {
-      results = checkLetter(text);
-    }
-    const fails = results.filter((r) => r[0] === "FAIL");
-    stdout += `\n${label} ${basename(path)}: ${fails.length ? "FAIL" : "pass"} (${fails.length} fail, ${results.length - fails.length} warn)\n`;
-    for (const [level, msg] of results) stdout += `  [${level}] ${msg}\n`;
-    failed = failed || fails.length > 0;
+    stdout += "\n" + (failed ? "✘ fix the FAILs before delivering" : "✔ mechanical checks clean") + "\n";
+    return { stdout: restoreLineSeparators(stdout), stderr: "", exitCode: failed ? 1 : 0 };
+  } catch (e) {
+    // Python's os.path.exists() is true for a directory too, so a
+    // --resume/--letter pointing at one clears the "file not found"
+    // branch and then open() raises IsADirectoryError — uncaught. A
+    // corrupt (non-UTF-8) file raises UnicodeDecodeError the same way.
+    return crashToTraceback(restoreLineSeparators(stdout), e);
   }
-  stdout += "\n" + (failed ? "✘ fix the FAILs before delivering" : "✔ mechanical checks clean") + "\n";
-  return { stdout, stderr: "", exitCode: failed ? 1 : 0 };
 }

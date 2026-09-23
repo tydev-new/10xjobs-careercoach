@@ -7,6 +7,15 @@
 // docs/spikes/spike-2-just-bash-commands.md's addendum).
 import { defineCommand } from "just-bash";
 import { dispatchPython3 } from "./dispatch.mjs";
+import { universalNewlines } from "./py-text.mjs";
+import { dirname } from "./path-util.mjs";
+
+// Same as io-node.mjs's utf8Strict: Python's open(..., encoding="utf-8")
+// raises UnicodeDecodeError on invalid UTF-8; ctx.fs.readFile's own
+// decoding may not, so bytes are decoded here instead (a standard Web
+// API, not Node-only) to get the same failure shape (the corpus's
+// `cm-latin1-bytes` case).
+const utf8Strict = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 
 // Adapts just-bash's IFileSystem (ctx.fs, ctx.cwd) to the checkers' `io`
 // interface. Paths are resolved against cwd exactly like the Python
@@ -18,10 +27,18 @@ function makeIo(ctx) {
       return ctx.fs.exists(resolve(path));
     },
     async readFile(path) {
-      return ctx.fs.readFile(resolve(path));
+      const bytes = await ctx.fs.readFileBuffer(resolve(path));
+      const text = utf8Strict.decode(bytes);
+      return universalNewlines(text);
     },
     async writeFile(path, content) {
-      await ctx.fs.writeFile(resolve(path), content);
+      const full = resolve(path);
+      try {
+        await ctx.fs.mkdir(dirname(full), { recursive: true });
+      } catch {
+        // already exists, or dirname(full) is "/" — either way, proceed.
+      }
+      await ctx.fs.writeFile(full, content);
     },
     async mtimeMs(path) {
       const st = await ctx.fs.stat(resolve(path));

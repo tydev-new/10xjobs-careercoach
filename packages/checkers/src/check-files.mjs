@@ -2,17 +2,38 @@
 // AND in the browser; no node:fs, no node:path. Every function that reads
 // the filesystem takes an `io` (see README.md "The io interface") as its
 // first argument — the one deliberate signature difference from the Python
-// functions of the same name, which `open()` a path directly. Two other
-// intentional, documented divergences (README.md "check_files divergences
-// from Python"): `--skills` has no `__file__`-relative default (there is no
-// script-file location in a bundled/browser context — callers always pass
-// `--skills` explicitly), and `--workspace` is never `~`-expanded (rule 9:
+// functions of the same name, which `open()` a path directly.
+//
+// `--skills`'s default (fix round 1, BLOCKER): Python's default is
+// `os.path.dirname(__file__)/../..` — wherever check_files.py physically
+// sits on disk, go up to the skills/ root. Every MVP skill's own SKILL.md
+// runs `check_files.py --workspace .` with NO --skills (e.g.
+// skills/apply/SKILL.md's session-close line), so this port must resolve
+// the same default, not silently do nothing. `import.meta.url` is the one
+// portable (non-Node-only) equivalent of `__file__` — it works in a
+// browser bundle too, provided the bundler preserves this module's
+// position relative to the bundled skills/ tree (packages/agent's job,
+// step 4). The offset here (`../../../skills`) is fixed: this file always
+// lives at packages/checkers/src/check-files.mjs, three levels above the
+// repo root.
+//
+// `--workspace` is never `~`-expanded (documented, unchanged): rule 9 —
 // the web app never sees a real home directory; fixtures use explicit
-// paths).
+// paths.
 import { join, dirname, basename, relative } from "./path-util.mjs";
-import { pySplit, stripChars, pyListRepr } from "./py-text.mjs";
-import { parseFlags, argError } from "./argx.mjs";
+import { pySplit, stripChars, pyListRepr, cpSlice, cpArray, pySplitlines, codePointCompare, pySortStrings, restoreLineSeparators } from "./py-text.mjs";
+import { parseFlags, argError, argHelp } from "./argx.mjs";
 import { walkFilesRecursive, listFiles, listPerChild, listDirNames } from "./fs-walk.mjs";
+import { HELP } from "./help-text.mjs";
+import { crashToTraceback } from "./traceback.mjs";
+
+function defaultSkillsRoot() {
+  try {
+    return new URL("../../../skills", import.meta.url).pathname;
+  } catch {
+    return ".";
+  }
+}
 
 export const HISTORY_HEADERS = {
   "base-resume-history.md": "| date | round | driver | scored vs FIXED | what changed |",
@@ -73,9 +94,6 @@ const TITLE_FOR_HEADER = new Map([
   [HISTORY_HEADERS["storybank-history.md"], "## Rounds"],
 ]);
 
-function splitLines(s) {
-  return s.split(/\r\n|\r|\n/);
-}
 function countChar(s, ch) {
   let n = 0;
   for (const c of s) if (c === ch) n++;
@@ -86,7 +104,7 @@ export async function checkTable(io, path, header, enums) {
   const res = [];
   const rawFile = await io.readFile(path);
   const raw = rawFile.split("\\|").join("");
-  const allLines = splitLines(raw).map((l) => l.trim());
+  const allLines = pySplitlines(raw).map((l) => l.trim());
   const idx = allLines.indexOf(header);
   if (idx === -1) {
     const title = TITLE_FOR_HEADER.get(header);
@@ -106,13 +124,13 @@ export async function checkTable(io, path, header, enums) {
     const stripped = l.replace(/^\|+/, "").replace(/\|+$/, "");
     const cells = stripped.split("|").map((c) => c.trim());
     if (cells.length !== ncols) {
-      res.push(["WARN", `row has ${cells.length} cells, the header has ${ncols}: "${l.slice(0, 60)}"`]);
+      res.push(["WARN", `row has ${cells.length} cells, the header has ${ncols}: "${cpSlice(l, 60)}"`]);
       continue;
     }
     for (const [i2, allowed] of enums) {
       const v = stripChars(cells[i2].toLowerCase(), "`*_ ");
       if (v && !allowed.has(v)) {
-        res.push(["WARN", `"${cells[i2]}" is not one of ${pyListRepr([...allowed].sort())} — apply/references/schema.md declares the enum`]);
+        res.push(["WARN", `"${cells[i2]}" is not one of ${pyListRepr(pySortStrings([...allowed]))} — apply/references/schema.md declares the enum`]);
       }
     }
     if (header === PANEL_HEADER) {
@@ -129,7 +147,7 @@ export async function checkHistory(io, path, header) {
   const res = [];
   const rawFile = await io.readFile(path);
   const raw = rawFile.split("\\|").join("");
-  const lines = splitLines(raw).map((l) => l.trim()).filter((l) => l.startsWith("|"));
+  const lines = pySplitlines(raw).map((l) => l.trim()).filter((l) => l.startsWith("|"));
   if (!lines.includes(header)) {
     res.push(["FAIL", `history header missing or altered — must be exactly "${header}"`]);
     return res;
@@ -201,7 +219,18 @@ export async function checkSkillProse(io, skillsRoot) {
 export async function checkStrays(io, workspace, schemas) {
   const res = [];
   const allowed = new Set([...Object.keys(schemas), ...MANIFEST_FILES.keys()]);
-  const names = await listDirNames(io, workspace);
+  // Python: `sorted(os.listdir(workspace))` — unlike fs-walk.mjs's other
+  // helpers (which treat a missing/non-directory path as "nothing here"),
+  // os.listdir() raises (FileNotFoundError / NotADirectoryError) UNCAUGHT
+  // for exactly those two cases — the corpus's `cf-missing-workspace-dir`
+  // and `cf-workspace-is-a-file`. The `io` interface's own readdir is
+  // deliberately graceful (every OTHER caller in this file wants "nothing
+  // here", not a thrown error) so the check is done explicitly here,
+  // rather than by relying on io.readdir to fail.
+  if (!(await io.isDir(workspace))) {
+    throw new Error(`[Errno 2] No such file or directory: '${workspace}'`);
+  }
+  const names = pySortStrings(await io.readdir(workspace));
   for (const name of names) {
     if (name.startsWith(".")) continue;
     const p = join(workspace, name);
@@ -261,7 +290,7 @@ export function norm(s) {
   out = out.trim();
   const parts = pySplit(out);
   if (parts.length && parts[parts.length - 1].length > 3 && parts[parts.length - 1].endsWith("s")) {
-    parts[parts.length - 1] = parts[parts.length - 1].slice(0, -1);
+    parts[parts.length - 1] = cpArray(parts[parts.length - 1]).slice(0, -1).join("");
   }
   return parts.join(" ");
 }
@@ -331,17 +360,18 @@ const PROG = "check_files.py";
 const USAGE = "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\n";
 const OPTIONS = [
   { flag: "--workspace", dest: "workspace", required: true },
-  { flag: "--skills", dest: "skills", default: "." },
+  { flag: "--skills", dest: "skills", default: defaultSkillsRoot() },
 ];
 
 export async function run(argv, io) {
-  const parsed = parseFlags(argv, { options: OPTIONS });
+  const parsed = parseFlags(argv, { options: OPTIONS, help: HELP.check_files });
+  if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const a = parsed.args;
 
   const skillsRoot = a.skills;
   const schemas = await loadSchemas(io, skillsRoot);
-  const fnames = Object.keys(schemas).sort();
+  const fnames = pySortStrings(Object.keys(schemas));
   if (fnames.length === 0) {
     return { stdout: "FAIL  no schemas found — is --skills pointing at the skills directory?\n", stderr: "", exitCode: 1 };
   }
@@ -351,6 +381,7 @@ export async function run(argv, io) {
   let stdout = "";
   const ws = a.workspace;
 
+  try {
   for (const fname of fnames) {
     const path = join(ws, fname);
     if (!(await io.exists(path))) continue;
@@ -413,5 +444,11 @@ export async function run(argv, io) {
     if (level === "FAIL") failed++;
   }
   stdout += `\n${checked} file(s) checked against ${fnames.length} schema(s); ${failed} failure(s).\n`;
-  return { stdout, stderr: "", exitCode: failed ? 1 : 0 };
+  return { stdout: restoreLineSeparators(stdout), stderr: "", exitCode: failed ? 1 : 0 };
+  } catch (e) {
+    // checkStrays' io.readdir(workspace) is the one call in this script
+    // that matches Python's own uncaught os.listdir() crash — a missing
+    // workspace or a workspace path that's actually a file.
+    return crashToTraceback(restoreLineSeparators(stdout), e);
+  }
 }

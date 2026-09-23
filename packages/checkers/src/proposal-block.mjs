@@ -1,8 +1,10 @@
 // A faithful JS port of skills/apply/scripts/proposal_block.py. Runs in
 // Node AND in the browser; no node:fs, no node:path.
 import { join, isAbsolute } from "./path-util.mjs";
-import { stripChars, pyInt, pyListRepr } from "./py-text.mjs";
-import { parseFlags, argError } from "./argx.mjs";
+import { stripChars, pyInt, pyListRepr, cpSlice, cpLength, restoreLineSeparators, pySplitlines } from "./py-text.mjs";
+import { parseFlags, argError, argHelp } from "./argx.mjs";
+import { HELP } from "./help-text.mjs";
+import { crashToTraceback } from "./traceback.mjs";
 
 const COVERAGE_HEADER = "| requirement | status | evidence | decision |";
 const SELECTION_HEADER = "| # | role | bullet | in/out | source | words | why |";
@@ -40,10 +42,6 @@ function contentWords(text) {
   return words.filter((w) => !STOP.has(w.toLowerCase()) && w.length > 2);
 }
 
-function splitLines(s) {
-  return s.split(/\r\n|\r|\n/);
-}
-
 const PROG = "proposal_block.py";
 const USAGE =
   "usage: proposal_block.py [-h] --workspace WORKSPACE --application APPLICATION\n" +
@@ -59,15 +57,23 @@ const OPTIONS = [
  * @param {{exists(p:string):Promise<boolean>, readFile(p:string):Promise<string>}} io
  */
 export async function run(argv, io) {
-  const parsed = parseFlags(argv, { options: OPTIONS });
+  const parsed = parseFlags(argv, { options: OPTIONS, help: HELP.proposal_block });
+  if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const a = parsed.args;
 
   const apath = isAbsolute(a.application) ? a.application : join(a.workspace, a.application);
   const bpath = a.base || join(a.workspace, "base-resume.md");
-  const rawFile = await io.readFile(apath);
+  // Python's main() has no os.path.exists() guard before open(apath) — a
+  // missing application file crashes uncaught (FileNotFoundError).
+  let rawFile;
+  try {
+    rawFile = await io.readFile(apath);
+  } catch (e) {
+    return crashToTraceback("", e);
+  }
   const raw = rawFile.split("\\|").join("");
-  const lines = splitLines(raw).map((l) => l.trim());
+  const lines = pySplitlines(raw).map((l) => l.trim());
   const baseText = (await io.exists(bpath)) ? await io.readFile(bpath) : "";
   const baseStems = new Set(contentWords(baseText).map(stem));
 
@@ -84,7 +90,7 @@ export async function run(argv, io) {
     if (outs.length) {
       out.push(`**Cut — ${outs.length} of ${outs.length + ins.length} bullets, weakest first.** Say "keep <bullet>" and it comes back.`);
       outs.forEach((r, idx) => {
-        const bullet = r[2].length <= 70 ? r[2] : r[2].slice(0, 67).replace(/\s+$/, "") + "…";
+        const bullet = cpLength(r[2]) <= 70 ? r[2] : cpSlice(r[2], 67).replace(/\s+$/, "") + "…";
         out.push(`${idx + 1}. ${r[1]} — ${bullet} — *${r[6]}*`);
       });
     }
@@ -115,7 +121,7 @@ export async function run(argv, io) {
       out.push("");
       out.push('**Their words, placed** — say "Summary" / "Skills" / "leave it out" to move any of these:');
       for (const r of sbu) {
-        const ev = r[2].slice(0, 60) + (r[2].length > 60 ? "…" : "");
+        const ev = cpSlice(r[2], 60) + (cpLength(r[2]) > 60 ? "…" : "");
         out.push(`- **${r[0]}** — true of you (${ev}); placed where the document shows it`);
       }
     }
@@ -123,7 +129,7 @@ export async function run(argv, io) {
       out.push("");
       out.push('**Gaps — evidence you might have?** ("no" is a fine answer)');
       for (const r of gaps) {
-        const ev = r[2].slice(0, 80) + (r[2].length > 80 ? "…" : "");
+        const ev = cpSlice(r[2], 80) + (cpLength(r[2]) > 80 ? "…" : "");
         out.push(`- ${r[0]} — ${ev}`);
       }
     }
@@ -136,7 +142,7 @@ export async function run(argv, io) {
         if (missing.length) {
           findings.push([
             "WARN",
-            `\`have\` row "${req.slice(0, 50)}": their word(s) ${pyListRepr(missing)} do not appear in the base — true in the base but missing THEIR word is \`shown-but-unnamed\`, and then it is a placement the candidate can move`,
+            `\`have\` row "${cpSlice(req, 50)}": their word(s) ${pyListRepr(missing)} do not appear in the base — true in the base but missing THEIR word is \`shown-but-unnamed\`, and then it is a placement the candidate can move`,
           ]);
         }
       }
@@ -149,5 +155,5 @@ export async function run(argv, io) {
   for (const [level, msg] of findings) stdout += `${level}  ${msg}\n`;
   if (!findings.length) stdout += "clean: proposal block printed; no FAIL, no WARN\n";
   const exitCode = findings.some(([l]) => l === "FAIL") ? 1 : 0;
-  return { stdout, stderr: "", exitCode };
+  return { stdout: restoreLineSeparators(stdout), stderr: "", exitCode };
 }

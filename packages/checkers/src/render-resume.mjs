@@ -9,9 +9,11 @@
 // `words: N  ->  <path>` line) matches byte for byte.
 //
 // Runs in Node AND in the browser; no node:fs, no node:path.
-import { join, dirname } from "./path-util.mjs";
-import { pySplit, normSpace } from "./py-text.mjs";
-import { parseFlags, argError } from "./argx.mjs";
+import { join } from "./path-util.mjs";
+import { pySplit, normSpace, pySplitlines, pyRstrip, pyStrip, restoreLineSeparators } from "./py-text.mjs";
+import { parseFlags, argError, argHelp } from "./argx.mjs";
+import { HELP } from "./help-text.mjs";
+import { crashToTraceback } from "./traceback.mjs";
 
 const CSS = `
 @page { size: Letter; margin: 0.4in 0.5in; }
@@ -48,16 +50,16 @@ export function blocks(mdText) {
     kind = null;
     buf = [];
   };
-  for (const raw of mdText.split(/\r\n|\r|\n/)) {
-    const s = raw.replace(/\s+$/, "");
-    if (!s.trim()) {
+  for (const raw of pySplitlines(mdText)) {
+    const s = pyRstrip(raw);
+    if (!pyStrip(s)) {
       flush();
       continue;
     }
     const m = s.match(/^(#{1,3})\s+(.*)$/);
     if (m) {
       flush();
-      out.push([`h${m[1].length}`, m[2].trim()]);
+      out.push([`h${m[1].length}`, pyStrip(m[2])]);
       continue;
     }
     if (s.startsWith("- ")) {
@@ -67,7 +69,7 @@ export function blocks(mdText) {
       continue;
     }
     if (kind === "li" || kind === "p") {
-      buf.push(s.trim());
+      buf.push(pyStrip(s));
       continue;
     }
     flush();
@@ -132,18 +134,36 @@ const OPTIONS = [
  * @param {{readFile(p:string):Promise<string>, writeFile(p:string, c:string):Promise<void>}} io
  */
 export async function run(argv, io) {
-  const parsed = parseFlags(argv, { options: OPTIONS });
+  const parsed = parseFlags(argv, { options: OPTIONS, help: HELP.render_resume });
+  if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const a = parsed.args;
 
-  const mdText = await io.readFile(a.md);
+  // Python's main() has no os.path.exists() guard before open(a.md) — a
+  // missing --md file crashes uncaught (FileNotFoundError).
+  let mdText;
+  try {
+    mdText = await io.readFile(a.md);
+  } catch (e) {
+    return crashToTraceback("", e);
+  }
   const words = wordCount(mdText);
-  const htmlPath = a.html || join(dirname(a.md) || ".", "resume.html");
+  // Python falls back to tempfile.mkdtemp() — a fresh directory OUTSIDE
+  // wherever --md lives — when --html is omitted, so it never touches (or
+  // collides with) a file already in the candidate's workspace. There is
+  // no directory concept a browser sandbox can call "temporary" the same
+  // way, so this port instead uses a fixed path outside any reasonable
+  // relative workspace tree, for the same reason: never overwrite a
+  // workspace file the caller didn't name. (The exact path differs from
+  // Python's own — which is a fresh random directory every run and so can
+  // never be matched byte-for-byte either — see README.md "render_resume
+  // and --html".)
+  const htmlPath = a.html || "/tmp/checkers-render-resume/resume.html";
   await io.writeFile(htmlPath, toHtml(mdText));
   let stdout = `words: ${words}  ->  ${htmlPath}\n`;
   if (a.pdf) {
     stdout +=
       "PDF: NOT RENDERED — the web app renders the HTML for the candidate's own browser to print (no Chrome subprocess in the browser); see references/patterns.md § The PDF (the conversion ladder)\n";
   }
-  return { stdout, stderr: "", exitCode: 0 };
+  return { stdout: restoreLineSeparators(stdout), stderr: "", exitCode: 0 };
 }

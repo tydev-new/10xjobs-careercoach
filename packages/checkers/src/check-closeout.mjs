@@ -10,7 +10,9 @@
 //   io.mtimeMs(path)   -> Promise<number>        (epoch ms)
 // and a `now` function returning epoch ms (defaults to Date.now so tests
 // can freeze time the way the Python test's os.utime() does).
-import { parseFlags, argError } from "./argx.mjs";
+import { parseFlags, argError, argHelp } from "./argx.mjs";
+import { cpSlice } from "./py-text.mjs";
+import { HELP } from "./help-text.mjs";
 
 export const STAGES = ["groundwork", "searching", "applying", "interviewing", "deciding"];
 
@@ -117,7 +119,7 @@ export async function checkCloseout(args, io, now = () => Date.now()) {
     for (const q of asked) {
       const kq = keywords(q);
       if (!rows.some((r) => intersects(kq, keywords(r)))) {
-        findings.push(["FAIL", `asked "${q.slice(0, 60)}" — no Waiting-on-you row shares a word with it; write the row this turn`]);
+        findings.push(["FAIL", `asked "${cpSlice(q, 60)}" — no Waiting-on-you row shares a word with it; write the row this turn`]);
       }
     }
     if (asked.length && rows.length === 0) {
@@ -150,7 +152,8 @@ const OPTIONS = [
 ];
 
 export async function run(argv, io, now = () => Date.now()) {
-  const parsed = parseFlags(argv, { options: OPTIONS });
+  const parsed = parseFlags(argv, { options: OPTIONS, help: HELP.check_closeout });
+  if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const { stdout, exitCode } = await checkCloseout(parsed.args, io, now);
   return { stdout, stderr: "", exitCode };

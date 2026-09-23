@@ -10,8 +10,8 @@ export function join(...parts) {
   if (nonEmpty.length === 0) return ".";
   let out = "";
   for (const p of nonEmpty) {
-    if (out === "") out = p;
-    else if (p.startsWith("/")) out = out.replace(/\/+$/, "") + p; // an absolute part re-roots, matching os.path.join
+    if (p.startsWith("/")) out = p; // an absolute part re-roots — everything before it is discarded, matching os.path.join("a", "/b") == "/b"
+    else if (out === "") out = p;
     else out = out.endsWith("/") ? out + p : `${out}/${p}`;
   }
   return normalize(out);

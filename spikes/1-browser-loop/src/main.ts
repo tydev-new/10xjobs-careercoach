@@ -24,6 +24,19 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { getRuntimeInterceptKey, getRuntimeRealKey } from "./runtime-key";
 import { cannedResponse } from "./canned-sse";
 
+// Real skill prose (no personal/candidate data — these are repo source
+// files) loaded at BUILD time via Vite's `?raw` import, concatenated into
+// a realistic ~4,000-5,000 token system prompt for the live cache test
+// (item 1 of the 2026-09-23 rework). Sized against Anthropic's ~1,024-token
+// minimum for a cacheable block — the earlier live run's whole prompt was
+// only ~989 tokens, under that floor, which is one of the two reasons the
+// first attempt showed no cache read (see docs/spikes/spike-1-browser-loop.md
+// "Live cache rework").
+import coachSkillMd from "../../../skills/coach/SKILL.md?raw";
+import workspaceClaudeMd from "../../../skills/profile/templates/workspace-CLAUDE.md?raw";
+import gateGrammarMd from "../../../skills/coach/references/gate-grammar.md?raw";
+import evalMd from "../../../skills/coach/references/eval.md?raw";
+
 // MVP default model (plan decision #3: "Models through OpenRouter, default
 // a Claude model"). Verified 2026-09-22 via openrouter.ai/anthropic/claude-sonnet-5
 // ("The exact model slug/id string is `anthropic/claude-sonnet-5`") — see
@@ -33,6 +46,33 @@ const MODEL_ID = "anthropic/claude-sonnet-5";
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 function write(id: string, text: string) {
   $(id).textContent = text;
+}
+
+// Real skill text — coach's own SKILL.md, its gate-grammar and eval
+// references, and the workspace CLAUDE.md template the web app writes at
+// sign-up (design-web-agent.md § 7). All four are genuine repo prose, not
+// a synthetic filler string, and none of it is candidate data.
+const SYSTEM_PROMPT = [
+  "# skills/coach/SKILL.md\n\n" + coachSkillMd,
+  "# skills/coach/references/gate-grammar.md\n\n" + gateGrammarMd,
+  "# skills/coach/references/eval.md\n\n" + evalMd,
+  "# skills/profile/templates/workspace-CLAUDE.md\n\n" + workspaceClaudeMd,
+].join("\n\n---\n\n");
+
+// No tokenizer bundled for this spike — chars/4 is a standard rough
+// estimate for English prose and is only used to size the prompt against
+// Anthropic's ~1,024-token cache minimum before spending a live call.
+const ESTIMATED_TOKENS = Math.round(SYSTEM_PROMPT.length / 4);
+
+// Zero-cost sanity check (no network): confirms the system prompt actually
+// loaded and is sized in the target range BEFORE any live call is made.
+function runSystemPromptSizeCheck() {
+  const inRange = ESTIMATED_TOKENS >= 3500 && ESTIMATED_TOKENS <= 6000;
+  write(
+    "result-prompt-size",
+    `${inRange ? "PASS" : "FAIL"} chars=${SYSTEM_PROMPT.length} estimatedTokens=${ESTIMATED_TOKENS} (target ~4000-5000, chars/4 estimate)`
+  );
+  return inRange;
 }
 
 // ---------------------------------------------------------------------
@@ -268,16 +308,41 @@ async function runRequestBuilt() {
 //    src/runtime-key.ts), make one real streamed call with a Claude
 //    model and a tool, and check a cache read on turn 2. Otherwise:
 //    BLOCKED (needs key), not a pass.
-// ---------------------------------------------------------------------
-async function runRealCallIfKeyed() {
+//
+// Live cache rework (2026-09-23): the first live run showed
+// cacheReadTokens 0 on both turns at 989 input tokens — under Anthropic's
+// ~1,024-token cache minimum, AND the code was reading the wrong usage
+// field (`usage.cachedInputTokens`, which doesn't exist on the AI SDK's
+// `LanguageModelUsage` type — the real field is
+// `usage.inputTokenDetails.cacheReadTokens`, confirmed against
+// node_modules/ai/dist/index.d.ts). Fixed both: SYSTEM_PROMPT above is
+// ~4,000-5,000 real tokens, and a `cache_control: { type: "ephemeral" }`
+// breakpoint (node_modules/@openrouter/ai-sdk-provider/dist/index.d.ts:
+// "Enable Anthropic automatic prompt caching by setting a top-level
+// cache_control directive") is set on both turns.
+//
+// `noZdr`: the provider's no-data-kept filter (`zdr: true`) restricts
+// routing to Zero-Data-Retention endpoints, which is a real candidate
+// reason Anthropic prompt caching might not apply (a ZDR endpoint may not
+// persist the cache at all). Passing `noZdr: true` drops `zdr` (keeps
+// `data_collection: "deny"`) so the two configurations can be compared —
+// used only as a diagnostic within the live-call budget, never by default.
+async function runRealCallIfKeyed(noZdr = false) {
+  // Zero-cost (no network): always run, key or not, so the prompt's size
+  // is visible even when the live call itself is BLOCKED.
+  const sizeOk = runSystemPromptSizeCheck();
   const key = getRuntimeRealKey();
   if (!key) {
     write("result-real", "BLOCKED needs OPENROUTER_API_KEY (none supplied at runtime)");
-    return "blocked";
+    return { status: "blocked" as const, sizeOk };
   }
   try {
     const openrouter = createOpenRouter({ apiKey: key });
-    const model = openrouter.chat(MODEL_ID);
+    const providerFilter: Record<string, unknown> = noZdr ? { data_collection: "deny" } : NO_DATA_KEPT_PROVIDER_FILTER;
+    const model = openrouter.chat(MODEL_ID, {
+      provider: providerFilter as any,
+      cache_control: { type: "ephemeral" },
+    });
     const echoTool = tool({
       description: "Echo a string back",
       inputSchema: jsonSchema<{ text: string }>({
@@ -287,30 +352,59 @@ async function runRealCallIfKeyed() {
       }),
       execute: async ({ text }) => ({ text }),
     });
+
+    const turn1UserText =
+      "Please call the echo tool with the text 'order-A100-status-check', then confirm in one sentence that you did.";
     const turn1 = streamText({
       model,
-      prompt: "Call the echo tool with the text 'spike-1'. Then say done.",
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: turn1UserText }],
       tools: { echoTool },
       stopWhen: stepCountIs(3),
     });
     await turn1.text;
     const usage1 = await turn1.usage;
+    const turn1ResponseMessages = await turn1.responseMessages;
 
+    // Turn 2 is a REAL second turn: the identical system prompt (required
+    // for the cache prefix to match), the full turn-1 exchange, and one
+    // NEW user message — not a repeat of turn 1.
+    const turn2UserText =
+      "Thanks. Now do the same check again, but this time with the text 'order-B200-status-check' instead.";
     const turn2 = streamText({
       model,
-      prompt: "Call the echo tool with the text 'spike-1'. Then say done.",
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: turn1UserText }, ...turn1ResponseMessages, { role: "user", content: turn2UserText }],
       tools: { echoTool },
       stopWhen: stepCountIs(3),
     });
     await turn2.text;
     const usage2 = await turn2.usage;
-    const cacheRead =
-      (usage2 as any)?.cachedInputTokens ?? (usage2 as any)?.providerMetadata?.anthropic?.cacheReadInputTokens;
-    write("result-real", `PASS turn1=${JSON.stringify(usage1)} turn2=${JSON.stringify(usage2)} cacheRead=${cacheRead}`);
-    return cacheRead ? "pass-with-cache" : "pass-no-cache-signal";
+
+    const cacheReadTurn1 = usage1.inputTokenDetails?.cacheReadTokens ?? 0;
+    const cacheWriteTurn1 = usage1.inputTokenDetails?.cacheWriteTokens ?? 0;
+    const cacheReadTurn2 = usage2.inputTokenDetails?.cacheReadTokens ?? 0;
+    const cacheWriteTurn2 = usage2.inputTokenDetails?.cacheWriteTokens ?? 0;
+
+    // providerMetadata is a raw pass-through — OpenRouter's own usage
+    // accounting (cost, in USD) rides here if the provider returned it.
+    const providerMetadata1 = await turn1.providerMetadata;
+    const providerMetadata2 = await turn2.providerMetadata;
+    const cost1 = (providerMetadata1 as any)?.openrouter?.usage?.cost;
+    const cost2 = (providerMetadata2 as any)?.openrouter?.usage?.cost;
+
+    const summary = {
+      providerFilter,
+      systemPromptEstimatedTokens: ESTIMATED_TOKENS,
+      turn1: { inputTokens: usage1.inputTokens, outputTokens: usage1.outputTokens, cacheReadTokens: cacheReadTurn1, cacheWriteTokens: cacheWriteTurn1, costUsd: cost1 },
+      turn2: { inputTokens: usage2.inputTokens, outputTokens: usage2.outputTokens, cacheReadTokens: cacheReadTurn2, cacheWriteTokens: cacheWriteTurn2, costUsd: cost2 },
+    };
+    const pass = cacheReadTurn2 > 0;
+    write("result-real", `${pass ? "PASS" : "FAIL"} ${JSON.stringify(summary)}`);
+    return { status: (pass ? "pass-with-cache" : "fail-no-cache-read") as const, cacheReadTurn2, summary, sizeOk };
   } catch (err) {
     write("result-real", "FAIL " + String(err));
-    return "fail";
+    return { status: "fail" as const, error: String(err) };
   }
 }
 
@@ -399,7 +493,13 @@ async function main() {
   const c = runProviderConstruction();
   const d = await runRequestBuilt();
   const f = await runUiMessageStream();
-  const e = await runRealCallIfKeyed();
+  // Diagnostic-only toggle (never on by default): set by verify.mjs from
+  // SPIKE1_NO_ZDR=1, to compare with/without the ZDR routing restriction
+  // when isolating why a cache read might not show up. Spends 2 more live
+  // calls, so it is only ever used deliberately, within the live-call
+  // budget documented in docs/spikes/spike-1-browser-loop.md.
+  const noZdr = Boolean((globalThis as any).__SPIKE1_NO_ZDR__);
+  const e = await runRealCallIfKeyed(noZdr);
   const done = $("done");
   done.setAttribute("data-done", "true");
   done.setAttribute("data-mock-pass", String(a));
@@ -407,8 +507,9 @@ async function main() {
   done.setAttribute("data-provider-pass", String(c));
   done.setAttribute("data-request-pass", String(d));
   done.setAttribute("data-ui-stream-pass", String(f));
-  done.setAttribute("data-real", String(e));
-  done.textContent = `done mock=${a} stream=${b} provider=${c} request=${d} uiStream=${f} real=${e}`;
+  done.setAttribute("data-real-status", e.status);
+  done.setAttribute("data-real-cache-read-turn2", String((e as any).cacheReadTurn2 ?? ""));
+  done.textContent = `done mock=${a} stream=${b} provider=${c} request=${d} uiStream=${f} real=${e.status}`;
 }
 
 main();

@@ -38,6 +38,21 @@ console.log("static server up on :4173 serving", DIST);
 // any file — this is what "runtime, not baked" means in practice.
 const INTERCEPT_KEY = `sk-or-v1-RUNTIME-${crypto.randomBytes(16).toString("hex")}`;
 const REAL_KEY = process.env.OPENROUTER_API_KEY || null;
+// Diagnostic-only: compare with/without the ZDR routing restriction when
+// isolating why a live cache read might not show up. Spends 2 extra live
+// calls — only ever set deliberately (SPIKE1_NO_ZDR=1), never by default.
+const NO_ZDR = process.env.SPIKE1_NO_ZDR === "1";
+
+// Defense in depth: this script never intentionally logs the key, but every
+// piece of text printed below is masked anyway before it reaches the
+// terminal, in case a usage/metadata object ever echoed it back.
+function maskString(s) {
+  return s.replace(/sk-or-[A-Za-z0-9_-]+/g, "sk-or-<masked>");
+}
+function logMasked(...parts) {
+  const rendered = parts.map((p) => maskString(typeof p === "string" ? p : JSON.stringify(p)));
+  console.log(rendered.join(" "));
+}
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
@@ -52,11 +67,12 @@ page.on("pageerror", (err) => consoleErrors.push(String(err)));
 // for: the build already exists on disk with no key in it; this is what
 // supplies one at run time.
 await page.addInitScript(
-  ([interceptKey, realKey]) => {
+  ([interceptKey, realKey, noZdr]) => {
     window.__OPENROUTER_RUNTIME_KEY__ = interceptKey;
     if (realKey) window.__OPENROUTER_REAL_KEY__ = realKey;
+    if (noZdr) window.__SPIKE1_NO_ZDR__ = true;
   },
-  [INTERCEPT_KEY, REAL_KEY]
+  [INTERCEPT_KEY, REAL_KEY, NO_ZDR]
 );
 
 await page.goto("http://localhost:4173/");
@@ -69,23 +85,26 @@ const done = await page.$eval("#done", (el) => ({
   providerPass: el.getAttribute("data-provider-pass"),
   requestPass: el.getAttribute("data-request-pass"),
   uiStreamPass: el.getAttribute("data-ui-stream-pass"),
-  real: el.getAttribute("data-real"),
+  realStatus: el.getAttribute("data-real-status"),
+  realCacheReadTurn2: el.getAttribute("data-real-cache-read-turn2"),
 }));
 const resultMock = await page.$eval("#result-mock", (el) => el.textContent);
 const resultStream = await page.$eval("#result-stream", (el) => el.textContent);
 const resultProvider = await page.$eval("#result-provider", (el) => el.textContent);
 const resultRequest = await page.$eval("#result-request", (el) => el.textContent);
 const resultUiStream = await page.$eval("#result-ui-stream", (el) => el.textContent);
+const resultPromptSize = await page.$eval("#result-prompt-size", (el) => el.textContent);
 const resultReal = await page.$eval("#result-real", (el) => el.textContent);
 
-console.log("DOM #done:", done);
-console.log("DOM #result-mock:", resultMock);
-console.log("DOM #result-stream:", resultStream);
-console.log("DOM #result-provider:", resultProvider);
-console.log("DOM #result-request:", resultRequest);
-console.log("DOM #result-ui-stream:", resultUiStream);
-console.log("DOM #result-real:", resultReal);
-if (consoleErrors.length) console.log("console errors:", consoleErrors);
+logMasked("DOM #done:", done);
+logMasked("DOM #result-mock:", resultMock);
+logMasked("DOM #result-stream:", resultStream);
+logMasked("DOM #result-provider:", resultProvider);
+logMasked("DOM #result-request:", resultRequest);
+logMasked("DOM #result-ui-stream:", resultUiStream);
+logMasked("DOM #result-prompt-size:", resultPromptSize);
+logMasked("DOM #result-real:", resultReal);
+if (consoleErrors.length) logMasked("console errors:", consoleErrors);
 
 await browser.close();
 server.close();
@@ -115,10 +134,10 @@ const leaks = [];
 for (const f of distFiles) {
   const text = await readFile(f, "utf-8").catch(() => "");
   for (const needle of [...valueNeedles, ...buildTimeNeedles]) {
-    if (text.includes(needle)) leaks.push({ file: f, needle });
+    if (text.includes(needle)) leaks.push({ file: f, needle: "<redacted — see needle KIND, never printed raw>", kind: needle === REAL_KEY ? "real-key-value" : needle === INTERCEPT_KEY ? "intercept-key-value" : needle });
   }
 }
-console.log(
+logMasked(
   "KEY NOT BAKED grep:",
   leaks.length === 0
     ? "clean — no secret value and no build-time env mechanism found in dist/ (the library's own OPENROUTER_API_KEY env-var-NAME fallback string is present, which is expected and holds no value)"
@@ -132,5 +151,9 @@ const ok =
   done.requestPass === "true" &&
   done.uiStreamPass === "true" &&
   leaks.length === 0;
-console.log(ok ? "VERIFY PASS" : "VERIFY FAIL");
+logMasked(ok ? "VERIFY PASS" : "VERIFY FAIL");
+logMasked(
+  "Live cache criterion (informational — not part of VERIFY PASS/FAIL, since it legitimately BLOCKs without a key):",
+  `status=${done.realStatus} cacheReadTurn2=${done.realCacheReadTurn2}`
+);
 process.exit(ok ? 0 : 1);

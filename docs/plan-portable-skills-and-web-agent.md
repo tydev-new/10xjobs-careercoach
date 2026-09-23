@@ -253,6 +253,27 @@ conversation** (rule 12).
 - [ ] the beta runs behind a flag; a migration plan for existing WebUI users is
       written (not run)
 
+### Goal post - Beta on Vercel (owner, 2026-09-23)
+
+The next milestone is real beta users on a Vercel deployment. It is steps 2,
+3, 4, and 5b done, plus hosting:
+
+- the web app (`apps/web`, a static Vite build) on Vercel, with per-branch
+  preview deployments; the production URL is Supabase Auth's redirect URL;
+- the Supabase project, the Storage bucket, and the key Edge Function
+  (step 2 and 5b), with no preview controls in the production build;
+- access is invite-only (Supabase Auth), and each user gets the $5 starter
+  credit on a capped OpenRouter key.
+
+**Exit:**
+
+- [ ] steps 2, 3, 4, 5b exits all green
+- [ ] the production deployment serves the default build (no fixture picker
+      or Autoplay; grep the deployed bundle)
+- [ ] the O dogfood run (step 6's first exit) passes on the deployed URL
+- [ ] O invites the first beta users; the migration of existing WebUI users
+      (step M) stays separate
+
 ### Order
 
 ```

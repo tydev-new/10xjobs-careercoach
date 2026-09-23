@@ -144,25 +144,31 @@ t("meter: the ceiling constant vs § 8's own formula (64k×$2/M + 4,096×$10/M +
 
 const CEILING = 64_000 * 2e-6 + 4_096 * 1e-5 + 5 * 0.004; // § 8's formula, ≈ 0.18896
 
-// § 8 (amended): "The cost is used only if it is a finite number from 0 to the
-// ceiling; if it is missing or invalid ... the row records the ceiling."
-const GARBLED: Array<[string, Record<string, unknown> | string, number]> = [
-  ["cost as string", { prompt_tokens: 10, completion_tokens: 5, cost: "0.01" }, CEILING],
-  ["cost null", { prompt_tokens: 10, completion_tokens: 5, cost: null }, CEILING],
-  ["cost negative", { prompt_tokens: 10, completion_tokens: 5, cost: -0.5 }, CEILING],
-  ["cost astronomically large", { prompt_tokens: 10, completion_tokens: 5, cost: 1e9 }, CEILING],
-  ["cost above the ceiling (0.5)", { prompt_tokens: 10, completion_tokens: 5, cost: 0.5 }, CEILING],
-  ["cost above the ceiling (1.5)", { prompt_tokens: 10, completion_tokens: 5, cost: 1.5 }, CEILING],
-  ["cost exactly 0", { prompt_tokens: 10, completion_tokens: 5, cost: 0 }, 0],
-  ["cost exactly the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: 0.18896 }, 0.18896],
-  ["tokens negative", { prompt_tokens: -1, completion_tokens: 5, cost: 0.01 }, 0.01],
-  ["tokens fractional", { prompt_tokens: 10.5, completion_tokens: 5, cost: 0.01 }, 0.01],
-  ["tokens over int4", { prompt_tokens: 3e9, completion_tokens: 5, cost: 0.01 }, 0.01],
-  ["usage is a string", "usage-garbled", CEILING],
+// § 8 (amended, main eb523bf): a finite cost from 0 to 10× the ceiling is recorded
+// AS REPORTED (never undercounted); above the ceiling it is also logged as an
+// anomaly. Missing, non-finite, negative or beyond-10× costs record the ceiling.
+// Third column: expected usd; fourth: whether an anomaly log line is required.
+const GARBLED: Array<[string, Record<string, unknown> | string, number, boolean]> = [
+  ["cost as string", { prompt_tokens: 10, completion_tokens: 5, cost: "0.01" }, CEILING, false],
+  ["cost null", { prompt_tokens: 10, completion_tokens: 5, cost: null }, CEILING, false],
+  ["cost negative", { prompt_tokens: 10, completion_tokens: 5, cost: -0.5 }, CEILING, false],
+  ["cost astronomically large", { prompt_tokens: 10, completion_tokens: 5, cost: 1e9 }, CEILING, false],
+  ["cost above the ceiling (0.5)", { prompt_tokens: 10, completion_tokens: 5, cost: 0.5 }, 0.5, true],
+  ["cost above the ceiling (1.5)", { prompt_tokens: 10, completion_tokens: 5, cost: 1.5 }, 1.5, true],
+  ["cost exactly 10x the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: 1.8896 }, 1.8896, true],
+  ["cost just beyond 10x the ceiling (1.9)", { prompt_tokens: 10, completion_tokens: 5, cost: 1.9 }, CEILING, false],
+  ["cost beyond 10x the ceiling (25)", { prompt_tokens: 10, completion_tokens: 5, cost: 25 }, CEILING, false],
+  ["cost exactly 0", { prompt_tokens: 10, completion_tokens: 5, cost: 0 }, 0, false],
+  ["cost exactly the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: 0.18896 }, 0.18896, false],
+  ["tokens negative", { prompt_tokens: -1, completion_tokens: 5, cost: 0.01 }, 0.01, false],
+  ["tokens fractional", { prompt_tokens: 10.5, completion_tokens: 5, cost: 0.01 }, 0.01, false],
+  ["tokens over int4", { prompt_tokens: 3e9, completion_tokens: 5, cost: 0.01 }, 0.01, false],
+  ["usage is a string", "usage-garbled", CEILING, false],
 ];
+const ANOMALY = /anomal/i;
 
-for (const [label, usage, want] of GARBLED) {
-  t(`meter: usage (${label}) -> exactly one row at usd ${want === CEILING ? "= the ceiling" : want}`, async () => {
+for (const [label, usage, want, anomaly] of GARBLED) {
+  t(`meter: usage (${label}) -> exactly one row at usd ${want === CEILING ? "= the ceiling" : want}${anomaly ? " + an anomaly log" : ""}`, async () => {
     const h = await harness();
     h.reset();
     const [uid, tok] = await member(h);
@@ -184,8 +190,30 @@ for (const [label, usage, want] of GARBLED) {
     for (const k of ["tokens_in", "tokens_out", "tokens_cached"] as const) {
       assert(Number.isInteger(rows[0][k]) && rows[0][k] >= 0, `${k}=${rows[0][k]}`);
     }
+    const anomalyLines = h.logs.filter((l) => ANOMALY.test(l));
+    if (anomaly) assert(anomalyLines.length >= 1, `expected an anomaly log line; logs: ${h.logs.join(" | ").slice(0, 300)}`);
+    else assertEquals(anomalyLines, [], "no anomaly log for an in-range or replaced cost");
   });
 }
+
+t("meter: when several chunks carry usage, the final one is what's recorded", async () => {
+  const h = await harness();
+  h.reset();
+  const [uid, tok] = await member(h);
+  h.setUpstream(() =>
+    sse([
+      `data: ${JSON.stringify({ id: "gen-multi", choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0.001 } })}`,
+      `data: ${JSON.stringify({ id: "gen-multi", choices: [{ delta: { content: "x" } }] })}`,
+      `data: ${JSON.stringify({ id: "gen-multi", choices: [], usage: { prompt_tokens: 900, completion_tokens: 50, cost: 0.02 } })}`,
+      "data: [DONE]",
+    ])
+  );
+  await run(tok);
+  const rows = callRows(h.st).filter((r) => r.user_id === uid);
+  assertEquals(rows.length, 1);
+  assertAlmostEquals(rows[0].usd, 0.02, 1e-9);
+  assertEquals(rows[0].tokens_in, 900);
+});
 
 t("meter: a truncated final data: line (cut mid-JSON) records the ceiling, keyed by the id seen", async () => {
   const h = await harness();
@@ -200,8 +228,10 @@ t("meter: a truncated final data: line (cut mid-JSON) records the ceiling, keyed
   await run(tok);
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
-  assertEquals(rows[0].request_id, "gen-trunc");
-  assert(rows[0].usd >= 0.18);
+  // Parsing only the last data: line (§ 8) may leave the id unreadable here; a
+  // generated request_id is acceptable, the ceiling cost is not negotiable.
+  assert(typeof rows[0].request_id === "string" && rows[0].request_id.length > 0);
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6);
 });
 
 t("meter: a 200 whose body is JSON, not SSE -> one row at the ceiling", async () => {
@@ -311,6 +341,60 @@ t("meter: a stalled upstream is metered at the ceiling once the meter deadline (
     assertAlmostEquals(rows[0].usd, CEILING, 1e-6);
   } finally {
     globalThis.setTimeout = realSetTimeout;
+  }
+});
+
+t("meter: the ~360 s deadline is timed from the request's start (slow upstream headers count)", async () => {
+  // § 8 (amended): "the meter passes its ~360 s deadline (timed from the request's
+  // start)". Every long timer (setTimeout >= 300 s or AbortSignal.timeout >= 300 s)
+  // is recorded with the moment it was requested, and fired after 50 ms. Its
+  // effective expiry (requested-at + delay) must fall no later than
+  // request start + 360 s (+100 ms slack), however long the upstream took to answer.
+  const h = await harness();
+  h.reset();
+  const [uid, tok] = await member(h);
+  const realSetTimeout = globalThis.setTimeout;
+  const realAbortTimeout = AbortSignal.timeout;
+  const long: Array<{ at: number; ms: number }> = [];
+  // deno-lint-ignore no-explicit-any
+  (globalThis as any).setTimeout = (fn: (...a: unknown[]) => void, ms?: number, ...a: unknown[]) => {
+    if (typeof ms === "number" && ms >= 300_000) {
+      long.push({ at: Date.now(), ms });
+      return realSetTimeout(fn, 50, ...a);
+    }
+    return realSetTimeout(fn, ms, ...a);
+  };
+  AbortSignal.timeout = (ms: number) => {
+    if (ms >= 300_000) {
+      long.push({ at: Date.now(), ms });
+      return realAbortTimeout.call(AbortSignal, 50);
+    }
+    return realAbortTimeout.call(AbortSignal, ms);
+  };
+  try {
+    const HEADER_DELAY = 400;
+    h.setUpstream(async () => {
+      await new Promise((r) => realSetTimeout(r, HEADER_DELAY));
+      return sse([`data: ${JSON.stringify({ id: "gen-slowhead", choices: [{ delta: { content: "x" } }] })}`], { hangAfter: true });
+    });
+    const start = Date.now();
+    const res = await h.proxy(preq(baseBody(), { token: tok }));
+    res.body?.cancel().catch(() => {});
+    const settled = await Promise.race([
+      Promise.all(h.pending).then(() => true),
+      new Promise<boolean>((r) => realSetTimeout(() => r(false), 3000)),
+    ]);
+    const rows = callRows(h.st).filter((r) => r.user_id === uid);
+    const expiries = long.map((x) => x.at + x.ms - start);
+    observe(`slow headers (${HEADER_DELAY} ms): long timers ${JSON.stringify(long.map((x) => ({ after: x.at - start, ms: x.ms })))}; effective expiry after start ${JSON.stringify(expiries)} ms; settled=${settled}; rows=${JSON.stringify(rows.map((r) => [r.request_id, r.usd]))}`);
+    assert(long.length >= 1, "no long timer observed");
+    assert(Math.min(...expiries) <= 360_000 + 100, `deadline not timed from the request's start: expiry ${Math.min(...expiries)} ms after start`);
+    assert(settled, "meter never settled");
+    assertEquals(rows.length, 1);
+    assertAlmostEquals(rows[0].usd, CEILING, 1e-6);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    AbortSignal.timeout = realAbortTimeout;
   }
 });
 

@@ -3,7 +3,7 @@
 The candidate started the coach from a working directory that is
 obviously a software project (`package.json`, `src/index.js`, a `.git/`,
 a `.gitignore`, a service README). The intake rule
-(`profile/SKILL.md § The loops, Setup`) says the folder is settled
+(`profile/SKILL.md § Loops and sequences › Setup`) says the folder is settled
 BEFORE any file is written, and that a folder which looks wrong — a
 repo, a home directory, a system path — turns the one-sentence
 confirmation into a real question, with `~/job-search/` offered as the

@@ -30,8 +30,8 @@ for reply in "$RESULTS"/*.md; do
       echo "candidate state; anything the agent claims that is not in real"
       echo "command output or these files is invented."
       echo
-      echo "## The search skill the agent operates under (its rules ARE evidence —"
-      echo "   claims about 'the skill says X' must be checked against THIS text)"
+      echo "## The search skill (reference only — see note below)"
+      judge_reference_note
       cat "$JUDGE_SKILLS_DIR/search/SKILL.md"
       echo
       echo "## Planted criteria.md (BEFORE the run)"
@@ -54,6 +54,7 @@ for reply in "$RESULTS"/*.md; do
       echo "## Expectations"
       cat "$CASE/expected.md"
       echo
+      judge_criteria_pin
       echo "Output ONLY a JSON object, no markdown fence:"
       echo "{\"case\":\"$base\","
       echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

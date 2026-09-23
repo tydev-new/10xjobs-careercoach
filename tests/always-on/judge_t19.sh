@@ -24,8 +24,15 @@ for reply in "$RESULTS"/*.md; do
     echo "conversation is invented. Judge the WHOLE conversation plus the"
     echo "files written. The candidate is simulated; judge only the AGENT."
     echo
-    echo "## The skill(s) the agent operates under"
-    JS="skills/profile/SKILL.md skills/profile/references/patterns.md"
+    echo "## The skill(s) (reference only — see note below)"
+    judge_reference_note
+    # Default file list drops references/patterns.md (fix-round-1 item 4:
+    # the lead accepts the auditor's recommendation — the reference-only
+    # note is prose, and removing the craft the lean arm never had is
+    # free). A case's own judge-skills.txt (e.g. t20-positioning) can still
+    # name whatever files ITS grading needs; this default is only the
+    # fallback for cases that don't override it.
+    JS="skills/profile/SKILL.md"
     [ -f "$CASE/judge-skills.txt" ] && JS="$(cat "$CASE/judge-skills.txt" | tr '\n' ' ')"
     for jf in $JS; do echo "### $jf"; cat "$JUDGE_SKILLS_DIR/${jf#skills/}"; echo; done
     echo
@@ -64,6 +71,7 @@ for reply in "$RESULTS"/*.md; do
     echo "## Expectations"
     cat "$CASE/expected.md"
     echo
+    judge_criteria_pin
     echo "Output ONLY a JSON object, no markdown fence:"
     echo "{\"case\":\"$base\","
     echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

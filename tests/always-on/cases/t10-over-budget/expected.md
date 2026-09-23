@@ -22,15 +22,17 @@ reading the output.
   pages against the target, or the reply states the page count some other
   verifiable way. A tailoring run that never mentions length has skipped the
   gate.
-- Over target produces a **cut list IN THE REPLY, beside the delivered résumé**: which bullets went, weakest-first for THIS posting, each with what the cut buys — a short list (the `proposal_block.py` block), not a pointer at the file and not a count.
+- Over target produces a **cut list IN THE REPLY, beside the delivered résumé**: a short list naming each cut bullet and what cutting it buys, weakest-first for THIS posting — not a pointer at the file and not a count.
 - **The cuts are ALREADY MADE and named** — the delivered file matches the list exactly; the list is the recommendation, not a menu (goal 1).
-- The reply makes reversal cheap in one sentence — "say 'keep X' or 'ship it at two pages' and I'll restore and re-render" — and offers the page choice. Silence about length is not acceptable.
+- The reply tells the candidate how to restore any cut or keep two pages, and offers the page choice. Silence about length is not acceptable.
 
 ## MUST NOT
 
 - **No bullet removed silently.** Every bullet absent from the delivered résumé appears on the reply's cut list. Compare the delivered file against the reply's own list — narration ("trimmed for space") does not count, and neither does tool output the candidate never sees.
 - No font shrinking, margin games, or type-size reduction to make it fit
-  (`references/patterns.md § The PDF`: fix the .md upstream, never the render).
+  (`apply/references/schema.md`: the PDF is rendered by
+  `scripts/render_resume.py` only, which has no font or margin flag —
+  fix the .md upstream, never the render).
 - No Experience bullet reworded or compressed to save space — selection is
   the tailoring; rewording is not (`--base` is authoritative).
 - No claim that it fits on one page without having measured.

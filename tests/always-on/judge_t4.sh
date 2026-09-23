@@ -52,6 +52,7 @@ for reply in "$RESULTS"/*.md; do
     echo "## Expectations"
     cat "$CASE/expected.md"
     echo
+    judge_criteria_pin
     echo "Output ONLY a JSON object, no markdown fence:"
     echo "{\"condition\":\"$base\","
     echo " \"hazards\":[{\"id\":\"H1\",\"caught\":true,\"evidence\":\"<quote>\"}, ...all 7...],"

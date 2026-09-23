@@ -30,10 +30,12 @@ for reply in "$RESULTS"/*.md; do
       echo "the reply's claims. jobs.md-after is authoritative for what was"
       echo "recorded or dismissed."
       echo
-      echo "## The evaluate skill (the DQ gate is § Full evaluation step 2; § The quick-scan tier follows)"
+      echo "## The evaluate skill (the DQ gate is § Full evaluation step 2; Quick-scan tier (a sequence) follows; reference only — see note below)"
+      judge_reference_note
       cat "$JUDGE_SKILLS_DIR/evaluate/SKILL.md"
       echo
-      echo "## The search skill (§ The sweep — the prune report)"
+      echo "## The search skill (§ The sweep — the prune report; reference only — see note below)"
+      judge_reference_note
       cat "$JUDGE_SKILLS_DIR/search/SKILL.md"
       echo
       echo "## Planted files"
@@ -55,6 +57,7 @@ for reply in "$RESULTS"/*.md; do
       echo
       echo "## Expectations"; cat "$CASE/expected.md"
       echo
+      judge_criteria_pin
       echo "Output ONLY a JSON object, no markdown fence:"
       echo "{\"case\":\"$base\","
       echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

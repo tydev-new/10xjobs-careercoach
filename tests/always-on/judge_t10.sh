@@ -38,16 +38,14 @@ for reply in "$RESULTS"/*.md; do
       echo "deterministic _materials_check.txt output is authoritative for the"
       echo "verbatim-bullets criterion — do not re-litigate it from prose. The"
       echo "TOOL LOG shows what subagent prompts and shell commands actually"
-      echo "ran; behavioral criteria (panel inputs, one round, checker ran) are"
-      echo "judged from it, not from the reply's claims."
+      echo "ran; any behavioral criterion in Expectations below is judged from"
+      echo "it, not from the reply's claims."
       echo
-      echo "## The apply skill the agent operates under"
+      echo "## The apply skill (reference only — see note below)"
+      judge_reference_note
       cat "$JUDGE_SKILLS_DIR/apply/SKILL.md"
       echo
-      echo "### references/patterns.md"
-      cat "$JUDGE_SKILLS_DIR/apply/references/patterns.md"
-      echo
-      echo "### profile/references/candidate-voice.md (loaded by tailoring's first moment rule)"
+      echo "### profile/references/candidate-voice.md (Policy — facts need a yes before a résumé line; not reference-only)"
       cat "$JUDGE_SKILLS_DIR/profile/references/candidate-voice.md"
       echo
       echo "## Planted files"
@@ -93,6 +91,7 @@ for reply in "$RESULTS"/*.md; do
       echo "## Expectations"
       cat "$CASE/expected.md"
       echo
+      judge_criteria_pin
       echo "Output ONLY a JSON object, no markdown fence:"
       echo "{\"case\":\"$base\","
       echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

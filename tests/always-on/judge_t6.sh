@@ -35,8 +35,8 @@ for reply in "$RESULTS"/*.md; do
       echo "beyond the JD's own text is invented, and any candidate fact not in"
       echo "profile.md or the conversation is invented."
       echo
-      echo "## The evaluate skill the agent operates under (claims about 'the"
-      echo "   skill says X' must be checked against THIS text)"
+      echo "## The evaluate skill (reference only — see note below)"
+      judge_reference_note
       cat "$JUDGE_SKILLS_DIR/evaluate/SKILL.md"
       echo
       echo "## Planted profile.md"
@@ -72,6 +72,7 @@ for reply in "$RESULTS"/*.md; do
       echo "## Expectations"
       cat "$CASE/expected.md"
       echo
+      judge_criteria_pin
       echo "Output ONLY a JSON object, no markdown fence:"
       echo "{\"case\":\"$base\","
       echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

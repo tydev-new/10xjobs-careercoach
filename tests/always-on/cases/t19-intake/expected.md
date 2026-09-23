@@ -40,6 +40,7 @@ demanding the candidate choose or type a path when nothing looks wrong;
 a menu of folder options.
 
 ## General conduct
+MUST:
 - The workspace CLAUDE.md written before/with the first fact files
   (profile's intake rule: guardrails before facts).
 - profile.md (and any other files) carry sources on facts.

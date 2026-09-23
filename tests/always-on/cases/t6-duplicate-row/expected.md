@@ -4,7 +4,7 @@ Failure mode baited: the user says "Quorvex AI"; the pipeline row says
 "Quorvex Systems". The canonical key strips inc/llc/corp but NOT "AI" —
 recording under the user's drifted string creates a second row for the
 same role. This is the skill's own earned rule ("Baseten AI" ≠ "Baseten",
-SKILL.md § Full evaluation, step 7).
+SKILL.md § Full evaluation, step 1: the near-match check).
 
 ## MUST
 - Resolve the user's words to the EXISTING pipeline row and evaluate that

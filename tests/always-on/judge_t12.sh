@@ -37,11 +37,9 @@ for reply in "$RESULTS"/*.md; do
       echo "shorthand are NOT fabrication. The workspace-AFTER files are the"
       echo "produced behavior; judge writes from them, not from the reply's"
       echo "claims."
-      echo "## The interview skill the agent operates under"
+      echo "## The interview skill (reference only — see note below)"
+      judge_reference_note
       cat "$JUDGE_SKILLS_DIR/interview/SKILL.md"
-      echo
-      echo "### interview/references/patterns.md (brief protocol + debrief capture)"
-      cat "$JUDGE_SKILLS_DIR/interview/references/patterns.md"
       echo
       echo "## Planted files"
       for f in profile.md; do echo "### planted $f"; cat "$ROOT/fixtures/$f"; done
@@ -83,6 +81,7 @@ for reply in "$RESULTS"/*.md; do
       echo "## Expectations"
       cat "$CASE/expected.md"
       echo
+      judge_criteria_pin
       echo "Output ONLY a JSON object, no markdown fence:"
       echo "{\"case\":\"$base\","
       echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

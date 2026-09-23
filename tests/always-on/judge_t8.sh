@@ -35,11 +35,9 @@ for reply in "$RESULTS"/*.md; do
       echo "(scripts it ran) are visible in the post-run files — judge writes by"
       echo "the files, not the narration."
       echo
-      echo "## The coach skill the agent operates under"
+      echo "## The coach skill (reference only — see note below)"
+      judge_reference_note
       cat "$JUDGE_SKILLS_DIR/coach/SKILL.md"
-      echo
-      echo "## The coach's program reference (its contract binds every reply)"
-      cat "$JUDGE_SKILLS_DIR/coach/references/patterns.md"
       echo
       echo "## Planted files"
       cat "$ROOT/fixtures/profile.md"
@@ -72,6 +70,7 @@ for reply in "$RESULTS"/*.md; do
       echo "## Expectations"
       cat "$CASE/expected.md"
       echo
+      judge_criteria_pin
       echo "Output ONLY a JSON object, no markdown fence:"
       echo "{\"case\":\"$base\","
       echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

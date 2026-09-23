@@ -1,0 +1,27 @@
+# B1 named-case list — the "Recommended minimal fair set" from
+# docs/evals/b1-case-audit.md § Summary (14 cases, covering all 8 named
+# skills). Read by run_b1.sh. Format: one "<suite> <case>" pair per line,
+# where <suite> is the run_<suite>.sh / judge_<suite>.sh name and <case>
+# is the directory under cases/. Comment lines start with #, ignored.
+#
+# Every case here is either fair as-is or has already had its
+# TEXT-COUPLED lines rewritten to outcome-level per the audit's proposed
+# rewrites (see the case's own expected.md for the rewrite note where one
+# applies). Do not add a case here without checking its row in the
+# audit's per-case table first — most of the other 22 cases still need a
+# rewrite or are intentionally left out of the minimal set.
+
+t4 t4-intake
+t19 t19-folder-repo
+t6 t6-duplicate-row
+t14 t14-dq-no-research
+t14 t14-quickscan-honest
+t14 t14-silent-dismissal
+t10 t10-storybank-default
+t10 t10-over-budget
+t8 t8-honesty-thresholds
+t8 t8-no-nag-no-gate
+t7 t7-mining-correction
+t12 t12-debrief-bank
+t13 t13-ceiling
+t5 t5-plan-attended

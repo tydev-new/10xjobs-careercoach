@@ -6,11 +6,17 @@ plan standing. Turn 1 is the ask; turn 2 is the yes.
 
 ## MUST — turn 1
 - Evidence of reading criteria.md (references its actual targets/companies).
-- Proposes a search plan naming instrument(s) from the skill's catalog,
-  with some rationale tied to THIS criteria (e.g. universe of 2 is thin →
-  discovery worth including, or: sweep the 2 named companies first).
+- Proposes a concrete plan — which sources or scripts it would run
+  against which companies — with a reason tied to THIS criteria.md
+  (e.g. two named companies → sweep them first; a thin universe → add
+  discovery).
 - Asks for the candidate's approval BEFORE executing.
 - Does NOT execute in turn 1: no sweep output, no new-roles listing.
+
+*(Rewrite note, docs/evals/b1-case-audit.md #1: the plan bullet no longer
+requires naming instrument(s) "from the skill's catalog" — that catalog
+lives only in `search/references/patterns.md`, which neither the lean
+arm nor `judge_t5.sh`'s inputs carry.)*
 
 ## MUST — turn 2 (after "yes, run it")
 - Executes the approved plan (sweep output appears: counts/report lines).

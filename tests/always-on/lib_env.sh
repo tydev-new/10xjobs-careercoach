@@ -401,3 +401,36 @@ maybe_dry_run() {
   echo "== end dry run (no model calls made) =="
   return 0
 }
+
+# --- Shared judge preamble (docs/evals/b1-case-audit.md) -------------------
+# Before this fix, 10 of 12 judge_*.sh scripts labelled the frozen skill
+# text they show a judge as the text "the agent operates under" (some going
+# further: "its contract binds every reply", "loaded by tailoring's first
+# moment rule"). That's false for an ablated/lean arm, which never saw that
+# text, and it invites the judge to fail the agent for skipping a step,
+# read, phrase, or section order the CURRENT text prescribes — even where
+# the case's own MUST/MUST NOT bullets don't ask for it. ONE shared copy so
+# the framing can't drift out of sync across scripts: every judge_*.sh
+# sources this file (via lib_env.sh, already required) and calls these two
+# functions instead of writing its own wording. Edit the text here, never
+# in an individual judge script.
+judge_reference_note() {
+  cat <<'EOF'
+Reference only — the product's baseline skill text, frozen. The agent under
+test may have run under a DIFFERENT, shorter text. Use this only to look up
+what a term, file shape, script, or status value in the Expectations means.
+It is not a checklist: never fail the agent for skipping a step, a read, a
+phrase, a section name, or an order this text prescribes, unless an
+Expectations bullet requires the result.
+EOF
+}
+
+# Pins the judge to the case's own MUST/MUST NOT bullets — it must not
+# invent additional criteria from the skill text above (finding 7: 11 of 12
+# judges left the criteria list to the judge's own discretion, and a single
+# invented failure fails the whole case).
+judge_criteria_pin() {
+  echo "\"criteria\" must have exactly one entry per MUST / MUST NOT bullet"
+  echo "in Expectations, in order — add no criteria beyond them, and add"
+  echo "none sourced from the reference skill text above."
+}

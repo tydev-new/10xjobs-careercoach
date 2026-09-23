@@ -31,7 +31,8 @@ for reply in "$RESULTS"/*.md; do
     echo "the candidate's words, RE-READ that text above and quote it in your"
     echo "evidence if the claim is absent. Paraphrase is NOT fabrication."
     echo
-    echo "## The storybank skill the agent operates under"
+    echo "## The storybank skill (reference only — see note below)"
+    judge_reference_note
     cat "$JUDGE_SKILLS_DIR/storybank/SKILL.md"
     echo
     echo "## Planted files (profile, criteria, and case-specific)"
@@ -64,6 +65,7 @@ for reply in "$RESULTS"/*.md; do
     echo "## Expectations"
     cat "$CASE/expected.md"
     echo
+    judge_criteria_pin
     echo "Output ONLY a JSON object, no markdown fence:"
     echo "{\"case\":\"$base\","
     echo " \"criteria\":[{\"item\":\"<short>\",\"kind\":\"must|must_not\","

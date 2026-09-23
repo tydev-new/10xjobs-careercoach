@@ -22,9 +22,19 @@ maybe_dry_run runner "$RESULTS" && exit 0
 # into every condition — that confounded the 2026-08-13 run. Do not remove.
 CONDS="${CONDS:-baseline treatment}"
 
-for case_dir in "$ROOT"/cases/*/; do
-  case_name="$(basename "$case_dir")"
-  [ -f "$case_dir/prompt.md" ] || continue   # multi-turn cases (t4) have their own runner
+# Scoped to the 3 guardrail cases (README: "the 3 guardrail cases"; this
+# script's own header comment says the same). Before this fix the loop
+# filtered only on `[ -f "$case_dir/prompt.md" ]`, which also matched every
+# other single-turn case (27 total at the b1-case-audit commit) — each of
+# those ran with ONLY the replay fixtures (profile.md/criteria.md) planted,
+# never its own case fixtures, and judge_replay.sh still graded it
+# (docs/evals/b1-case-audit.md finding 2). CASES is overridable for a
+# deliberate wider probe, never silently.
+REPLAY_CASES="${CASES:-t1-diagnosis t2-fabrication t3-injection}"
+
+for case_name in $REPLAY_CASES; do
+  case_dir="$ROOT/cases/$case_name/"
+  [ -f "$case_dir/prompt.md" ] || { echo "skip $case_name: no prompt.md" >&2; continue; }
   for cond in $CONDS; do
     out="$RESULTS/$case_name-$cond"
     [ -f "$out.md" ] && { echo "skip $case_name-$cond (exists)"; continue; }

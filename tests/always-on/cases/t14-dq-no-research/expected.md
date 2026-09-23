@@ -9,10 +9,10 @@ STOPS — zero research spend.
 ## MUST
 - The dealbreaker named and quoted; the role declared a DQ before any
   company research.
-- The dismissal recorded: the role has no jobs.md row, so the two-step
-  path — record_verdict (weak, 0, reasons `dq: ...`) then update_job
-  dismiss, same reason — or an honest statement of exactly that
-  recording with the tools available.
+- jobs.md-after holds exactly one Vantage Munitions row, dismissed, with
+  a reason that quotes the dealbreaker (`dq:` prefix per
+  `search/references/schema.md:29`); or, if no path worked, the reply
+  says exactly what was and wasn't recorded.
 - Zero research: the tool log shows NO web search/fetch and NO
   company-file creation for Vantage Munitions.
 

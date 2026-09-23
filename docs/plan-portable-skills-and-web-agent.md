@@ -31,10 +31,11 @@ three:
 |---|---|---|
 | 1 | Rule 9 amended from "Local and yours" to **"Yours"**: exportable as the same plain-file folder, encrypted, never trained on, deletable; local-first still supported | cloud storage needed the precedence chain fixed first |
 | 2 | **Loop runs in the browser** on the Vercel AI SDK. The server loop comes later, reusing the same package | the owner accepts no background search in the MVP; the job-board APIs (Greenhouse, Lever, Ashby, SmartRecruiters) allow browser requests (tested 2026-09-22); the AI SDK runs in browsers, Node, and Deno |
-| 3 | **Models through OpenRouter**, default a Claude model | one API for all models (it also serves B); per-user provisioned keys with spending limits give prepaid billing without a proxy; web search runs on OpenRouter's servers |
-| 4 | **State in Supabase**: auth, Storage for the workspace files, rows only for accounts, balances, and the gate log | already in the stack; per-user access rules; no DB copies of career facts (rule 12) |
+| 3 | **Models through OpenRouter**, default a Claude model | one API for all models (it also serves B); billing is a per-user ledger behind one app key in a proxy (row 7); web search runs on OpenRouter's servers |
+| 4 | **State in Supabase**: auth, workspace text files as versioned rows and binaries in Storage (design § 2), plus the usage ledger and the gate log | already in the stack; per-user access rules; no DB copies of career facts (rule 12) |
 | 5 | **New app, replaces the existing WebUI later**; beta users migrate after phase 6 | owner's call; Phase 5 of the earlier plan (OpenClaw integration) is superseded |
 | 6 | Checkers: **ported to JavaScript**, with a parity test against Python until the local plugin switches over. Pyodide is the fallback | one runtime for the browser, a later server, and the MCP server. A temporary duplicate is allowed only with a loud-fail parity test (PROCESS step 4) |
+| 7 | **Model proxy (2026-09-23):** the owner's existing OpenRouter key (shared with the live CareerCoach app; $20 limit, daily reset), only in the Edge Function `ten-model-proxy`; a derived ledger balance; the owner's existing production Supabase project with `ten_`-named objects; Vercel hosting | the owner won't create a management key; no key in the browser; one money table; the shared $20/day limit bounds every loss path |
 
 ---
 
@@ -44,7 +45,7 @@ three:
 Browser tab
  ├─ web app ── apps/workspace-ui components + chat pane
  └─ packages/agent  (no window/DOM/localStorage imports; everything injected)
-      ├─ AI SDK loop ── OpenRouter model (per-user key, spending limit = balance)
+      ├─ AI SDK loop ── OpenRouter model via ten-model-proxy (Supabase session JWT)
       ├─ skills/ bundled read-only at build time; loaded in stages:
       │    descriptions always → SKILL.md when a skill is activated → references on demand
       ├─ just-bash: in-memory workspace + custom commands
@@ -54,9 +55,9 @@ Browser tab
       └─ gate: spend only (owner, 2026-09-22) → "needs your word" → the typed yes gets logged
           │
 Supabase ─┼─ Auth
-          ├─ Storage: users/{uid}/ws/{path}, versioned writes, per-user access rules
-          ├─ Rows: account, balance, gate log
-          └─ Edge Function: mint/raise the user's OpenRouter key (the only server code in the MVP)
+          ├─ ten_ws_files (text, compare-and-swap) + Storage ten-workspaces (binaries)
+          ├─ Rows: ten_usage_ledger (balance = credits − calls), ten_gate_log
+          └─ Edge Functions: ten-model-proxy (the one app key), ten-delete-account
 
 Later, the server loop: same packages/agent + a server entry + deferGate
 (refuses every side effect and leaves it in plan.md) + pg_cron/queue.
@@ -88,8 +89,8 @@ The four spikes, each written up as a one-page pass/fail note in `docs/spikes/`:
    Python script's.
 3. Supabase Storage isolation: user A's token cannot list, read, or write
    `users/B/…`.
-4. OpenRouter: a provisioned key with a credit limit is rejected once over the
-   limit, and a provider filter restricts calls to providers that keep no data.
+4. The model proxy (replaces the per-user-key spike, owner 2026-09-23): the
+   criteria in `docs/design-web-agent.md` § Step-1 spikes.
 
 The contracts, written by Ar in `docs/design-web-agent.md`:
 
@@ -180,8 +181,9 @@ is a one-line change.
 
 ### Step 5b - Wire to the real agent · Co, Te · after steps 2, 4, and 5a
 
-Swap the mock transport for the in-tab agent transport; add the Edge Function
-that mints and raises keys; the balance chip; the cost estimate before big runs.
+Swap the mock transport for the in-tab agent transport; add the
+`ten-model-proxy` and `ten-delete-account` Edge Functions; the balance chip; the
+cost estimate before big runs.
 
 **Exit:**
 
@@ -189,9 +191,9 @@ that mints and raises keys; the balance chip; the cost estimate before big runs.
       persona: sign up → upload résumé → profile intake → paste a job URL or text
       → evaluate verdict → tailored résumé and cover letter with the checker
       clean → download PDF → "what's next" written to `plan.md`
-- [ ] the diff from 5a is the transport swap plus key and balance wiring: no
+- [ ] the diff from 5a is the transport swap plus proxy and balance wiring: no
       screen rework
-- [ ] the client bundle holds no secret except the user's own OpenRouter key
+- [ ] the client bundle holds no secret at all (only the Supabase URL and anon key)
 - [ ] going over the limit shows a clear message, not a broken loop
 - [ ] cost per journey is measured and written down (this sets pricing)
 
@@ -229,7 +231,7 @@ conversation** (rule 12).
 
 - **Header:** the avatar with its five states (idle, thinking, working, needs
   you, done; hover shows the current action), a balance chip, and a `⋯` menu for
-  export, sign out, and key.
+  export, sign out, and delete my beta data.
 - **Transcript:** replies in plain prose, **cards** for structured results, and
   collapsed **"ran …" lines** for tool calls that expand to show what ran and
   what it returned (rule 11: the file, not the narration).
@@ -258,12 +260,13 @@ conversation** (rule 12).
 The next milestone is real beta users on a Vercel deployment. It is steps 2,
 3, 4, and 5b done, plus hosting:
 
-- the web app (`apps/web`, a static Vite build) on Vercel, with per-branch
-  preview deployments; the production URL is Supabase Auth's redirect URL;
-- the Supabase project, the Storage bucket, and the key Edge Function
-  (step 2 and 5b), with no preview controls in the production build;
-- access is invite-only (Supabase Auth), and each user gets the $5 starter
-  credit on a capped OpenRouter key.
+- the web app (`apps/web`, a static Vite build) on Vercel; preview deployments
+  run the mock only; the production URL is in Supabase Auth's Redirect URLs
+  (the Site URL stays the old app's);
+- the `ten_` objects from the migration, and the two Edge Functions (steps 2
+  and 5b), with no preview controls in the production build;
+- anyone can sign in (the sign-in is shared with the old app), but only a
+  member with an admin-inserted $5 credit row can use Ten.
 
 **Exit:**
 
@@ -418,12 +421,22 @@ including the fixes → Ar closing review → O dogfoods → merge.
 - **Prompt injection** from job descriptions and web pages. No tool sends or
   submits; the gate runs in the tab, and only the candidate's own typed yes gets
   through.
-- **A user-held OpenRouter key** can be used outside the app. It is capped at
-  that user's own balance, so the exposure is the user's own money. Rotate it
-  on logout.
+- **One key shared with the live app, behind one proxy.** The proxy is a
+  single point of failure, and a member calling it directly can run parallel
+  calls past their balance. The key's $20 limit resets daily and is shared
+  with the live CareerCoach app: a busy beta day can cut off the live app (and
+  vice versa), the bound is $20 per day, the two apps' costs mix in
+  OpenRouter's usage view (the beta ledger is the only beta cost record), and
+  rotating the key means updating both apps. A $5/day beta-wide ceiling in the
+  proxy (owner, 2026-09-23) keeps at least $15/day for the live app, less
+  in-flight calls.
+- **A shared production project.** The beta's objects are `ten_`-named, created
+  and dropped by reviewed SQL the owner applies at a quiet time; its guard is a
+  tripwire, so the owner's read-only policy query and the spike 3 re-run pass
+  before the first credit row.
 - **OpenRouter drift** (new provider features arrive late, e.g. provider bug
   #494). Pin the provider version; spike 1 re-runs on each upgrade.
 - **Data processors:** OpenRouter plus the model provider. Enforce the
-  no-data-kept provider filter (spike 4) and name them in the privacy terms.
+  no-data-kept provider filter (forced by the proxy) and name them in the privacy terms.
 - **Cost per session:** measured in step 5; the cost estimate runs before big
   runs.

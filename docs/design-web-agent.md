@@ -1,6 +1,6 @@
 # Design - Web agent contracts (MVP)
 
-**Status:** Draft r3 for owner approval (plan step 1, contracts half)
+**Status:** Draft r4 for owner approval (plan step 1, contracts half)
 **Date:** 2026-09-22 · **Owner:** Yong · **Author:** architect
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
@@ -8,7 +8,7 @@
 owns the wrapper and where each prop comes from (§ 6.2).
 
 `UNVERIFIED` = not confirmed from vendor docs or the installed package.
-`PENDING OWNER` = proposed, not yet confirmed by O. Reasons: Decision log.
+`PENDING OWNER` = not yet confirmed by O. Reasons: Decision log.
 
 **Default model:** `anthropic/claude-sonnet-5` on OpenRouter (on its live
 model list, 2026-09-22), for the web app and the B1 runner.
@@ -29,6 +29,9 @@ export interface Deps {
   fetch: typeof fetch;           // ATS fetch and the price list only
   clock: { now(): Date };        // every timestamp and mtime check reads this
   logger?: { info(e: object): void; warn(e: object): void; error(e: object): void };
+  scripts: ScriptRunner;         // the ported checkers behind `python3` (§ 5)
+  webSearch?: (q: string, n: number) => Promise<{ results: SearchResult[]; usd: number }>; // § 4
+  checkLanguage?: (files: string[]) => Promise<{ report: string; usd: number }>;          // § 4
   limits?: { maxSteps?: number /* 25 */; spendGateUsd?: number /* 1.00, owner 2026-09-22 */; windowWords?: number /* 4000 */ };
 }
 
@@ -44,9 +47,10 @@ export function statusOf(messages: UIMessage[], chat: ChatStatus): Status;      
 export function parsePlanTodo(md: string): { text: string; ref?: string }[];                        // § 6.2
 ```
 
-- The entry point builds `model` (the OpenRouter provider, the user's key, the
-  spike-4 provider filter). The package never sees the key, and imports no
-  `window`, `document`, `localStorage`, `node:*`, or Supabase client.
+- The browser entry builds `model`: the OpenRouter provider with `baseURL` =
+  `ten-model-proxy` and the Supabase session JWT as auth (§ 8); no model key
+  reaches the browser. The package imports no `window`, `document`,
+  `localStorage`, `node:*`, or Supabase client.
 - One loop: `streamText` with the tools and `stopWhen: stepCountIs(maxSteps)`.
   A headless run reads the same stream to the end.
 
@@ -59,11 +63,9 @@ fails on any `window`/`document`/`localStorage`/`node:` import in the package.
 
 ## 2. Workspace store
 
-This is the versioned-write contract of `workspace-core.mjs`: a read returns a
-`version`, and a write with a stale `expectedVersion` fails with
-`version_conflict`. It adds "create a text file". The UI gets the **same
-instance** for the side panel, downloads, and uploads, and never calls agent
-tools.
+The versioned-write contract of `workspace-core.mjs` (a stale
+`expectedVersion` fails with `version_conflict`), plus "create a text file".
+The UI gets the **same instance** and never calls agent tools.
 
 ```ts
 export interface WorkspaceStore {
@@ -75,55 +77,71 @@ export interface WorkspaceStore {
 export interface FileInfo { path: string; version: string /* opaque */; size: number; updatedAt: string; editable: boolean }
 export type FileRead = (FileInfo & { binary: false; content: string }) | (FileInfo & { binary: true; bytes: Uint8Array });
 // WorkspaceError.code: invalid_ref | outside_workspace | resource_missing | version_conflict |
-//   already_exists | not_editable | content_too_large | upload_too_large | unsupported_type
+//   already_exists | path_conflict | not_editable | content_too_large | upload_too_large |
+//   unsupported_type | workspace_full | not_a_member
 ```
 
 **Path rules** (from `resolveRef`, one list for every backend):
 
-- Paths are relative. No `..`, no segment starting with `.`, no NUL.
-- `.md .txt .json .html` are editable and versioned, capped at 2 MB. `.html`
-  is the rendered résumé, rewritten on every revision. The UI shows it only in
-  a sandboxed iframe (§ 6.1). Step 2 adds `.html` to the local store's
-  `TEXT_EXTENSIONS`.
+- Paths are relative, NFC (the client normalizes; the server refuses other
+  forms), ≤ 512 chars. No `..`, no segment starting with `.`, no `//`,
+  backslash, control, invisible or format character (Unicode Cf and the
+  characters HFS+ ignores). A new path may not sit under a file, be the folder
+  of an existing path, or be a case variant of one (`path_conflict`): any of
+  these breaks the export on a case-insensitive disk.
+- `.md .txt .json .html` are editable and versioned (2 MB). `.html` is the
+  rendered résumé, shown only in a sandboxed iframe (§ 6.1); step 2 adds it to
+  the local store's `TEXT_EXTENSIONS`.
 - `.pdf .docx` are upload-only and create-only, capped at 10 MB.
-- `skills/` and `CLAUDE.md` at the root are **not writable** by the agent
-  (§ 7). Writes there fail with `not_editable`.
+- `skills/` and any `CLAUDE.md` are **not writable** by the agent (§ 7),
+  compared case-insensitively. Writes there fail with `not_editable`. The app
+  creates the root `CLAUDE.md` before the first agent turn.
 
-**Uploads:** the UI calls `upload("documents/<name>")` **before** sending the
-message. If the name is taken, it tries `-2`, `-3`, and so on. The message
-carries a `file` part with `url: "workspace:documents/<name>"`. The package
-turns that part into one text line ("The candidate attached
-`documents/<name>`."). The bytes are never sent to the model.
+**Uploads:** the UI calls `upload("documents/<name>")` (then `-2`, `-3` on a
+clash) **before** sending; the message's `file` part has
+`url: "workspace:documents/<name>"`, which the package turns into one text
+line. The bytes never go to the model.
 
-**On Supabase Storage (step 2):**
+**On Supabase (step 2; spike 3 showed Storage ignores `If-Match`):** each
+file lives in exactly one place, chosen by its extension (rule 12).
 
-- A private bucket. Each object is stored at `users/{uid}/ws/{path}`.
-- Per-user access rules. Spike 3 proves that user A cannot list, read, or
-  write user B's objects.
-- `version` is whatever the conditional write checks, such as the ETag.
-  **UNVERIFIED:** whether uploads honour `If-Match`. If they don't, step 2
-  brings a compare-and-swap design to the architect before building it. A
-  read-then-upload does not meet this contract.
-- `updatedAt` comes from the object's `updated_at`. **UNVERIFIED** that
-  overwriting updates it; spike 3 records this.
-- No database copy of any file, listing, or version (rule 12).
+- **Text files** (`.md .txt .json .html`) are rows in `ten_ws_files`
+  (`user_id`, `path`, `content`, `version`, `updated_at`; primary key
+  `user_id, path`). Users can only select their own rows, and every write
+  goes through `ten_ws_write(path, content, expected)`. That function acts
+  only on `auth.uid()`'s rows:
+  - with `expected` null, it does `insert … on conflict do nothing`, and a
+    clash is `already_exists`;
+  - otherwise it does `update … where version = expected`, and zero rows is
+    `version_conflict` (or `resource_missing`).
+
+  `version` is a sha256 prefix of the content, computed in SQL, the same as
+  the local store's. `updated_at` is `now()`, which `check_closeout` reads.
+- **Binaries** (`.pdf .docx`) go to the private bucket `ten-workspaces`, at
+  `users/{uid}/ws/{path}`, create-only (no `x-upsert`; a clash is a 409,
+  per spike 3). `version` is the object's ETag.
+- `list()` merges the two sources, which never overlap; the bucket policy
+  accepts only `.pdf`/`.docx` names.
+- Only beta members (§ 8) can write. Per-user caps: 2,000 text files and 50 MB
+  (`workspace_full`), and 50 objects (≤ 500 MB).
+- Refusals are SQLSTATE `PTxxx` (HTTP xxx), message = the `WorkspaceError`
+  code (409, 404, 403, 400, 415, 413; table in the migration).
 
 **Export, import, delete (rule 9):**
 
-- Export is a zip in the exact folder shape: entry name = `path`, bytes as
-  stored, no prefix, no metadata.
-- Import takes a zip into an **empty** workspace only. Every entry is checked
-  against the path rules, and one bad entry refuses the whole import. This
-  blocks zip-slip and hidden files.
-- Delete is `delete_account` (§ 8).
+- Export: a zip in the exact folder shape (entry = `path`, bytes as stored).
+- Import: a zip into an **empty** workspace only; one entry failing the path
+  rules refuses the whole import (blocks zip-slip).
+- Delete is `ten-delete-account` (§ 8): beta data only.
 - The fixture for step 2 is `tests/always-on/fixtures/apply/` plus
   `tests/always-on/fixtures/{profile,criteria}.md`, an invented persona.
 
 **Prevents:** two writers silently overwriting each other; one user reading
 another's files; a cloud folder that can't be exported or deleted (rule 9).
 **Proved by:** the step 2 exits on the named fixture; one store test suite run
-against the in-memory, local-folder, and Supabase stores; a delete test that
-leaves no object and no row.
+against the in-memory, local-folder, and Supabase stores (including two
+parallel writes with the same `expected`: exactly one wins); a delete test
+that leaves no beta object or row.
 
 ---
 
@@ -142,8 +160,9 @@ file (the host note, § 7).
 
 - `label` is the tool's `action` input (6 words or fewer, checked).
 - `text` is `action`, then each of `items` (the roles or files the run
-  covers) on its own line, then the code-built cost line.
-- `amountUsd` is `highUsd`.
+  covers) on its own line, then the code-built cost line "Estimated cost: $X
+  to $Y." (cents rounded up).
+- `amountUsd` is `highUsd`, rounded up to the cent.
 - `gateLine` is the spend line from the bundled `gate-grammar.md`, word for
   word, with `$<amount>` filled from `amountUsd` to two decimals. If the
   bundle has no spend line, the tool fails loudly. Today the line reads
@@ -170,44 +189,40 @@ export interface Gate {
 **Matching the reply.** `matchGateReply` runs in code, before the model sees
 the message.
 
-1. At most one gate is open per chat. A new gate expires the old one.
-2. The **next** message approves only if its `origin` is `"typed"` **and** the
+1. At most one gate is open per chat; a new gate expires the old one.
+2. The **next** message approves only if `origin` is `"typed"` **and** the
    whole message, trimmed and lowercased, with at most one trailing `.` or
-   `!`, is exactly `yes`. Anything else leaves the gate open, and the model is
-   told it is not approved.
-3. An exact `no`, `don't`, `cancel`, or `stop` declines the gate. The model is
-   told not to ask again unprompted.
-4. There is no approve button. The UI sets `metadata.origin` on every user
-   message.
+   `!`, is exactly `yes`. Anything else leaves it open, and the real package
+   forwards the reply to the model with a "not approved" note (the fixed line
+   in § 6.1 is the mock's alone).
+3. An exact `no`, `don't`, `cancel`, or `stop` declines it; the model is told
+   not to ask again unprompted.
+4. No approve button. The UI sets `metadata.origin` on every user message.
 
-**Gate status has one owner: the `gate_log` row.**
+**Gate status has one owner: the `ten_gate_log` row.**
 
-- `setGateStatus` writes the row, then emits `data-gate-status { gateId, status }`.
-  It runs at open (`pending`) and at approve, decline, or expire.
-- When a reply leaves the gate open, the part is emitted again with no write.
-- The UI shows the latest status per `gateId`. On a chat's first turn, the
-  package expires every `pending` row from older chats.
+- `setGateStatus` writes the row, then emits `data-gate-status { gateId, status }`
+  (at open, approve, decline, expire). A reply that leaves it open re-emits
+  with no write. The UI shows the latest status per `gateId`. A chat's first
+  turn expires `pending` rows from older chats.
 
-**`gate_log` table** (own rows only; a database function moves `status` off
-`pending` exactly once; no other update; no delete except `delete_account`):
-
-`id` uuid pk (= gateId) · `user_id` uuid · `chat_id` text · `kind` text ·
-`label` text · `text_hash` text · `gate_line` text · `amount_usd` numeric ·
-`status` text (`pending`/`approved`/`declined`/`expired`) · `typed_text` text
-null · `created_at` · `decided_at` null.
+**`ten_gate_log`** (migration, § 8; `gateId` a UUID; text columns capped):
+own rows readable; members only write, through `ten_gate_open` (which expires
+the chat's open gate), `ten_gate_decide` (off `pending` exactly once) and
+`ten_gate_expire_other_chats`. It is **written by the candidate's browser**, a
+record, not server proof of consent; no server control reads it. Spending is
+enforced by the proxy's balance check and the key limit, so a self-approved
+gate cannot spend past the balance.
 
 **Prevents:** spending past the limit without the candidate's word; a job post
 or web page approving a gate (only an exact typed `yes` counts, and the model
 cannot write the candidate's message); a paraphrased gate line; a gate card
 and a status light that disagree.
-**Proved by:**
-- a step 4 test that no spend past the allowance happens without a logged
-  typed yes;
-- a `matchGateReply` table: `yes`, `Yes.`, `YES!` typed approve; `yes but…`,
-  `y`, `sure`, a pasted text containing yes, and a `ui`-origin `yes` do not;
-- a test that the gate line equals the bundled spend line with the amount
-  filled in;
-- a test that a new chat expires older `pending` rows.
+**Proved by:** a step 4 test (no spend past the allowance without a logged
+typed yes); a `matchGateReply` table (`yes`, `Yes.`, `YES!` typed approve;
+`yes but…`, `y`, `sure`, pasted text containing yes, a `ui`-origin `yes` do
+not); the gate line equals the bundled spend line, amount filled; a new chat
+expires older `pending` rows.
 
 ---
 
@@ -219,23 +234,21 @@ Nothing is thrown into the stream.
 | tool | input | output |
 |---|---|---|
 | `load_skill` | `{ name: "profile" \| "evaluate" \| "apply" \| "coach" }` | `{ path, content }` (§ 7) |
-| `read_file` | `{ path }` (workspace path, or `skills/…`) | `{ path, content, readOnly }`; `.pdf`/`.docx` → `{ path, text, extracted: true }` |
+| `read_file` | `{ path }` (workspace path, or `skills/…`) | `{ path, content, readOnly }`; `.pdf`/`.docx` → `unsupported_type` (no extractor yet) |
 | `write_file` | `{ path, content }` | `{ path, written: true }`, or `version_conflict` / `read_first` / `not_editable` |
 | `list_files` | `{ dir? }` | `{ files: { path, size, updatedAt }[] }` |
 | `bash` | `{ command }` | `{ stdout, stderr, exitCode, changed: string[] }` |
 | `web_search` | `{ query, maxResults? (≤ 5) }` | `{ results: [{ url, title, excerpt }] }` |
 | `fetch_job` | `{ url, saveTo? }` | `{ board, company, title, location, url, text, compensation?, savedTo? }` or `unsupported_url` |
-| `estimate_cost` | `{ action (≤ 6 words), steps, webSearches, items? (≤ 8, each ≤ 12 words) }` | `{ lowUsd, highUsd, balanceUsd, needsGate, method }`; opens the gate when `needsGate` (§ 3) |
+| `estimate_cost` | `{ action (≤ 6 words), steps, webSearches, items? (≤ 8, each ≤ 12 words) }` | `{ action, lowUsd, highUsd, balanceUsd, needsGate, method }`; opens the gate when `needsGate` (§ 3) |
 | `check_language` | `{ files }` → `{ report, usd }` | adopted by the owner, 2026-09-22 |
 
-- **Versions are tracked by the package.** Per chat, it keeps the last version
-  it saw for each path, from `read_file`, `write_file`, and `bash`
-  write-backs. Writing an existing file the chat has never seen returns
-  `read_first`. On `version_conflict`, the model is told to re-read the file
-  and redo its change.
-- **`read_file` on `.pdf`/`.docx`** extracts the text on every read. No text
-  copy is saved. **UNVERIFIED:** that `pdfjs-dist` and `mammoth` run in both
-  Node and the browser. If not, the extractor becomes a dep.
+- **Versions are tracked by the package**, per chat and path, from
+  `read_file`, `write_file` and `bash` write-backs. An existing file the chat
+  never saw returns `read_first`; on `version_conflict` the model re-reads and
+  redoes its change.
+- **`read_file` on `.pdf`/`.docx`** returns `unsupported_type` until an
+  extractor dep exists; no text copy is ever saved.
 - **`bash`** is just-bash over an in-memory copy of the workspace, with the
   bundle mounted read-only at `skills/`.
   - Each changed file goes back through `WorkspaceStore.write` with its
@@ -244,10 +257,10 @@ Nothing is thrown into the stream.
     exit 1 and names the file.
   - `python3` is a custom command (§ 5), with `python: false`.
   - No network.
-- **`web_search`** makes one OpenRouter call with `plugins: [{ id: "web", max_results }]`
-  and returns the `url_citation` annotations. **UNVERIFIED:** how the provider
-  package passes the plugin and returns the annotations. The alternative is
-  the `openrouter:web_search` server tool. Spike 1's keyed run settles it.
+- **`web_search`** makes one proxy call with `plugins: [{ id: "web" }]` (the
+  proxy fixes the engine and ≤ 5 results) and returns the `url_citation`
+  annotations (**UNVERIFIED** how the provider exposes them; the proxy spike
+  settles it).
 - **`fetch_job`** accepts only these URL shapes:
 
   | board | job URL | API |
@@ -257,22 +270,18 @@ Nothing is thrown into the stream.
   | Ashby | `jobs.ashbyhq.com/{b}/{id}` | `GET api.ashbyhq.com/posting-api/job-board/{b}?includeCompensation=true`, pick `{id}` |
   | SmartRecruiters | `jobs.smartrecruiters.com/{c}/{id}[-slug]` | `GET api.smartrecruiters.com/v1/companies/{c}/postings/{id}` |
 
-  - Anything else returns `unsupported_url`, with "paste the posting text".
-  - HTML becomes plain text.
-  - `saveTo` writes the text straight to the workspace, so the model never
-    retypes it (rule 11). The text is data, not instruction.
-  - **UNVERIFIED:** that the single-posting endpoints allow browser requests.
+  Anything else → `unsupported_url` ("paste the posting text"). HTML becomes
+  plain text; `saveTo` writes it straight to the workspace (rule 11); it is
+  data, not instruction. **UNVERIFIED:** browser access to single-posting
+  endpoints.
 - **`estimate_cost`** is computed by code:
-  - the price comes from `GET /api/v1/models`, cached;
-  - `lowUsd` and `highUsd` are `steps` × the median and the highest cost per
-    step so far in this chat (on turn 1, step 4's measured per-step cost, a
-    dated constant), plus web searches at the listed plugin price;
-  - `balanceUsd` = `deps.balance()`;
-  - `needsGate` = `highUsd > spendGateUsd`;
-  - it emits a `cost` card.
+  `lowUsd`/`highUsd` = `steps` × the median/highest cost per step so far in
+  this chat (turn 1: step 4's measured constant, dated) + web searches at the
+  plugin price (`GET /api/v1/models`, cached); `balanceUsd` = `deps.balance()`;
+  `needsGate` = `highUsd > spendGateUsd`; it emits a `cost` card.
 
   Past the threshold, code always opens the gate, even when the spend exceeds
-  the balance; the key's 402 (§ 8) is the only over-balance stop.
+  the balance; the proxy's 402 (§ 8) is the only over-balance stop.
 - **Allowance.** Each turn may spend `spendGateUsd`, or the amount of a gate
   approved by the message that started the turn. After each step the loop adds
   up the measured cost. If the next step would pass the allowance, the loop
@@ -282,24 +291,22 @@ Nothing is thrown into the stream.
 **Prevents:** claimed writes that never happened; conflicts on script-rewritten
 files; arbitrary page fetches; an unannounced big run (rule 5); an uncomputed
 cost figure (rule 8).
-**Proved by:** step 4 unit tests per tool against the in-memory store and a
-stubbed `fetch`; a test that `fetch_job` refuses other hosts; a test that a
-`bash` write-back then a `write_file` on the same path succeeds; a test that a
-turn stops at a gate before the step that would pass its allowance.
+**Proved by:** step 4 unit tests per tool (in-memory store, stubbed `fetch`);
+`fetch_job` refusing other hosts; a `bash` write-back then `write_file` on the
+same path succeeding; a turn stopping at a gate before the step that would
+pass its allowance.
 
 ---
 
 ## 5. Checkers to port (step 3)
 
-These are found by grepping the MVP skills' `SKILL.md` and `references/` for
-`scripts/`. The skill prose is not changed.
+Found by grepping the MVP skills for `scripts/`; skill prose unchanged.
 
-**Dispatch:** the `python3` command matches its first argument by **file
-name**. So `scripts/…`, `../apply/scripts/…` and `skills/apply/scripts/…` all
-reach the same port. The rest of the arguments go through the same flag
-parser. An unknown script, `-c`, or no argument exits 127 with
-`not available in the web app: <name>`. Output and exit codes match the Python
-byte for byte.
+**Dispatch:** `python3` matches its first argument by **file name**, so
+`scripts/…`, `../apply/scripts/…` and `skills/apply/scripts/…` reach the same
+port with the same flag parser. An unknown script, `-c`, or no argument exits
+127 with `not available in the web app: <name>`. Output and exit codes match
+the Python byte for byte.
 
 | script | called by | CLI | reads → writes | exit |
 |---|---|---|---|---|
@@ -342,10 +349,9 @@ into `tests/run.py`, plus the coverage check.
 
 ### 6.1 Transport, envelope, status, mock
 
-The UI uses `useChat` with a custom `ChatTransport` (the SDK's own interface,
-`ai@7.0.111`). There are two implementations: `agentTransport(coach)` calls
-`coach.stream()`, and `mockTransport(fixture)` replays a fixture. Both return
-`null` from `reconnectToStream`. Swapping one for the other is one line.
+`useChat` with the SDK's `ChatTransport` (`ai@7.0.111`), implemented twice:
+`agentTransport(coach)` and `mockTransport(fixture)`; both return `null` from
+`reconnectToStream`, and swapping them is one line.
 
 **Assistant parts:**
 
@@ -375,19 +381,15 @@ The UI uses `useChat` with a custom `ChatTransport` (the SDK's own interface,
 
 **Fixture file** (steps 5a and 5b): `{ meta, files, messages }`.
 
-- `meta`: the persona, a description, and placeholders such as
-  `spendGateUsd`, labelled as placeholders.
-- `files`: the seed workspace (`path → content`). The mock loads it into the
-  in-memory `WorkspaceStore` that the UI also reads, so the side panel opens
-  real content.
-- `messages`: `UIMessage[]`, the whole scripted chat.
+`meta` = persona, description, labelled placeholders (e.g. `spendGateUsd`);
+`files` = the seed workspace, loaded into the in-memory store the UI also
+reads; `messages` = the whole scripted `UIMessage[]`.
 
 **Mock replay:**
 
-- Each `sendMessages` emits the next assistant message that follows the
-  latest user message in `messages`.
-- Chunks are emitted about 150 ms apart: `start`, `text-*`,
-  `tool-input-available`/`tool-output-available`, `data-*`, `finish`.
+- Each `sendMessages` emits the next assistant message after the latest user
+  message, as chunks ~150 ms apart (`start`, `text-*`, `tool-input-available`/
+  `tool-output-available`, `data-*`, `finish`).
 - At an open gate: a reply equal to the fixture's next scripted user message
   replays that scripted turn; a typed exact yes (real `matchGateReply` →
   `approve`, origin `typed`) jumps to the turn after the fixture's scripted
@@ -395,8 +397,8 @@ The UI uses `useChat` with a custom `ChatTransport` (the SDK's own interface,
   an off-script reply emits `pending` and "Not approved — type yes to go
   ahead." and does not advance. A later yes at a declined gate is an ordinary
   message; the gate stays declined (§ 3).
-- Tool outputs and files in a fixture come from **running the real scripts**,
-  and its cards come from the **real card builder**.
+- Fixture tool outputs and files come from **the real scripts**; cards from
+  **the real builder**.
 - **The `.html` side-panel view** (agent-writable, so it must open no outbound
   channel): an iframe `sandbox` without `allow-scripts` (and never
   `allow-scripts` with `allow-same-origin`), with `<meta http-equiv="Content-Security-Policy"
@@ -405,9 +407,9 @@ The UI uses `useChat` with a custom `ChatTransport` (the SDK's own interface,
 
 ### 6.2 Where every card comes from
 
-The model never writes a card. After each tool result, the package applies
-this table. A card is a **receipt of a file or a script's output**; the
-reasoning stays in the model's prose.
+The model never writes a card. After each tool result the package applies
+this table. A card is a
+**receipt of a file or a script's output**; reasoning stays in the prose.
 
 | after | card | props from | `ref` |
 |---|---|---|---|
@@ -417,10 +419,9 @@ reasoning stays in the model's prose.
 | `bash` `render_resume.py`, exit 0 | `document` | `--md` path; `words` from `words: N  ->  path`; `htmlPath` if inside the workspace; badge = the chat's latest `checker` result for that `.md`, else `not-run` | the `.md` |
 | `bash` `check_closeout.py`, exit 0 | `plan` | `parsePlanTodo(plan.md)` and the `--stage` value | `plan.md` |
 
-- **Verdict `ref`:** `record_verdict` is called with `--jd-file` whenever a job
-  description file exists (the host note, § 7, says so). If the row has no
-  `jd_file`, the card has no `ref` and shows "no analysis file linked". It
-  never guesses a path.
+- **Verdict `ref`:** `record_verdict` gets `--jd-file` whenever a JD file
+  exists (host note, § 7). With no `jd_file`, the card has no `ref` and shows
+  "no analysis file linked"; it never guesses.
 - **`parsePlanTodo(md) → { text, ref? }[]`** is pure and exported from
   `packages/agent`. The card builder and `apps/workspace-ui` (its `parsePlan`
   maps from it) both use it.
@@ -437,15 +438,9 @@ reasoning stays in the model's prose.
 **Prevents:** UI rework at the swap; a card that says more than its file
 (rules 8, 11); a status light that disagrees with the gate log; a gate that
 approves on a click.
-**Proved by:**
-- step 4 tests that feed real script stdout through the builder;
-- a test that model output cannot produce `data-card`, `data-gate`, or
-  `data-gate-status`;
-- a `parsePlanTodo` table test: `-` and numbered bullets, with and without a
-  backticked path;
-- a `statusOf` table test;
-- the step 5a exits;
-- step 5b's exit that the diff is the transport swap only.
+**Proved by:** builder tests on real script stdout; a test that model output
+cannot produce `data-card`/`data-gate`/`data-gate-status`; `parsePlanTodo` and
+`statusOf` table tests; the step 5a exits; step 5b's transport-swap-only diff.
 
 ---
 
@@ -453,23 +448,18 @@ approves on a click.
 
 1. **Always on (the system prompt):**
    - **Tier 0 is always the bundled `skills/profile/templates/workspace-CLAUDE.md`,
-     never the workspace copy.** At sign-up, code (not the model) writes that
-     template to the workspace `CLAUDE.md`, so the export works locally.
-     After that, the agent cannot write it (§ 2).
-   - **The host note (about 80 words):** this app cannot send, submit, click,
-     or open pages. Sends and submits go in `plan.md § To do` with their
-     prepared file. Outreach plans and PDF files are not made here; say so
-     when you deliver. `CLAUDE.md` is already in place. Pass `--jd-file` to
-     `record_verdict` when a job description file exists. Language check:
-     per the owner's `check_language` decision.
+     never the workspace copy.** The app creates the workspace `CLAUDE.md`
+     (create-only) at first run or import, for export; the agent cannot write it.
+   - **The host note:** the literal text is the bundled
+     `skills/profile/templates/web-host-note.md` (beside the Tier 0 template,
+     so the word report counts it; a `skills/_host/` dir would fail the
+     every-skill-is-converted invariant).
    - **Tier 1:** the `description:` lines of profile, evaluate, apply, and
      coach.
    - **The tool descriptions:** about 350 words.
-2. **On match:** `load_skill(name)` returns the `SKILL.md` with its bundle
-   path, so its relative links resolve.
+2. **On match:** `load_skill(name)` → the `SKILL.md` with its bundle path.
 3. **On demand:** `read_file("skills/<skill>/references/<file>.md")`.
-4. **Never loaded:** scripts run through `bash`, and only their output enters
-   context.
+4. **Never loaded:** scripts; only their `bash` output enters context.
 
 **Target: ~3,300 words of instructions per turn** (owner decision,
 2026-09-22, because Tier 0 grew). That is the always-on block plus one `SKILL.md`.
@@ -477,7 +467,7 @@ approves on a click.
 **Window:** the package re-sends at most `windowWords` (4,000) of history,
 dropping whole older turns first and always keeping the latest user message.
 A `SKILL.md` that falls out is loaded again when needed; gate state lives in
-`gate_log`. A reload starts a new chat.
+`ten_gate_log`. A reload starts a new chat.
 
 **Prevents:** loading more than local does (rule 15); unbounded cost per turn
 (rule 5); a transcript the export leaves out (rule 9); **persistent prompt
@@ -494,74 +484,182 @@ changing the guardrails for every later chat.
 
 ---
 
-## 8. Key and balance
+## 8. Model proxy, balance, and the production project
 
-One Supabase Edge Function, `openrouter-key`, holds the OpenRouter
-provisioning key. It is the only server code in the MVP.
+**Setup (owner, 2026-09-23).** The proxy uses the owner's **existing**
+OpenRouter key, which the live CareerCoach app also uses, stored as the secret
+`TEN_OPENROUTER_API_KEY` in `ten-model-proxy` only. Its limit is **$20 with a
+daily reset**, shared by both apps. A **beta-wide daily ceiling of $5**
+(owner, 2026-09-23) keeps the live app's share: before forwarding, the proxy
+sums today's (UTC) beta calls with the service-only `ten_beta_spend_today()`
+and, at $5 or more, answers **503** "The beta has reached today's limit. Try
+again tomorrow." (shown as `model_error`, not `over_balance`). So the live app
+keeps at least $15/day, less only the beta calls already in flight when the
+ceiling is crossed (each ≤ the ceiling below). Beta and live costs mix in
+OpenRouter's usage view, so the ledger is the only beta cost record; rotating
+the key means updating both apps.
+Every model call goes through the proxy; the price list is fetched directly.
 
-**The balance is one number:** `accounts.balance_usd` minus the live key's
-usage, which equals the live key's remaining limit.
+The beta shares the owner's **existing production Supabase project**,
+`career-coach-nextgen` (Postgres 17), and its sign-in with the old app. On
+2026-09-23 it had zero storage policies and RLS on for `storage.objects` and
+`storage.buckets` (the observed baseline). Every object it adds is named `ten_…`/`ten-…`,
+created by `supabase/migrations/20260923000000_ten_beta_init.sql` and dropped
+by `supabase/teardown/ten_beta_teardown.sql`; the owner applies both, never an
+agent, at a quiet time (3 s lock timeout; on a timeout nothing changes). Its
+lasting protection is three **restrictive pins** (built-in functions only):
+no permissive policy, now or added later by the old app, can open
+`ten-workspaces` rows to anyone but their owner, or make the bucket public or
+delete it. The apply-time guard is an **allowlist**: it refuses RLS off, a
+`storage.buckets` UPDATE/DELETE/ALL policy, and any `storage.objects` policy
+not deparsed as `bucket_id = '<name>'` (alone or ANDed at the top level);
+a CASE, `= false` or `IS DISTINCT FROM` shape is refused, and so is a safe
+`IN (…)` (no such policy exists today). The proof, in order: the owner's
+read-only queries (header), then spike 3's isolation re-run, **both before
+the first credit row**; until then nobody can write. RLS is on and `anon`
+revoked from creation.
 
-| action | caller | does |
-|---|---|---|
-| `mint` | user session | if a key is live: disable it, read its usage, subtract it, delete it. Then create a key with `limit = balance_usd` and return it once |
-| `revoke` | user session | disable, read usage, subtract, delete (sign-out) |
-| `delete_account` | user session | `revoke`; delete everything under `users/{uid}/`; delete the rows and the auth user. Unused beta credit is forfeited (owner, 2026-09-22); the confirmation says so plainly |
-| `raise` | **service role only** | add to `balance_usd`, and `PATCH` the live key's `limit` up by the same amount |
+**Vercel:** only production signs in; previews run the mock with no Supabase
+env. The production URL goes in Auth's **Redirect URLs** (the Site URL, used by
+the old app's emails, is untouched), and every auth link passes `redirectTo`.
 
-- Endpoints: `POST`/`PATCH`/`DELETE /api/v1/keys[/{hash}]`. Row `accounts`:
-  `user_id` · `balance_usd` · `key_hash` · `updated_at` (own row readable;
-  only the function writes).
-- **Beta funding (owner, 2026-09-22):** a $5.00 starter credit per new user,
-  set by an admin through `raise`. There is no payment page. The first-run greeting is static UI text,
-  not a `UIMessage`, and is never sent to the model. It says when the balance
-  is $0.
-- **The browser holds** the user's key in memory only (fetched at run time,
-  never from a build variable) and the Supabase session. User-facing text
-  calls it **"your usage key"**.
-- **One tab:** a Web Locks lock. A second tab shows "Ten is open in another
-  tab" and does not mint. A reload mints again, which rotates the key.
-- **`deps.balance()`** is `GET /api/v1/key` → `data.limit_remaining` with the
-  user's key. This is documented by OpenRouter; spike 4 confirms it live. The
-  chip and `estimate_cost` both read it. The UI re-reads it when a turn ends
-  and when the window regains focus, with no polling.
-- **Over the limit:** OpenRouter answers 402 (documented; spike 4 confirms
-  it). The loop emits `data-error over_balance` and ends the turn.
+**Who is in:** public sign-up is **open**, so anyone on the internet can hold
+a signed-in session; membership (a `credit` row an admin inserts, $5.00,
+checked by `ten_is_member()`) is the **only barrier** to beta data. The proxy
+(403) and every `ten_` function and policy that reads or writes beta data
+check it; the one exception is the ledger's own-row read, where membership
+itself lives. The app says: "Ten is in a private beta. Ask the person who
+invited you for access."
 
-**Prevents:** a server secret in the bundle; a user raising their own
-balance; a leaked key overspending; a key outliving sign-out; a second tab
-killing a run; an undeletable account.
-**Proved by:** spike 4; the step 5b exits; function tests showing that
-`raise` with a user token is refused, that `mint` twice leaves one live key
-and the right balance, and that `delete_account` leaves nothing behind.
+**`ten-model-proxy`** accepts `POST …/ten-model-proxy/chat/completions` and
+`OPTIONS`. Any other path or method gets 404. In order:
+
+1. **Auth:** it resolves a signed-in user (`role = authenticated`, a `sub`),
+   otherwise 401. The anon or publishable key alone gets 401.
+2. **Size and membership:** a body over 256 KB gets 413. A non-member gets 403.
+3. **Balance and ceiling:** if the user's balance is not above 0, 402, shown
+   as `over_balance`: "Your beta credit is used up. Ask the person who invited
+   you for more." If the beta's spend today is $5 or more, 503 (above).
+4. **Builds** the upstream body from an allowlist. It copies `messages`,
+   `tools`, `tool_choice` and `temperature`. It **sets**:
+   - `model` = `anthropic/claude-sonnet-5`, an exact match with no suffix
+     (anything else gets 400 `model_not_allowed`);
+   - `max_tokens` = min(client, 4,096);
+   - `stream: true`;
+   - `provider: { data_collection: "deny", zdr: true }`;
+   - `cache_control: { type: "ephemeral" }`;
+   - if the client asked for `plugins: [{ id: "web" }]`, exactly
+     `[{ id: "web", engine: "exa", max_results: min(n, 5) }]`.
+
+   Everything else (`models`, `max_completion_tokens`, `reasoning`,
+   `web_search_options`, other plugins, `stream: false`, …) is dropped. One
+   hard-coded upstream: `https://openrouter.ai/api/v1/chat/completions`.
+5. **Streams** the response back, teed. Inside `EdgeRuntime.waitUntil` it
+   reads the other copy to the end (parsing only the last `data:` line) and
+   writes one `ten_usage_ledger` row keyed by the response `id`, from the
+   final chunk's `usage.cost` and token counts, error endings included. If no
+   cost can be read it records the **ceiling**, about $0.18 (64k input tokens
+   at $2/M + 4,096 output at $10/M + one search). One metering path only.
+6. **Upstream failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx becomes
+   a 503, which the loop shows as `model_error`, not `over_balance`.
+
+**`ten_usage_ledger`** is the only money table (`kind` `credit`/`call`,
+`request_id` unique, token counts, `usd numeric(12,6)`; columns in the
+migration). Users select their own rows; only the service role writes.
+
+- **Balance** = credits − calls, derived, never stored (rule 12).
+  `ten_balance()` is a `security definer` wrapper that passes `auth.uid()` to
+  the one formula, `ten_balance_for`, so it takes no argument and shows only
+  the caller's; the proxy calls service-only `ten_balance_for(uid)`. `deps.balance()` reads
+  it at turn end and on window focus. The chip rounds **down** to cents; a
+  negative balance shows $0.00.
+- **The honest bound** (owner, 2026-09-23: no server lock or rate limit): a
+  member calling the proxy directly can run calls in parallel, each starting
+  only while the balance is above 0. A user's loss is the calls in flight when
+  it crosses zero (each ≤ the ceiling); the beta's total by the $5/day
+  ceiling plus in-flight calls, and everything by the key's shared $20/day. The one-tab lock had no other use and is removed.
+- **`ten-delete-account`** runs with the service role, acts only on the user
+  its JWT resolves to (anon/publishable key → 401), and deletes **beta data
+  only**, keeping the shared sign-in: it removes `users/{uid}/` objects
+  through the **Storage API** (list, then remove; SQL deletes are refused and
+  would orphan the files), then the `ten_ws_files`, `ten_usage_ledger` and
+  `ten_gate_log` rows. The UI says: "This deletes your
+  Ten beta data. Your sign-in stays because it's shared with the older app.
+  Unused credit is forfeited."
+- **CORS:** the proxy allows only the production Vercel origin and
+  `http://localhost:5173`.
+- **The browser holds** only the Supabase session. A custom `fetch` sets
+  `Authorization: Bearer <current JWT>` on each call (§ 1).
+
+**Time (paid plan: 400 s wall clock; 2 s CPU excluding I/O).** A proxy
+request is one model call (tools run in the browser); 4,096 tokens at 30–80
+tokens/s take 51–137 s. If a call is still cut off, or the cap truncates a tool
+call's arguments, the loop writes nothing from it and shows a retryable
+`model_error`: "The reply was cut off. Nothing from it was saved. Try again."
+(**UNVERIFIED** how `ai@7.0.111` surfaces a stream with no `finish`.)
+
+**Prevents:** a model key in the browser; any client field reaching around
+the model, output, search, or path limits; spending a zero balance; a
+non-member spending or storing; a free call from a disconnect; a balance
+stored twice; deleting a shared sign-in; the beta starving the live app of
+more than $5/day (plus in-flight calls); a later old-app storage policy
+opening beta files.
+**Proved by:** stubbed-upstream tests of the **outgoing** body (no `models`,
+`max_completion_tokens`, `web_search_options`; `stream: true`; forced
+`provider`; `max_results` ≤ 5); 401 (no JWT, anon or publishable key, both
+functions); 403 non-member; 402 at zero; 413 over 256 KB; 404 `/embeddings`;
+400 `…:online`; a stopped stream still writes a row; duplicate `request_id`
+rejected; users cannot insert ledger rows; unlisted-origin preflight gets no
+allow header; delete leaves the auth user, no beta rows, and a known path
+downloads as not-found; `ten_beta_spend_today()` sums only today's calls and
+is service-only; the SQL harness in `tests/sql/` (README there: `run-r2.mjs`,
+`r3-own.mjs`; guard, CAS, codes, caps, paths, membership, pins, teardown after
+the Storage API step) passes.
 
 ---
 
 ## Step-1 spikes
 
-The pass criteria are the plan's (step 1). Status:
+The pass criteria are the plan's (step 1), except spike 4, which the proxy
+spike replaced (owner, 2026-09-23).
 
-- **1: BLOCKED** on a key (streamed call, turn-2 cache read, `web_search`
-  annotations). Keyless still to show: the `provider` filter in the
-  intercepted request; `streamText` → `toUIMessageStream` in the page.
-- **2: pass on the mechanism**; the letter moves to step 3 (§ 5), owner to accept.
-- **3: no note.** Also records `If-Match` on a stale ETag and `updated_at` on overwrite.
-- **4: no note.** Also records the 402, `limit_remaining`, and the provider filter used.
+- **1: PASS** (live streamed call and a turn-2 cache read, 2026-09-23), except
+  the `web_search` annotations. Those are re-run through the proxy.
+- **2: pass on the mechanism**; the letter moves to step 3 (§ 5).
+- **3: isolation BLOCKED** until the owner applies the migration. The re-run
+  proves, on `ten_ws_files` RLS and the `ten-workspaces` policies with the
+  project's **real** policy list, that A cannot list, read, or write B's rows
+  or objects, and that a non-member cannot write. Found: `If-Match` is
+  ignored (hence the compare-and-swap in § 2); `updated_at` changes on
+  overwrite.
+- **4, the proxy spike** (with a live budget set first). It passes when:
+  - the § 8 "Proved by" tests pass;
+  - one ledger row per call has `usd` equal to `total_cost` from
+    `GET /api/v1/generation?id=`;
+  - a web-search call's `usage.cost` matches the change in the key's
+    credits (if not, the proxy adds the listed plugin price);
+  - there is a turn-2 cache read through the proxy;
+  - streaming works end to end from the Vercel build.
 
 ---
 
 ## Decision log
 
-- Only a spend gate on the web: nothing there sends or submits (PENDING
-  OWNER; the local plugin keeps send and submit).
+- Spend is the only web gate; nothing there sends or submits (owner, 09-22).
 - The gate opens from `estimate_cost`: one way in, one tool fewer.
-- Cards are built by code, as receipts of files (rule 11); evaluate's
-  summary card stays the prose reply, so no `criteriaLine`.
-- The plan card shows lines word for word: no numbers parsed from prose (rule 8).
-- Gate status lives in the row only: two stored copies disagree (rule 12).
-- No saved chat (files are the memory): bounded cost per turn.
-- Tier 0 comes from the bundle: a writable system prompt is a persistent
-  injection path.
-- Versions tracked by the package; status derived, not sent (no second copy).
-- `check_language` (owner: adopt, 2026-09-22): one fresh-context model call
-  per document set (about $0.015–$0.02 a call, to be measured in step 4).
+- Cards are code-built receipts of files (rule 11); the plan card shows lines
+  word for word (rule 8).
+- Gate status lives in the row; UI status is derived (rule 12).
+- No saved chat: files are the memory, cost per turn is bounded.
+- Tier 0 from the bundle: a writable system prompt is a persistent injection.
+- `check_language` adopted (owner, 09-22): one fresh-context call per document
+  set (~$0.015–$0.02, measured in step 4).
+- A proxy that builds its own body over the live app's existing key ($20/day,
+  shared; owner, 09-23), and a ledger-derived balance.
+- Text in `ten_ws_files` with a SQL compare-and-swap, binaries create-only in
+  Storage: Storage has no conditional write (spike 3); one home per file.
+- A credit row = beta member; delete removes beta data only (shared sign-in).
+- A $5/day beta-wide ceiling in the proxy (owner, 09-23): the shared key's
+  $20/day stays at least $15 for the live app.
+- Restrictive pins on the bucket, plus an allowlist guard at apply time: the
+  pins hold against policies added later; parsing SQL text can't.

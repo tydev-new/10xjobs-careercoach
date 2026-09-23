@@ -5,3 +5,7 @@ __pycache__/
 tests/always-on/results/
 node_modules/
 dist/
+# local secrets (API keys for spikes and dev); never commit
+.env
+.env.*
+*.env.local

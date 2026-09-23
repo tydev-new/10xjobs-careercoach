@@ -149,7 +149,8 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "rr-u2028-and-formfeed", files: { "r.md": "# A\n\npara one - sneaky bullet\fmore\n" }, args: ["--md", "r.md", "--html", "out.html"] });
   add({ s, id: "rr-very-long-line", files: { "r.md": `# A\n\n${LONG}\n` }, args: ["--md", "r.md", "--html", "out.html"] });
   add({ s, id: "rr-default-html-path", files: { "applications/acme-resume.md": "# A\n\nhi\n", "applications/resume.html": "PRE-EXISTING\n" },
-    args: ["--md", "applications/acme-resume.md"], note: "Python writes to a mkdtemp() dir; path is random by design" });
+    args: ["--md", "applications/acme-resume.md"], htmlMask: true, untouched: { "applications/resume.html": "PRE-EXISTING\n" },
+    note: "html path masked (mkdtemp); pre-existing applications/resume.html must be untouched" });
   add({ s, id: "rr-arg-bad-pages", files: { "r.md": "# A\n" }, args: ["--md", "r.md", "--pages", "two"] });
   add({ s, id: "rr-arg-pages-spaces", files: { "r.md": "# A\n" }, args: ["--md", "r.md", "--html", "o.html", "--pages", " 3"] });
   add({ s, id: "rr-arg-help", files: {}, args: ["-h"] });
@@ -251,6 +252,84 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "cc-arg-asked-missing-value", files: {}, args: ["--workspace", ".", "--asked"] });
 }
 
+// ------------------------------------------------------------------ round 2
+// New adversarial cases (re-verify of fix round 1), aimed at the areas round 1
+// found broken: CRLF / lone CR, BOM, argparse, code-point lengths, code-point
+// sort, and the check_files default under the design's own skills mount.
+{
+  const PROFILE = "# P\n## Snapshot\n## Experience\n## Intake findings\n### Positioning strengths\n### Likely interviewer concerns\n" +
+    "### Career-narrative gaps\n### Story seeds\n## Interview history\n## Constraints\n## Application defaults\n";
+  const sk = ["--skills", SKILLS];
+  const J = (body) => "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n" + body;
+  const RV = ["--workspace", ".", "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong"];
+  const UJ = ["--workspace", ".", "--company", "Café", "--title", "Staff"];
+  const ONE = J("## To Review\n\n### Café Labs — Staff Engineer\n- URL: https://c\n\n");
+  const BASE = "# Base\n\n## Experience\n- Wrote SQL pipelines in Postgres for the finance team.\n";
+  const R = ["--workspace", ".", "--resume", "resume.md"];
+  const COV = "## Coverage\n\n| requirement | status | evidence | decision |\n|---|---|---|---|\n";
+  const SEL = "## Selection\n\n| # | role | bullet | in/out | source | words | why |\n|---|---|---|---|---|---|---|\n";
+  const PB = ["--workspace", ".", "--application", "a.md"];
+  const PLAN = "## Board\nWaiting on you\n- the comp floor\nTo do\n- x\n";
+
+  // CRLF / lone CR / mixed
+  add({ s: "check_materials", id: "r2-cm-lone-cr-multiline-bullet", files: { "base-resume.md": BASE,
+    "resume.md": "# A\r\r## Summary\r\rok.\r\r## Experience\r\r- Wrote SQL pipelines in Postgres for the finance team.\r  and invented a database.\r" }, args: R });
+  add({ s: "check_materials", id: "r2-cm-crlf-reworded-pair", files: { "base-resume.md": BASE,
+    "resume.md": CRLF("# A\n\n## Summary\n\nok.\n\n## Experience\n\n- Built Postgres pipelines for finance.\n\n## Reworded\n\n- base: Wrote SQL pipelines in Postgres for the finance team.\n  tailored: Built Postgres pipelines for finance.\n") }, args: R });
+  add({ s: "update_job", id: "r2-uj-mixed-endings", files: { "jobs.md": "# Pipeline\r\n\n## To Review\r\r### Café Labs — Staff Engineer\n- URL: https://c\r\n- Reason: a\rb\n\n## Search notes\r\n\r\nn1\rn2\r\n" }, args: [...UJ, "--stage", "Offer"] });
+  add({ s: "check_files", id: "r2-cf-crlf-history-bad-row", files: { "base-resume-history.md": CRLF("| date | round | driver | scored vs FIXED | what changed |\n|---|---|---|---|---|\n| a | 1 | x | y |\n") }, args: ["--workspace", ".", ...sk] });
+  add({ s: "check_closeout", id: "r2-cc-lone-cr-plan", files: { "plan.md": "## Board\rWaiting on you\r- the comp floor\r  continued row\rTo do\r- x\r" }, args: ["--workspace", ".", "--stage", "applying", "--asked", "comp floor"] });
+  add({ s: "proposal_block", id: "r2-pb-crlf-escaped-pipe", files: { "a.md": CRLF(COV + "| C\\|C++ | gap | none | open |\n\n" + SEL) }, args: PB });
+
+  // BOM
+  add({ s: "record_verdict", id: "r2-rv-bom-before-stage-heading", files: { "jobs.md": "﻿## To Review\n\n### Beta — PM\n- URL: u\n\n" }, args: RV });
+  add({ s: "check_files", id: "r2-cf-bom-profile", files: { "profile.md": "﻿" + PROFILE.replace("# P\n", "") }, args: ["--workspace", ".", ...sk] });
+  add({ s: "render_resume", id: "r2-rr-bom-heading", files: { "r.md": "﻿# Title\n\nbody ﻿ word\n" }, args: ["--md", "r.md", "--html", "o.html"] });
+  add({ s: "check_closeout", id: "r2-cc-bom-waiting", files: { "plan.md": "## Board\n﻿Waiting on you\n- comp floor\n" }, args: ["--workspace", ".", "--stage", "applying", "--asked", "comp floor"] });
+  add({ s: "check_materials", id: "r2-cm-bom-and-nel-word-count", files: { "letter.md": "Dear Hiring Manager,\n\none\u0085two\u001cthree ﻿ four\n" }, args: ["--workspace", ".", "--letter", "letter.md"] });
+
+  // argparse
+  add({ s: "record_verdict", id: "r2-rv-arg-double-dash", files: {}, args: ["--", ...RV] });
+  add({ s: "record_verdict", id: "r2-rv-arg-abbrev-with-equals", files: {}, args: [...RV, "--sco=50", "--trac=B"] });
+  add({ s: "record_verdict", id: "r2-rv-arg-help-after-bad-choice", files: {}, args: ["--verdict", "STRONG", "-h"] });
+  add({ s: "record_verdict", id: "r2-rv-arg-help-before-bad-choice", files: {}, args: ["-h", "--verdict", "STRONG"] });
+  add({ s: "record_verdict", id: "r2-rv-arg-score-equals-negative", files: {}, args: [...RV, "--score=-5"] });
+  add({ s: "record_verdict", id: "r2-rv-arg-empty-equals-workspace", files: {}, args: ["--workspace=", "--company", "A", "--title", "B", "--verdict", "weak"] });
+  add({ s: "check_closeout", id: "r2-cc-arg-asked-dash-value", files: { "plan.md": PLAN }, args: ["--workspace", ".", "--stage", "applying", "--asked", "-x"] });
+  add({ s: "check_closeout", id: "r2-cc-arg-asked-negative-number", files: { "plan.md": PLAN }, args: ["--workspace", ".", "--stage", "applying", "--asked", "-5"] });
+  add({ s: "check_closeout", id: "r2-cc-arg-asked-equals-dash", files: { "plan.md": PLAN }, args: ["--workspace", ".", "--s", "applying", "--ask=--comp floor", "--ask", "floor"] });
+  add({ s: "check_materials", id: "r2-cm-arg-single-dash-unknown", files: {}, args: ["-w", ".", "--resume", "x.md"] });
+  add({ s: "update_job", id: "r2-uj-arg-help-with-value", files: {}, args: ["--help=foo"] });
+  add({ s: "update_job", id: "r2-uj-arg-dismiss-then-stage", files: { "jobs.md": ONE }, args: [...UJ, "--dismiss", "--stage", "Applied"] });
+  add({ s: "update_job", id: "r2-uj-arg-stage-abbrev-and-space-value", files: { "jobs.md": ONE }, args: [...UJ, "--sta", "To Review", "--rea", "x"] });
+  add({ s: "render_resume", id: "r2-rr-arg-pages-zero-strict", files: { "r.md": "# A\n" }, args: ["--md", "r.md", "--html", "o.html", "--pages", "0", "--strict"] });
+  add({ s: "check_files", id: "r2-cf-arg-workspace-twice", files: { "profile.md": PROFILE }, args: ["--workspace", "nope", "--workspace", ".", ...sk] });
+
+  // code-point lengths
+  const astral = (n) => "𝐀".repeat(n);
+  add({ s: "proposal_block", id: "r2-pb-exactly-70-astral-no-truncation", files: { "a.md": COV + "\n" + SEL + `| 1 | Acme | ${astral(70)} | out | base | 3 | w |\n` }, args: PB });
+  add({ s: "proposal_block", id: "r2-pb-71-astral-truncation", files: { "a.md": COV + "\n" + SEL + `| 1 | Acme | ${astral(66)} ${astral(4)} | out | base | 3 | w |\n` }, args: PB });
+  add({ s: "proposal_block", id: "r2-pb-have-row-astral-req-50", files: { "a.md": COV + `| ${astral(49)} Kubernetes | have | x | answered |\n\n` + SEL, "base-resume.md": "# B\n- Python\n" }, args: PB });
+  add({ s: "check_closeout", id: "r2-cc-asked-zwj-and-combining", files: { "plan.md": PLAN }, args: ["--workspace", ".", "--stage", "applying", "--asked", "👨‍👩‍👧‍👦".repeat(9) + "é".repeat(20)] });
+  add({ s: "check_materials", id: "r2-cm-reworded-base-missing-astral-60", files: { "base-resume.md": BASE,
+    "resume.md": `# A\n\n## Summary\n\nok.\n\n## Experience\n\n- x\n\n## Reworded\n\n- base: ${astral(61)} gone\n  tailored: x\n` }, args: R });
+  add({ s: "check_files", id: "r2-cf-table-row-exactly-60-astral", files: { "applications/a.md": COV + `| ${astral(56)} |\n` }, args: ["--workspace", ".", ...sk] });
+
+  // code-point sort
+  add({ s: "record_verdict", id: "r2-rv-sort-titles-astral-vs-fffd", files: { "jobs.md": J("## To Review\n\n### Acme — � lead\n\n### Acme — 😀 lead\n\n### Acme — ａ lead\n\n") }, args: ["--workspace", ".", "--company", "Zed", "--title", "PM", "--verdict", "weak"] });
+  add({ s: "update_job", id: "r2-uj-sort-dismissed-astral", files: { "jobs.md": J("## Dismissed\n\n### 😀co — PM\n- Was: To Review\n\n### ￠co — PM\n- Was: Applied\n\n## To Review\n\n### Café — Staff Engineer\n\n") }, args: [...UJ, "--dismiss"] });
+  add({ s: "record_verdict", id: "r2-rv-unicode-digit-scores", files: { "jobs.md": J("## To Review\n\n### A — PM\n- Score: ٣\n\n### B — PM\n- Score: +05\n\n### C — PM\n- Score: 0\n\n### D — PM\n- Score: -3\n\n### E — PM\n- Score: 1e3\n\n### F — PM\n- Score: ５\n\n") }, args: ["--workspace", ".", "--company", "G", "--title", "PM", "--verdict", "weak", "--score", "4"] });
+  add({ s: "check_files", id: "r2-cf-application-order-astral", files: { "applications/😀.md": COV + "| x | bad |\n", "applications/￠.md": COV + "| y | bad |\n", "applications/z.md": COV + "| z | bad |\n" }, args: ["--workspace", ".", ...sk] });
+
+  // whitespace edges Python strips and JS trim() does not (and vice versa)
+  add({ s: "record_verdict", id: "r2-rv-nel-and-u2028-in-fields", files: { "jobs.md": J("## To Review\n\n### Beta — PM\n- Reason: foo\u0085\n- URL: a b\n- Location:  x﻿\n\n") }, args: RV });
+  add({ s: "record_verdict", id: "r2-rv-newline-in-title-arg", files: {}, args: ["--workspace", ".", "--company", "Acme", "--title", "PM\n## Offer", "--verdict", "weak"] });
+
+  // check_files default --skills under the design's own mount (skills/ inside the workspace)
+  add({ s: "check_files", id: "r2-cf-default-skills-design-mount", files: { "profile.md": PROFILE }, args: ["--workspace", "."], mount: "design",
+    note: "design-web-agent.md § 4: bundle mounted read-only at `skills/`; skill prose passes no --skills" });
+}
+
 // ------------------------------------------------------------------ engines
 function seed(ws, c) {
   rmSync(ws, { recursive: true, force: true });
@@ -304,7 +383,14 @@ function skillFiles() {
 }
 const q = (a) => `'${a.replace(/'/g, `'\\''`)}'`;
 async function runJsBash(c, ws) {
-  const files = { ...skillFiles() };
+  // Default: skills seeded at their HOST absolute paths (so explicit
+  // `--skills <host path>` args resolve). mount:"design" instead mounts them
+  // ONLY where design-web-agent.md § 4 puts them: "the bundle mounted
+  // read-only at `skills/`" of the workspace — and nowhere else.
+  const files = {};
+  for (const [p, b] of Object.entries(skillFiles())) {
+    files[c.mount === "design" ? join(ws, "skills", relative(SKILLS, p)) : p] = b;
+  }
   const old = new Date(Date.now() - 3 * 3600 * 1000);
   for (const [rel, content] of Object.entries(c.files)) {
     files[join(ws, rel)] = { content: new Uint8Array(content instanceof Buffer ? content : Buffer.from(content, "utf-8")), ...((c.old || []).includes(rel) ? { mtime: old } : {}) };
@@ -321,6 +407,7 @@ async function runJsBash(c, ws) {
     for (const n of (await fs.readdir(d)).sort()) {
       const p = join(d, n);
       const st = await fs.stat(p);
+      if (c.mount === "design" && p === join(ws, "skills")) continue;
       if (st.isDirectory) { out[relative(ws, p) + "/"] = "<dir>"; await walk(p); }
       else out[relative(ws, p)] = Buffer.from(await fs.readFileBuffer(p)).toString("base64");
     }
@@ -329,14 +416,29 @@ async function runJsBash(c, ws) {
   return { stdout: r.stdout, stderr: r.stderr, code: r.exitCode, files: out };
 }
 
+const CRASH = new Set(["cm-resume-is-a-directory", "cm-latin1-bytes", "pb-missing-application", "rr-missing-md",
+  "cf-missing-workspace-dir", "cf-workspace-is-a-file"]);
 const MASK = (s) => s.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00/g, "<TS>").replace(/updated \d{4}-\d{2}-\d{2}/g, "updated <D>");
-function compare(a, b, { mask = false } = {}) {
-  const m = mask ? MASK : (x) => x;
+// LEAD RULING (2026-09-23, fix round 1): on an uncaught-exception path,
+// parity = the same exit code + a stderr whose FIRST line is exactly
+// "Traceback (most recent call last):" on BOTH sides; the rest of the
+// traceback may differ. stdout (Python flushes what it printed before the
+// crash) and the workspace files are still compared exactly.
+const TRACEBACK = "Traceback (most recent call last):";
+// render_resume without --html: Python writes to tempfile.mkdtemp() (a fresh
+// random dir), so the path after "->" is masked on both sides; the rest of
+// stdout and every workspace file are still compared exactly.
+const HTML_PATH = (s) => s.replace(/^(words: \d+ {2}-> {2}).*$/m, "$1<TMP>/resume.html");
+function compare(a, b, { mask = false, crash = false, htmlMask = false } = {}) {
   const diffs = [];
-  if (a.stdout !== b.stdout) diffs.push("stdout");
+  const so = htmlMask ? HTML_PATH : (x) => x;
+  if (so(a.stdout) !== so(b.stdout)) diffs.push("stdout");
   if (a.code !== b.code) diffs.push(`exit ${a.code}!=${b.code}`);
   const a1 = (a.stderr || "").split("\n")[0], b1 = (b.stderr || "").split("\n")[0];
-  if (a1 !== b1) diffs.push("stderr-line1");
+  if (crash) {
+    if (a1 !== TRACEBACK) diffs.push(`py-not-a-traceback`);
+    if (b1 !== TRACEBACK) diffs.push(`stderr-line1-not-traceback`);
+  } else if (a1 !== b1) diffs.push("stderr-line1");
   else if (a.stderr !== b.stderr) diffs.push("stderr-rest");
   const keys = new Set([...Object.keys(a.files), ...Object.keys(b.files)]);
   for (const k of [...keys].sort()) {
@@ -359,8 +461,15 @@ for (const c of C) {
   seed(ws, c); const py = runPy(c, ws);
   seed(ws, c); const jb = runJsBin(c, ws);
   seed(ws, c); const bs = await runJsBash(c, ws);
-  const dBin = compare(py, jb);
-  const dBash = compare(py, bs, { mask: WRITERS.has(c.s) });
+  const opts = { crash: CRASH.has(c.id), htmlMask: !!c.htmlMask };
+  const dBin = compare(py, jb, opts);
+  const dBash = compare(py, bs, { ...opts, mask: WRITERS.has(c.s) });
+  for (const [label, r] of [["py", py], ["jsbin", jb], ["jsbash", bs]]) {
+    for (const [rel, want] of Object.entries(c.untouched || {})) {
+      const got = r.files[rel];
+      if (got !== Buffer.from(want).toString("base64")) (label === "jsbash" ? dBash : dBin).push(`${label}-touched:${rel}`);
+    }
+  }
   results.push({ id: c.id, script: c.s, bin: dBin, bash: dBash, py, jb, bs, note: c.note });
 }
 rmSync(SCRATCH, { recursive: true, force: true });

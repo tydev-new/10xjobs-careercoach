@@ -154,17 +154,33 @@ export async function createBackend(opts: BackendOptions = {}): Promise<Backend>
         }
       }
       if (url.pathname === "/rest/v1/ten_ws_files" && method === "GET") {
+        // PostgREST subset: select=, path=eq.|gt.|gte.|lt., order=<col>.asc|desc,
+        // limit=, offset=. Anything else is refused loudly (400) so a store
+        // relying on an unimplemented feature fails instead of passing.
+        const known = new Set(["select", "path", "order", "limit", "offset"]);
+        for (const k of url.searchParams.keys()) if (!known.has(k)) return json(400, { message: `stand-in: unsupported param ${k}` });
         const sel = (url.searchParams.get("select") ?? "*").split(",").map((s) => s.trim());
         for (const c of sel) if (!/^[a-z_]+$/.test(c)) return json(400, { message: `bad select ${c}` });
-        const pathFilter = url.searchParams.get("path");
         const where: string[] = [];
         const params: unknown[] = [];
-        if (pathFilter) {
-          if (!pathFilter.startsWith("eq.")) return json(400, { message: "only eq supported in this stand-in" });
-          params.push(pathFilter.slice(3));
-          where.push(`path = $${params.length}`);
+        for (const pf of url.searchParams.getAll("path")) {
+          const m = /^(eq|gt|gte|lt)\.([\s\S]*)$/.exec(pf);
+          if (!m) return json(400, { message: `stand-in: unsupported path filter ${pf}` });
+          params.push(m[2]);
+          where.push(`path ${{ eq: "=", gt: ">", gte: ">=", lt: "<" }[m[1] as "eq"]} $${params.length}`);
         }
-        const sql = `select ${sel.join(", ")} from public.ten_ws_files ${where.length ? "where " + where.join(" and ") : ""} order by path${maxRows ? ` limit ${maxRows}` : ""}`;
+        let orderSql = ""; // PostgREST gives no order unless asked: emulate by a scrambled order
+        const ord = url.searchParams.get("order");
+        if (ord) {
+          const m = /^(path|updated_at)\.(asc|desc)$/.exec(ord);
+          if (!m) return json(400, { message: `stand-in: unsupported order ${ord}` });
+          orderSql = `order by ${m[1]} ${m[2]}`;
+        } else orderSql = "order by md5(path)";
+        const lim = url.searchParams.get("limit");
+        const off = url.searchParams.get("offset");
+        let limit = lim !== null ? Number(lim) : Infinity;
+        if (maxRows) limit = Math.min(limit, maxRows);
+        const sql = `select ${sel.join(", ")} from public.ten_ws_files ${where.length ? "where " + where.join(" and ") : ""} ${orderSql}${Number.isFinite(limit) ? ` limit ${limit}` : ""}${off ? ` offset ${Number(off)}` : ""}`;
         try {
           const r = await asUser(uid, () => db.query<Record<string, unknown>>(sql, params));
           return json(200, r.rows.map((row) => ("updated_at" in row ? { ...row, updated_at: iso(row.updated_at) } : row)));

@@ -354,7 +354,11 @@ test("F1 upload name clash: the store reports already_exists so the UI's -2, -3 
   assert.deepEqual([a.path, b2.path, b3.path], ["documents/cv.pdf", "documents/cv-2.pdf", "documents/cv-3.pdf"]);
 });
 
-test("F2 SPEC (known step 5b gap): a case-variant upload clash (CV.pdf vs cv.pdf) is a WorkspaceError the UI can act on", async () => {
+// KNOWN GAP, step 5b (lead's ruling 2026-09-23): Storage refusals other than
+// a duplicate still surface as a generic Error, so the UI's -2/-3 loop throws
+// on CV.pdf vs cv.pdf instead of moving on. Kept visible as a todo: it runs
+// and reports, but does not fail tests/run.py until 5b maps the code.
+test("F2 SPEC (known step 5b gap): a case-variant upload clash (CV.pdf vs cv.pdf) is a WorkspaceError the UI can act on", { todo: "step 5b: map Storage RLS refusals (case-variant clash) to a WorkspaceError" }, async () => {
   const b = await be();
   const { store } = await member(b);
   await store.upload("documents/cv.pdf", PDF);
@@ -435,4 +439,61 @@ test("D6 cross-backend: the in-memory store accepts paths the Supabase server re
   const accepted: string[] = [];
   for (const [p, why] of SPEC_CLIENT_SIDE) if ((await codeOf(mem.write(p, "x", null))) === "RESOLVED") accepted.push(why);
   assert.deepEqual(accepted, [], "in-memory store accepted these; the Supabase server refuses them");
+});
+
+// ---------------------------------------------------------------- paging (H3, fix round 1)
+
+test("C3b paging: the keyset cursor survives PostgREST-special and unicode characters at the page boundary", async () => {
+  const b = await createBackend({ maxRows: 1000 });
+  const { uid, store } = await member(b);
+  const seed: Record<string, string> = {};
+  for (let i = 0; i < 998; i++) seed[`a/n${String(i).padStart(4, "0")}.md`] = "x";
+  // rows 999..1003 in path order: the 1000th row (the cursor) is the hostile one
+  const hostile = ["b/a,b (c) \"q\" & d=e%f+g #h ?i*.md", "b/b café 日本.md", "b/c.md", "b/d.md", "b/e.md"];
+  seed["a/zz.md"] = "x";
+  for (const h of hostile) seed[h] = "x";
+  await b.seedText(uid, seed);
+  const got = (await store.list()).map((f) => f.path);
+  assert.equal(got.length, 1004);
+  assert.equal(new Set(got).size, 1004, "a row was returned twice");
+  for (const h of hostile) assert.ok(got.includes(h), `missing ${h}`);
+});
+
+test("C3c paging must not stop early when the server's max_rows is below the client page size (never silently truncate)", { todo: "LOW: listText breaks on rows.length < 1000; a project max_rows < 1000 would truncate silently" }, async () => {
+  const b = await createBackend({ maxRows: 500 });
+  const { uid, store } = await member(b);
+  const seed: Record<string, string> = {};
+  for (let i = 0; i < 700; i++) seed[`n/f${String(i).padStart(4, "0")}.md`] = "x";
+  await b.seedText(uid, seed);
+  assert.equal((await store.list()).length, 700);
+});
+
+// ---------------------------------------------------------------- L1: one path rule for every backend
+
+test("D7 path-rule parity: validateRef/isReadOnlyPath accept exactly what the SQL accepts, for every BMP code point and the listed astral ranges", async () => {
+  const { validateRef, isReadOnlyPath } = await import("../../packages/agent/src/workspace/path-rules.ts");
+  const b = await be();
+  const cps: number[] = [];
+  for (let c = 0x01; c <= 0xffff; c++) if (c < 0xd800 || c > 0xdfff) cps.push(c);
+  for (const [a, z] of [[0x110bd, 0x110cd], [0x13430, 0x1343f], [0x1bca0, 0x1bca3], [0x1d173, 0x1d17a], [0xe0000, 0xe0080], [0x1f600, 0x1f601]]) for (let c = a; c <= z; c++) cps.push(c);
+  const inputs = cps.map((c) => `n/a${String.fromCodePoint(c)}b.md`);
+  // SQL verdict, in one query (PGlite; production's regex locale is checked live)
+  const r = await b.db.query<{ i: number; ok: boolean }>(
+    "select i, public.ten_path_ok(p) and lower(p) !~ '^skills/' and lower(p) !~ '(^|/)claude\\.md$' as ok from unnest($1::text[]) with ordinality as t(p, i)",
+    [inputs],
+  );
+  const mism: string[] = [];
+  for (const row of r.rows) {
+    const p = inputs[row.i - 1];
+    let client: boolean;
+    try {
+      const v = validateRef(p);
+      if (v !== p) continue; // normalized (NFC singleton, / or \): the client sends the normalized form
+      client = !isReadOnlyPath(v);
+    } catch {
+      client = false;
+    }
+    if (client !== row.ok) mism.push(`U+${p.codePointAt(3)!.toString(16).toUpperCase().padStart(4, "0")} client=${client} sql=${row.ok}`);
+  }
+  assert.deepEqual(mism.slice(0, 40), [], `${mism.length} mismatches`);
 });

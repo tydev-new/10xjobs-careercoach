@@ -53,5 +53,30 @@ else:
     else:
         passed += 1
 
+# packages/checkers: the JS ports' own unit tests, plus the parity test
+# against the real Python scripts (docs/design-web-agent.md § 5, step 3).
+# Skips loudly (not silently) when node isn't on PATH, same pattern as
+# tests/web above.
+CHECKERS = os.path.join(HERE, "..", "packages", "checkers")
+if not node:
+    print("\nSKIPPED packages/checkers (unit + parity): no `node` on PATH")
+else:
+    print("\n--- node --test packages/checkers/test/unit/*.test.mjs ---")
+    unit_tests = sorted(glob.glob(os.path.join(CHECKERS, "test", "unit", "*.test.mjs")))
+    result = subprocess.run([node, "--test", *unit_tests], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL packages/checkers/test/unit (node --test) — see output above")
+    else:
+        passed += 1
+
+    print("\n--- node packages/checkers/test/parity.mjs ---")
+    result = subprocess.run([node, os.path.join(CHECKERS, "test", "parity.mjs")], cwd=CHECKERS)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL packages/checkers/test/parity.mjs — see output above")
+    else:
+        passed += 1
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

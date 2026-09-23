@@ -112,7 +112,7 @@ function DocumentCard({
       </div>
       <div className="card-actions">
         {fileRef ? <OpenInPanel onOpen={() => onOpen(fileRef)} /> : null}
-        {props.htmlPath ? (
+        {props.htmlPath && import.meta.env.VITE_HIDE_PRINT !== "1" ? (
           <button
             type="button"
             className="card-open-link"

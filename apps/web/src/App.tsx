@@ -2,8 +2,15 @@ import { useState, type ReactElement } from "react";
 import { ChatShell } from "./ChatShell";
 import { FIXTURES, fixtureById } from "./fixtures";
 
+// Follow the host's explicit choice (data-theme on <html>), else the OS setting.
 function initialTheme(): "light" | "dark" {
-  return "light";
+  try {
+    const stamped = document.documentElement.dataset.theme;
+    if (stamped === "light" || stamped === "dark") return stamped;
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  } catch {
+    return "light";
+  }
 }
 
 export function App(): ReactElement {

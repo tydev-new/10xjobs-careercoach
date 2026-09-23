@@ -53,9 +53,12 @@ job, post-MVP only if dogfooding shows chat + cards isn't enough).
 ```
 
 - **Header:** avatar with its five states (§ 1.2), a balance chip
-  (reads the candidate's own key limit directly — C § 8, not the
-  envelope), a `⋯` menu (export workspace, sign out, manage your usage
-  key — C § 8's own user-facing term, never "OpenRouter key").
+  (reads `deps.balance()` — C § 8, not the envelope; rounded **down**
+  to the cent, and a balance at or below zero still reads `$0.00`,
+  never a negative number), a `⋯` menu (export workspace, delete my
+  beta data — § 1.7, sign out). There is no per-candidate key to
+  manage — one shared app key sits behind the model proxy (C § 8) — so
+  "manage your usage key" is gone from the product, menu included.
 - **Transcript:** prose interleaved with collapsed "ran …" lines
   (§ 3) and cards (§ 2), oldest first, autoscroll.
 - **Composer:** attach, free text, `/` opens a skill picker (optional
@@ -91,23 +94,79 @@ gate's `label` (C § 3 — the model's own ≤6-word tag).
 Minimal: email/password or magic link, one line under the logo from
 `PRINCIPLES.md` rule 1 ("Help you get a job offer you actually want"),
 and a link "Prefer local? Run it from your terminal" (rule 9 —
-local-first stays a supported exit).
+local-first stays a supported exit). Sign-in is **shared with the
+older CareerCoach app** (C § 8) — the same credentials sign a
+candidate into both, and anyone can complete it; it proves who someone
+is, not that they're in the beta. **After sign-in, one membership
+check** (a credit row, C § 8) decides what comes next, before the chat
+ever mounts: a member goes straight to § 1.5, anyone else sees § 1.6.
+No separate route or spinner screen — the check happens once, on the
+same shell.
 
 ### 1.5 Empty / first-run state
 
 Static UI copy, not a `UIMessage` sent to or from the model (nothing
 has run, so `Coach.stream` produced nothing): avatar `idle`, one line
-naming the $0 starting balance and the honest next step — no
-manufactured welcome enthusiasm (rule 8):
+naming the honest next step — no manufactured welcome enthusiasm (rule
+8). **Members start at $5** (C § 8, owner 2026-09-23: an admin-inserted
+credit row of $5.00), so the chip reads `$5.00`, not `$0.00`:
 
 ```
-◉ Ten · idle                                  $0.00  ⋯
+◉ Ten · idle                                  $5.00  ⋯
 Ten: I don't have anything of yours yet. Drop in a résumé,
      or tell me the job you're going for, and I'll start
      your workspace.
 ```
 
 Side panel: "Nothing open yet."
+
+### 1.6 Not a member
+
+Sign-in is open to anyone (§ 1.4); only a member — a credit row an
+admin inserts — can use Ten (C § 8). A signed-in non-member never
+reaches the chat: same shell, no avatar, no cards, no composer, one
+plain line and nothing else to do (rule 18, honest — there is nothing
+this screen can offer them but the fact):
+
+```
+You're signed in, but this beta is invite-only. Ask the
+person who invited you to add you.
+```
+
+No balance chip (there is nothing to spend yet), no fixture/preview
+controls, no retry button — the only way forward is someone else
+adding the credit row; signing out and back in re-checks membership.
+The `⋯` menu keeps only sign out. This is C § 8's own wording for the
+app to say; this section fixes only where and how it's shown.
+
+### 1.7 Delete my beta data
+
+The `⋯` menu's one irreversible action. C § 3 keeps the term "gate"
+for the spend gate alone, but rule 7 names *any* action that's
+identity-bearing or irreversible, and this one forfeits money and
+erases records — so it renders in the same shape, the candidate's
+typed `yes` standing in for a button the same way it does at a spend
+gate (§ 2.5):
+
+1. **The complete thing** — named, not summarized: "your workspace
+   files, your usage history, and your gate log" (C § 8's three
+   tables: `ten_ws_files` and the Storage bucket, `ten_usage_ledger`,
+   `ten_gate_log`).
+2. **The one plain sentence** — C § 8's own wording, word for word:
+   "This deletes your Ten beta data. Your sign-in stays because it's
+   shared with the older app. Unused credit is forfeited."
+3. **The candidate's typed yes** — the same composer, the same rule as
+   the spend gate: no button fires it, only an exact typed `yes`.
+4. **The report-back** — once `ten-delete-account` returns, one line
+   confirms what happened: "Deleted. You're signed out of Ten — your
+   sign-in for the older app is untouched."
+
+This is a menu-triggered confirmation, not a `data-gate` part (C § 3's
+`GateRequest.kind` is `"spend"` only): it carries no `gateId` and never
+touches `ten_gate_log`. **Open for the architect:** whether this
+confirmation reuses the gate card's rendering (a `kind` value C § 3
+doesn't have yet) or is its own component that happens to follow the
+same four steps — either way, no button, ever.
 
 ## 2. The card catalog
 
@@ -203,8 +262,15 @@ model ever sees the reply. No button, ever. Code opens a gate whenever
 `needsGate` is true, regardless of balance — the model cannot hold it
 back, and the `cost` card (§ 2.6) always shows `balanceUsd` beside the
 range so the candidate can judge it themselves. The only
-`data-error over_balance` comes from the loop after OpenRouter
-actually rejects a call mid-run (C § 8) — see `over-limit-error.json`.
+`data-error over_balance` comes from the model proxy's own balance
+check, which runs **before** it forwards anything upstream (C § 8: "if
+the user's balance is not above 0, 402") — not from OpenRouter
+rejecting a call mid-run. So a run that hits it stops with **no model
+reply for that step**: whatever finished earlier in the turn (the
+roles already recorded, the files already written) is what's on
+screen, and the next word from the model comes only once the candidate
+sends a new message, once there's credit again. See
+`over-limit-error.json`.
 
 ### 2.6 `cost`
 
@@ -218,12 +284,25 @@ itself (§ 2.5); there's no second "say go" reply.
 ### 2.7 `data-error`
 
 Rendered exactly as the envelope carries it — `{ code, message,
-retryable }` (C § 6.1 names the five `code` values). `nextStep` copy
-is a small UI-owned lookup keyed by `code` (e.g. `over_balance` → "Add
-funds to keep going."), since the part carries no such field and the
-codes are a closed set. The UI never computes a number into `message`
-that the part didn't carry (e.g. "2 of 8 roles") — that belongs in the
-model's own next plain-text turn.
+retryable }` (C § 6.1 names the five `code` values). `message` is
+never a UI invention: it's the literal sentence the server sent, and
+under `model_error` that sentence differs by cause even though the
+`code` doesn't — the beta-wide ceiling ("The beta has reached today's
+limit. Try again tomorrow.") and a truncated reply ("The reply was cut
+off. Nothing from it was saved. Try again.") are both `model_error`,
+told apart only by their own `message` text (C § 8), never by a
+separate code. `over_balance`'s own message is now "Your beta credit
+is used up. Ask the person who invited you for more." — there is no
+"add funds" step in the beta (one shared app key, no per-candidate
+spend), so the old `nextStep` lookup entry for it is gone; the message
+already says what to do, and repeating it would be the kind of
+boilerplate rule 8 rules out. `model_error` carries no `nextStep` line
+either, for the same reason — one static line can't fit both "try
+again in a moment" and "try again tomorrow" without contradicting
+whichever one is actually true. The remaining `nextStep` entries
+(`tool_error`, `offline`, `step_cap`) are unchanged. The UI never
+computes a number into `message` that the part didn't carry (e.g. "2
+of 8 roles") — that belongs in the model's own next plain-text turn.
 
 ## 3. The collapsed "ran …" line
 
@@ -274,7 +353,10 @@ Files:
   `estimate_cost` (no `request_gate` call), a non-`yes` reply that
   leaves it pending, and the `yes` that approves it.
 - `over-limit-error.json` — a run that stops on a real
-  `data-error over_balance` after OpenRouter rejects a call mid-run.
+  `data-error over_balance`: the proxy refuses the **next** call before
+  it ever reaches the model (C § 8), so the turn ends right after the
+  cards for the roles already finished, with no further model text —
+  never a reply composed after the refusal.
 - `checker-failure.json` — a `checker` card `FAIL`, then the agent
   fixing it on its own next turn (rule 3 — no candidate action
   needed); no `document` card exists until the fix renders cleanly.

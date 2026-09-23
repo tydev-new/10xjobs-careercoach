@@ -1,6 +1,6 @@
 import { useState, type ReactElement } from "react";
 import { Avatar } from "./Avatar";
-import { formatUsd } from "../format.ts";
+import { formatBalanceUsd } from "../format.ts";
 import type { FixtureEntry } from "../fixtures";
 import type { Status } from "../types";
 
@@ -84,7 +84,12 @@ export function Header(props: HeaderProps): ReactElement {
             Autoplay
           </button>
         ) : null}
-        <span className="balance-chip">{balanceUsd === undefined ? "—" : `$${formatUsd(balanceUsd)}`}</span>
+        {/* deps.balance() (design-web-agent.md § 8) rounds DOWN to the
+            cent and never shows below $0.00 — formatBalanceUsd, not
+            formatUsd (S2/N3, docs/reviews/proxy-change-review.md). */}
+        <span className="balance-chip">
+          {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
+        </span>
         <div className="menu">
           <button
             type="button"
@@ -99,9 +104,12 @@ export function Header(props: HeaderProps): ReactElement {
               <button type="button" role="menuitem" disabled>
                 Export workspace
               </button>
-              <button type="button" role="menuitem" disabled>
-                Manage your usage key
-              </button>
+              {/* No per-candidate key to manage: one shared app key sits
+                  behind the model proxy (design-web-agent.md § 8), so
+                  "Manage your usage key" is gone (design-web-ui.md § 1.1).
+                  "Delete my beta data" (design-web-ui.md § 1.7) is its own
+                  confirmation flow, out of scope for this pass — disabled
+                  here rather than added half-built. */}
               <button
                 type="button"
                 role="menuitem"

@@ -8,9 +8,19 @@ import type { DataErrorData, ErrorCode } from "../types";
 // candidate can do — never a promise of what the agent itself will do
 // next (that's the model's own next turn to say, from the files, not the
 // UI's to guess).
-const NEXT_STEP: Record<ErrorCode, string> = {
-  over_balance: "Add funds to keep going.",
-  model_error: "Try again in a moment.",
+//
+// S2 (docs/reviews/proxy-change-review.md): `over_balance` and
+// `model_error` have NO entry here anymore. `data.message` for these two
+// is now the server's own literal sentence (design-web-ui.md § 2.7,
+// design-web-agent.md § 8), and it already says what to do — repeating it
+// would be the boilerplate rule 8 rules out. It also can't be one static
+// line: `model_error` alone covers at least two different real messages
+// ("The beta has reached today's limit. Try again tomorrow." vs. "The
+// reply was cut off. Nothing from it was saved. Try again.") — a fixed
+// `nextStep` would contradict whichever one didn't apply. There is no
+// "add funds" step in the beta (one shared app key, no per-candidate
+// spend), so the old over_balance line is gone outright, not reworded.
+const NEXT_STEP: Partial<Record<ErrorCode, string>> = {
   tool_error: "A tool call failed.",
   offline: "Check your connection and try again.",
   // A step_cap stop opens a "Continue this run" gate (C § 4) — the SAME

@@ -99,28 +99,47 @@ it separately, as above, against a built preview server).
 - `src/store.ts` — `FixtureStore`, a `WorkspaceStore` (`docs/design-web-agent.md`
   § 2: async `read` -> `FileRead`, `list`, `write`, `upload`) backed by a
   fixture's `files`. The UI never reads a fixture's `files` directly — only
-  through this store. Also exposes a mock-preview-only
-  `startingBalanceUsd()`: the fixture's own explicit `meta.startingBalanceUsd`
-  if it has one, else `undefined` ("unknown" — the header chip shows "—").
-  A workspace having **no files does not mean $0** (`gate-moment.json` has
-  `files: {}` mid-conversation, not a new account) — only an explicit
-  `meta.startingBalanceUsd` (currently just `empty-first-run.json`, `0`)
-  ever produces a number here.
-- `src/format.ts` — `formatUsd`: at least 2 decimals, never rounds one off
-  (keeps whichever is longer — 2, or the number's own).
+  through this store. Also exposes a mock-preview-only `async balance()`:
+  the mock's stand-in for `deps.balance()` (C § 8) — the fixture's own
+  explicit `meta.startingBalanceUsd` if it has one, else `undefined`
+  ("unknown" — the header chip shows "—"). A workspace having **no files
+  does not mean $0** (`gate-moment.json` has `files: {}` mid-conversation,
+  not a new account) — only an explicit `meta.startingBalanceUsd`
+  (currently `empty-first-run.json`, `5`, matching a member's starting
+  credit) ever produces a number here. `gate-moment.json` and
+  `over-limit-error.json` declare none, so their header chip stays "—"
+  even after a cost card streams (see `ChatShell.tsx` below) — that's a
+  deliberate consequence of decoupling the chip from the cost card, not a
+  bug: the `cost` card inside the transcript still shows its own
+  `balanceUsd`, from `estimate_cost`'s own return (design-web-ui.md § 2.6),
+  untouched.
+- `src/format.ts` — `formatUsd` (the cost card's numbers: at least 2
+  decimals, never rounds one off — keeps whichever is longer, 2 or the
+  number's own) and `formatBalanceUsd` (the header chip only: rounds
+  **down** to the cent, and a balance at or below zero reads `$0.00`,
+  never negative — design-web-agent.md § 8).
 - `src/ChatShell.tsx`, `src/App.tsx` — wiring: `useChat` +
-  `MockChatTransport`, the fixture picker, Autoplay, theme toggle.
-  The first-run greeting shows only when the **store** is empty
-  (`store.list()` returns nothing) *and* no messages exist yet — not
-  merely an empty chat on a fixture whose workspace already has files.
+  `MockChatTransport`, the fixture picker, Autoplay, theme toggle. The
+  balance chip reads `store.balance()` (never the latest `cost` card —
+  docs/reviews/proxy-change-review.md S2), read at the same moments the
+  real `deps.balance()` is: once on mount/fixture change, at the end of
+  each turn, and on window focus. An `over_balance` refusal already on
+  screen clamps the reading to `$0.00` regardless of the store's declared
+  figure, since that error code only ever fires when the real balance
+  isn't above zero. The first-run greeting shows only when the **store**
+  is empty (`store.list()` returns nothing) *and* no messages exist yet —
+  not merely an empty chat on a fixture whose workspace already has files.
 - `src/components/` — Header/Avatar, Transcript, ToolRun (the collapsed
   "ran …" line), Cards (verdict/plan/document/checker/cost — verdict
   labels are `eval.md`'s own tier names; the cost card shows
   `estimate_cost`'s numbers via `formatUsd`, never widened or rounded
   down), GateCard, ErrorPart (each line states only what happened or what
   the candidate can do — never a promise of what the agent itself will do
-  next), Composer, SidePanel ("Print / Save as PDF" opens the sandboxed
-  iframe and calls its own `print()`; sandboxed
+  next; `over_balance` and `model_error` carry no extra "next step" line
+  of their own anymore — the server's own `message` already says what to
+  do, per-cause, and a single static line can't fit every cause without
+  contradicting one of them), Composer, SidePanel ("Print / Save as PDF"
+  opens the sandboxed iframe and calls its own `print()`; sandboxed
   `allow-same-origin allow-modals`, deliberately **no** `allow-scripts` —
   see the code comment in `SidePanel.tsx` — and every `.html` file's own
   content gets a Content-Security-Policy `<meta>` prepended,
@@ -128,10 +147,16 @@ it separately, as above, against a built preview server).
   hostile `<img src="https://...">` beacon can't be fetched either),
   MarkdownView (a small dependency-free renderer for `.md` in the panel).
 - `fixtures/*.json` — not owned by this slice; see
-  `docs/design-web-ui.md` § 4 and `docs/design-web-agent.md` § 6.1. Only
-  edit made here: `empty-first-run.json`'s `meta` gained
-  `"startingBalanceUsd": 0`, matching what its own `description` already
-  said in prose ("the $0 starting balance").
+  `docs/design-web-ui.md` § 4 and `docs/design-web-agent.md` § 6.1. Edits
+  made here for the proxy contract change (r4; `docs/reviews/proxy-change-review.md`
+  S2/N3): `empty-first-run.json`'s `meta.startingBalanceUsd` is now `5`
+  (a member's credit row starts at $5, not $0); `over-limit-error.json`
+  no longer has a `tool-web_search output-error` part or a trailing
+  model `text` part after the refusal (the proxy now refuses the next
+  call **before** it reaches the model, so nothing composes a reply for
+  that step) and its `data-error.message` is the proxy's real 402 text,
+  "Your beta credit is used up. Ask the person who invited you for
+  more."
 
 ## Known gaps / open questions for the lead
 

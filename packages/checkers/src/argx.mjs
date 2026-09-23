@@ -68,14 +68,20 @@ export function parseFlags(argv, spec) {
   for (let i = 0; i < argv.length; i++) {
     const tok = argv[i];
 
-    // "--" (argparse/POSIX end-of-options marker): consumed, never itself
-    // an extra; EVERY token after it is positional — since none of these
-    // 7 scripts declare a positional argument, that means every remaining
-    // token becomes an unrecognized-argument extra, with no further flag
-    // parsing (so a "--workspace" appearing after "--" is a literal
-    // string, not the --workspace flag).
+    // "--" (argparse/POSIX end-of-options marker): every token AFTER it is
+    // positional — since none of these 7 scripts declare a positional
+    // argument, that means every remaining token becomes an
+    // unrecognized-argument extra, with no further flag parsing (so a
+    // "--workspace" appearing after "--" is a literal string, not the
+    // --workspace flag). The "--" token itself is ALSO an extra here
+    // (fix round 3, item 3 — confirmed live against CPython: with no
+    // positional to consume it, "--" is never silently dropped;
+    // `parser.parse_args(["--workspace", ".", "--"])` ->
+    // "unrecognized arguments: --", and `[..., "--", "extra"]` ->
+    // "unrecognized arguments: -- extra", "--" first).
     if (!afterDoubleDash && tok === "--") {
       afterDoubleDash = true;
+      extras.push(tok);
       continue;
     }
     if (afterDoubleDash) {
@@ -84,6 +90,13 @@ export function parseFlags(argv, spec) {
     }
 
     if (tok === "-h") return { help: true, text: help };
+    // "-h=x" (confirmed live against CPython): -h/--help is one action
+    // registered under both option strings, so an inline value on the
+    // SHORT form gets the exact same "ignored explicit argument" error
+    // (naming both forms) as "--help=x" does, below.
+    if (tok.startsWith("-h=")) {
+      return { error: `argument -h/--help: ignored explicit argument '${tok.slice(3)}'` };
+    }
 
     let flagPart = tok;
     let inlineValue = null;

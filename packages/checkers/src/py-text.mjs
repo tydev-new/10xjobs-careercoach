@@ -131,13 +131,30 @@ export function restoreLineSeparators(s) {
 // since splitlines() runs on text a checker already holds in-memory).
 // Only call this where the Python source literally calls `.splitlines()`
 // (render_resume.py's `blocks()`, check_materials.py's case-prose
-// paragraph split) — every OTHER "split into lines" in these scripts is a
-// plain `.split("\n")` or regex `^`/`$`, which is LF-only (see
-// universalNewlines's comment) and must NOT use this.
+// paragraph split, check_closeout.py's `waiting_rows()`, check_files.py's
+// / proposal_block.py's `raw.splitlines()`) — every OTHER "split into
+// lines" in these scripts is a plain `.split("\n")` or regex `^`/`$`,
+// which is LF-only (see universalNewlines's comment) and must NOT use
+// this. This is the ONE shared helper every port uses for a Python
+// `.splitlines()` call — see check-closeout.mjs's `waitingRows` (fix
+// round 3, item 2) for why a bespoke `.split(/\r?\n/)` in a port is a bug
+// even when the port never intended to diverge: it silently drops the
+// \v/\f/\x1c-\x1e/NEL/U+2028/U+2029 boundaries Python's splitlines()
+// recognizes (the corpus's `r3-cc-nel-rows` case).
 const SPLITLINES_RE = new RegExp(`\\r\\n|[\\n\\r\\v\\f\\x1c\\x1d\\x1e\\x85${U2028_SENTINEL}${U2029_SENTINEL}]`);
 export function pySplitlines(s) {
   if (s === "") return [];
-  return s.split(SPLITLINES_RE);
+  const parts = s.split(SPLITLINES_RE);
+  // Python's splitlines() never emits a trailing empty line for a string
+  // that ends exactly on a line boundary ("a\n".splitlines() == ["a"],
+  // not ["a", ""]) — unlike a plain regex split, which always emits one
+  // final (possibly empty) fragment after the last match. Since a
+  // trailing empty fragment can ONLY occur when the last match ends at
+  // the string's own end, popping it once (never more) exactly reproduces
+  // Python's rule, including runs of blank lines ("a\n\n".splitlines()
+  // == ["a", ""], i.e. drop only the LAST empty fragment).
+  if (parts.length && parts[parts.length - 1] === "") parts.pop();
+  return parts;
 }
 
 // Python's str.strip(chars) / lstrip / rstrip: strip any of the given

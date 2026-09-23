@@ -87,14 +87,9 @@ else:
         passed += 1
 
 # tests/checkers-parity/: the INDEPENDENT tester's own suite for
-# packages/checkers (plan step 3, fix round 2, item 4) — separate from
-# packages/checkers/test/ (the coder's own tests, above). Wired in now
-# that extra.mjs is green under the lead's uncaught-exception ruling
-# (round 1) and the one remaining diff is a reasoned, documented case
-# (packages/checkers/README.md "Known, sanctioned divergences" —
-# `cf-default-skills-as-the-skill-prose-calls-it`, superseded by round 2's
-# more accurate `r2-cf-default-skills-design-mount`; extra.mjs itself
-# can't be told this, so this block's own pass/fail still reflects it).
+# packages/checkers (plan step 3, fix round 2 item 4; fix round 3 brought
+# it to 156/156 both engines) — separate from packages/checkers/test/
+# (the coder's own tests, above).
 CHECKERS_PARITY = os.path.join(HERE, "checkers-parity")
 if not node:
     print("\nSKIPPED tests/checkers-parity: no `node` on PATH")
@@ -112,6 +107,23 @@ else:
     if result.returncode != 0:
         failed += 1
         print("FAIL tests/checkers-parity/extra.mjs — see output above")
+    else:
+        passed += 1
+
+    # tests/checkers-parity/e2e_both.py: the independent tester's own
+    # replay of test_e2e_lifecycle.py's fixtures through BOTH engines (fix
+    # round 3, item "wire e2e_both.py into tests/run.py"). It's a
+    # standalone script, not a test_*.py module of test_*() functions
+    # (importing it runs the whole thing immediately, including its own
+    # sys.exit) — so it's run as a subprocess here, the same pattern as
+    # the other node-based suites above, not imported like tests/test_*.py.
+    # It also shells out to `node` itself (to run packages/checkers/bin/),
+    # so it's gated on `node` being on PATH, same as its siblings here.
+    print("\n--- python3 tests/checkers-parity/e2e_both.py ---")
+    result = subprocess.run([sys.executable, os.path.join(CHECKERS_PARITY, "e2e_both.py")])
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers-parity/e2e_both.py — see output above")
     else:
         passed += 1
 

@@ -24,8 +24,11 @@ import { CANONICAL_SKILL_PATH } from "../src/dispatch.mjs";
 const HERE = dirname(fileURLToPath(import.meta.url)); // .../packages/checkers/bin
 const REPO_ROOT = dirname(dirname(dirname(HERE))); // bin -> checkers -> packages -> repo root
 const invokedScriptPath = join(REPO_ROOT, "skills", CANONICAL_SKILL_PATH["check_files.py"]);
+// This CLI's own real disk position never depends on --workspace (unlike
+// dispatch.mjs's resolver — see check-files.mjs's header comment).
+const resolveInvokedScriptPath = () => invokedScriptPath;
 
-const { stdout, stderr, exitCode } = await run(process.argv.slice(2), nodeIo, invokedScriptPath);
+const { stdout, stderr, exitCode } = await run(process.argv.slice(2), nodeIo, resolveInvokedScriptPath);
 if (stdout) process.stdout.write(stdout);
 if (stderr) process.stderr.write(stderr);
 process.exit(exitCode);

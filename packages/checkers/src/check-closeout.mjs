@@ -11,7 +11,7 @@
 // and a `now` function returning epoch ms (defaults to Date.now so tests
 // can freeze time the way the Python test's os.utime() does).
 import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { cpSlice } from "./py-text.mjs";
+import { cpSlice, pySplitlines } from "./py-text.mjs";
 import { HELP } from "./help-text.mjs";
 
 export const STAGES = ["groundwork", "searching", "applying", "interviewing", "deciding"];
@@ -26,27 +26,30 @@ function posixJoin(...parts) {
   return a.endsWith("/") ? a + b : `${a}/${b}`;
 }
 
+// Python: re.search(r"^Waiting on you\s*\n(.*?)(?=^(?:To do|Doing|Done|##)\b|\Z)", text, re.S|re.M)
+// `^`/`$` under Python's re.M matches only at real `\n` boundaries — NOT
+// the broader set `.splitlines()` recognizes — so this extraction step
+// stays LF-only (text is already through `universalNewlines`, which
+// turns CRLF/CR into `\n` and swaps U+2028/U+2029 for non-line-terminator
+// sentinels, so JS's own `^`/`$` (which under `m` treats \n, \r,
+// U+2028/U+2029 as terminators) agrees with Python's here once neither
+// of the other three remains in the text). `$(?![\s\S])` is `\Z`: end of
+// the WHOLE string, not "before a trailing newline" (which plain `$`
+// would also accept under the `m` flag).
+const WAITING_RE = /^Waiting on you\s*\n([\s\S]*?)(?=^(?:To do|Doing|Done|##)\b|$(?![\s\S]))/m;
+
 export function waitingRows(text) {
-  // Python: re.search(r"^Waiting on you\s*\n(.*?)(?=^(?:To do|Doing|Done|##)\b|\Z)", text, re.S|re.M)
-  // then splits the captured block into bullet rows (a row can span
-  // multiple wrapped lines).
-  const lines = text.split(/\r?\n/);
-  let start = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (/^Waiting on you\s*$/.test(lines[i])) {
-      start = i + 1;
-      break;
-    }
-  }
-  if (start === -1) return [];
-  const block = [];
-  for (let i = start; i < lines.length; i++) {
-    if (/^(To do|Doing|Done|##)\b/.test(lines[i])) break;
-    block.push(lines[i]);
-  }
+  const m = WAITING_RE.exec(text);
+  if (!m) return [];
+  // Python then splits the CAPTURED block with `.splitlines()` — the
+  // broad boundary set (\v, \f, \x1c-\x1e, NEL, U+2028/U+2029 too), not
+  // `\n` alone (fix round 3, item 2 — this port previously re-split the
+  // whole text by `/\r?\n/` up front and lost every one of those; the
+  // corpus's `r3-cc-nel-rows` case has a NEL-delimited bullet row and a
+  // form-feed-only continuation line).
   const rows = [];
   let cur = null;
-  for (const ln of block) {
+  for (const ln of pySplitlines(m[1])) {
     if (/^\s*[-*•]\s+/.test(ln)) {
       if (cur !== null) rows.push(cur);
       cur = ln.replace(/^\s*[-*•]\s+/, "");

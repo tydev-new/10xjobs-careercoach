@@ -4,38 +4,45 @@
 // first argument — the one deliberate signature difference from the Python
 // functions of the same name, which `open()` a path directly.
 //
-// `--skills`'s default (fix round 2, item 1 — BLOCKER, revised): Python's
-// default is `os.path.dirname(__file__) + "/../.."` — wherever
-// check_files.py's OWN file physically sits, go up two levels to the
-// skills/ root (confirmed against CPython: `__file__` for the `__main__`
-// script is resolved to an absolute path, joining whatever relative
-// script argument `python3` was given with the process's real cwd —
-// `python3 skills/profile/scripts/check_files.py` from cwd `X` gives
-// `__file__` == `X/skills/profile/scripts/check_files.py`). Every MVP
-// skill's own SKILL.md runs `check_files.py --workspace .` with NO
-// --skills (e.g. skills/apply/SKILL.md's session-close line), so this
-// port must resolve the same default.
+// `--skills`'s default (fix round 2, item 1; fix round 3, item 1 —
+// revised again): Python's default is `os.path.dirname(__file__) +
+// "/../.."` — wherever check_files.py's OWN file physically sits, go up
+// two levels to the skills/ root (confirmed against CPython: `__file__`
+// for the `__main__` script is resolved to an absolute path, joining
+// whatever relative script argument `python3` was given with the
+// process's real cwd AT INVOCATION TIME — `python3
+// skills/profile/scripts/check_files.py` from cwd `X` gives `__file__`
+// == `X/skills/profile/scripts/check_files.py`). Every MVP skill's own
+// SKILL.md runs `check_files.py --workspace .` with NO --skills (e.g.
+// skills/apply/SKILL.md's session-close line), so this port must resolve
+// the same default.
 //
 // This function does the SAME two-dirnames-up arithmetic Python does —
-// but on `invokedScriptPath`, a value THIS PORT NEVER COMPUTES ITSELF.
-// Each caller supplies its own caller-appropriate equivalent of
-// `__file__`: `dispatch.mjs`'s `dispatchPython3` reconstructs it from
-// where docs/design-web-agent.md § 4 guarantees the skills bundle is
-// mounted (`<ctx.cwd>/skills/...`) — deliberately ignoring the actual
-// (often fictional, per S12) argv[0] path — and `bin/check_files.mjs`
-// (a Node-only file, like io-node.mjs) uses its own real position on
-// disk. There is deliberately no `import.meta.url`/host-disk-path
-// fallback IN THIS SHARED PORT FILE: that was fix round 1's mistake —
-// it silently pointed at wherever THIS PACKAGE happens to live on the
-// machine running the code, which is meaningless inside just-bash's
-// in-memory filesystem (docs/design-web-agent.md § 4's actual runtime;
-// this is why the round-1 fix passed every case that happened to mirror
-// the host's real disk layout into the sandbox, and failed the one case,
-// `r2-cf-default-skills-design-mount`, that mounts the bundle only where
-// the design doc says it lives), and — a second, independent bug — a raw
-// `new URL(...).pathname` percent-encodes a space in the path (`%20`),
-// which a caller that DOES have a real filesystem path (bin/check_files.mjs)
-// must decode with `fileURLToPath`, not read as `.pathname` directly.
+// but on a script path THIS PORT NEVER COMPUTES ITSELF. Each caller
+// supplies its own caller-appropriate equivalent of `__file__`, via
+// `resolveInvokedScriptPath(workspace)` — a function, not a bare string,
+// because the answer can depend on where the caller resolves things from:
+//
+//   - `bin/check_files.mjs` (a Node-only file, like io-node.mjs) ignores
+//     the workspace argument and always returns its own real position on
+//     disk (there is deliberately no `import.meta.url`/host-disk-path
+//     fallback IN THIS SHARED PORT FILE: that was fix round 1's
+//     mistake — it silently pointed at wherever THIS PACKAGE happens to
+//     live on the machine running the code, meaningless inside
+//     just-bash's in-memory filesystem). A raw `new URL(...).pathname`
+//     also percent-encodes a space in the path (`%20`); bin/check_files.mjs
+//     decodes with `fileURLToPath` instead.
+//   - `dispatch.mjs`'s `dispatchPython3` reconstructs it from where
+//     docs/design-web-agent.md § 4 guarantees the skills bundle is
+//     mounted: `<workspace>/skills/...` — joined against THIS SCRIPT'S
+//     OWN `--workspace` argument (not the shell's cwd at large, and
+//     deliberately ignoring the actual, often fictional per S12, argv[0]
+//     path). Using cwd directly broke the moment the shell's cwd wasn't
+//     the workspace root (fix round 3's `r3-cf-default-skills-from-subdir-cwd`:
+//     `cd applications && check_files.py --workspace ..`) — the
+//     workspace argument, resolved against cwd by the same `io` every
+//     other relative path in this file already goes through, is cwd-depth
+//     independent the way Python's own `__file__` resolution is.
 //
 // `--workspace` is never `~`-expanded (documented, unchanged): rule 9 —
 // the web app never sees a real home directory; fixtures use explicit
@@ -395,20 +402,22 @@ const OPTIONS = [
 /**
  * @param {string[]} argv
  * @param {object} io
- * @param {string} [invokedScriptPath] the caller's equivalent of Python's
- *   `__file__` for check_files.py (see this file's header comment) — only
- *   consulted when `--skills` isn't given. If a caller has none to offer,
- *   `--skills` falls back to `"."` (never silently succeeds with the
- *   wrong root; a caller that truly has nothing better should say so
- *   explicitly rather than this port guessing a host path).
+ * @param {(workspace: string) => string} [resolveInvokedScriptPath] given
+ *   the ALREADY-PARSED `--workspace` value, returns the caller's
+ *   equivalent of Python's `__file__` for check_files.py (see this
+ *   file's header comment) — only consulted when `--skills` isn't given.
+ *   If a caller has none to offer, `--skills` falls back to `"."` (never
+ *   silently succeeds with the wrong root; a caller that truly has
+ *   nothing better should say so explicitly rather than this port
+ *   guessing a host path).
  */
-export async function run(argv, io, invokedScriptPath) {
+export async function run(argv, io, resolveInvokedScriptPath) {
   const parsed = parseFlags(argv, { options: OPTIONS, help: HELP.check_files });
   if (parsed.help) return argHelp(parsed.text);
   if (parsed.error) return argError(PROG, USAGE, parsed.error);
   const a = parsed.args;
 
-  const skillsRoot = a.skills ?? (invokedScriptPath ? skillsRootFromScriptPath(invokedScriptPath) : ".");
+  const skillsRoot = a.skills ?? (resolveInvokedScriptPath ? skillsRootFromScriptPath(resolveInvokedScriptPath(a.workspace)) : ".");
   const schemas = await loadSchemas(io, skillsRoot);
   const fnames = pySortStrings(Object.keys(schemas));
   if (fnames.length === 0) {

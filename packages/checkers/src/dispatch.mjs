@@ -30,10 +30,10 @@ export const CANONICAL_SKILL_PATH = {
   "check_files.py": "profile/scripts/check_files.py",
 };
 
-// name -> (argv, io, now, invokedScriptPath) => Promise<{stdout, stderr, exitCode}>
+// name -> (argv, io, now, resolveInvokedScriptPath) => Promise<{stdout, stderr, exitCode}>
 export const REGISTRY = {
   "check_materials.py": (argv, io) => checkMaterials(argv, io),
-  "check_files.py": (argv, io, now, invokedScriptPath) => checkFiles(argv, io, invokedScriptPath),
+  "check_files.py": (argv, io, now, resolveInvokedScriptPath) => checkFiles(argv, io, resolveInvokedScriptPath),
   "proposal_block.py": (argv, io) => proposalBlock(argv, io),
   "record_verdict.py": (argv, io, now) => recordVerdict(argv, io, now),
   "update_job.py": (argv, io, now) => updateJob(argv, io, now),
@@ -52,19 +52,27 @@ export function basenameOf(p) {
  * (e.g. `check_messages.py`), a bare `-c`, or no argument at all exits 127
  * with a clear message — the same shape a missing command would.
  *
- * `skillsMountRoot` (optional): the directory the skills bundle is
- * mounted at in THIS caller's filesystem — docs/design-web-agent.md § 4:
- * "the bundle mounted read-only at `skills/`" of the sandboxed workspace,
- * i.e. `<cwd>/skills`. When given, it's combined with the matched
- * script's own CANONICAL_SKILL_PATH to reconstruct "where this script's
- * `__file__` would be" — fed to check_files.py's port for its --skills
- * default (fix round 2, item 1), the same way Python computes it from its
- * own `__file__`, and deliberately IGNORING argv[0]'s own (often
- * fictional — see the S12 file-name-only routing above) path. If omitted,
- * the handler falls back to its own caller-appropriate default (see
+ * docs/design-web-agent.md § 4: the skills bundle is mounted read-only at
+ * `<workspace>/skills` of the sandboxed workspace — where `<workspace>`
+ * is THIS SCRIPT'S OWN `--workspace` argument (not the shell's cwd at
+ * large: fix round 3, item 1 — the shell can `cd` below the workspace
+ * root before invoking `python3`, e.g. `cd applications && python3
+ * .../check_files.py --workspace ..`, and Python's own `__file__`
+ * resolution is independent of that; deriving from cwd directly broke
+ * the moment cwd wasn't the workspace root). check_files.py's port is
+ * the only handler that reads this: it's given a resolver function,
+ * `(workspace) => join(workspace, "skills", CANONICAL_SKILL_PATH[name])`
+ * — called AFTER the script has parsed its OWN `--workspace` value — to
+ * reconstruct "where this script's `__file__` would be", fed to
+ * check_files.py's port for its --skills default (fix round 2, item 1),
+ * the same way Python computes it from its own `__file__`, and
+ * deliberately IGNORING argv[0]'s own (often fictional — see the S12
+ * file-name-only routing above) path. If a script has no
+ * CANONICAL_SKILL_PATH entry, the resolver is omitted and the handler
+ * falls back to its own caller-appropriate default (see
  * bin/check_files.mjs for the Node CLI's).
  */
-export async function dispatchPython3(argv, io, now, skillsMountRoot) {
+export async function dispatchPython3(argv, io, now) {
   const scriptArg = argv[0];
   if (!scriptArg) {
     return { stdout: "", stderr: "not available in the web app: (no script given)\n", exitCode: 127 };
@@ -74,7 +82,8 @@ export async function dispatchPython3(argv, io, now, skillsMountRoot) {
   if (!handler) {
     return { stdout: "", stderr: `not available in the web app: ${name}\n`, exitCode: 127 };
   }
-  const invokedScriptPath =
-    skillsMountRoot != null && CANONICAL_SKILL_PATH[name] ? join(skillsMountRoot, "skills", CANONICAL_SKILL_PATH[name]) : undefined;
-  return handler(argv.slice(1), io, now, invokedScriptPath);
+  const resolveInvokedScriptPath = CANONICAL_SKILL_PATH[name]
+    ? (workspace) => join(workspace, "skills", CANONICAL_SKILL_PATH[name])
+    : undefined;
+  return handler(argv.slice(1), io, now, resolveInvokedScriptPath);
 }

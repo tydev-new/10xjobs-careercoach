@@ -35,17 +35,20 @@ export function createTenAuthClient(opts: AuthOptions): SupabaseClient {
  * `origin` fallback given and no env var set, this throws rather than
  * silently sending an auth link to the wrong place.
  */
-export function siteRedirectUrl(origin?: string): string {
+// L4 (fix round 1, lead's ruling): siteRedirectUrl NEVER falls back to a
+// passed origin — VITE_SITE_URL only, or throw. A page origin (e.g. a
+// Vercel preview URL) is not necessarily in Supabase Auth's Redirect URLs
+// allowlist, and falling back to it would send a real auth link somewhere
+// the owner never approved. The parameter is kept (ignored) only so an
+// existing call site isn't forced to change shape; nothing reads it.
+export function siteRedirectUrl(_ignoredOrigin?: string): string {
   // Optional chaining on `import.meta.env` itself, not just the property:
   // under plain Node (this file's own unit tests), `import.meta.env` is
   // undefined — only Vite injects it. Reading `.VITE_SITE_URL` straight
-  // off `undefined` would throw before the `origin` fallback ever ran.
+  // off `undefined` would throw before the check below ever ran.
   const configured = (import.meta.env?.VITE_SITE_URL as string | undefined)?.trim();
   if (configured) return configured;
-  if (origin && origin.trim()) return origin.trim();
-  throw new Error(
-    "siteRedirectUrl: VITE_SITE_URL is not set and no fallback origin was given — refusing to guess redirectTo (§ 8).",
-  );
+  throw new Error("siteRedirectUrl: VITE_SITE_URL is not set — refusing to guess redirectTo (§ 8).");
 }
 
 // A minimal structural subset of SupabaseClient's auth surface — lets the

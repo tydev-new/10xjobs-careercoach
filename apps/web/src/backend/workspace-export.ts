@@ -2,15 +2,50 @@
 // "Export, import, delete (rule 9)"):
 //
 //   - Export: a zip in the exact folder shape (entry = path, bytes as stored).
-//   - Import: a zip into an EMPTY workspace only; one entry failing the path
-//     rules refuses the whole import (blocks zip-slip).
+//   - Import: a zip into an EMPTY workspace only (or one holding only the
+//     app's own root CLAUDE.md, § 7 / fix round 1 M5); one entry failing
+//     the path rules refuses the whole import (blocks zip-slip).
 //
 // Uses fflate (pinned 0.8.3) — a small, dependency-free, browser-safe zip
 // library (no node:* import, works the same in the browser and in Node).
 // No window/document/localStorage.
-import { unzipSync, zipSync, type Zippable } from "fflate";
+//
+// Fix round 1 (lead's rulings, independent tester's findings):
+//   H1 — there is no user-level delete for ten_ws_files, so an import
+//     can't be rolled back once a write lands. Every entry is validated
+//     against the FULL path rules (mirroring the SQL exactly, via
+//     packages/agent's shared path-rules.ts, L1) and the aggregate/
+//     per-entry size and count caps BEFORE any write happens. If a write
+//     still fails partway through (a genuine server-side surprise, since
+//     the up-front pass can't observe true server state), the failure is
+//     WorkspaceImportPartialError, carrying exactly what WAS written —
+//     never a silently partial import.
+//   H2 — the zip's entries are read from the central directory and
+//     size-checked BEFORE inflation (fflate's `unzipSync` filter callback
+//     fires with each entry's declared `originalSize` before it decides
+//     whether to inflate that entry), so a small zip that claims a huge
+//     uncompressed size is refused without ever holding those bytes in
+//     memory. Any single entry over its own cap, or a running total over
+//     an aggregate cap, or the entry count itself, aborts immediately.
+//   M4 — text is decoded with {fatal:true, ignoreBOM:true}: invalid UTF-8
+//     is refused (unsupported_type), and a leading BOM is preserved as
+//     part of the string (so re-encoding on export reproduces it byte for
+//     byte, matching TextEncoder's own BOM behavior).
+//   M5 — a workspace holding only the app-created root CLAUDE.md (§ 7:
+//     "created at first run or import") still counts as empty for import
+//     purposes; a CLAUDE.md entry INSIDE the incoming zip is skipped, with
+//     a note in the result, rather than failing the whole import or
+//     overwriting the app's own bundle-derived copy.
+import { unzipSync, zipSync, type UnzipFileInfo, type Zippable } from "fflate";
 import type { FileInfo, WorkspaceStore } from "../../../../packages/agent/src/types.ts";
-import { isEditableExt, isUploadExt, validateRef } from "../../../../packages/agent/src/workspace/path-rules.ts";
+import {
+  MAX_EDIT_BYTES,
+  MAX_UPLOAD_BYTES,
+  isEditableExt,
+  isReadOnlyPath,
+  isUploadExt,
+  validateRef,
+} from "../../../../packages/agent/src/workspace/path-rules.ts";
 
 export interface ImportError {
   path: string; // the zip entry name as given (not validated/normalized)
@@ -24,6 +59,28 @@ export class WorkspaceImportError extends Error {
     this.name = "WorkspaceImportError";
     this.errors = errors;
   }
+}
+
+/** H1: thrown only once writing has actually started and a write fails
+ *  partway through, after the up-front validation pass already accepted
+ *  the whole zip (so this is a genuine server-side surprise — a race with
+ *  another write, a cap crossed by something else concurrently, etc., not
+ *  a rule this store's own checks should have caught). `written` is
+ *  exactly what landed before the failure; there is no rollback. */
+export class WorkspaceImportPartialError extends Error {
+  written: FileInfo[];
+  constructor(message: string, written: FileInfo[], cause: unknown) {
+    super(message, { cause });
+    this.name = "WorkspaceImportPartialError";
+    this.written = written;
+  }
+}
+
+export interface ImportResult {
+  written: FileInfo[];
+  /** Human-readable notes about entries that were accepted but not
+   *  written verbatim (currently: a skipped CLAUDE.md, M5). */
+  notes: string[];
 }
 
 /** Zip entry names use forward slashes and no leading "./" per the zip
@@ -45,7 +102,9 @@ function toEntryName(path: string): string {
  * itself isn't valid; a real "last modified" isn't part of the
  * WorkspaceStore contract's FileInfo in any exported form, and rule 9's
  * round trip only promises the FILES are byte-identical, not the zip
- * container's timestamps).
+ * container's timestamps). `store.list()` itself pages through every row
+ * (H3, packages/agent's Supabase store), so this never silently truncates
+ * past a single PostgREST page either.
  */
 // fflate reads the year via the LOCAL calendar, so a UTC midnight right at
 // the 1980 boundary can read back as 1979 in a negative-offset timezone;
@@ -101,85 +160,185 @@ async function listAllFiles(store: WorkspaceStore): Promise<FileInfo[]> {
   return [...seen.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
+// ---------------------------------------------------------------------
+// import — aggregate caps mirroring § 2 exactly: 2,000 text files, 50 MB
+// of text; 50 binary objects (<= 500 MB at the 10 MB/file cap). The
+// 2,050 entry-count cap (H2) is the sum, checked directly too as a cheap
+// first guard against a zip with very many tiny/empty entries.
+// ---------------------------------------------------------------------
+
+const MAX_TEXT_FILES = 2000;
+const MAX_TEXT_BYTES_TOTAL = 50 * 1024 * 1024;
+const MAX_OBJECTS = 50;
+const MAX_ENTRIES = MAX_TEXT_FILES + MAX_OBJECTS; // 2,050
+
+interface AdmittedEntry {
+  path: string;
+  zipName: string; // the raw name fflate indexes `entries` by
+  editable: boolean;
+}
+
 /**
- * Import a zip into an EMPTY workspace only (§ 2). Validates every entry
- * against the same path rules every store enforces (validateRef,
- * isEditableExt/isUploadExt) BEFORE writing anything — one bad entry
- * refuses the whole import (blocks zip-slip: a ../ entry, an absolute
- * path, a dotfile segment, or an unsupported extension). Throws
- * `WorkspaceImportError` listing every offending entry if any are found
- * (not just the first), and never partially imports.
+ * Import a zip into an EMPTY workspace, or one holding only the app's own
+ * root CLAUDE.md (§ 2, M5). Validates every entry against the SAME shared
+ * path rules every store enforces (packages/agent/path-rules.ts, mirroring
+ * the SQL exactly, L1), the extension/size caps, and the aggregate caps —
+ * ALL of it before any byte is inflated (H2) and before any write happens
+ * (H1) — so one bad entry, or the zip as a whole being over a cap, refuses
+ * the WHOLE import and writes nothing. `WorkspaceImportError` lists every
+ * offending entry found in the up-front pass (H2's central-directory
+ * check throws on the FIRST violation it reaches, so that list may hold
+ * just one entry for a very large zip — inflating the rest to keep
+ * checking would defeat the point).
  *
- * "Empty workspace only": checked by calling `store.list()` first; a
- * non-empty target throws a plain Error (not WorkspaceImportError, which
- * is reserved for per-entry problems) before touching the zip at all.
+ * "Empty (or CLAUDE.md-only) workspace only": checked by calling
+ * `store.list()` first; anything else throws a plain `Error` (not
+ * `WorkspaceImportError`, which is reserved for per-entry problems)
+ * before touching the zip at all.
  */
-export async function importWorkspace(store: WorkspaceStore, zipBytes: Uint8Array): Promise<FileInfo[]> {
+export async function importWorkspace(store: WorkspaceStore, zipBytes: Uint8Array): Promise<ImportResult> {
   const existing = await store.list();
-  if (existing.length > 0) {
+  const isEmptyOrClaudeMdOnly = existing.length === 0 || (existing.length === 1 && existing[0].path === "CLAUDE.md");
+  if (!isEmptyOrClaudeMdOnly) {
     throw new Error("import refused: the workspace is not empty");
+  }
+
+  const notes: string[] = [];
+  const admitted: AdmittedEntry[] = [];
+  const claimedLower = new Map<string, string>(); // lower(path) -> path, for a readable clash message
+  let entryCount = 0;
+  let textFileCount = 0;
+  let totalTextBytes = 0;
+  let totalObjects = 0;
+
+  function fail(zipName: string, reason: string): never {
+    throw new WorkspaceImportError([{ path: zipName, reason }]);
+  }
+
+  function checkClash(path: string, zipName: string): void {
+    const lower = path.toLowerCase();
+    for (const [otherLower, otherPath] of claimedLower) {
+      if (otherLower === lower) fail(zipName, `path_conflict: case-variant clash with another entry in this import: ${otherPath}`);
+      if (lower.startsWith(`${otherLower}/`)) fail(zipName, `path_conflict: nested under another entry in this import: ${otherPath}`);
+      if (otherLower.startsWith(`${lower}/`)) fail(zipName, `path_conflict: is a folder of another entry in this import: ${otherPath}`);
+    }
   }
 
   let entries: Record<string, Uint8Array>;
   try {
-    entries = unzipSync(zipBytes);
+    entries = unzipSync(zipBytes, {
+      // H2: called with each entry's CENTRAL-DIRECTORY metadata (name,
+      // originalSize) BEFORE fflate decides whether to inflate it — every
+      // check here runs off that metadata (plus running totals), so an
+      // oversized entry, or one that would cross an aggregate cap, is
+      // refused without ever being inflated. Throwing here aborts
+      // unzipSync entirely (fflate does not catch filter's exceptions).
+      filter(file: UnzipFileInfo): boolean {
+        const zipName = file.name;
+        if (zipName.endsWith("/")) return false; // a directory pseudo-entry; nothing to inflate or write
+
+        entryCount++;
+        if (entryCount > MAX_ENTRIES) fail(zipName, `workspace_full: the import has more than ${MAX_ENTRIES} entries`);
+
+        let path: string;
+        try {
+          path = validateRef(zipName);
+        } catch (e) {
+          return fail(zipName, (e as Error).message);
+        }
+
+        if (path === "CLAUDE.md") {
+          // M5: the app owns this file (§ 7); skip it — with a note —
+          // rather than refusing the whole import or overwriting the
+          // bundle-derived copy the app is responsible for.
+          notes.push("CLAUDE.md in the import was skipped: the app's own copy is authoritative (§ 7).");
+          return false;
+        }
+        if (isReadOnlyPath(path)) {
+          return fail(zipName, `not_editable: ${path} is not writable by the agent`);
+        }
+
+        const editable = isEditableExt(path);
+        const uploadable = isUploadExt(path);
+        if (!editable && !uploadable) {
+          return fail(zipName, `unsupported_type: ${path} is not an editable or uploadable file type`);
+        }
+
+        if (editable) {
+          if (file.originalSize > MAX_EDIT_BYTES) {
+            return fail(zipName, `content_too_large: ${path} is over ${MAX_EDIT_BYTES} bytes`);
+          }
+          textFileCount++;
+          if (textFileCount > MAX_TEXT_FILES) {
+            return fail(zipName, `workspace_full: the import has more than ${MAX_TEXT_FILES} text files`);
+          }
+          totalTextBytes += file.originalSize;
+          if (totalTextBytes > MAX_TEXT_BYTES_TOTAL) {
+            return fail(zipName, `workspace_full: the import's text totals more than ${MAX_TEXT_BYTES_TOTAL} bytes`);
+          }
+        } else {
+          if (file.originalSize === 0 || file.originalSize > MAX_UPLOAD_BYTES) {
+            return fail(zipName, `upload_too_large: ${path} must be between 1 byte and ${MAX_UPLOAD_BYTES} bytes`);
+          }
+          totalObjects++;
+          if (totalObjects > MAX_OBJECTS) {
+            return fail(zipName, `workspace_full: the import has more than ${MAX_OBJECTS} binary objects`);
+          }
+        }
+
+        checkClash(path, zipName);
+        claimedLower.set(path.toLowerCase(), path);
+        admitted.push({ path, zipName, editable });
+        return true;
+      },
+    });
   } catch (e) {
+    if (e instanceof WorkspaceImportError) throw e;
     throw new WorkspaceImportError([{ path: "(zip)", reason: `not a valid zip: ${(e as Error).message}` }]);
   }
 
-  // Directory entries (fflate includes a trailing-"/" pseudo-entry for
-  // folders with no zeroed... actually fflate's unzipSync only returns
-  // FILE entries, but a hand-built or foreign zip could still carry a
-  // "dir/" entry with a name ending in "/" and zero bytes; skip it rather
-  // than trying to write a file with a trailing slash.
-  const fileEntries = Object.entries(entries).filter(([name]) => !name.endsWith("/"));
-
-  const errors: ImportError[] = [];
-  const validated: { path: string; bytes: Uint8Array }[] = [];
-  const claimedLower = new Set<string>();
-
-  for (const [name, bytes] of fileEntries) {
-    let path: string;
-    try {
-      path = validateRef(name);
-    } catch (e) {
-      errors.push({ path: name, reason: (e as Error).message });
-      continue;
-    }
-    // Root CLAUDE.md is never written through the ordinary WorkspaceStore.write()
-    // path on ANY backend (path-rules.ts's isReadOnlyPath, unconditionally) — §
-    // 7: "the app creates the root CLAUDE.md before the first agent turn," a
-    // separate, app-owned step from importing candidate files, and Tier 0 is
-    // always the BUNDLED template regardless of the workspace's own copy, so
-    // an imported CLAUDE.md's content doesn't change agent behavior either way.
-    // Skip it here rather than failing the whole import on a not_editable
-    // refusal; the app's own setup step (re)creates it after import.
-    if (path === "CLAUDE.md") continue;
-    if (!isEditableExt(path) && !isUploadExt(path)) {
-      errors.push({ path: name, reason: `unsupported file type: ${path}` });
-      continue;
-    }
-    const lower = path.toLowerCase();
-    if (claimedLower.has(lower)) {
-      errors.push({ path: name, reason: `case-variant clash with another entry: ${path}` });
-      continue;
-    }
-    claimedLower.add(lower);
-    validated.push({ path, bytes });
-  }
-
-  if (errors.length > 0) {
-    throw new WorkspaceImportError(errors);
-  }
-
-  const written: FileInfo[] = [];
-  for (const { path, bytes } of validated) {
-    if (isEditableExt(path)) {
-      const content = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-      written.push(await store.write(path, content, null));
+  // Second pass: every admitted entry is now inflated (fflate already did
+  // that for entries the filter returned true for) — decode text strictly
+  // (M4). This can only be checked after inflation (bytes, not metadata),
+  // so it's a second, separate refusal point; still entirely before any
+  // write() / upload() call.
+  const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+  const toWrite: { path: string; content?: string; bytes?: Uint8Array }[] = [];
+  for (const a of admitted) {
+    const bytes = entries[a.zipName];
+    if (a.editable) {
+      let content: string;
+      try {
+        content = decoder.decode(bytes);
+      } catch {
+        throw new WorkspaceImportError([{ path: a.zipName, reason: `unsupported_type: ${a.path} is not valid UTF-8` }]);
+      }
+      toWrite.push({ path: a.path, content });
     } else {
-      written.push(await store.upload(path, bytes));
+      toWrite.push({ path: a.path, bytes });
     }
   }
-  return written;
+
+  // H1: only now, after every entry passed both validation passes, do any
+  // writes happen. If one still fails (a genuine server-side surprise —
+  // there's no way to roll back a partial import, so this is reported
+  // explicitly rather than left silent.
+  const written: FileInfo[] = [];
+  try {
+    for (const w of toWrite) {
+      if (w.content !== undefined) {
+        written.push(await store.write(w.path, w.content, null));
+      } else {
+        written.push(await store.upload(w.path, w.bytes!));
+      }
+    }
+  } catch (e) {
+    throw new WorkspaceImportPartialError(
+      `import failed after writing ${written.length} of ${toWrite.length} entr${toWrite.length === 1 ? "y" : "ies"}: ${(e as Error).message}`,
+      written,
+      e,
+    );
+  }
+
+  return { written, notes };
 }

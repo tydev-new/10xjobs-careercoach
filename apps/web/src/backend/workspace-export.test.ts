@@ -38,8 +38,9 @@ test("importWorkspace() into an empty store writes every entry", async () => {
     "documents/notes.txt": new TextEncoder().encode("hi"),
     "documents/resume.pdf": new TextEncoder().encode("%PDF-1.4 x"),
   });
-  const written = await importWorkspace(store, zip);
+  const { written, notes } = await importWorkspace(store, zip);
   assert.equal(written.length, 3);
+  assert.deepEqual(notes, []);
   const read = await store.read("plan.md");
   if (!read.binary) assert.equal(read.content, "# Plan\n");
   const pdf = await store.read("documents/resume.pdf");
@@ -79,8 +80,10 @@ test("importWorkspace() skips a root CLAUDE.md entry (the app owns creating it s
     "plan.md": new TextEncoder().encode("good"),
     "CLAUDE.md": new TextEncoder().encode("guardrails"),
   });
-  const written = await importWorkspace(store, zip);
+  const { written, notes } = await importWorkspace(store, zip);
   assert.deepEqual(written.map((f) => f.path), ["plan.md"]);
+  assert.equal(notes.length, 1);
+  assert.match(notes[0], /CLAUDE\.md/);
   await assert.rejects(store.read("CLAUDE.md"), (e: any) => e.code === "resource_missing");
 });
 

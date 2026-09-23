@@ -34,12 +34,15 @@ function fakeClient(overrides: Partial<AuthClientLike["auth"]> = {}, rpcImpl?: A
 // siteRedirectUrl — § 8's "every auth link passes redirectTo"
 // ---------------------------------------------------------------------
 
-test("siteRedirectUrl: with no VITE_SITE_URL and no origin given, throws (never silently guesses)", () => {
+test("siteRedirectUrl: with no VITE_SITE_URL set, throws (never silently guesses)", () => {
   assert.throws(() => siteRedirectUrl(), /VITE_SITE_URL/);
 });
 
-test("siteRedirectUrl: falls back to the given origin when VITE_SITE_URL is unset", () => {
-  assert.equal(siteRedirectUrl("http://localhost:5173"), "http://localhost:5173");
+// L4 (fix round 1): never falls back to a passed origin, even when
+// VITE_SITE_URL is unset — a page origin isn't necessarily in Supabase
+// Auth's Redirect URLs allowlist.
+test("siteRedirectUrl: an origin argument is ignored entirely — still throws with VITE_SITE_URL unset", () => {
+  assert.throws(() => siteRedirectUrl("http://localhost:5173"), /VITE_SITE_URL/);
 });
 
 // ---------------------------------------------------------------------

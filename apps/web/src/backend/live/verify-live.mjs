@@ -258,6 +258,39 @@ async function main() {
     const hasBinary = paths.includes("documents/cv.pdf");
     pass(hasText && hasBinary, "ws-list-merges-both", "A's store.list() includes both the text row and the Storage object", `paths=${JSON.stringify(paths)}`);
   }
+
+  // ===================== H3: list() pages past PostgREST's 1,000-row default (fix round 1) =====================
+  // The tester's PGlite stand-in (tests/store/pglite-backend.ts) doesn't
+  // implement offset/keyset pagination for GET /rest/v1/ten_ws_files (only
+  // `select` and `path=eq.X`), so this can only be proven against the REAL
+  // project — this is that proof. Seeds 1,005 extra rows for A (service
+  // role) so A's total is 1,006 text rows + 2 (plan.md, documents/cv.pdf
+  // already written above) = 1,008, past the 1,000-row default page.
+  {
+    const rows = [];
+    for (let i = 0; i < 1005; i++) {
+      const content = `bulk ${i}\n`;
+      rows.push({
+        user_id: uidA,
+        path: `bulk/f${String(i).padStart(4, "0")}.md`,
+        content,
+        version: crypto.createHash("sha256").update(content, "utf8").digest("hex").slice(0, 16),
+      });
+    }
+    const ins = await admin.from("ten_ws_files").insert(rows);
+    if (!pass(!ins.error, "ws-paginate-seed", "seed 1,005 extra text rows for A via service role", ins.error?.message)) {
+      // fall through — the next check will report the shortfall honestly
+    }
+    const cnt = await admin.from("ten_ws_files").select("path", { count: "exact", head: true }).eq("user_id", uidA);
+    const listedA = await storeA.list();
+    const textCount = listedA.filter((f) => f.path.endsWith(".md") || f.path.endsWith(".txt") || f.path.endsWith(".json") || f.path.endsWith(".html")).length;
+    pass(
+      textCount === cnt.count,
+      "ws-paginate-list",
+      `store.list() returns every text row past the 1,000-row PostgREST page (A has ${cnt.count} rows)`,
+      `list() text entries=${textCount}`,
+    );
+  }
 }
 
 async function cleanup() {

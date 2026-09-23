@@ -170,28 +170,47 @@ interface TenWsFileRow {
   updated_at: string;
 }
 
+// PostgREST's own page cap (Supabase's default db-max-rows is 1000); a
+// workspace can hold up to 2,000 text files (§ 2's cap), so one request is
+// not enough — fix round 1, H3: "list() and export page through
+// ten_ws_files with a stable order (path) until exhausted; never silently
+// truncate." `order=path.asc` is explicit (PostgREST gives no ordering
+// guarantee without it), and pagination is KEYSET (`path=gt.<cursor>`),
+// not offset-based: `path` is part of the row's own primary key
+// `(user_id, path)`, so it is a stable, always-advancing cursor — no
+// "page N" can ever repeat or skip a row, and (unlike offset) it can't
+// silently loop forever against a backend that doesn't honor offset.
+const LIST_PAGE_SIZE = 1000;
+
 async function listText(o: Internal, prefix: string): Promise<FileInfo[]> {
   const token = await o.accessToken();
-  const res = await o.fetchImpl(`${o.url}/rest/v1/ten_ws_files?select=path,content,version,updated_at`, {
-    headers: { apikey: o.anonKey, Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    throw new Error(`list (ten_ws_files) failed: HTTP ${res.status} ${await res.text()}`);
-  }
-  const rows = (await res.json()) as TenWsFileRow[];
   const out: FileInfo[] = [];
-  for (const row of rows) {
-    if (prefix && !row.path.startsWith(prefix)) continue;
-    const rest = prefix ? row.path.slice(prefix.length) : row.path;
-    // depth <= 3 from the listed dir, matching in-memory-store.ts's rule.
-    if (rest.split("/").length > 4) continue;
-    out.push({
-      path: row.path,
-      version: row.version,
-      size: byteSize(row.content),
-      updatedAt: row.updated_at,
-      editable: isEditableExt(row.path) && !isReadOnlyPath(row.path),
-    });
+  let cursor: string | null = null;
+  for (;;) {
+    const pathQuery = cursor ? `&path=gt.${encodeURIComponent(cursor)}` : "";
+    const res = await o.fetchImpl(
+      `${o.url}/rest/v1/ten_ws_files?select=path,content,version,updated_at&order=path.asc&limit=${LIST_PAGE_SIZE}${pathQuery}`,
+      { headers: { apikey: o.anonKey, Authorization: `Bearer ${token}` } },
+    );
+    if (!res.ok) {
+      throw new Error(`list (ten_ws_files) failed: HTTP ${res.status} ${await res.text()}`);
+    }
+    const rows = (await res.json()) as TenWsFileRow[];
+    for (const row of rows) {
+      if (prefix && !row.path.startsWith(prefix)) continue;
+      const rest = prefix ? row.path.slice(prefix.length) : row.path;
+      // depth <= 3 from the listed dir, matching in-memory-store.ts's rule.
+      if (rest.split("/").length > 4) continue;
+      out.push({
+        path: row.path,
+        version: row.version,
+        size: byteSize(row.content),
+        updatedAt: row.updated_at,
+        editable: isEditableExt(row.path) && !isReadOnlyPath(row.path),
+      });
+    }
+    if (rows.length < LIST_PAGE_SIZE) break; // exhausted
+    cursor = rows[rows.length - 1].path;
   }
   return out;
 }
@@ -221,7 +240,14 @@ async function listBinaries(o: Internal, prefix: string): Promise<FileInfo[]> {
       },
       body: JSON.stringify({ prefix: storagePrefix, limit: 1000, offset: 0, sortBy: { column: "name", order: "asc" } }),
     });
-    if (!res.ok) return; // an absent "directory" lists as empty, not an error
+    if (!res.ok) {
+      // M2 (fix round 1): a failed Storage list is an ERROR, never treated
+      // as empty — a prefix with genuinely no objects still answers 200
+      // with `[]` (it's a query, not an existence check), so any non-2xx
+      // here is a real failure (network, auth, 5xx) that must not be
+      // silently swallowed into "no binaries" (a wrong, truncated list()).
+      throw new Error(`list (storage) failed: HTTP ${res.status} ${await res.text()}`);
+    }
     const entries = (await res.json()) as StorageListEntry[];
     for (const e of entries) {
       const childRel = relDir ? `${relDir}/${e.name}` : e.name;
@@ -379,8 +405,10 @@ async function uploadOne(o: Internal, rawPath: string, bytes: Uint8Array): Promi
   const token = await o.accessToken();
   const objectPath = `users/${o.userId}/ws/${relPath}`;
   const mime = UPLOAD_MIME[extOf(relPath)] ?? "application/octet-stream";
-  // No x-upsert header (§ 2: "no x-upsert; a clash is a 409, per spike 3") —
-  // create-only is the default.
+  // No x-upsert header — create-only is the default. (§ 2 says "a clash is
+  // a 409, per spike 3"; L2, fix round 1: confirmed the OUTER status is
+  // actually 400, with a nested `statusCode: "409"` in the body — see the
+  // duplicate-upload handling below, verified live.)
   const res = await o.fetchImpl(`${o.url}/storage/v1/object/${TEN_WORKSPACES_BUCKET}/${encodeObjectPath(objectPath)}`, {
     method: "POST",
     headers: {
@@ -397,11 +425,20 @@ async function uploadOne(o: Internal, rawPath: string, bytes: Uint8Array): Promi
     body: new Blob([bytes as unknown as ArrayBuffer]),
   });
   if (res.status === 200 || res.status === 201) {
-    const respBody = (await res.json().catch(() => ({}))) as { Id?: string };
-    const etag = res.headers.get("etag") ?? respBody.Id ?? "";
+    // M1 (fix round 1): a binary's version IS its ETag, identical between
+    // upload(), list() and read() — the upload response itself carries no
+    // ETag header (confirmed live, § 2's header note), only `{ Id, Key }`,
+    // so `Id` is NOT a fair stand-in for the version list()/read() will
+    // report later. Fetch the object back (the only metadata route this
+    // store relies on — no HEAD/info endpoint assumed) so all three agree
+    // by construction.
+    const etagFromUploadResponse = res.headers.get("etag");
+    const version = etagFromUploadResponse
+      ? normalizeEtag(etagFromUploadResponse)
+      : (await readBinary(o, relPath)).version;
     return {
       path: relPath,
-      version: normalizeEtag(etag),
+      version,
       size: bytes.byteLength,
       updatedAt: new Date().toISOString(),
       editable: false,

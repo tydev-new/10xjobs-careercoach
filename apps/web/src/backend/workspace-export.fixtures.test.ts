@@ -72,7 +72,7 @@ test("import -> export round trip is byte-identical on the step 2 fixture", asyn
   const zipIn = zipSync(original);
 
   const store = createInMemoryWorkspaceStore();
-  const written = await importWorkspace(store, zipIn);
+  const { written } = await importWorkspace(store, zipIn);
   assert.equal(written.length, Object.keys(original).length, "every fixture file should have been written");
 
   const zipOut = await exportWorkspace(store);

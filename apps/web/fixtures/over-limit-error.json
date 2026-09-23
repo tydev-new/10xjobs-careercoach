@@ -1,7 +1,7 @@
 {
   "meta": {
     "persona": "Sam Okafor (invented) — sam.okafor.demo@example.com, 555-0119",
-    "description": "A batch evaluation run stops mid-way when OpenRouter actually rejects a call over the balance — the real over-balance mechanism (a real rejection mid-run), not a pre-check. Each exit-0 record_verdict call gets its own verdict card, props built from that call's real output and the jobs.md row it wrote (company, title, verdict, score, reason; no track/dealbreakers/ref since neither call passed --track/--dealbreakers/--jd-file). files holds the real jobs.md produced by actually running record_verdict.py for the two roles that finished before the run stopped."
+    "description": "A batch evaluation run stops mid-way when the model proxy refuses the NEXT call because the balance is not above 0 (design-web-agent.md § 8) — a pre-call refusal, not OpenRouter rejecting a call mid-run. So there is no model reply after it: the turn ends right after the second role's verdict card, with no trailing tool call and no trailing text (design-web-ui.md § 2.5/§ 4 — never a reply composed after the refusal). Each exit-0 record_verdict call gets its own verdict card, props built from that call's real output and the jobs.md row it wrote (company, title, verdict, score, reason; no track/dealbreakers/ref since neither call passed --track/--dealbreakers/--jd-file). files holds the real jobs.md produced by actually running record_verdict.py for the two roles that finished before the run stopped."
   },
   "files": {"jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 2** · dismissed: 0 · updated 2026-09-22\n\n## To Review\n\n### Meridian Labs — Product Lead\n- Seen: 2026-09-22T22:22:26+00:00\n- Updated: 2026-09-22T22:22:26+00:00\n- Verdict: investable_stretch\n- Score: 64\n- Reason: Series B stage matches target; one leveling gap\n- Evaluated: 2026-09-22T22:22:26+00:00\n\n### Solterra Robotics — Group PM\n- Seen: 2026-09-22T22:22:26+00:00\n- Updated: 2026-09-22T22:22:26+00:00\n- Verdict: weak\n- Score: 31\n- Reason: Hardware-heavy roadmap, little overlap with candidate's SaaS background\n- Evaluated: 2026-09-22T22:22:26+00:00\n"},
   "messages": [
@@ -59,15 +59,11 @@
           "reason": "Hardware-heavy roadmap, little overlap with candidate's SaaS background"
         } } },
         { "type": "text", "text": "Solterra Robotics – Group PM: recorded as Weak Fit. Moving to the next one." },
-        { "type": "tool-web_search", "toolCallId": "call-6", "state": "output-error",
-          "input": { "query": "Cascadia Freight leadership team", "maxResults": 5 },
-          "errorText": "OpenRouter request rejected: credit limit reached (402)" },
         { "type": "data-error", "data": {
           "code": "over_balance",
-          "message": "You're out of balance for now.",
+          "message": "Your beta credit is used up. Ask the person who invited you for more.",
           "retryable": false
-        } },
-        { "type": "text", "text": "I got through 2 roles — Meridian Labs and Solterra Robotics, both recorded in jobs.md — before OpenRouter rejected the next call over your balance. My estimate was wrong: I said $0.60–$0.90 against your $1.00 balance, and it ran out after 2 of 8. Add funds and I'll pick up on the rest of what you sent." }
+        } }
       ]
     }
   ]

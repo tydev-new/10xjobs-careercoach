@@ -1,5 +1,5 @@
 import { useChat } from "@ai-sdk/react";
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { latestGateStatuses, statusOf } from "./agent-helpers.ts";
 import { Composer } from "./components/Composer";
 import { Header } from "./components/Header";
@@ -8,26 +8,35 @@ import { Transcript } from "./components/Transcript";
 import type { FixtureEntry } from "./fixtures";
 import { MockChatTransport } from "./mock-transport.ts";
 import { FixtureStore } from "./store.ts";
-import type { AppMessage, CostCardProps, DataCardData, FileRead } from "./types.ts";
+import type { AppMessage, DataCardData, DataErrorData, FileRead } from "./types.ts";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** The candidate's balance: only ever a number a streamed part or the
- *  store itself provides (L1) — never an invented figure. `undefined`
- *  means unknown, and the chip renders "—". */
-function currentBalance(messages: AppMessage[], startingBalance: number | undefined): number | undefined {
-  let balance: number | undefined;
-  for (const message of messages) {
-    for (const part of message.parts as Array<Record<string, unknown>>) {
-      if (part.type === "data-card") {
-        const data = part.data as DataCardData;
-        if (data.card === "cost") balance = (data.props as CostCardProps).balanceUsd;
-      }
-    }
-  }
-  return balance ?? startingBalance;
+/** S2 (docs/reviews/proxy-change-review.md): the chip reads `deps.balance()`
+ *  (C § 8), not the latest `cost` card — those were two sources for one
+ *  number. In this mock there's no live ledger, so `balance()` (called by
+ *  ChatShell below, never derived reactively from `messages` on every
+ *  render) has exactly two honest sources, in order:
+ *  1. an `over_balance` refusal already on screen means the real balance
+ *     is not above 0 right now (design-web-agent.md § 8's own proxy
+ *     check) — so the chip shows $0.00, whatever any earlier estimate
+ *     said (design-web-ui.md § 2.5/§ 2.7);
+ *  2. otherwise the store's own declared balance (its mock stand-in for
+ *     the ledger, § 2's `store.balance()`) — never an invented number (L1).
+ *  `undefined` means unknown, and the chip renders "—". */
+async function readBalance(
+  messages: AppMessage[],
+  store: FixtureStore
+): Promise<number | undefined> {
+  const hasOverBalance = messages.some((message) =>
+    (message.parts as Array<Record<string, unknown>>).some(
+      (part) => part.type === "data-error" && (part.data as DataErrorData).code === "over_balance"
+    )
+  );
+  if (hasOverBalance) return 0;
+  return store.balance();
 }
 
 function extractText(message: AppMessage): string {
@@ -65,6 +74,7 @@ export function ChatShell({
   const [openRef, setOpenRef] = useState<string | undefined>(undefined);
   const [openFile, setOpenFile] = useState<FileRead | undefined>(undefined);
   const [panelOpenOnPhone, setPanelOpenOnPhone] = useState(false);
+  const [balanceUsd, setBalanceUsd] = useState<number | undefined>(undefined);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const statusRef = useRef(status);
   statusRef.current = status;
@@ -72,7 +82,27 @@ export function ChatShell({
   messagesRef.current = messages;
 
   const currentStatus = statusOf(messages, status);
-  const balanceUsd = currentBalance(messages, store.startingBalanceUsd());
+
+  // balance() is read at the moments design-web-agent.md § 8 names for the
+  // real deps.balance(): once on mount/fixture change, at the end of each
+  // turn, and on window focus — never recomputed on every render off
+  // `messages` (S2). See readBalance's own comment above.
+  const refreshBalance = useCallback(() => {
+    void readBalance(messagesRef.current, store).then(setBalanceUsd);
+  }, [store]);
+
+  useEffect(() => {
+    refreshBalance();
+  }, [refreshBalance]);
+
+  useEffect(() => {
+    if (status === "ready" || status === "error") refreshBalance();
+  }, [status, refreshBalance]);
+
+  useEffect(() => {
+    window.addEventListener("focus", refreshBalance);
+    return () => window.removeEventListener("focus", refreshBalance);
+  }, [refreshBalance]);
 
   // The side panel opens the file the last-emitted card with a ref points
   // at (design-web-ui.md § 1.1). Never reads the fixture directly — only

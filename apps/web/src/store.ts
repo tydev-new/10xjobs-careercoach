@@ -89,13 +89,16 @@ export class FixtureStore implements WorkspaceStore {
     return this.toFileInfo(path, entry);
   }
 
-  /** Mock-preview-only extension, not part of C § 2: the fixture's own
-   *  explicit `meta.startingBalanceUsd`, if it has one. Real balance always
-   *  comes from deps.balance() (C § 8) or a streamed cost card — this
-   *  covers only the one case neither can: the very first screen, before
-   *  any turn has run. `undefined` means "unknown", which the UI renders
-   *  as "—" (L1), never an invented number. */
-  startingBalanceUsd(): number | undefined {
+  /** Mock-preview-only extension, not part of C § 2 — the mock's stand-in
+   *  for `deps.balance()` (C § 8): async, and read by ChatShell at the
+   *  same moments the real one is (turn end, window focus, and once on
+   *  mount), never scanned live off the latest streamed `cost` card
+   *  (S2, docs/reviews/proxy-change-review.md — those were two sources
+   *  for one number). This mock has no real ledger, so it can only ever
+   *  return the fixture's own explicit `meta.startingBalanceUsd` — never
+   *  an invented number (L1). `undefined` means "unknown", which the UI
+   *  renders as "—". */
+  async balance(): Promise<number | undefined> {
     return this.declaredStartingBalanceUsd;
   }
 

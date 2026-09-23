@@ -63,7 +63,13 @@ for (const vp of [{ width: 1280, height: 800, tag: "desktop" }, { width: 375, he
   rec((await avatarState(page)) === "idle", T("empty-first-run avatar idle"));
   const emptyText = await page.locator(".empty-state").innerText();
   rec(/anything of yours yet/.test(emptyText), T("empty-first-run static line"), emptyText.slice(0, 60));
-  rec((await page.locator(".balance-chip").innerText()) === "$0.00", T("empty-first-run balance $0.00"));
+  rec((await page.locator(".balance-chip").innerText()) === "$5.00", T("empty-first-run: a member starts at $5.00 (ui § 1.5)"), await page.locator(".balance-chip").innerText());
+  // ui § 1.1: the ⋯ menu has no usage-key item
+  await page.locator(".menu-trigger").click();
+  const menu = (await page.locator(".menu-panel").innerText()).split("\n").map((x) => x.trim()).filter(Boolean);
+  rec(!menu.some((x) => /usage key/i.test(x)), T('menu has no "Manage your usage key"'), JSON.stringify(menu));
+  rec(!/usage key/i.test(await page.locator("body").innerText()), T('no "usage key" text anywhere on screen'));
+  await page.locator(".menu-trigger").click();
 
   // ---- mvp journey, typed by hand
   await select(page, "mvp-journey");
@@ -181,7 +187,15 @@ for (const vp of [{ width: 1280, height: 800, tag: "desktop" }, { width: 375, he
   await select(page, "over-limit-error");
   await playTyped(page, "over-limit-error");
   const err = await page.locator(".card--error").innerText();
-  rec(err.includes("over_balance") && err.includes("You're out of balance for now."), T("error card renders code + message verbatim"), err.replace(/\n/g, " | "));
+  rec(err.includes("over_balance") && err.includes("Your beta credit is used up. Ask the person who invited you for more.") && !/add funds/i.test(err), T("error card renders code + the proxy's message verbatim, no next-step line"), err.replace(/\n/g, " | "));
+  // ui § 2.5: a pre-call refusal -> no model reply after it (the error card is the last thing in the turn, and no later turn)
+  const lastChildIsError = await page.locator(".bubble--assistant").last().evaluate((b) => b.lastElementChild?.classList.contains("card--error"));
+  const bubblesAfter = await page.evaluate(() => { const e = document.querySelector(".card--error"); const all = [...document.querySelectorAll(".bubble")]; return all.length - 1 - all.indexOf(e.closest(".bubble")); });
+  rec(lastChildIsError && bubblesAfter === 0, T("nothing from the model after the over_balance refusal"), `lastChildIsError=${lastChildIsError} bubblesAfter=${bubblesAfter}`);
+  rec((await page.locator(".balance-chip").innerText()) === "$0.00", T("chip reads $0.00 once over_balance is on screen"), await page.locator(".balance-chip").innerText());
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await page.waitForTimeout(200);
+  rec((await page.locator(".balance-chip").innerText()) === "$0.00", T("chip still $0.00 after a window-focus re-read"));
   rec((await count(page, ".card--cost")) === 1, T("cost card renders"), await page.locator(".card--cost").innerText());
   rec((await avatarState(page)) === "done", T("after error turn avatar = done"));
 

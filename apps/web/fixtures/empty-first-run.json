@@ -1,8 +1,8 @@
 {
   "meta": {
     "persona": "none yet — a brand-new sign-in with no workspace files",
-    "description": "The empty / first-run state (design-web-ui.md § 1.5). messages is empty on purpose: the greeting is static UI text naming the $0 starting balance, never a UIMessage and never sent to or from the model (design-web-agent.md § 8). The avatar reads idle because no turn has run in this chat. files is empty, since no workspace exists yet.",
-    "startingBalanceUsd": 0
+    "description": "The empty / first-run state (design-web-ui.md § 1.5). messages is empty on purpose: the greeting is static UI text, never a UIMessage and never sent to or from the model (design-web-agent.md § 8). The avatar reads idle because no turn has run in this chat. files is empty, since no workspace exists yet. The chip reads $5.00 — a member's credit row starts at $5.00 (design-web-agent.md § 8, owner 2026-09-23), not $0.",
+    "startingBalanceUsd": 5
   },
   "files": {},
   "messages": []

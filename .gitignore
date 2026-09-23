@@ -9,3 +9,5 @@ dist/
 .env
 .env.*
 *.env.local
+# Vercel project link (IDs); never commit
+.vercel/

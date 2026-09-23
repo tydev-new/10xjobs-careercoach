@@ -351,6 +351,8 @@ generations (4, 4.5, 4.6, 5 all postdate it on OpenRouter's own listing).
   helper, and must pin the `{unified, raw}` finish-reason shape in any
   fixtures it writes.
 - **Runtime-key pattern**: `packages/agent`'s `Deps` (per `design-web-agent.md`)
+  (superseded 2026-09-23 by design-web-agent.md § 8: no key reaches the
+  browser; the model goes through `ten-model-proxy` with the session JWT)
   should take the OpenRouter key as an injected value, never read it via
   a bundler env substitution — this spike's `getRuntimeInterceptKey`/
   `getRuntimeRealKey` split (dummy-for-tests vs real-for-live) is a

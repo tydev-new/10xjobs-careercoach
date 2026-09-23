@@ -1,0 +1,22 @@
+{
+  "name": "@10xjobs/agent",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "packages/agent — the shared coach loop (docs/design-web-agent.md). No window/document/localStorage/node:* imports in src/.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@openrouter/ai-sdk-provider": "3.1.0",
+    "ai": "7.0.111"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.2",
+    "typescript": "5.9.3"
+  }
+}

@@ -11,7 +11,7 @@ Read in this order.
 | [`design-cross-host-active-context.md`](design-cross-host-active-context.md) | the agreed simple context handoff shared across agent hosts |
 | [`plan-cross-host-workspace-interface.md`](plan-cross-host-workspace-interface.md) | implementation order with OpenClaw and cloud WebUI integration last |
 | [`plan-portable-skills-and-web-agent.md`](plan-portable-skills-and-web-agent.md) | portable skills, measured simplification, and the web agent MVP steps |
-| [`design-web-agent.md`](design-web-agent.md) | the web MVP's contracts: agent package, store, gate, tools, checker ports, transport, loading, key and balance |
+| [`design-web-agent.md`](design-web-agent.md) | the web MVP's contracts: agent package, store, gate, tools, checker ports, transport, loading, model proxy and balance |
 | [`design-web-ui.md`](design-web-ui.md) | the web MVP's screen, cards, and fixture conversations |
 | [`skill-shape.md`](skill-shape.md) | the five-file shape every skill follows, and how to convert one |
 | [`PROCESS.md`](PROCESS.md) | the ritual for changing anything |

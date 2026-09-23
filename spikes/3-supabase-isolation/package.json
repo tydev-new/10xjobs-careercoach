@@ -1,0 +1,12 @@
+{
+  "name": "spike-3-supabase-isolation",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.58.0"
+  }
+}

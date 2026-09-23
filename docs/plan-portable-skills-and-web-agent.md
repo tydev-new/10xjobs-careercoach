@@ -108,7 +108,8 @@ this step exits.
 
 - [ ] all 4 spike notes say pass. A fail changes the design before step 2 (a
       fail on spike 2 triggers the Pyodide fallback)
-- [ ] **O approves** the contracts and the fixture screens
+- [ ] **O approves** the contracts and the fixture screens (UI design and the
+      mock-preview screens approved 2026-09-22; contracts pending)
 - [ ] a GitHub issue opened with the steps as checkboxes
 
 ### Step 2 - Workspace and auth on Supabase · Co, Te

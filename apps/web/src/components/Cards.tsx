@@ -106,10 +106,16 @@ function DocumentCard({
 }): ReactElement {
   return (
     <div className="card card--document">
+      {/* The file name IS the receipt (design-web-ui-refresh.md — the
+          ChatGPT file-edit-card pattern, filename-led): rule#8, no
+          field this card didn't get from `props`/`ref`. */}
       <div className="card-title">
-        Document — {props.words} words · checker{" "}
-        <span className={`badge badge--${props.checker}`}>{props.checker}</span>
+        {fileRef ? <span className="card-title-file">{fileRef}</span> : "Document"}
       </div>
+      <p className="card-meta">
+        {props.words} words · checker{" "}
+        <span className={`badge badge--${props.checker}`}>{props.checker}</span>
+      </p>
       <div className="card-actions">
         {fileRef ? <OpenInPanel onOpen={() => onOpen(fileRef)} /> : null}
         {props.htmlPath && import.meta.env.VITE_HIDE_PRINT !== "1" ? (
@@ -139,12 +145,14 @@ function CheckerCard({
   return (
     <div className="card card--checker">
       <div className="card-title">
-        {props.label} {props.name}:{" "}
+        {props.label} <span className="card-title-file">{props.name}</span>
+      </div>
+      <p className="card-meta">
         <span className={`badge badge--${props.status === "pass" ? "pass" : "fail"}`}>
           {props.status}
         </span>{" "}
         ({props.failCount} fail, {props.warnCount} warn)
-      </div>
+      </p>
       {clean ? (
         <p className="card-body">clean</p>
       ) : (

@@ -1,36 +1,106 @@
+/* =====================================================================
+   Design tokens (docs/design-web-ui-refresh.md owns the rationale for
+   every value here — this file only implements it). Color, type, space,
+   radius and motion each have one light and one dark value; nothing in
+   this file uses a raw hex/px outside this block.
+   ===================================================================== */
 :root {
-  --bg: #f7f7f5;
+  /* ---- Color: surface, text, border ---- */
+  --bg: #faf9f6;
   --bg-panel: #ffffff;
-  --fg: #1d1d1f;
-  --fg-muted: #6b6b70;
-  --border: #e2e2e0;
-  --accent: #2f6fed;
-  --accent-soft: #e8f0fe;
-  --amber: #b9770e;
-  --amber-soft: #fdf1de;
+  --bg-sunken: #f1efe9; /* code/quote blocks, the composer pill's own fill */
+  --fg: #1b1b1d;
+  --fg-muted: #6a6a6f;
+  --border: #e5e2dc;
+
+  /* ---- Color: one accent, used sparingly (design-references.md
+     "Patterns across the set" — one accent, once per screen) ---- */
+  --accent: #2f5fcb;
+  --accent-soft: #e8eefc;
+  --on-accent: #ffffff;
+
+  /* ---- Color: category marks, never severity (Things 3 — a leading
+     mark names WHICH list, not how urgent it is; § 2.4 keeps FAIL out
+     of alarm-red for the same reason) ---- */
+  --amber: #8a5a0a;
+  --amber-soft: #fbefdb;
   --green: #1e7e34;
   --green-soft: #e6f4ea;
   --red: #a5372d;
   --red-soft: #fbe9e7;
-  --code-bg: #f0f0ee;
-  --radius: 10px;
+  --code-bg: #f1f0ec;
+
+  /* ---- Type: three families, each an openly licensed (SIL OFL) face
+     bundled via @fontsource, never loaded from an external font CDN.
+     Fallback stacks are named so a slow/blocked font load still reads
+     as the right kind of type. ---- */
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-serif: "Source Serif 4 Variable", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* ---- Type scale (px) ---- */
+  --text-2xs: 11px;
+  --text-xs: 12.5px;
+  --text-sm: 13.5px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 17.5px;
+  --text-xl: 21px;
+  --text-2xl: 27px;
+
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-normal: 1.6;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ---- Spacing (4px base) ---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---- Radius ---- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --radius: var(--radius-md); /* legacy alias, still read by a few rules below */
+
+  /* ---- Motion ---- */
+  --duration-fast: 120ms;
+  --duration-base: 220ms;
+  --duration-slow: 2400ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-linear: linear;
 }
 
 [data-theme="dark"] {
-  --bg: #17181a;
-  --bg-panel: #1f2023;
-  --fg: #e9e9ea;
-  --fg-muted: #9a9aa0;
-  --border: #303236;
-  --accent: #6ea1ff;
+  --bg: #161616;
+  --bg-panel: #1e1e1f;
+  --bg-sunken: #29292b;
+  --fg: #ececea;
+  --fg-muted: #a3a2a0;
+  --border: #302f2d;
+
+  --accent: #8fafef;
   --accent-soft: #22314f;
-  --amber: #e0a63c;
-  --amber-soft: #3a2f13;
-  --green: #6fcf87;
-  --green-soft: #16321f;
-  --red: #e28277;
-  --red-soft: #3a1c19;
-  --code-bg: #2a2b2f;
+  --on-accent: #12141a;
+
+  --amber: #e3ae5c;
+  --amber-soft: #3a2c12;
+  --green: #7ed18f;
+  --green-soft: #173420;
+  --red: #e2897c;
+  --red-soft: #3b1d19;
+  --code-bg: #232324;
 }
 
 * {
@@ -45,7 +115,10 @@ body,
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* The theme lives on this wrapper (data-theme="light"|"dark"), not on
@@ -62,9 +135,20 @@ button {
   cursor: pointer;
 }
 
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+/* L4 (phone, keyboard up): a fixed 100vh doesn't shrink when the mobile
+   keyboard opens, so the composer can end up pinned below the visible
+   viewport. 100dvh (the visual/dynamic viewport) does — this is the one
+   line that keeps the composer in reach; the vh line stays first as a
+   fallback for the handful of engines without dvh support. */
 .app-shell {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 
@@ -82,31 +166,33 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .app-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .app-header-title {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-md);
+  letter-spacing: -0.01em;
 }
 
 .app-header-status {
-  font-weight: 400;
+  font-weight: var(--weight-regular);
   color: var(--fg-muted);
 }
 
 .app-header-action {
   color: var(--fg-muted);
-  font-size: 0.85em;
+  font-size: var(--text-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -115,39 +201,47 @@ button {
 .app-header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 .fixture-picker {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.8em;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
   color: var(--fg-muted);
   border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  padding: var(--space-1) var(--space-2);
   min-height: 44px;
 }
 
 .fixture-picker-label {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .fixture-picker select {
   min-height: 44px;
   min-width: 44px;
+  font-family: inherit;
+  background: var(--bg-panel);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
 .pill-button {
   border: 1px solid var(--border);
   background: var(--bg-panel);
   color: var(--fg);
-  border-radius: 999px;
-  padding: 6px 12px;
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-3);
   min-height: 44px;
   min-width: 44px;
+  font-size: var(--text-sm);
+  transition: background var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
 }
 
 .pill-button--active {
@@ -159,9 +253,11 @@ button {
 .balance-chip {
   background: var(--accent-soft);
   color: var(--accent);
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-weight: 600;
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .menu {
@@ -171,9 +267,11 @@ button {
 .menu-trigger {
   border: 1px solid var(--border);
   background: var(--bg-panel);
-  border-radius: 999px;
+  color: var(--fg-muted);
+  border-radius: var(--radius-full);
   width: 44px;
   height: 44px;
+  font-size: var(--text-md);
 }
 
 .menu-panel {
@@ -182,11 +280,12 @@ button {
   top: 40px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(20, 20, 22, 0.14);
   display: flex;
   flex-direction: column;
-  min-width: 200px;
+  min-width: 210px;
+  padding: var(--space-1);
   z-index: 20;
 }
 
@@ -194,8 +293,10 @@ button {
   text-align: left;
   background: none;
   border: none;
-  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
   color: var(--fg);
+  font-size: var(--text-sm);
   min-height: 44px;
 }
 
@@ -203,19 +304,20 @@ button {
   background: var(--accent-soft);
 }
 
-/* ---- Avatar ---- */
+/* ---- Avatar (design-web-ui.md § 1.3: one status signal, not scattered
+   spinners) ---- */
 
 .avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
 }
 
 .avatar-dot {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: var(--fg-muted);
   display: inline-block;
@@ -227,18 +329,18 @@ button {
 
 .avatar--thinking .avatar-dot {
   background: var(--accent);
-  animation: pulse-slow 2.2s ease-in-out infinite;
+  animation: pulse-slow var(--duration-slow) var(--ease-standard) infinite;
 }
 
 .avatar--working .avatar-dot {
   background: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
-  animation: spin-ring 1s linear infinite;
+  animation: ring-breathe 1.1s var(--ease-standard) infinite;
 }
 
 .avatar--needs-you .avatar-dot {
   background: var(--amber);
-  animation: pulse-amber 1.4s ease-in-out infinite;
+  animation: pulse-amber 1.6s var(--ease-standard) infinite;
 }
 
 .avatar--done .avatar-dot {
@@ -251,14 +353,30 @@ button {
 }
 
 @keyframes pulse-amber {
-  0%, 100% { opacity: 0.6; }
+  0%, 100% { opacity: 0.65; }
   50% { opacity: 1; }
 }
 
-@keyframes spin-ring {
+@keyframes ring-breathe {
   0% { box-shadow: 0 0 0 3px var(--accent-soft); }
   50% { box-shadow: 0 0 0 6px var(--accent-soft); }
   100% { box-shadow: 0 0 0 3px var(--accent-soft); }
+}
+
+/* Every animation has a still equivalent — never a hard requirement to
+   perceive motion to read status (craft rule). */
+@media (prefers-reduced-motion: reduce) {
+  .avatar--thinking .avatar-dot,
+  .avatar--working .avatar-dot,
+  .avatar--needs-you .avatar-dot {
+    animation: none;
+  }
+  .avatar--working .avatar-dot {
+    box-shadow: 0 0 0 4px var(--accent-soft);
+  }
+  .avatar--needs-you .avatar-dot {
+    opacity: 1;
+  }
 }
 
 /* ---- Transcript ---- */
@@ -266,29 +384,45 @@ button {
 .transcript {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 16px;
+  padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .empty-state {
   flex: 1 1 auto;
   display: flex;
   align-items: center;
-  padding: 24px;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.empty-state p {
+  max-width: 460px;
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
   color: var(--fg-muted);
+  text-align: center;
 }
 
 .bubble {
-  max-width: 720px;
+  /* min(), not a bare 720px: an unbroken long token (a pasted URL) must
+     never push this wider than the viewport at 375px — overflow-wrap is
+     the second half of that fix, letting a URL itself break mid-word
+     rather than forcing the bubble to grow around it. */
+  max-width: min(720px, 100%);
+  overflow-wrap: anywhere;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
 }
 
 .bubble--user {
   align-self: flex-end;
   background: var(--accent-soft);
-  border-radius: var(--radius);
-  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
 }
 
 .bubble--assistant {
@@ -296,131 +430,194 @@ button {
 }
 
 .bubble-role {
-  font-size: 0.72em;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--fg-muted);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
+  font-weight: var(--weight-semibold);
 }
 
 .attachment-chip {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 2px 10px;
-  font-size: 0.85em;
-  margin-top: 4px;
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  margin-top: var(--space-1);
+  color: var(--fg-muted);
 }
 
-/* ---- Tool run ---- */
+.attachment-chip .mono {
+  color: var(--fg);
+}
+
+.attachment-icon {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+/* ---- Tool run: grouped "ran …" rows, plain words, icon-led and muted —
+   the Claude/Linear pattern (design-references.md) — never a raw tool
+   name or JSON in the collapsed line. ---- */
 
 .tool-run {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
 .tool-run-toggle {
   background: none;
   border: none;
   color: var(--fg-muted);
-  padding: 4px 0;
-  font-size: 0.9em;
+  padding: var(--space-1) 0;
+  font-size: var(--text-sm);
   min-height: 44px;
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
 }
 
 .tool-run-caret {
   display: inline-block;
   width: 1em;
+  color: var(--fg-muted);
 }
 
 .tool-run-detail {
   border-left: 2px solid var(--border);
   margin-left: 6px;
-  padding-left: 12px;
+  padding-left: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .tool-run-row-name {
-  font-weight: 600;
-  font-size: 0.85em;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
 }
 
 .tool-run-row-label {
-  font-size: 0.75em;
+  font-size: var(--text-xs);
   color: var(--fg-muted);
-  margin-top: 2px;
+  margin-top: var(--space-1);
 }
 
 .tool-run-row pre,
 .side-panel-raw {
+  font-family: var(--font-mono);
   background: var(--code-bg);
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
   overflow-x: auto;
-  font-size: 0.82em;
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* A write step's honest receipt (design-web-ui-refresh.md): the file it
+   wrote and the one real number the tool result actually carries (the
+   new content's own line count) — never a diff the tool didn't report,
+   and never a button (rule 7: no card fires or reverses an action). */
+.tool-run-write {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  background: var(--code-bg);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+}
+
+.tool-run-write-verb {
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
+}
+
+.tool-run-write-name {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.tool-run-write-meta {
+  color: var(--fg-muted);
+  font-size: var(--text-xs);
 }
 
 /* ---- Cards ---- */
 
 .card {
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
   background: var(--bg-panel);
-  margin: 6px 0;
+  margin: var(--space-1) 0;
 }
 
 .card-title {
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-lg);
+  margin-bottom: var(--space-1);
+  line-height: var(--leading-tight);
+}
+
+.card-title-file {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-medium);
+  font-size: var(--text-md);
 }
 
 .card-body {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
+  line-height: var(--leading-normal);
 }
 
 .card-meta {
   color: var(--fg-muted);
-  font-size: 0.85em;
-  margin: 4px 0;
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0;
 }
 
 .card-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   align-items: center;
+  margin-top: var(--space-2);
 }
 
 .card-open-link {
   background: none;
   border: none;
   color: var(--accent);
-  font-size: 0.9em;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   min-height: 44px;
   min-width: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 10px;
+  padding: 0 var(--space-2);
 }
 
 .card-open-link--inline {
-  margin-left: 6px;
-  font-size: 0.8em;
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  min-height: auto;
+  min-width: auto;
 }
 
 .badge {
   display: inline-block;
-  border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 0.78em;
-  font-weight: 600;
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-2);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
 }
 
 .badge--quick-scan {
@@ -435,6 +632,9 @@ button {
   color: var(--green);
 }
 
+/* A checker FAIL is styled distinct, never alarm-red (§ 2.4): it means
+   the agent's own next turn fixes it, not that the candidate must act —
+   same amber "category, not severity" mark as pending/declined. */
 .badge--fail,
 .badge--FAIL,
 .badge--declined,
@@ -450,40 +650,69 @@ button {
 }
 
 .plan-items {
-  padding-left: 20px;
-  margin: 8px 0;
+  list-style: none;
+  padding-left: 0;
+  margin: var(--space-2) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .plan-items li {
-  margin-bottom: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  line-height: var(--leading-snug);
+}
+
+.plan-items li::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  transform: translateY(-2px);
 }
 
 .checker-findings {
-  margin: 6px 0;
-  padding-left: 18px;
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
 }
 
-/* Gate card */
+/* Gate card (design-web-ui.md § 2.5, gate-grammar.md): the complete
+   artifact, the plain-sentence gate line, then only a typed "yes" — the
+   card itself never renders anything that could be mistaken for a
+   confirm control. */
 
 .card--gate {
   border-color: var(--amber);
+  border-width: 1.5px;
 }
 
 .gate-text {
   white-space: pre-wrap;
   font-family: inherit;
-  background: var(--code-bg);
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin: 6px 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
 }
 
 .gate-line {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-base);
 }
 
 .gate-instruction {
   color: var(--amber);
+  font-size: var(--text-sm);
 }
 
 .card--error {
@@ -494,48 +723,111 @@ button {
   color: var(--red);
 }
 
-/* ---- Markdown view ---- */
+.card--cost .card-body {
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Markdown view (side panel: workspace files as plain formatted
+   text — Granola/Teal's document-beside-receipts relationship). ---- */
+
+.markdown-view {
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
 
 .markdown-view h2,
 .markdown-view h3,
 .markdown-view h4 {
-  margin: 12px 0 6px;
+  margin: var(--space-4) 0 var(--space-2);
+  line-height: var(--leading-tight);
 }
 
 .markdown-view p {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
 .markdown-view .md-gap {
-  height: 6px;
+  height: var(--space-2);
 }
 
 .markdown-view table {
   border-collapse: collapse;
   width: 100%;
-  margin: 8px 0;
-  font-size: 0.85em;
+  margin: var(--space-3) 0;
+  font-size: var(--text-sm);
 }
 
 .markdown-view th,
 .markdown-view td {
   border: 1px solid var(--border);
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   text-align: left;
 }
 
 .inline-code {
+  font-family: var(--font-mono);
   background: var(--code-bg);
   border-radius: 4px;
   padding: 0 4px;
-  font-size: 0.92em;
+  font-size: 0.9em;
 }
 
-/* ---- Composer ---- */
+/* A résumé or cover-letter preview reads like a document, not app chrome
+   (design-web-ui-refresh.md; Claude/Granola's serif-for-content pairing,
+   design-references.md "Patterns across the set"). Applied by SidePanel
+   from the open file's own path — never a guess at file TYPE, since the
+   fixture's own path naming (`…-resume.md`, `…-cover-letter.md`) is what
+   the agent itself writes. */
+.side-panel-body--document .markdown-view {
+  font-family: var(--font-serif);
+  font-size: var(--text-md);
+}
+
+.side-panel-body--document .markdown-view h2,
+.side-panel-body--document .markdown-view h3,
+.side-panel-body--document .markdown-view h4 {
+  font-weight: var(--weight-semibold);
+}
+
+/* plan.md gets the checklist treatment (Linear's tight lists, Things 3's
+   neutral-text/leading-mark convention) instead of the serif document
+   look — it's a to-do list, not a document of record. */
+.side-panel-body--plan .markdown-view ul {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.side-panel-body--plan .markdown-view li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  line-height: var(--leading-snug);
+  font-size: var(--text-sm);
+}
+
+.side-panel-body--plan .markdown-view li::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-muted);
+  transform: translateY(-2px);
+}
+
+/* ---- Composer: one pill, Grok's own "the composer is the whole
+   surface" technique (design-references.md — attach, text and send
+   share one object). No button resizes or spins while loading (banned
+   defaults) — Send only dims. ---- */
 
 .composer {
   border-top: 1px solid var(--border);
-  padding: 10px 14px;
+  padding: var(--space-3) var(--space-4);
+  padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
 }
 
 .composer-suggestion {
@@ -545,58 +837,80 @@ button {
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   color: var(--accent);
-  border-radius: var(--radius);
-  padding: 8px 10px;
-  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
   min-height: 44px;
+  font-size: var(--text-sm);
 }
 
 .composer-row {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: var(--space-1);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-1);
 }
 
 .composer-attach,
 .composer-skills,
 .composer-send {
-  border: 1px solid var(--border);
-  background: var(--bg-panel);
-  border-radius: 8px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-full);
   min-height: 44px;
   min-width: 44px;
-  color: var(--fg);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  transition: background var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+
+.composer-attach:hover:not(:disabled),
+.composer-skills:hover:not(:disabled) {
+  background: var(--border);
 }
 
 .composer-send {
   background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  padding: 0 16px;
+  color: var(--on-accent);
+  padding: 0 var(--space-4);
+  font-weight: var(--weight-semibold);
 }
 
 .composer-send:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
 .composer-input {
   flex: 1 1 auto;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-2);
   resize: none;
   min-height: 44px;
   max-height: 160px;
-  background: var(--bg-panel);
+  background: none;
   color: var(--fg);
   font-family: inherit;
-  font-size: 1em;
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.composer-input:focus {
+  outline: none;
+}
+
+.composer-input::placeholder {
+  color: var(--fg-muted);
 }
 
 /* ---- Side panel ---- */
 
 .side-panel {
-  width: 360px;
+  width: 380px;
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -607,8 +921,8 @@ button {
 .side-panel-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
@@ -616,13 +930,15 @@ button {
   display: none;
   border: none;
   background: none;
-  font-size: 1.2em;
+  color: var(--fg);
+  font-size: var(--text-lg);
   min-width: 44px;
   min-height: 44px;
 }
 
 .side-panel-path {
-  font-size: 0.85em;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--fg-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -632,7 +948,7 @@ button {
 .side-panel-body {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 14px;
+  padding: var(--space-5);
 }
 
 .side-panel-empty {
@@ -644,7 +960,7 @@ button {
   height: 100%;
   min-height: 500px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: white;
 }
 
@@ -672,7 +988,7 @@ button {
   }
 
   .app-header {
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .fixture-picker {
@@ -693,51 +1009,90 @@ button {
   justify-content: center;
   background: var(--bg);
   color: var(--fg);
-  padding: 24px;
+  padding: var(--space-6);
 }
 
 .sign-in-card {
   width: 100%;
-  max-width: 360px;
+  max-width: 380px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .sign-in-logo {
   margin: 0;
-  font-size: 1.8em;
+  font-family: var(--font-serif);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-2xl);
 }
 
 .sign-in-tagline {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   color: var(--fg-muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
 }
 
 .sign-in-mode-toggle {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
+}
+
+.sign-in-mode-toggle button {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  min-height: 44px;
+}
+
+.sign-in-mode-toggle button:disabled {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
 }
 
 .sign-in-form {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .sign-in-form label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 0.9em;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--fg-muted);
 }
 
 .sign-in-form input {
-  padding: 8px 10px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-panel);
   color: var(--fg);
+  font-size: var(--text-md);
+  min-height: 44px;
+}
+
+.sign-in-form button[type="submit"] {
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-md);
+  min-height: 44px;
+}
+
+.sign-in-form button[type="submit"]:disabled {
+  opacity: 0.6;
 }
 
 .sign-in-error,
@@ -745,12 +1100,14 @@ button {
 .composer-attach-error,
 .import-error {
   color: var(--red);
-  font-size: 0.9em;
+  font-size: var(--text-sm);
   margin: 0;
 }
 
 .sign-in-sent {
   color: var(--fg-muted);
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
 }
 
 .sign-in-link-button {
@@ -760,18 +1117,36 @@ button {
   cursor: pointer;
   padding: 0;
   text-align: left;
-  font-size: 0.85em;
+  font-size: var(--text-sm);
 }
 
 .sign-in-local {
-  margin-top: 8px;
-  font-size: 0.85em;
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
   color: var(--fg-muted);
 }
 
 .not-a-member-message {
   max-width: 420px;
   text-align: center;
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+  color: var(--fg);
+}
+
+.not-a-member-screen {
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.not-a-member-screen button {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  min-height: 44px;
+  font-size: var(--text-sm);
 }
 
 .menu-item-danger {
@@ -781,36 +1156,48 @@ button {
 .delete-confirm-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(20, 20, 22, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 50;
+  padding: var(--space-4);
 }
 
 .delete-confirm-card {
   background: var(--bg-panel);
   color: var(--fg);
-  border-radius: var(--radius);
-  padding: 20px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
   max-width: 420px;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .delete-confirm-scope {
-  font-weight: 600;
+  font-weight: var(--weight-semibold);
 }
 
 .delete-confirm-sentence {
   color: var(--fg-muted);
+  line-height: var(--leading-normal);
 }
 
 .delete-confirm-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
+}
+
+.delete-confirm-actions button {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  min-height: 44px;
+  font-size: var(--text-sm);
 }
 
 .composer-attach-input {

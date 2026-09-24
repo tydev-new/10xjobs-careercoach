@@ -33,6 +33,19 @@ function withCsp(html: string): string {
   return IFRAME_CSP + html;
 }
 
+// A résumé or cover letter reads like a document (serif, design-web-ui-
+// refresh.md); plan.md reads like a checklist. Read off the path the
+// agent itself wrote it to (fixtures name résumés `…-resume.md` and
+// letters `…-cover-letter.md`, `docs/design-web-ui.md` § 4) — never a
+// guess from the file's content.
+function bodyModifier(path: string | undefined): string {
+  if (!path) return "";
+  const base = path.split("/").pop() ?? path;
+  if (/resume|cover-letter/i.test(base)) return " side-panel-body--document";
+  if (base === "plan.md") return " side-panel-body--plan";
+  return "";
+}
+
 export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function SidePanel(
   { file, open, onClose },
   iframeRef
@@ -51,7 +64,7 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
           (observed as stray leftover nodes when React reused DOM across
           two unrelated .md structures with coincidentally-matching
           positional keys). */}
-      <div className="side-panel-body" key={file?.path ?? "empty"}>
+      <div className={`side-panel-body${bodyModifier(file?.path)}`} key={file?.path ?? "empty"}>
         {!file ? (
           <p className="side-panel-empty">Nothing open yet.</p>
         ) : file.binary ? (

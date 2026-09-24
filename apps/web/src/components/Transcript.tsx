@@ -1,4 +1,4 @@
-import { useMemo, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, type ReactElement } from "react";
 import { latestGateStatuses } from "../agent-helpers";
 import type { AppMessage, DataCardData, DataErrorData, GateRequest } from "../types";
 import { Card } from "./Cards";
@@ -9,6 +9,28 @@ import { ToolRun, type ToolPartLike } from "./ToolRun";
 type Group =
   | { kind: "tool"; parts: ToolPartLike[] }
   | { kind: "other"; part: Record<string, unknown> };
+
+// A plain stroke icon, not an emoji (banned defaults: no emoji standing
+// in for an icon) — a single small attach mark, same weight as the rest
+// of the chip's muted text.
+function AttachmentIcon(): ReactElement {
+  return (
+    <svg
+      className="attachment-icon"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  );
+}
 
 function groupParts(parts: Array<Record<string, unknown>>): Group[] {
   const groups: Group[] = [];
@@ -39,8 +61,20 @@ export function Transcript({
 }): ReactElement {
   const gateStatuses = useMemo(() => latestGateStatuses(messages), [messages]);
 
+  // design-web-ui.md § 1.1: "oldest first, autoscroll" — a new message, a
+  // streaming delta, a tool row completing, or a card landing all extend
+  // this same container, so scrolling it to bottom on every messages
+  // update (a new array reference each chunk, ai@7.0.111's own update
+  // model) keeps whatever just arrived in view without the candidate
+  // scrolling by hand.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
   return (
-    <div className="transcript">
+    <div className="transcript" ref={scrollRef}>
       {messages.map((message) => {
         if (message.role === "user") {
           const text = message.parts.find((p) => p.type === "text") as
@@ -56,7 +90,8 @@ export function Transcript({
               {text ? <p>{text.text}</p> : null}
               {files.map((f, i) => (
                 <div key={i} className="attachment-chip">
-                  📎 {f.filename ?? "attachment"}
+                  <AttachmentIcon />
+                  <span className="mono">{f.filename ?? "attachment"}</span>
                 </div>
               ))}
             </div>

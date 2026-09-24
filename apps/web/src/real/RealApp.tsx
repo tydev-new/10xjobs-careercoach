@@ -187,11 +187,24 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   if (screen.kind === "loading" || screen.kind === "checking-membership") {
     return <div className="app-shell app-shell--loading" />;
   }
+  // Every screen — pre-auth included — lives under the same theme root:
+  // [data-theme="dark"]'s variable overrides only apply to their own
+  // descendants (styles.css), so sign-in/not-a-member must sit inside
+  // .app-root too, or they'd always render in light-mode tokens
+  // regardless of the host's own dark-mode setting.
   if (screen.kind === "signed-out") {
-    return <SignIn client={authClient} redirectTo={siteRedirectUrl()} />;
+    return (
+      <div className="app-root" data-theme={theme}>
+        <SignIn client={authClient} redirectTo={siteRedirectUrl()} />
+      </div>
+    );
   }
   if (screen.kind === "not-a-member") {
-    return <NotAMember onSignOut={handleSignOut} />;
+    return (
+      <div className="app-root" data-theme={theme}>
+        <NotAMember onSignOut={handleSignOut} />
+      </div>
+    );
   }
   if (screen.kind === "deleted") {
     // The sign-in screen underneath (sign-out already happened — § 1.7
@@ -199,7 +212,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
     // fix round 2 item 3), with the report-back on top; OK just closes
     // the overlay onto the now-ordinary sign-in screen.
     return (
-      <>
+      <div className="app-root" data-theme={theme}>
         <SignIn client={authClient} redirectTo={siteRedirectUrl()} />
         <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
           <div className="delete-confirm-card">
@@ -209,39 +222,45 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
             </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
   if (screen.kind === "error") {
     return (
-      <div className="app-shell app-shell--config-error">
-        <div>
-          <p>{screen.message}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void client.auth.getSession().then(({ data }) => {
-                const uid = data.session?.user.id;
-                if (uid) {
-                  checkedUserIdRef.current = uid;
-                  void checkAndAdvance(uid);
-                } else {
-                  setScreen({ kind: "signed-out" });
-                }
-              });
-            }}
-          >
-            Retry
-          </button>
-          <button type="button" onClick={handleSignOut}>
-            Sign out
-          </button>
+      <div className="app-root" data-theme={theme}>
+        <div className="app-shell app-shell--config-error">
+          <div>
+            <p>{screen.message}</p>
+            <button
+              type="button"
+              onClick={() => {
+                void client.auth.getSession().then(({ data }) => {
+                  const uid = data.session?.user.id;
+                  if (uid) {
+                    checkedUserIdRef.current = uid;
+                    void checkAndAdvance(uid);
+                  } else {
+                    setScreen({ kind: "signed-out" });
+                  }
+                });
+              }}
+            >
+              Retry
+            </button>
+            <button type="button" onClick={handleSignOut}>
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     );
   }
   if (!coach || !workspace || !balanceFn) {
-    return <div className="app-shell app-shell--loading" />;
+    return (
+      <div className="app-root" data-theme={theme}>
+        <div className="app-shell app-shell--loading" />
+      </div>
+    );
   }
   return (
     <div className="app-root" data-theme={theme}>

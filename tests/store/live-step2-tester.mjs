@@ -164,7 +164,7 @@ async function main() {
       "anon token write": await codeOf(storeFor(users.a, ANON).write("x.md", "x", null)),
     };
     const want = {
-      "NFD name": "WorkspaceError:invalid_ref",
+      "NFD name": "RESOLVED", // lead's M3 ruling: the client normalizes to NFC
       "zero-width": "WorkspaceError:invalid_ref",
       "nested CLAUDE.md": "WorkspaceError:not_editable",
       "case variant of race.md": "WorkspaceError:path_conflict",
@@ -174,6 +174,32 @@ async function main() {
     };
     const bad = Object.entries(want).filter(([k, v]) => got[k] !== v);
     rec("live PT409/403/400 codes map to WorkspaceError through the store", bad.length === 0, JSON.stringify(got));
+    const nfcStored = (await sA1.list()).some((f) => f.path === "notes/caf\u00e9.md");
+    rec("the NFD write is stored under its NFC path", nfcStored);
+  }
+  // ---- L1 live: the shared client rule vs production's ten_path_ok (the server's own regex locale)
+  {
+    const { validateRef, isReadOnlyPath } = await import(path.join(REPO, "packages/agent/src/workspace/path-rules.ts"));
+    const cps = [];
+    for (let c = 0x80; c <= 0x9f; c++) cps.push(c);
+    cps.push(0x01, 0x1f, 0x7f, 0xa0, 0xad, 0x061c, 0x200b, 0x2028, 0x2029, 0x202e, 0x2066, 0xfeff, 0xfff9, 0xe0001, 0x3000, 0x00e9);
+    const mism = [];
+    for (const c of cps) {
+      const p = `n/a${String.fromCodePoint(c)}b.md`;
+      const r = await a1.client.rpc("ten_path_ok", { p });
+      if (r.error) {
+        mism.push(`U+${c.toString(16)} rpc error ${r.error.message}`);
+        continue;
+      }
+      let client;
+      try {
+        client = validateRef(p) === p && !isReadOnlyPath(p);
+      } catch {
+        client = false;
+      }
+      if (client !== r.data) mism.push(`U+${c.toString(16).toUpperCase()} client=${client} server=${r.data}`);
+    }
+    rec(`live parity: validateRef vs production ten_path_ok on ${cps.length} code points`, mism.length === 0, mism.length ? `${mism.length} mismatches: ${mism.slice(0, 6).join("; ")}…` : "all agree");
   }
   // ---- upload refusals (known step 5b gap: generic Error) — record the real shapes
   {

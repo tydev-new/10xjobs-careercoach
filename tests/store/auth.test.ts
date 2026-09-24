@@ -53,11 +53,11 @@ test("U2 under Vite, siteRedirectUrl() returns VITE_SITE_URL even when a (differ
   assert.equal(mod.siteRedirectUrl("https://preview-123.vercel.app"), "https://ten.example.app");
 });
 
-test("U3 with VITE_SITE_URL unset and no origin, siteRedirectUrl() throws rather than letting Supabase fall back to the Site URL", async () => {
+test("U3 with VITE_SITE_URL unset, siteRedirectUrl() throws, with or without an origin argument (L4: never a fallback that could land on the Site URL)", async () => {
   const mod = await loadAuthWithEnv({ VITE_SITE_URL: undefined });
   assert.throws(() => mod.siteRedirectUrl(), /VITE_SITE_URL/);
-  // Observed (not asserted): with an origin it returns that origin.
-  console.log(`unset + origin -> ${mod.siteRedirectUrl("http://localhost:5173")}`);
+  assert.throws(() => (mod.siteRedirectUrl as (o?: string) => string)("http://localhost:5173"), /VITE_SITE_URL/);
+  assert.throws(() => (mod.siteRedirectUrl as (o?: string) => string)("https://preview-123.vercel.app"), /VITE_SITE_URL/);
 });
 
 test("U4 magic link and sign-up pass the given redirectTo as emailRedirectTo; password sign-in sends no redirect", async () => {

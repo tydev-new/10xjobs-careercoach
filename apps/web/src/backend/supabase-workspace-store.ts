@@ -209,7 +209,11 @@ async function listText(o: Internal, prefix: string): Promise<FileInfo[]> {
         editable: isEditableExt(row.path) && !isReadOnlyPath(row.path),
       });
     }
-    if (rows.length < LIST_PAGE_SIZE) break; // exhausted
+    // C3c (fix round 2): break on an EMPTY page, not "fewer than requested"
+    // — a project's own PostgREST max_rows can sit below our page size, so
+    // a full page can legitimately come back shorter than LIST_PAGE_SIZE
+    // while more rows remain; only zero rows means truly exhausted.
+    if (rows.length === 0) break;
     cursor = rows[rows.length - 1].path;
   }
   return out;

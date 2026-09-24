@@ -178,6 +178,74 @@ interface AdmittedEntry {
   editable: boolean;
 }
 
+// ---------------------------------------------------------------------
+// M-new-2 / I7 (fix round 2): the central directory's declared sizes
+// (checked in the filter, above) can be forged relative to the entry's
+// ACTUAL data — a STORED entry's real bytes are whatever its compressed-
+// size field says (untouched by a lie about originalSize alone, I6); a
+// DEFLATEd entry's real bytes are silently truncated to the (lied,
+// smaller) declared size, since fflate allocates its output buffer to
+// exactly `originalSize` and does not itself check a CRC (I7). So the
+// SECOND pass below re-checks every admitted entry's ACTUAL inflated
+// byte length against the same per-entry/aggregate caps, and its CRC32
+// against the central directory's own declared value (read here,
+// independently of fflate's internal parse) — before any write.
+// ---------------------------------------------------------------------
+
+const CRC32_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC32_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/** Reads each entry's declared CRC32 straight from the zip's CENTRAL
+ *  DIRECTORY (the same authoritative source fflate itself reads size and
+ *  compression method from) — independent of, and not trusting, fflate's
+ *  own internal bookkeeping. Malformed input returns whatever was parsed
+ *  before the parse gave up; a missing entry is then treated as "no
+ *  declared CRC found" by the caller, which refuses rather than skips. */
+function readCentralDirectoryCrcs(zip: Uint8Array): Map<string, number> {
+  const map = new Map<string, number>();
+  const dv = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+  let e = zip.length - 22;
+  for (; e >= 0 && dv.getUint32(e, true) !== 0x06054b50; e--) {
+    if (zip.length - e > 65558) return map;
+  }
+  if (e < 0) return map;
+  let count = dv.getUint16(e + 10, true);
+  let o = dv.getUint32(e + 16, true);
+  // ZIP64 locator/record, mirroring fflate's own unzipSync.
+  if (e - 20 >= 0 && dv.getUint32(e - 20, true) === 0x07064b50) {
+    const ze = Number(dv.getBigUint64(e - 12, true));
+    if (ze + 4 <= zip.length && dv.getUint32(ze, true) === 0x06064b50) {
+      count = Number(dv.getBigUint64(ze + 32, true));
+      o = Number(dv.getBigUint64(ze + 48, true));
+    }
+  }
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  for (let i = 0; i < count && o + 46 <= zip.length; i++) {
+    if (dv.getUint32(o, true) !== 0x02014b50) break; // malformed; the byte-length/decode checks still catch a bad entry
+    const declaredCrc = dv.getUint32(o + 16, true);
+    const nlen = dv.getUint16(o + 28, true);
+    const elen = dv.getUint16(o + 30, true);
+    const clen = dv.getUint16(o + 32, true);
+    const name = decoder.decode(zip.subarray(o + 46, o + 46 + nlen));
+    map.set(name, declaredCrc);
+    o += 46 + nlen + elen + clen;
+  }
+  return map;
+}
+
 /**
  * Import a zip into an EMPTY workspace, or one holding only the app's own
  * root CLAUDE.md (§ 2, M5). Validates every entry against the SAME shared
@@ -206,6 +274,12 @@ export async function importWorkspace(store: WorkspaceStore, zipBytes: Uint8Arra
   const notes: string[] = [];
   const admitted: AdmittedEntry[] = [];
   const claimedLower = new Map<string, string>(); // lower(path) -> path, for a readable clash message
+  // I9 (fix round 2): the pre-check must treat an EXISTING root CLAUDE.md
+  // (the M5 case) as an already-claimed FILE for clash purposes too, so
+  // e.g. "CLAUDE.md/x.md" is refused up front (a WorkspaceImportError,
+  // nothing written) rather than passing the pre-check and failing
+  // mid-write on the server's own ten_path_clash (a WorkspaceImportPartialError).
+  if (existing.length === 1) claimedLower.set("claude.md", "CLAUDE.md");
   let entryCount = 0;
   let textFileCount = 0;
   let totalTextBytes = 0;
@@ -218,8 +292,8 @@ export async function importWorkspace(store: WorkspaceStore, zipBytes: Uint8Arra
   function checkClash(path: string, zipName: string): void {
     const lower = path.toLowerCase();
     for (const [otherLower, otherPath] of claimedLower) {
-      if (otherLower === lower) fail(zipName, `path_conflict: case-variant clash with another entry in this import: ${otherPath}`);
-      if (lower.startsWith(`${otherLower}/`)) fail(zipName, `path_conflict: nested under another entry in this import: ${otherPath}`);
+      if (otherLower === lower) fail(zipName, `path_conflict: case-variant clash with another entry (or the workspace's existing CLAUDE.md): ${otherPath}`);
+      if (lower.startsWith(`${otherLower}/`)) fail(zipName, `path_conflict: nested under an existing file (another entry, or the workspace's existing CLAUDE.md): ${otherPath}`);
       if (otherLower.startsWith(`${lower}/`)) fail(zipName, `path_conflict: is a folder of another entry in this import: ${otherPath}`);
     }
   }
@@ -298,15 +372,42 @@ export async function importWorkspace(store: WorkspaceStore, zipBytes: Uint8Arra
   }
 
   // Second pass: every admitted entry is now inflated (fflate already did
-  // that for entries the filter returned true for) — decode text strictly
-  // (M4). This can only be checked after inflation (bytes, not metadata),
-  // so it's a second, separate refusal point; still entirely before any
-  // write() / upload() call.
+  // that for entries the filter returned true for). Three checks that can
+  // only run on the ACTUAL bytes (not the central directory's declared
+  // metadata, which the filter above already used and which can lie,
+  // M-new-2/I6/I7): the real byte length against the same per-entry and
+  // aggregate caps (recomputed fresh from real lengths — a forged
+  // originalSize must not admit real bytes over any cap), the entry's
+  // CRC32 against the central directory's own declared value (catches a
+  // DEFLATEd entry that decodes short/wrong without fflate itself
+  // erroring), and — for text — a strict UTF-8 decode (M4). All of this
+  // is still entirely before any write() / upload() call.
+  const declaredCrcs = readCentralDirectoryCrcs(zipBytes);
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
   const toWrite: { path: string; content?: string; bytes?: Uint8Array }[] = [];
+  let actualTextFiles = 0;
+  let actualTextBytes = 0;
+  let actualObjects = 0;
   for (const a of admitted) {
     const bytes = entries[a.zipName];
+
+    const declaredCrc = declaredCrcs.get(a.zipName);
+    if (declaredCrc === undefined || crc32(bytes) !== declaredCrc) {
+      throw new WorkspaceImportError([{ path: a.zipName, reason: `the entry's data does not match its declared CRC32 (corrupt or truncated): ${a.path}` }]);
+    }
+
     if (a.editable) {
+      if (bytes.byteLength > MAX_EDIT_BYTES) {
+        throw new WorkspaceImportError([{ path: a.zipName, reason: `content_too_large: ${a.path}'s actual size is over ${MAX_EDIT_BYTES} bytes (declared size did not match)` }]);
+      }
+      actualTextFiles++;
+      if (actualTextFiles > MAX_TEXT_FILES) {
+        throw new WorkspaceImportError([{ path: a.zipName, reason: `workspace_full: the import has more than ${MAX_TEXT_FILES} text files (by actual size)` }]);
+      }
+      actualTextBytes += bytes.byteLength;
+      if (actualTextBytes > MAX_TEXT_BYTES_TOTAL) {
+        throw new WorkspaceImportError([{ path: a.zipName, reason: `workspace_full: the import's actual text totals more than ${MAX_TEXT_BYTES_TOTAL} bytes (declared sizes did not match)` }]);
+      }
       let content: string;
       try {
         content = decoder.decode(bytes);
@@ -315,6 +416,13 @@ export async function importWorkspace(store: WorkspaceStore, zipBytes: Uint8Arra
       }
       toWrite.push({ path: a.path, content });
     } else {
+      if (bytes.byteLength === 0 || bytes.byteLength > MAX_UPLOAD_BYTES) {
+        throw new WorkspaceImportError([{ path: a.zipName, reason: `upload_too_large: ${a.path}'s actual size must be between 1 byte and ${MAX_UPLOAD_BYTES} bytes (declared size did not match)` }]);
+      }
+      actualObjects++;
+      if (actualObjects > MAX_OBJECTS) {
+        throw new WorkspaceImportError([{ path: a.zipName, reason: `workspace_full: the import has more than ${MAX_OBJECTS} binary objects (by actual size)` }]);
+      }
       toWrite.push({ path: a.path, bytes });
     }
   }

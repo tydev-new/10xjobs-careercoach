@@ -65,12 +65,20 @@ function makeFakeBackend() {
     // ---- select ten_ws_files (list, or a single path) ----
     if (url.includes("/rest/v1/ten_ws_files") && method === "GET") {
       const u = new URL(url);
-      const pathFilter = u.searchParams.get("path"); // "eq.<path>" or null
-      let out = [...rows.values()];
+      const pathFilter = u.searchParams.get("path"); // "eq.<path>" | "gt.<path>" | null
+      let out = [...rows.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
       if (pathFilter?.startsWith("eq.")) {
         const want = decodeURIComponent(pathFilter.slice(3));
         out = out.filter((r) => r.path === want);
+      } else if (pathFilter?.startsWith("gt.")) {
+        // The store's own keyset pagination cursor (fix round 2, C3c/H3):
+        // must actually advance past `cursor`, or listText()'s "loop until
+        // an empty page" would never terminate against this fake.
+        const cursor = decodeURIComponent(pathFilter.slice(3));
+        out = out.filter((r) => r.path > cursor);
       }
+      const limitParam = u.searchParams.get("limit");
+      if (limitParam !== null) out = out.slice(0, Number(limitParam));
       return jsonResponse(
         200,
         out.map((r) => ({ path: r.path, content: r.content, version: r.version, updated_at: r.updated_at })),

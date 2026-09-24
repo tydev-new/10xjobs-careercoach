@@ -15,7 +15,7 @@ import type { WorkspaceStore } from "../../packages/agent/src/types.ts";
 import { createInMemoryWorkspaceStore } from "../../packages/agent/src/workspace/in-memory-store.ts";
 import { createLocalFolderWorkspaceStore } from "../../packages/agent/src/workspace/local-folder-store.ts";
 import { createRootClaudeMd, createSupabaseWorkspaceStore } from "../../apps/web/src/backend/supabase-workspace-store.ts";
-import { exportWorkspace, importWorkspace } from "../../apps/web/src/backend/workspace-export.ts";
+import { WorkspaceImportError, WorkspaceImportPartialError, exportWorkspace, importWorkspace } from "../../apps/web/src/backend/workspace-export.ts";
 import { ANON, REPO, SUPABASE_URL, createBackend } from "./pglite-backend.ts";
 
 const req = createRequire(path.join(REPO, "apps/web/package.json"));
@@ -139,10 +139,10 @@ const BAD_ENTRIES: [string, Uint8Array, string][] = [
   ["Skills/x.md", enc("x"), "Skills/ (case)"],
   ["notes/CLAUDE.md", enc("x"), "nested CLAUDE.md"],
   ["notes/claude.md", enc("x"), "nested claude.md"],
-  ["notes/cafe\u0301.md", enc("x"), "NFD name"],
   ["notes/a\u200Bb.md", enc("x"), "zero-width"],
   ["notes/a\u202Eb.md", enc("x"), "RTL override"],
   ["notes/a\u0001b.md", enc("x"), "control char"],
+  ["notes/a\u0085b.md", enc("x"), "C1 control (U+0085 NEL)"],
   ["n/" + "a".repeat(510) + ".md", enc("x"), "> 512 chars"],
   ["tool.exe", enc("MZ"), "unsupported type"],
   ["big.md", new Uint8Array(2 * 1024 * 1024 + 1).fill(0x61), "text > 2 MB"],
@@ -285,4 +285,131 @@ test("P2 a schema-conformant workspace (from skills/profile/references/schema.md
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------- fix round 1 additions
+
+for (const m of makers) {
+  test(`I2b [${m.label}] an NFD entry name is accepted and stored as NFC (lead's M3 ruling)`, async () => {
+    const store = await m.make();
+    await importWorkspace(store, zipSync({ "notes/café.md": enc("x"), "documents/résumé.pdf": enc("%PDF x") }));
+    const paths = (await store.list()).map((f) => f.path).sort();
+    assert.deepEqual(paths, ["documents/résumé.pdf", "notes/café.md"]);
+    for (const p of paths) assert.equal(p, p.normalize("NFC"));
+    const out = Object.keys(unzipSync(await exportWorkspace(store))).sort();
+    assert.deepEqual(out, ["documents/résumé.pdf", "notes/café.md"], "export entry names are NFC");
+  });
+}
+
+/** Rewrites the declared uncompressed size of `name` in both the local
+ *  header and the central directory of a fflate-built zip (no zip64). */
+function lieAboutSize(zip: Uint8Array, name: string, declared: number): Uint8Array {
+  const z = zip.slice();
+  const dv = new DataView(z.buffer);
+  const nameBytes = enc(name);
+  let hits = 0;
+  for (let i = 0; i + 4 < z.length; i++) {
+    const sig = dv.getUint32(i, true);
+    if (sig === 0x04034b50 || sig === 0x02014b50) {
+      const central = sig === 0x02014b50;
+      const nlen = dv.getUint16(i + (central ? 28 : 26), true);
+      const nstart = i + (central ? 46 : 30);
+      if (nlen === nameBytes.length && Buffer.from(z.subarray(nstart, nstart + nlen)).equals(Buffer.from(nameBytes))) {
+        dv.setUint32(i + (central ? 24 : 22), declared, true);
+        hits++;
+      }
+    }
+  }
+  assert.equal(hits, 2, "patched local + central header");
+  return z;
+}
+
+test("I6 a STORED entry that under-declares its size (3 MB declared as 10 bytes) is refused whole, nothing written", async () => {
+  for (const m of makers) {
+    const zip = lieAboutSize(zipSync({ "plan.md": enc("# plan\n"), "notes/big.md": new Uint8Array(3 * 1024 * 1024).fill(0x61) }, { level: 0 }), "notes/big.md", 10);
+    const store = await m.make();
+    let err: unknown = null;
+    try {
+      await importWorkspace(store, zip);
+    } catch (e) {
+      err = e;
+    }
+    const left = (await store.list()).map((f) => f.path);
+    assert.ok(err, `${m.label}: resolved`);
+    assert.deepEqual(left, [], `${m.label}: partial import (${(err as Error)?.name}): ${JSON.stringify(left)}`);
+  }
+});
+
+// FIXED (fix round 2, M-new-2/I7): the second import pass verifies each
+// entry's CRC32 against the central directory's own declared value, which
+// catches exactly this case (a DEFLATEd entry silently truncated to a
+// forged declared size).
+test("I7 a DEFLATED entry that under-declares its size is refused (not silently truncated to the declared size)", async () => {
+  const real = new Uint8Array(3 * 1024 * 1024).fill(0x61);
+  const zip = lieAboutSize(zipSync({ "plan.md": enc("# plan\n"), "notes/big.md": real }, { level: 9 }), "notes/big.md", 100);
+  const store = createInMemoryWorkspaceStore();
+  let outcome = "resolved";
+  try {
+    await importWorkspace(store, zip);
+  } catch (e) {
+    outcome = `refused: ${(e as Error).name}`;
+  }
+  if (outcome === "resolved") {
+    const r = await store.read("notes/big.md");
+    assert.fail(`imported with ${r.size} of ${real.byteLength} bytes (silently truncated)`);
+  }
+});
+
+test("I8 a CLAUDE.md entry in the zip is skipped with a note, and the app's own root CLAUDE.md is untouched (Supabase)", async () => {
+  const be = await createBackend();
+  const uid = await be.newUser({ member: true });
+  const opts = { url: SUPABASE_URL, anonKey: ANON, userId: uid, accessToken: async () => `jwt:${uid}`, fetchImpl: be.fetchImpl };
+  await createRootClaudeMd(opts, "# Ten guardrails\n");
+  const store = createSupabaseWorkspaceStore(opts);
+  const res = await importWorkspace(store, zipSync({ "CLAUDE.md": enc("# hostile\n"), "plan.md": enc("x") }));
+  assert.equal(res.notes.length, 1, JSON.stringify(res.notes));
+  const r = await store.read("CLAUDE.md");
+  assert.ok(!r.binary && r.content === "# Ten guardrails\n");
+  assert.deepEqual((await store.list()).map((f) => f.path).sort(), ["CLAUDE.md", "plan.md"]);
+});
+
+// FIXED (fix round 2, I9): the pre-check now seeds the existing root
+// CLAUDE.md as an already-claimed path before validating the zip, so a
+// clash with it is a WorkspaceImportError up front, not a
+// WorkspaceImportPartialError mid-write.
+test("I9 entries that clash with the app's existing root CLAUDE.md (CLAUDE.md/x.md, claude.md) refuse the whole import, nothing written (Supabase)", async () => {
+  const obs: string[] = [];
+  for (const bad of ["CLAUDE.md/x.md", "claude.md", "Claude.md"]) {
+    const be = await createBackend();
+    const uid = await be.newUser({ member: true });
+    const opts = { url: SUPABASE_URL, anonKey: ANON, userId: uid, accessToken: async () => `jwt:${uid}`, fetchImpl: be.fetchImpl };
+    await createRootClaudeMd(opts, "# g\n");
+    const store = createSupabaseWorkspaceStore(opts);
+    let name = "resolved";
+    try {
+      await importWorkspace(store, zipSync({ "plan.md": enc("x"), [bad]: enc("y") }));
+    } catch (e) {
+      name = (e as Error).name;
+    }
+    const left = (await store.list()).map((f) => f.path).filter((p) => p !== "CLAUDE.md");
+    if (name !== "WorkspaceImportError" || left.length) obs.push(`${bad}: ${name}, left ${JSON.stringify(left)}`);
+  }
+  assert.deepEqual(obs, []);
+});
+
+test("I10 a genuine mid-import server surprise is a WorkspaceImportPartialError carrying exactly what was written", async () => {
+  const inner = createInMemoryWorkspaceStore();
+  let n = 0;
+  const flaky = { ...inner, write: async (p: string, c: string, v: string | null) => (++n === 2 ? Promise.reject(new Error("503")) : inner.write(p, c, v)) };
+  let err: unknown;
+  try {
+    await importWorkspace(flaky, zipSync({ "a.md": enc("1"), "b.md": enc("2"), "c.md": enc("3") }));
+  } catch (e) {
+    err = e;
+  }
+  assert.ok(err instanceof WorkspaceImportPartialError, String(err));
+  const written = (err as WorkspaceImportPartialError).written.map((f) => f.path);
+  assert.deepEqual(written, (await inner.list()).map((f) => f.path));
+  assert.equal(written.length, 1);
+  void WorkspaceImportError;
 });

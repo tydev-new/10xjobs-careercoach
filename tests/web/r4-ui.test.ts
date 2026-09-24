@@ -84,16 +84,29 @@ for (const [label, msg, retryable] of [["beta ceiling", CEILING, false], ["upstr
     assert.ok(!/try again in a moment/i.test(html));
   });
 }
+// ui § 2.7 as amended 2026-09-24 (follow-up A, lead ruling): step_cap's line
+// no longer promises a gate; the new line is read from the doc itself.
+const UI_DOC = readFileSync(new URL("../../docs/design-web-ui.md", import.meta.url), "utf8").replace(/\s+/g, " ");
+const STEP_CAP_NEXT = UI_DOC.match(/no gate promise: "([^"]+)"/)?.[1] ?? "(not found in design-web-ui.md § 2.7)";
+test("ui § 2.7: the amended step_cap line is the doc's own sentence", () => {
+  assert.equal(STEP_CAP_NEXT, "Send another message to pick up where it left off.");
+});
 for (const [code, next] of [
   ["tool_error", "A tool call failed."],
   ["offline", "Check your connection and try again."],
-  ["step_cap", "This opened a gate — type yes to continue the run."],
+  ["step_cap", STEP_CAP_NEXT],
 ] as const) {
-  test(`error card: ${code} keeps its unchanged next-step line`, () => {
+  test(`error card: ${code} shows its next-step line (§ 2.7 as amended)`, () => {
     const html = renderErrorPart({ code, message: "x", retryable: false });
     assert.deepEqual(metas(html), [esc(next)]);
   });
 }
+test("error card: step_cap promises no gate and asks for no 'yes' (a step_cap stop opens none)", () => {
+  const html = renderErrorPart({ code: "step_cap", message: "This turn ran out of steps before finishing.", retryable: true });
+  assert.ok(html.includes(`<p class="card-body">${esc("This turn ran out of steps before finishing.")}</p>`), html);
+  assert.deepEqual(metas(html), [esc(STEP_CAP_NEXT), "This can be retried."]);
+  assert.ok(!/\bgate\b|type yes|\byes\b/i.test(html), html);
+});
 
 // ---- ui § 2.5 / fixture: over_balance is a pre-call refusal -> no model reply after it
 test("over-limit-error.json: the proxy's exact over_balance sentence, and nothing after it", () => {

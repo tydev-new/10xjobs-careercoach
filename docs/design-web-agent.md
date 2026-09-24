@@ -5,8 +5,8 @@
 **Amended:** 2026-09-24, § 9 (cut-off replies; owner-approved) and § 10
 (new-version notice; owner-approved). Where § 9 and an earlier section
 disagree, § 9 wins. Again 2026-09-24: § 11 (the conversation is kept;
-owner requirement) and § 12 (a turn that grows too large). Each wins over
-earlier text it names.
+owner requirement) and § 12 (a turn that grows too large), both approved
+by the owner as written (2026-09-24). Each wins over earlier text it names.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -1182,6 +1182,15 @@ sign-ins. This replaces § 7's "a reload starts a new chat" and the
 decision-log line "No saved chat". Candidate-facing copy: `design-web-ui.md`
 § 1.7–1.9.
 
+**Resolved (owner, 2026-09-24, relayed by the lead; approved as written):**
+
+1. No "start fresh" in this release (§ 11.1).
+2. Past the size cap, the oldest turns are dropped with the on-screen line
+   (§ 11.4, UI § 1.9); no archive.
+3. Import skips `.ten/conversation.json` and starts a new conversation
+   (§ 11.7).
+4. No separate conversation viewer: the export covers rule 9 (§ 11.7).
+
 **Prevents:** losing the conversation to a reload, a deploy notice or
 another device; a second conversation (rule 12); a saved copy of a file
 drifting from the file (rules 11, 12); a conversation the export or the
@@ -1190,7 +1199,7 @@ delete leaves out (rule 9).
 ### 11.1 One conversation per user
 
 One continuing conversation, restored on load; no list, no "start fresh"
-yet (it needs an archive and a viewer: owner question). Why: rule 12 and
+(owner, 2026-09-24: it would need an archive and a viewer). Why: rule 12 and
 the cross-host contract's "one persistent canonical chat"
 (`design-cross-host-active-context.md`). The window (§ 7) keeps a long
 conversation's cost per turn flat. The key is the user, so the database
@@ -1524,8 +1533,11 @@ spike replaced (owner, 2026-09-23).
 - The conversation is kept (owner, 09-24; § 11): one row per user, so one
   conversation (rule 12); tool data over 2,000 characters is not kept,
   because a copy of a file drifts from the file (rules 11, 12); a table,
-  not a workspace file, so no agent tool can rewrite it; no "start fresh"
-  yet.
-- A long turn trims itself (§ 12): older tool data in the current turn
+  not a workspace file, so no agent tool can rewrite it. Approved as
+  written (owner, 09-24), with: no "start fresh"; past the cap, oldest
+  turns dropped with a visible line, no archive; import skips
+  `.ten/conversation.json` and starts a new conversation; no separate
+  viewer, the export covers rule 9.
+- A long turn trims itself (§ 12; approved as written, owner, 09-24): older tool data in the current turn
   becomes a stub before a step would pass 160 KB; the proxy's 256 KB cap
   and the cost ceiling stay. A refusal is its own code, `too_large`.

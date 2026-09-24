@@ -95,7 +95,9 @@ export interface GateStatusData {
   status: GateStatus;
 }
 
-export type ErrorCode = "over_balance" | "model_error" | "tool_error" | "offline" | "step_cap" | "cut_off";
+// "too_large" (§ 12.2, amended 2026-09-24): a proxy 413 — the current
+// turn's request grew too large to send.
+export type ErrorCode = "over_balance" | "model_error" | "tool_error" | "offline" | "step_cap" | "cut_off" | "too_large";
 
 export interface DataErrorData {
   code: ErrorCode;

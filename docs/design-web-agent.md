@@ -2,8 +2,9 @@
 
 **Status:** Draft r4 for owner approval (plan step 1, contracts half)
 **Date:** 2026-09-22 · **Owner:** Yong · **Author:** architect
-**Amended:** 2026-09-24, § 9 (cut-off replies; owner-approved). Where § 9
-and an earlier section disagree, § 9 wins.
+**Amended:** 2026-09-24, § 9 (cut-off replies; owner-approved) and § 10
+(new-version notice; owner-approved). Where § 9 and an earlier section
+disagree, § 9 wins.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -1078,6 +1079,95 @@ Should that case count as a cut-off too? It is out of scope here.
 
 ---
 
+## 10. Telling an open tab a newer version is live (amendment, 2026-09-24)
+
+Owner-approved (2026-09-24). Candidate-facing copy: `design-web-ui.md` § 1.8.
+
+**Receipt (live beta, 2026-09-24; numbers only).** The § 9 fix went live
+at 11:57. A 14:00 run used a tab opened earlier: the new proxy capped the
+reply at 8,192, but the old app made no continuation call and showed no
+`cut_off`, and its bundled skills lacked the § 9.7 hint. It saved nothing
+and cost about $0.81. The agent and skills run inside the tab (§ 1), so a
+tab runs the code it loaded until it reloads.
+
+**Prevents:** spending on code a deploy already replaced.
+
+### 10.1 One build id, in two places
+
+- `apps/web/vite.config.ts` computes one id per build, `<short git
+  sha>-<UTC build time, YYYYMMDDTHHMMSSZ>` (`nogit-<time>` without git),
+  so every build differs.
+- That value goes into the bundle (Vite `define`) and into `version.json`
+  at the site root, `{"id":"<id>"}`, emitted by a small plugin in the same
+  config. One value feeds both.
+- No header config: Vercel serves static files `max-age=0,
+  must-revalidate` (live site, 2026-09-24) and caches them per deployment
+  (Vercel CDN cache docs); the client fetches with `cache: "no-store"`.
+- `deploy-prod.sh` gains a third refusal: no `version.json` in the static
+  output, or its id in no file under `assets/` (else every tab stays
+  silent).
+
+### 10.2 Detection (`apps/web`, member chat screen only)
+
+A check fetches `/version.json` (2 s timeout). **Newer** means status 200
+and a non-empty string `id` that differs from the built-in one (differs,
+not higher: a rollback counts). **Anything else is ignored silently**:
+network error, timeout, non-200, bad JSON, no `id`. Nothing shows, nothing
+is blocked; the dev server has no `version.json`, so it stays silent.
+Once newer is known, checks stop.
+
+**When:** on mount; when the tab becomes visible or the window gets focus;
+every 5 minutes while visible; before every send.
+
+### 10.3 No turn starts on replaced code
+
+Every send (a gate `yes` included) checks first, with the composer
+disabled as while a turn is submitted.
+
+- **Newer:** the message is **not sent**: no model call, no spend. Its
+  text goes back into the composer word for word, and the notice shows
+  its "not sent" line.
+- **Same id, or the check failed:** sent as today.
+
+**Why block, not warn:** a warning still lets replaced code spend the
+candidate's money, as in the receipt (rule 5). A reload takes seconds and
+loses only the chat on screen, which is already disposable (§ 7). A
+failed check never blocks. **Known limit:** tabs opened before the first
+build with this check can't be reached.
+
+### 10.4 Test plan
+
+Written from this section and UI § 1.8, not the code.
+
+- **(i) Build:** `dist/version.json` is `{"id": X}`, X has the § 10.1
+  format and appears in a `dist/assets/*.js` file; two builds, two ids.
+- **(ii) Deploy scans:** with a stub `npx` first on `PATH` (its `vercel
+  build` copies a real `dist` to `.vercel/output/static`; its `vercel
+  deploy` records the call), a clean build deploys; a home path or no
+  `SKILL.md` is still refused; no `version.json`, or its id in no asset,
+  is refused (exit 1, no deploy call).
+- **(iii) Detection** (injected fetch): same id, no notice; different,
+  notice; reject, timeout, 404, 500, bad JSON, no or empty `id`: no
+  notice, and a send goes through.
+- **(iv) When** (fake timers): fetches on mount, visible, focus, every 5
+  minutes while visible; none while hidden or once newer is known.
+- **(v) Pre-send:** newer: `sendMessages` is never called, no proxy
+  request, the composer holds the text word for word, the "not sent" line
+  shows. Same id, a failed fetch, or one over 2 s: sent once. A typed
+  `yes` at a pending gate with a newer id: not sent, gate still pending.
+- **(vi) UI:** § 1.8 copy word for word; hidden during a turn, shown
+  after; Reload calls `location.reload()`; 375 px, target ≥ 44 px; the
+  notice alone disables nothing.
+- **(vii) Live, once, after this ships** (owner's call; blocked sends
+  spend nothing): open the site, deploy again, focus the tab: the notice
+  shows, and a send is not sent and adds no ledger row.
+
+**UNVERIFIED:** Vite 8's bundler (Rolldown) emitting a plugin file as
+Rollup does ((i) settles it); `vercel build` copying `version.json` to the
+static root (the new refusal settles it on the first deploy).
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -1139,3 +1229,6 @@ spike replaced (owner, 2026-09-23).
   because the window can drop the whole capped turn.
 - Cap 8,192 (owner, 09-24): the most the ~360 s meter allows at 30 tokens/s,
   with margin; more needs another host. The ledger records `finish_reason`.
+- A deploy tells open tabs (owner, 09-24; § 10): one build id in the bundle
+  and in `version.json`; a newer id blocks the next send, so no spend on
+  replaced code; a failed check never blocks.

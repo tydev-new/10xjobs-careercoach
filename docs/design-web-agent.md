@@ -2,6 +2,8 @@
 
 **Status:** Draft r4 for owner approval (plan step 1, contracts half)
 **Date:** 2026-09-22 · **Owner:** Yong · **Author:** architect
+**Amended:** 2026-09-24, § 9 (cut-off replies; owner-approved). Where § 9
+and an earlier section disagree, § 9 wins.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -51,8 +53,9 @@ export function parsePlanTodo(md: string): { text: string; ref?: string }[];    
   `ten-model-proxy` and the Supabase session JWT as auth (§ 8); no model key
   reaches the browser. The package imports no `window`, `document`,
   `localStorage`, `node:*`, or Supabase client.
-- One loop: `streamText` with the tools and `stopWhen: stepCountIs(maxSteps)`.
-  A headless run reads the same stream to the end.
+- One loop: `streamText` with the tools and `stopWhen: stepCountIs(maxSteps)`,
+  plus at most one continuation call after a cut-off reply (§ 9); `maxSteps`
+  counts the steps of both calls. A headless run reads the same stream to the end.
 
 **Prevents:** a browser-only or server-only coach that the server loop or the
 MCP server would have to fork (rule 12).
@@ -362,7 +365,7 @@ into `tests/run.py`, plus the coverage check.
 | card | `data-card` | `{ card: "verdict" \| "plan" \| "document" \| "checker" \| "cost", props, ref? }`, from code only (§ 6.2) |
 | gate | `data-gate` | `GateRequest` (§ 3) |
 | gate status | `data-gate-status` | `{ gateId, status }`; the latest one wins |
-| error | `data-error` | `{ code: "over_balance" \| "model_error" \| "tool_error" \| "offline" \| "step_cap", message, retryable }` |
+| error | `data-error` | `{ code: "over_balance" \| "model_error" \| "tool_error" \| "offline" \| "step_cap" \| "cut_off", message, retryable }` (`cut_off`: § 9.3, amended 2026-09-24) |
 
 - `data-error.message` is the proxy's or tool's own sentence for the cause
   (§ 8) when one exists, else a fixed fallback per `code`. What was finished is
@@ -549,7 +552,7 @@ person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
    It **sets**:
    - `model` = `anthropic/claude-sonnet-5`, an exact match with no suffix
      (anything else gets 400 `model_not_allowed`);
-   - `max_tokens` = min(client, 4,096);
+   - `max_tokens` = min(client, 8,192) (was 4,096; amended 2026-09-24, § 9.5);
    - `stream: true`;
    - `provider: { data_collection: "deny", zdr: true }`;
    - `cache_control: { type: "ephemeral" }`;
@@ -569,15 +572,15 @@ person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
    non-finite, negative or beyond 10×, or the meter passes its ~360 s
    deadline (timed from the request's start), the row records the
    **ceiling**, computed from the formula (64k input tokens ×
-   input price + 4,096 × output price + one search; about $0.18 today). One
-   metering path only.
+   input price + 8,192 × output price + one search; about $0.23 today, § 9.5).
+   One metering path only; the same pass records `finish_reason` (§ 9.6).
 6. **Failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx,
    a Supabase error, or anything unexpected becomes a 503 with the CORS
    headers, shown as `model_error`, not `over_balance`.
 
 **`ten_usage_ledger`** is the only money table (`kind` `credit`/`call`,
-`request_id` unique, token counts, `usd numeric(12,6)`; columns in the
-migration). Users select their own rows; only the service role writes.
+`request_id` unique, token counts, `usd numeric(12,6)`, `finish_reason`
+(§ 9.6); columns in the migrations). Users select their own rows; only the service role writes.
 
 - **Balance** = credits − calls, derived, never stored (rule 12).
   `ten_balance()` is a `security definer` wrapper that passes `auth.uid()` to
@@ -610,11 +613,11 @@ migration). Users select their own rows; only the service role writes.
   `Authorization: Bearer <current JWT>` on each call (§ 1).
 
 **Time (paid plan: 400 s wall clock; 2 s CPU excluding I/O).** A proxy
-request is one model call (tools run in the browser); 4,096 tokens at 30–80
-tokens/s take 51–137 s. If a call is still cut off, or the cap truncates a tool
-call's arguments, the loop writes nothing from it and shows a retryable
-`model_error`: "The reply was cut off. Nothing from it was saved. Try again."
-(**UNVERIFIED** how `ai@7.0.111` surfaces a stream with no `finish`.)
+request is one model call (tools run in the browser); 8,192 tokens at 30–80
+tokens/s take 102–273 s, inside the meter's ~360 s (§ 9.5). A reply cut off at
+the output cap is handled in the agent (§ 9, amended 2026-09-24); the earlier
+retryable `model_error` "The reply was cut off…" is retired. A stream stopped
+with no finish reason at all is a separate, open case (§ 9.8).
 
 **Prevents:** a model key in the browser; any client field reaching around
 the model, output, search, or path limits; spending a zero balance; a
@@ -633,6 +636,312 @@ rows, no other beta rows, and a known path downloads as not-found; `ten_beta_spe
 is service-only; the SQL harness in `tests/sql/` (README there: `run-r2.mjs`,
 `r3-own.mjs`; guard, CAS, codes, caps, paths, membership, pins, teardown after
 the Storage API step) passes.
+
+---
+
+## 9. Cut-off replies (amendment, 2026-09-24)
+
+Owner-approved decisions (2026-09-24), written in by the architect. Where
+this section and an earlier one disagree, this one wins; the earlier text
+points here.
+
+**Receipt (live beta, 2026-09-24; numbers only).** Three "evaluate 4 JDs"
+runs in a row each ended on a reply of exactly 4,096 output tokens, the cap.
+Each reply was the final write of all four verdicts. Nothing was saved, and
+the turn ended with no text and no error. The next turn said no evaluation
+had been run. About $1.37 was spent for nothing. A profile-intake turn hit
+the same cap. Across ~140 calls, every reply that ended on its own used
+≤ 3,038 output tokens; 4,096 tokens took 52–55 s (~75 tokens/s).
+
+**Why it was silent (read in the installed packages).**
+
+- When a stream ends with `finish_reason: "length"`,
+  `@openrouter/ai-sdk-provider` 3.1.0 drops any tool call whose arguments
+  were still being written. Its `flush()` emits unfinished calls only when
+  the reason is `tool-calls`.
+- The step then has no tool call, the `ai@7.0.111` loop ends, and
+  `coach.ts` never read the finish reason.
+- The loop also **continues** after a `length` step that holds a finished
+  call (the provider emits a call once its arguments parse). So a later,
+  unfinished call can vanish mid-run.
+- On the next turn, `convertToModelMessages` leaves out a tool part still in
+  `input-streaming`, so the model sees no trace of the attempt.
+
+**Prevents:** work that is silently not saved; a next turn that says nothing
+was attempted; paying twice for the same cut-off.
+
+### 9.1 Detection (`packages/agent`)
+
+A step is **cut off** when its finish reason is `"length"` (the step result
+and the `finish-step` part both carry it). That is the whole test, and no
+proxy change is needed. A partial text reply with no tool call counts the
+same.
+
+- The stop condition checks this **first**, before the step cap. A cut-off
+  step stops the loop; its only other effect is recording the step's cost.
+- A tool part the cut-off left open is a `tool-input-start` with no
+  `tool-call` for its id (the existing stream tap sees both). Each one is
+  closed with the SDK's `tool-input-error` chunk: `input: {}` and
+  `errorText` "Cut off at the output limit before it ran. Nothing from it
+  was saved."
+  - The "ran …" line then shows that text, not an empty output (rule 11).
+  - Later turns carry a small, valid call-and-error pair, not the partial
+    arguments.
+
+### 9.2 One continuation per turn
+
+The identical request is never re-sent (`maxRetries: 0` stays). After a
+cut-off the coach makes **one** continuation call per turn, only if all of
+these hold:
+
+1. no continuation has run this turn;
+2. fewer than `maxSteps` steps are used, counting both calls (the
+   continuation's stop condition uses the turn's total);
+3. no gate is pending for the chat;
+4. spent-so-far plus the projected next step (§ 4's projection) is within
+   the turn's allowance;
+5. the turn wasn't aborted, and the call didn't end on an `error` part.
+
+**How it runs.** The AI SDK loop has already ended by then, so:
+
+- The coach reads the first call's tapped stream to its end. It then reads
+  `result.responseMessages` (every step's assistant and tool messages) and
+  `result.steps`.
+- Every step's cost is added **exactly once**. The stop condition records
+  the steps it sees. After each call, the coach records any it didn't (at
+  most the last). This also fixes a gap: today the last step of every call
+  goes uncounted.
+- A second `streamText` runs with the same `model`, `system`, `tools`,
+  `abortSignal` and `maxRetries: 0`. Its `messages` are, in order:
+  - the first call's input messages;
+  - its response messages (drop a trailing assistant message with no
+    content);
+  - one **user-role** message with this note, word for word:
+
+  > Note from the Ten app, not the candidate: your last reply was cut off
+  > at the output limit. The part that was cut off never ran: a tool call
+  > it was writing did not happen, and nothing from it was saved. Tool calls
+  > that finished before it did run. Do the unfinished work in smaller
+  > pieces, one file per write, and check the files before repeating
+  > anything.
+
+- The system prompt stays the same, so the continuation can reuse the
+  prompt cache. A changed system prompt would re-bill the whole prefix.
+- The note exists only in that request. It is never a `UIMessage`, and
+  `matchGateReply` never sees it.
+- **One assistant message on screen.** Every call's UI stream is merged
+  with `sendFinish: false`, and every call after the first also has
+  `sendStart: false`. The coach writes one `{ type: "finish" }` last. No
+  `apps/web` code reads that chunk's fields (checked 2026-09-24).
+- Inside the continuation the normal loop runs, with the same stop
+  condition, allowance, gate and step cap. Its calls are metered like any
+  other.
+
+### 9.3 A visible stop: `cut_off`
+
+A cut-off that can't be continued writes `data-error { code: "cut_off",
+message, retryable: true }` (§ 6.1). That covers any of 1–5 failing,
+including a second cut-off in the turn. There is never a third call. The
+message is fixed:
+
+> My reply got too long and was cut off, so its last step didn't save. Say
+> continue to redo it in smaller pieces.
+
+It says what happened and what the candidate can do, not what the agent
+will do (the L2 rule in `apps/web/src/components/ErrorPart.tsx`).
+
+- **Gates are untouched.** This path never opens, decides or expires a
+  gate, and a pending gate stays pending.
+- An allowance stop here opens no "Continue this run" gate. The
+  candidate's next message starts a new turn with a fresh allowance (§ 4),
+  so "say continue" is true.
+- **UI change needed.**
+  - `apps/web/src/types.ts` adds `"cut_off"` to `ErrorCode`.
+  - `ErrorPart` renders it through its generic path, with no `nextStep`
+    entry; the message already says what to do.
+  - `design-web-ui.md` § 2.7 is updated to match.
+  - The old § 8 cut-off `model_error` sentence is retired.
+
+### 9.4 The next turn knows
+
+The check is stateless and runs at the start of each turn. It looks at the
+assistant message just before the latest user message, in the history as
+sent, **before** the window trims it. If that message has a `data-error`
+part with code `cut_off`, the coach appends this note to that turn's system
+prompt (after the gate-pending note, when both apply):
+
+> Your previous reply in this chat was cut off at the output limit and
+> could not be finished, so part of that work was never saved. Check the
+> files for what is actually there. Tell the candidate plainly what was
+> saved and what wasn't (never that nothing was attempted), then do what's
+> missing in smaller pieces, one file per write, unless they asked for
+> something else.
+
+- **No stored flag (rule 12).** Data parts stay in the history: none is
+  transient, and the real transport sends every message.
+- **Before the window, on purpose.** A multi-JD turn's tool results can pass
+  `windowWords`. The window would then drop exactly the turn that was cut
+  off.
+- A turn whose continuation succeeded wrote no `cut_off`, so the next turn
+  gets no note.
+
+### 9.5 The cap and its time bound (proxy)
+
+`max_tokens` = min(client, **8,192**) (was 4,096). The ceiling comes from
+§ 8's formula with `core.ts`'s constants:
+
+64,000 × $2/M + 8,192 × $10/M + one search (5 × $0.004)
+= $0.128 + $0.08192 + $0.02 = **$0.22992, about $0.23** (was $0.18896).
+
+**Why 8,192 and no higher:**
+
+- The meter must finish within ~360 s of the request's start (Edge
+  Runtime wall clock: 400 s).
+- At the design's worst case of 30 tokens/s, 8,192 tokens take ~273 s, so
+  they fit. 16,384 tokens would take ~546 s, so they would not.
+- About 10,000 tokens (~333 s) is the most that fits. **Going beyond ~10k
+  needs a longer-running host for the proxy, not a bigger number.**
+- At today's measured ~75 tokens/s, 8,192 tokens take ~110 s.
+
+### 9.6 Recording why each call ended (proxy)
+
+This lets a cut-off show in the data without anyone reading a chat.
+
+- **Column:** `ten_usage_ledger.finish_reason text`, nullable, with
+  `check (finish_reason is null or char_length(finish_reason) <= 32)`.
+  - It is added by a **new** migration file,
+    `supabase/migrations/20260924000000_ten_ledger_finish_reason.sql` (3 s
+    lock timeout, one `alter table … add column`). The applied
+    `20260923000000_ten_beta_init.sql` is never edited.
+  - The owner applies it, never an agent, **before** deploying the proxy
+    that writes the column. Otherwise every insert would name an unknown
+    column and fail.
+  - The teardown needs no new statement (the column goes with the table),
+    but its header names both files. The SQL harness applies both files in
+    order.
+- **Parse:** in the meter's existing pass over the `data:` lines,
+  `finish_reason` is the **last non-null** `choices[0].finish_reason`
+  (OpenRouter's normalized value, not `native_finish_reason`).
+  - Reading only the last line would miss it: the usage chunk that follows
+    often has no `choices`.
+  - A string of 1–32 characters is kept. Anything else is null: another
+    type, no finish reason, or a meter that hit its deadline.
+- **Never blocks the insert:** a parse problem gives null, never an
+  exception, and the rest of the row is written as today. Credit rows leave
+  it null. It is cost metadata, so `ten-delete-account` keeps it with the
+  `call` rows.
+
+### 9.7 Prevention in the skill (evaluate)
+
+This is a hint, not a step. (CLAUDE.md: a measured miss earns a moment rule,
+a hint in patterns, or a script, never a step.)
+
+It goes in `skills/evaluate/references/patterns.md`, § Full evaluation —
+getting there, at the end of step 7 ("Record it"). It is host-neutral, word
+for word:
+
+> In a run over several roles, record each one as soon as its verdict is
+> decided (its analysis file and its `record_verdict.py` call), then move
+> to the next role. Never hold verdicts back to write together at the end:
+> a batch cut off partway (a reply limit, a closed session) saves nothing,
+> and the next session finds no sign the work was done. *(Receipt: web
+> beta, 2026-09-24: three four-role runs lost everything at the final
+> batch write.)*
+
+The coder pastes it, an independent reviewer checks it, and the deployed
+copy is refreshed with `cp -r skills/* ~/.claude/skills/`.
+
+### 9.8 Test plan
+
+The tester writes these from this section, not from the code. Use a stubbed
+model, the in-memory store and a fake gate, never a real workspace.
+
+- **(i) One continuation, then success.** The real
+  `@openrouter/ai-sdk-provider` gets a stubbed `fetch` streaming SSE: text,
+  a `write_file` whose arguments stop mid-string, then `finish_reason:
+  "length"`. The second response is a normal call, then `stop`. Pass when:
+  - there are exactly two requests;
+  - the second has the same system prompt, differs from the first, and ends
+    with the § 9.2 note word for word;
+  - the second call's tool runs;
+  - there is one message with one `start` and one `finish`;
+  - the dangling part is `output-error` with the § 9.1 text;
+  - there is no `cut_off`.
+
+  Variants: a text-only cut-off; a mid-run cut-off, where a step holds a
+  finished and an unfinished `write_file`. The finished one runs once, the
+  loop stops, and the continuation runs.
+- **(ii) Cut off twice.** Both requests end on `length`. Pass when there are
+  exactly two requests and one `cut_off`, with its fixed message and
+  `retryable: true`.
+- **(iii) Continuation blocked.** In each case, pass when there is no
+  second request and there is one `cut_off`:
+  - (a) spent plus projected passes the allowance;
+  - (b) the cut-off step is step `maxSteps`, and no `step_cap` is written;
+  - (c) a gate is pending, and it stays pending.
+
+  Also: the fake gate sees no open, decide or expire from this path, and
+  the cut-off step's cost is counted once, in both the turn and the chat.
+- **(iv) The next turn.**
+  - A `cut_off` part on the last assistant message: the system prompt ends
+    with the § 9.4 note word for word.
+  - No such part: no note.
+  - The cut-off turn outside `windowWords`: the note is still there.
+  - A declined gate: no model call.
+- **(v) Cap and ceiling.**
+  - Clamp: 8,192 stays; 8,193, absent and garbage all give 8,192.
+  - `CEILING_USD` = 64,000 × 2e-6 + 8,192 × 1e-5 + 5 × 0.004 = 0.22992.
+  - Every 4,096 assertion is updated (`core.test.ts`, `handler.test.ts`,
+    `tests/functions/*.test.ts`).
+- **(vi) `finish_reason`.**
+  - `"length"` on a content chunk, then a usage chunk with empty `choices`:
+    `"length"`.
+  - None, a number, `""`, or 33 characters: null.
+  - A stream cut mid-line: the last whole value, or null.
+  - A meter deadline: null.
+  - In every case the insert carries the key and succeeds.
+  - SQL harness: the column is nullable and refuses 33 characters, and
+    teardown leaves no `ten_` object.
+- **(vii) UI.**
+  - `ErrorPart` shows a `cut_off` part's message word for word, plus the
+    retryable line and no next-step line.
+  - A part closed by `tool-input-error` shows the § 9.1 text in the
+    expanded "ran …" line, as one part per call id.
+  - `apps/web` typechecks.
+- **(viii) Live, once, after deploy** (the owner approves the spend). A
+  fixture persona, never real data, runs a four-JD evaluate in production.
+  Pass when the ledger rows carry `finish_reason`, and any `length` row
+  shows in chat as a finished continuation or a visible `cut_off`.
+- **(ix) The hint.** A conduct harness per `tests/always-on/README.md`:
+  four planted JDs, 3 trials, majority rule. Pass when each role's
+  `jobs.md` row lands before the next role's analysis file. The owner
+  approves the spend first (rule 5).
+
+**UNVERIFIED** (the named test settles each one):
+
+- that the production finish reason was `length`. This is inferred from
+  the exact 4,096-token replies and the provider code; the new column
+  confirms it next time;
+- that a late `tool-input-error` updates the open part rather than adding
+  a second one (vii);
+- that OpenRouter accepts a user message right after tool results for
+  this model (i);
+- that the continuation reads the cache, i.e. its ledger `tokens_cached`
+  is above 0 (viii);
+- that the model accepts `max_tokens` 8,192 (viii).
+
+Known noise: `ai` logs a console warning about `rawInput` whenever history
+holds a part closed by `tool-input-error`.
+
+**Open question (owner): a stream that ends with no finish reason at all.**
+The provider maps that to `"other"`, not `"length"`.
+
+- With a pending tool call, the provider emits the call with `{}` input,
+  and it fails visibly as a tool error.
+- With text only, the turn still ends silently.
+- What a 400 s wall-clock kill looks like on the wire is **UNVERIFIED**.
+
+Should that case count as a cut-off too? It is out of scope here.
 
 ---
 
@@ -682,3 +991,11 @@ spike replaced (owner, 2026-09-23).
   $20/day stays at least $15 for the live app.
 - Restrictive pins on the bucket, plus an allowlist guard at apply time: the
   pins hold against policies added later; parsing SQL text can't.
+- Cut-off replies (owner, 09-24; § 9): detected in the agent from the finish
+  reason, one continuation per turn under the same allowance, else a visible
+  `cut_off`; the next turn is told, from history, with no stored flag (rule 12).
+- The retry note is a user-role message, not a system-prompt change: the
+  system prompt stays byte-identical, so the prompt cache survives. Prefill
+  was rejected (it cannot resume a dropped tool call).
+- Cap 8,192 (owner, 09-24): the most the ~360 s meter allows at 30 tokens/s,
+  with margin; more needs another host. The ledger records `finish_reason`.

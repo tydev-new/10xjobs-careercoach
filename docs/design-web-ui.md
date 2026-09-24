@@ -285,14 +285,15 @@ itself (§ 2.5); there's no second "say go" reply.
 ### 2.7 `data-error`
 
 Rendered exactly as the envelope carries it — `{ code, message,
-retryable }` (C § 6.1 names the five `code` values). `message` is
+retryable }` (C § 6.1 names the `code` values). `message` is
 never a UI invention: it's the literal sentence the server sent, and
 under `model_error` that sentence differs by cause even though the
 `code` doesn't — the beta-wide ceiling ("The beta has reached today's
-limit. Try again tomorrow.") and a truncated reply ("The reply was cut
-off. Nothing from it was saved. Try again.") are both `model_error`,
-told apart only by their own `message` text (C § 8), never by a
-separate code. `over_balance`'s own message is now "Your beta credit
+limit. Try again tomorrow.") and an upstream failure are both
+`model_error`, told apart only by their own `message` text (C § 8),
+never by a separate code. A reply cut off at the output limit is its
+own code, `cut_off` (C § 9.3, amended 2026-09-24): a fixed message
+that already says what to do, so it has no `nextStep` line. `over_balance`'s own message is now "Your beta credit
 is used up. Ask the person who invited you for more." — there is no
 "add funds" step in the beta (one shared app key, no per-candidate
 spend), so the old `nextStep` lookup entry for it is gone; the message

@@ -38,7 +38,32 @@ export const ERROR_MESSAGES: Record<ErrorCode, { message: string; retryable: boo
   tool_error: { message: "Something went wrong running that tool.", retryable: true },
   offline: { message: "You appear to be offline.", retryable: true },
   step_cap: { message: "This turn ran out of steps before finishing.", retryable: true },
+  // § 9.3 (amended 2026-09-24): a cut-off that can't be continued (both
+  // calls ended on "length", or a § 9.2 precondition failed). The
+  // message is fixed, word for word.
+  cut_off: {
+    message: "My reply got too long and was cut off, so its last step didn't save. Say continue to redo it in smaller pieces.",
+    retryable: true,
+  },
 };
+
+// § 9.1: a tool part a cut-off left open (a `tool-input-start` with no
+// `tool-call` for its id) is closed with this exact `tool-input-error`
+// text — word for word.
+const CUT_OFF_TOOL_ERROR_TEXT = "Cut off at the output limit before it ran. Nothing from it was saved.";
+
+// § 9.2's continuation note, a USER-role message (never a UIMessage,
+// never seen by matchGateReply) appended to the continuation's own
+// `messages` — word for word, unwrapped from the doc's blockquote.
+const CUT_OFF_CONTINUATION_NOTE =
+  "Note from the Ten app, not the candidate: your last reply was cut off at the output limit. The part that was cut off never ran: a tool call it was writing did not happen, and nothing from it was saved. Tool calls that finished before it did run. Do the unfinished work in smaller pieces, one file per write, and check the files before repeating anything.";
+
+// § 9.4's stateless next-turn note, appended to the system prompt (after
+// the gate-pending note, when both apply) when the assistant message just
+// before the latest user message carries a `cut_off` data-error part —
+// word for word, unwrapped from the doc's blockquote.
+const CUT_OFF_NEXT_TURN_NOTE =
+  '\n\n---\nYour previous reply in this chat was cut off at the output limit and could not be finished, so part of that work was never saved. Check the files for what is actually there. Tell the candidate plainly what was saved and what wasn\'t (never that nothing was attempted), then do what\'s missing in smaller pieces, one file per write, unless they asked for something else.';
 
 /** § 3.2's note, added to the system prompt (not a canned USER-FACING
  *  reply — the lead's fix-round-1 ruling: "the fixed line is the MOCK's
@@ -75,6 +100,44 @@ function textOf(m: AppMessage): string {
 
 function originOf(m: AppMessage): "typed" | "ui" {
   return (m.metadata as AppMessageMetadata | undefined)?.origin ?? "ui";
+}
+
+// § 9.4: "The check is stateless and runs at the start of each turn. It
+// looks at the assistant message just before the latest user message, in
+// the history AS SENT, before the window trims it." No stored flag (rule
+// 12) — this reads straight off the history the client resent.
+function cutOffJustBeforeLatestUser(messages: AppMessage[]): boolean {
+  let lastUserIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
+      lastUserIndex = i;
+      break;
+    }
+  }
+  if (lastUserIndex <= 0) return false;
+  const prev = messages[lastUserIndex - 1];
+  if (prev.role !== "assistant") return false;
+  const parts = prev.parts as unknown as Array<{ type: string; data?: { code?: string } }>;
+  return parts.some((p) => p.type === "data-error" && p.data?.code === "cut_off");
+}
+
+// § 9.2: "drop a trailing assistant message with no content" — an
+// AssistantModelMessage whose content is an empty string or an empty
+// array (nothing survived the cut off in that step: no text, no
+// finished tool call).
+function isEmptyAssistantContent(content: unknown): boolean {
+  if (typeof content === "string") return content.length === 0;
+  if (Array.isArray(content)) return content.length === 0;
+  return false;
+}
+
+function dropTrailingEmptyAssistantMessage<T extends { role: string; content: unknown }>(messages: T[]): T[] {
+  if (messages.length === 0) return messages;
+  const last = messages[messages.length - 1];
+  if (last.role === "assistant" && isEmptyAssistantContent(last.content)) {
+    return messages.slice(0, -1);
+  }
+  return messages;
 }
 
 // Step 5b coder's fix (flagged in the hand-back): design-web-ui.md § 2.7
@@ -161,14 +224,8 @@ function stripWorkspaceFileParts(messages: AppMessage[]): AppMessage[] {
 // addition) being present in every runtime this package ships to,
 // matching § 1's own "runs in the browser and on a server" bar. Same
 // async generator, same yielded values, same order.
-function tapErrorParts(stream: AsyncIterable<any>, onError: (error: unknown) => void): ReadableStream<any> {
-  async function* gen() {
-    for await (const part of stream) {
-      if (part?.type === "error") onError(part.error);
-      yield part;
-    }
-  }
-  const iterator = gen();
+function toPullReadableStream<T>(iterable: AsyncIterable<T>): ReadableStream<T> {
+  const iterator = iterable[Symbol.asyncIterator]();
   return new ReadableStream({
     async pull(controller) {
       const { value, done } = await iterator.next();
@@ -182,6 +239,44 @@ function tapErrorParts(stream: AsyncIterable<any>, onError: (error: unknown) => 
       await iterator.return?.(reason);
     },
   });
+}
+
+// § 9.1: watches one call's raw `fullStream` for two things, alongside the
+// existing M4 error tap (unchanged — still runs on the RAW part, before
+// `toUIMessageStream` swallows the classifiable detail):
+//   - a dangling tool part: a `tool-input-start` whose id never gets a
+//     matching `tool-call` (the cut-off dropped it). Closed the moment
+//     the step that left it open reports `finishReason: "length"` — via a
+//     direct `tool-input-error` UI chunk (§ 9.1's exact text), not
+//     something `toUIMessageStream` can derive from the raw stream alone
+//     (there's no such raw `TextStreamPart`).
+//   - whether the CALL ends cut off (`finish` with `finishReason: "length"`,
+//     § 9.1's whole test) — read here too so a call with zero client tool
+//     calls (nothing ever reaches the stop condition, see § 9.2) is still
+//     caught the moment its OWN "finish" chunk streams by, same as
+//     `result.finishReason` would report once awaited.
+function tapCutOffAndErrors(
+  stream: AsyncIterable<any>,
+  onError: (error: unknown) => void,
+  onDanglingToolPart: (toolCallId: string, toolName: string) => void,
+): ReadableStream<any> {
+  async function* gen() {
+    const pending = new Map<string, string>(); // toolCallId -> toolName
+    for await (const part of stream) {
+      if (part?.type === "error") {
+        onError(part.error);
+      } else if (part?.type === "tool-input-start") {
+        pending.set(part.id, part.toolName);
+      } else if (part?.type === "tool-call") {
+        pending.delete(part.toolCallId);
+      } else if (part?.type === "finish-step" && part.finishReason === "length" && pending.size > 0) {
+        for (const [toolCallId, toolName] of pending) onDanglingToolPart(toolCallId, toolName);
+        pending.clear();
+      }
+      yield part;
+    }
+  }
+  return toPullReadableStream(gen());
 }
 
 export function createCoach(deps: Deps): Coach {
@@ -309,6 +404,14 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     }
   }
 
+  // § 9.4: checked on `messages` — the history AS SENT — before the
+  // window trims it (a multi-JD turn's tool results can push `windowWords`
+  // past exactly the cut-off turn). After the gate-pending note, when both
+  // apply.
+  if (cutOffJustBeforeLatestUser(messages)) {
+    systemNote += CUT_OFF_NEXT_TURN_NOTE;
+  }
+
   const windowed = trimHistoryToWindow(messages, windowWords);
 
   const turnState: TurnState = {
@@ -350,106 +453,249 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     return DEFAULT_STEP_COST_MAX_USD;
   }
 
-  // ONE combined stop condition (not an array) so its side effects — the
-  // step_cap error, the mid-run allowance gate — run in a fixed order and
-  // exactly once per step boundary, with no risk of the SDK evaluating
-  // several independent conditions' side effects on the same step.
-  const stop: StopCondition<typeof tools, any> = async ({ steps }) => {
-    // 1. the hard step cap.
-    if (steps.length >= maxSteps) {
-      const { message, retryable } = ERROR_MESSAGES.step_cap;
-      writer.write({ type: "data-error", data: { code: "step_cap", message, retryable } });
+  // § 9.2: "every step's cost is added exactly once" — one recorder
+  // shared by both calls' stop conditions AND the post-call catch-up
+  // below, so nothing here decides cost on its own.
+  function recordStepCost(step: { providerMetadata?: any }): void {
+    const measuredUsd = step.providerMetadata?.openrouter?.usage?.cost ?? DEFAULT_STEP_COST_MEDIAN_USD;
+    const sample: StepCostSample = { usd: measuredUsd };
+    turnState.measuredSteps.push(sample);
+    state.chatMeasuredSteps.push(sample);
+    turnState.spentSoFarUsd += measuredUsd;
+  }
+
+  // ONE combined stop condition per call (not an array) so its side
+  // effects — the step_cap error, the mid-run allowance gate — run in a
+  // fixed order and exactly once per step boundary, with no risk of the
+  // SDK evaluating several independent conditions' side effects on the
+  // same step. `baseStepCount` is the number of steps already spent in
+  // an EARLIER call this turn (0 for the first call, the first call's own
+  // step count for the § 9.2 continuation) — § 9.2 precondition 2: "fewer
+  // than maxSteps steps are used, counting both calls (the continuation's
+  // stop condition uses the turn's total)".
+  //
+  // Returns both the condition itself and how many of ITS OWN steps it
+  // recorded — the AI SDK only calls this at all when the step it just
+  // ran has a client tool call to decide whether to continue past (see
+  // the hand-back): a text-only step, or one whose only tool call the
+  // cut-off dropped entirely, never reaches it, so the post-call
+  // catch-up below is what actually fixes § 9.2's "today the last step
+  // of every call goes uncounted" gap for those cases.
+  function makeStop(baseStepCount: number): { stop: StopCondition<typeof tools, any>; recordedCount: () => number } {
+    let recordedThisCall = 0;
+    const stop: StopCondition<typeof tools, any> = async ({ steps }) => {
+      const last = steps[steps.length - 1];
+      if (last && steps.length > recordedThisCall) {
+        recordStepCost(last as any);
+        recordedThisCall = steps.length;
+      }
+      // § 9.1: "The stop condition checks this first, before the step
+      // cap. A cut-off step stops the loop; its only other effect is
+      // recording the step's cost" (done above, unconditionally).
+      if ((last as any)?.finishReason === "length") return true;
+
+      // 1. the hard step cap, counting steps used in EARLIER calls too.
+      if (baseStepCount + steps.length >= maxSteps) {
+        const { message, retryable } = ERROR_MESSAGES.step_cap;
+        writer.write({ type: "data-error", data: { code: "step_cap", message, retryable } });
+        return true;
+      }
+      // 2. estimate_cost (or a tool's own reported cost) already pushed
+      //    this chat over — a gate may already be pending, opened by the
+      //    tool itself this step (§ 3: "code opens the spend gate and ends
+      //    the turn").
+      if ((await deps.gate.pending(chatId)) !== null) return true;
+
+      // 3. § 4's "allowance": each turn may spend spendGateUsd (or the
+      //    amount of a gate approved by the message that started the
+      //    turn). After each step the loop adds up the MEASURED cost
+      //    (H1: real step costs, never a constant, decide whether the
+      //    NEXT step fits); if it would pass the allowance, it stops
+      //    BEFORE that step and opens a gate for spent-so-far + the
+      //    projected next step.
+      const nextStepCost = projectedNextStepUsd();
+      if (turnState.spentSoFarUsd + nextStepCost <= allowanceUsd) return false;
+
+      const amountUsd = roundUpCents(turnState.spentSoFarUsd + nextStepCost);
+      const gateId = crypto.randomUUID();
+      const text = `Continue this run\nSpent so far this turn: $${turnState.spentSoFarUsd.toFixed(4)}`;
+      const req: GateRequest = {
+        gateId,
+        kind: "spend",
+        label: "Continue this run",
+        text,
+        textHash: await textHashOf(text),
+        gateLine: buildGateLine(gateGrammarMd, amountUsd),
+        amountUsd,
+      };
+      await openGate(req);
       return true;
-    }
-    // 2. estimate_cost (or a tool's own reported cost) already pushed
-    //    this chat over — a gate may already be pending, opened by the
-    //    tool itself this step (§ 3: "code opens the spend gate and ends
-    //    the turn").
-    if ((await deps.gate.pending(chatId)) !== null) return true;
-
-    // 3. § 4's "allowance": each turn may spend spendGateUsd (or the
-    //    amount of a gate approved by the message that started the
-    //    turn). After each step the loop adds up the MEASURED cost
-    //    (H1: real step costs, never a constant, decide whether the
-    //    NEXT step fits); if it would pass the allowance, it stops
-    //    BEFORE that step and opens a gate for spent-so-far + the
-    //    projected next step.
-    const last = steps[steps.length - 1];
-    if (last) {
-      const measuredUsd =
-        (last as any).providerMetadata?.openrouter?.usage?.cost ?? DEFAULT_STEP_COST_MEDIAN_USD;
-      const sample: StepCostSample = { usd: measuredUsd };
-      turnState.measuredSteps.push(sample);
-      state.chatMeasuredSteps.push(sample);
-      turnState.spentSoFarUsd += measuredUsd;
-    }
-    const nextStepCost = projectedNextStepUsd();
-    if (turnState.spentSoFarUsd + nextStepCost <= allowanceUsd) return false;
-
-    const amountUsd = roundUpCents(turnState.spentSoFarUsd + nextStepCost);
-    const gateId = crypto.randomUUID();
-    const text = `Continue this run\nSpent so far this turn: $${turnState.spentSoFarUsd.toFixed(4)}`;
-    const req: GateRequest = {
-      gateId,
-      kind: "spend",
-      label: "Continue this run",
-      text,
-      textHash: await textHashOf(text),
-      gateLine: buildGateLine(gateGrammarMd, amountUsd),
-      amountUsd,
     };
-    await openGate(req);
-    return true;
-  };
+    return { stop, recordedCount: () => recordedThisCall };
+  }
 
-  const result = streamText({
-    model: deps.model,
-    system: systemPrompt + systemNote,
-    messages: modelMessages,
-    tools,
-    stopWhen: stop,
-    abortSignal,
-    // Fix round 1, item 5 (flagged, outside this slice's own directory):
-    // ONE proxy call per step. The AI SDK's default `maxRetries: 2`
-    // auto-retries any APICallError with `isRetryable === true`, and the
-    // installed @openrouter/ai-sdk-provider's own default for that is
-    // "statusCode is 408/409/429/>=500" — ten-model-proxy's own
-    // deliberate refusals (over_balance 402, not_a_member 403, 413) are
-    // already outside that set and were never retried, but its 503
-    // (model_error — both the beta ceiling AND a genuinely-down upstream
-    // share this one status, § 8) IS >= 500, so the SDK silently retried
-    // a single refused turn 2-3 times against the proxy before ever
-    // reaching this package's own error handling. A raw network failure
-    // (fetch() itself throwing — offline, DNS, connection reset) is
-    // NEVER auto-retried by the SDK's default `shouldRetry` either way
-    // (it only fires for an APICallError/GatewayError instance, not a
-    // bare thrown error) — so `maxRetries: 0` costs nothing for "genuine
-    // network errors"; there was no SDK-level retry safety net for them
-    // to begin with. The candidate's own retry (typing again; the
-    // `retryable: true` flag on the resulting data-error) is the actual
-    // recovery path, same as it already is for every other error code.
-    maxRetries: 0,
-  });
+  interface CallOutcome {
+    steps: readonly any[];
+    cutOff: boolean;
+    hadError: boolean;
+    responseMessages: any[];
+  }
 
-  // Fix round 2, item 7: a refused first call (e.g. `recordedSteps.length
-  // === 0`, § 8's own 402/503 refusals) makes streamText's OWN internal
-  // deferred promises (finishReason/rawFinishReason/totalUsage/steps/
-  // initialResponseMessages — see @ai-sdk/provider-utils' own
-  // rejectResultPromises) reject with a NoOutputGeneratedError. This
-  // package never reads any of `result`'s promise-shaped getters (only
-  // `result.fullStream`, consumed below) — so nothing else ever attaches
-  // a `.catch` to them, and Node/the browser can report an unhandled
-  // rejection for a promise this code technically "caused" but never
-  // otherwise touches. Reading + settling them here (never throwing,
-  // never awaited by anything that matters) gives every one of them a
-  // handler, independent of whether this turn actually finishes.
-  void Promise.allSettled([result.steps, result.totalUsage, result.finishReason]);
+  // Runs ONE streamText call to completion and merges its UI stream —
+  // § 9.2's "one assistant message on screen": every call's stream is
+  // merged with `sendFinish: false`, and the coach itself writes the ONE
+  // `{ type: "finish" }` once both calls (or just the first) are done.
+  async function runOneCall(callMessages: unknown, baseStepCount: number, sendStart: boolean): Promise<CallOutcome> {
+    const { stop, recordedCount } = makeStop(baseStepCount);
+    const result = streamText({
+      model: deps.model,
+      // § 9.2: "The system prompt stays the same, so the continuation can
+      // reuse the prompt cache." Byte-identical on both calls: computed
+      // once, above, never touched again after the first call starts.
+      system: systemPrompt + systemNote,
+      messages: callMessages as any,
+      tools,
+      stopWhen: stop,
+      abortSignal,
+      // Fix round 1, item 5 (flagged, outside this slice's own directory):
+      // ONE proxy call per step. The AI SDK's default `maxRetries: 2`
+      // auto-retries any APICallError with `isRetryable === true`, and the
+      // installed @openrouter/ai-sdk-provider's own default for that is
+      // "statusCode is 408/409/429/>=500" — ten-model-proxy's own
+      // deliberate refusals (over_balance 402, not_a_member 403, 413) are
+      // already outside that set and were never retried, but its 503
+      // (model_error — both the beta ceiling AND a genuinely-down upstream
+      // share this one status, § 8) IS >= 500, so the SDK silently retried
+      // a single refused turn 2-3 times against the proxy before ever
+      // reaching this package's own error handling. A raw network failure
+      // (fetch() itself throwing — offline, DNS, connection reset) is
+      // NEVER auto-retried by the SDK's default `shouldRetry` either way
+      // (it only fires for an APICallError/GatewayError instance, not a
+      // bare thrown error) — so `maxRetries: 0` costs nothing for "genuine
+      // network errors"; there was no SDK-level retry safety net for them
+      // to begin with. The candidate's own retry (typing again; the
+      // `retryable: true` flag on the resulting data-error) is the actual
+      // recovery path, same as it already is for every other error code.
+      // § 9.2: "the identical request is never re-sent (`maxRetries: 0`
+      // stays)".
+      maxRetries: 0,
+    });
 
-  const tapped = tapErrorParts(result.fullStream, (error) => {
-    const { code, serverMessage } = classifyError(error);
-    const { message, retryable } = ERROR_MESSAGES[code];
-    writer.write({ type: "data-error", data: { code, message: serverMessage ?? message, retryable } });
-  });
+    // Fix round 2, item 7: a refused first call (e.g. `recordedSteps.length
+    // === 0`, § 8's own 402/503 refusals) makes streamText's OWN internal
+    // deferred promises (finishReason/rawFinishReason/totalUsage/steps/
+    // responseMessages — see @ai-sdk/provider-utils' own
+    // rejectResultPromises) reject with a NoOutputGeneratedError. Reading
+    // + settling them here (never throwing, never awaited by anything
+    // that matters) gives every one of them a handler, independent of
+    // whether this call actually finishes.
+    void Promise.allSettled([result.steps, result.totalUsage, result.finishReason, result.responseMessages]);
 
-  await writer.merge(toUIMessageStream({ stream: tapped, tools }) as any);
+    let hadError = false;
+    const tapped = tapCutOffAndErrors(
+      result.fullStream,
+      (error) => {
+        hadError = true;
+        const { code, serverMessage } = classifyError(error);
+        const { message, retryable } = ERROR_MESSAGES[code];
+        writer.write({ type: "data-error", data: { code, message: serverMessage ?? message, retryable } });
+      },
+      (toolCallId, toolName) => {
+        writer.write({
+          type: "tool-input-error",
+          toolCallId,
+          toolName,
+          input: {},
+          errorText: CUT_OFF_TOOL_ERROR_TEXT,
+        } as any);
+      },
+    );
+
+    // § 9.2: "Every call's UI stream is merged with sendFinish: false, and
+    // every call after the first also has sendStart: false." Read to the
+    // end HERE (not fire-and-forget via `writer.merge`) — § 9.2's own "the
+    // coach reads the first call's tapped stream to its end. It then
+    // reads result.responseMessages ... and result.steps" needs those
+    // promises settled before this function returns, which only happens
+    // once `result.fullStream` (piped through `tapped`) is fully drained.
+    const uiStream = toUIMessageStream({ stream: tapped, tools, sendStart, sendFinish: false });
+    const reader = (uiStream as ReadableStream<any>).getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      writer.write(value);
+    }
+
+    // A refused call (e.g. the proxy's own 402/503, § 8) already got its
+    // `data-error` from the tap's `onError` above — `result.steps` and
+    // `result.responseMessages` then reject with a `NoOutputGeneratedError`
+    // (fix round 2, item 7's own note). Falling back to `[]` here avoids
+    // a SECOND, duplicate `data-error` from the outer catch in
+    // `createCoach` (which only fires on a THROWN error, not a handled
+    // stream part).
+    const allSteps = await Promise.resolve(result.steps).catch(() => [] as any[]);
+    // § 9.2: "The stop condition records the steps it sees. After each
+    // call, the coach records any it didn't (at most the last)." — this
+    // also fixes § 9.2's named gap: "today the last step of every call
+    // goes uncounted" (a text-only or fully-dropped-tool-call cut-off
+    // step never reaches `stop()` at all, see `makeStop`'s own note).
+    if (allSteps.length > recordedCount()) {
+      recordStepCost(allSteps[allSteps.length - 1] as any);
+    }
+    const lastStep = allSteps[allSteps.length - 1] as any;
+    const cutOff = lastStep?.finishReason === "length";
+    const responseMessages = (await Promise.resolve(result.responseMessages).catch(() => [] as any[])) as any[];
+    return { steps: allSteps, cutOff, hadError, responseMessages };
+  }
+
+  const call1 = await runOneCall(modelMessages, 0, true);
+  let finalCutOff = call1.cutOff;
+
+  if (call1.cutOff) {
+    // § 9.2's five preconditions, checked in the order named there.
+    const preconditionsOk =
+      // 1. no continuation has run this turn (there is only ever one
+      //    attempt in this function — see "no third call" below).
+      // 2. fewer than maxSteps steps are used, counting both calls.
+      call1.steps.length < maxSteps &&
+      // 3. no gate is pending for the chat.
+      (await deps.gate.pending(chatId)) === null &&
+      // 4. spent-so-far plus the projected next step is within the
+      //    turn's allowance.
+      turnState.spentSoFarUsd + projectedNextStepUsd() <= allowanceUsd &&
+      // 5. the turn wasn't aborted, and the call didn't end on an
+      //    `error` part.
+      !abortSignal?.aborted &&
+      !call1.hadError;
+
+    if (preconditionsOk) {
+      // § 9.2: "messages are, in order: the first call's input messages;
+      // its response messages (drop a trailing assistant message with no
+      // content); one user-role message with this note, word for word."
+      const continuationMessages = [
+        ...(modelMessages as any[]),
+        ...dropTrailingEmptyAssistantMessage(call1.responseMessages),
+        { role: "user", content: CUT_OFF_CONTINUATION_NOTE },
+      ];
+      // "There is never a third call" — this is the ONLY continuation
+      // attempt this function ever makes, whatever call 2 itself ends on.
+      const call2 = await runOneCall(continuationMessages, call1.steps.length, false);
+      finalCutOff = call2.cutOff;
+    }
+    // preconditions failing (or a second cut-off) both fall through to
+    // the same visible § 9.3 `cut_off` below — no continuation, no gate.
+  }
+
+  // § 9.2: "The coach writes one { type: 'finish' } last. No apps/web code
+  // reads that chunk's fields."
+  writer.write({ type: "finish" } as any);
+
+  if (finalCutOff) {
+    // § 9.3: "A cut-off that can't be continued writes data-error
+    // { code: 'cut_off', ... }. That covers any of 1–5 failing, including
+    // a second cut-off in the turn. There is never a third call." Gates
+    // are untouched by this path (no open/decide/expire above).
+    const { message, retryable } = ERROR_MESSAGES.cut_off;
+    writer.write({ type: "data-error", data: { code: "cut_off", message, retryable } });
+  }
 }

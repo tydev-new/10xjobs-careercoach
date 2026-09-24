@@ -4,12 +4,18 @@
 // from handler.ts so they're trivial to unit test without any fetch mocking.
 
 export const MODEL = "anthropic/claude-sonnet-5";
-export const MAX_TOKENS_CAP = 4096;
+// § 9.5 (docs/design-web-agent.md, amended 2026-09-24): 8,192, was 4,096.
+// At the design's worst case of 30 tokens/s, 8,192 tokens take ~273 s —
+// inside the meter's ~360 s deadline (Edge Runtime wall clock: 400 s);
+// 16,384 tokens (~546 s) would not fit. About 10,000 tokens is the most
+// that fits at all; going higher needs a longer-running host, not a
+// bigger number.
+export const MAX_TOKENS_CAP = 8192;
 export const MAX_WEB_RESULTS = 5;
 
 // N3 (fix round 1): the ceiling is computed from § 8's own formula, not a
-// hand-picked constant — 64k input tokens, a full 4,096-token output (the
-// cap above), and one search at the fixed plugin's per-result price.
+// hand-picked constant — 64k input tokens, a full output at the cap above,
+// and one search at the fixed plugin's per-result price.
 const CEILING_INPUT_TOKENS = 64_000;
 const CEILING_INPUT_USD_PER_MILLION = 2;
 const CEILING_OUTPUT_USD_PER_MILLION = 10;
@@ -17,7 +23,7 @@ const CEILING_SEARCH_USD_PER_RESULT = 0.004; // Exa: $4 / 1,000 results
 export const CEILING_USD =
   (CEILING_INPUT_TOKENS * CEILING_INPUT_USD_PER_MILLION) / 1_000_000 +
   (MAX_TOKENS_CAP * CEILING_OUTPUT_USD_PER_MILLION) / 1_000_000 +
-  MAX_WEB_RESULTS * CEILING_SEARCH_USD_PER_RESULT; // ≈ $0.189, "about $0.18" in § 8
+  MAX_WEB_RESULTS * CEILING_SEARCH_USD_PER_RESULT; // § 9.5: $0.22992, "about $0.23" (was $0.18896)
 
 export const MAX_BODY_BYTES = 256 * 1024;
 export const BETA_CEILING_USD = 5;
@@ -110,22 +116,34 @@ export interface ParsedUsage {
   tokensIn?: number;
   tokensOut?: number;
   tokensCached?: number;
+  /** § 9.6: the LAST non-null `choices[0].finish_reason` seen across the
+   *  whole stream (OpenRouter's normalized value, not `native_finish_reason`).
+   *  Only a string survives this pass; length (1–32) is checked later, in
+   *  `sanitizeUsageForLedger`, alongside the ledger column's own check. */
+  finishReason?: string;
 }
 
 /** Parses an OpenRouter SSE stream's text for cost/tokens (round 2, item 5:
- * "the meter parses only the final `data:` line carrying usage", per § 8).
- * `usage` is REPLACED, never merged, each time a line with a `usage` object
- * is seen, so `cost`/`tokensIn`/`tokensOut`/`tokensCached` always come from
- * one single line — the last one that carried `usage` — never mixed across
- * chunks. `id` is read independently (the first chunk that has one; it's
- * the same value on every chunk in practice, and this keeps a truncated
- * final `usage` line from losing the key the row is written under — see
- * the "truncated final line" test). Tolerates `[DONE]`, keep-alive
- * comments, and a stream cut off mid-line (a malformed trailing `data:`
- * line is skipped rather than thrown). */
+ * "the meter parses only the final `data:` line carrying usage", per § 8),
+ * and for `finish_reason` (§ 9.6, amended 2026-09-24: "in the meter's
+ * existing pass over the `data:` lines"). `usage` is REPLACED, never
+ * merged, each time a line with a `usage` object is seen, so
+ * `cost`/`tokensIn`/`tokensOut`/`tokensCached` always come from one single
+ * line — the last one that carried `usage` — never mixed across chunks.
+ * `id` is read independently (the first chunk that has one; it's the same
+ * value on every chunk in practice, and this keeps a truncated final
+ * `usage` line from losing the key the row is written under — see the
+ * "truncated final line" test). `finishReason` is likewise read
+ * independently of `usage`/`id`: it's kept updated to the LAST NON-NULL
+ * `choices[0].finish_reason` seen, so the usage chunk that so often follows
+ * with an empty `choices` array (§ 9.6) never blanks out the value the
+ * content chunk before it carried. Tolerates `[DONE]`, keep-alive comments,
+ * and a stream cut off mid-line (a malformed trailing `data:` line is
+ * skipped rather than thrown). */
 export function parseUsageFromSSE(text: string): ParsedUsage | null {
   let id: string | undefined;
   let usage: Record<string, unknown> | undefined;
+  let finishReason: string | undefined;
 
   for (const rawLine of text.split("\n")) {
     const line = rawLine.trim();
@@ -142,10 +160,18 @@ export function parseUsageFromSSE(text: string): ParsedUsage | null {
       const o = obj as Record<string, unknown>;
       if (!id && typeof o.id === "string") id = o.id;
       if (o.usage && typeof o.usage === "object") usage = o.usage as Record<string, unknown>;
+      const choices = o.choices;
+      if (Array.isArray(choices) && choices.length > 0 && choices[0] && typeof choices[0] === "object") {
+        const fr = (choices[0] as Record<string, unknown>).finish_reason;
+        // "last non-null wins": a null/absent finish_reason on a later
+        // chunk (e.g. the trailing usage-only chunk) never overwrites an
+        // earlier real value.
+        if (typeof fr === "string") finishReason = fr;
+      }
     }
   }
 
-  if (!id && !usage) return null;
+  if (!id && !usage && finishReason === undefined) return null;
   const promptDetails =
     usage && typeof usage.prompt_tokens_details === "object" && usage.prompt_tokens_details !== null
       ? (usage.prompt_tokens_details as Record<string, unknown>)
@@ -157,6 +183,7 @@ export function parseUsageFromSSE(text: string): ParsedUsage | null {
     tokensOut: typeof usage?.completion_tokens === "number" ? (usage!.completion_tokens as number) : undefined,
     tokensCached:
       typeof promptDetails?.cached_tokens === "number" ? (promptDetails!.cached_tokens as number) : undefined,
+    finishReason,
   };
 }
 
@@ -169,6 +196,11 @@ export interface LedgerAmounts {
    * CEILING_USD (fix round 2) — worth its own anomaly log line, since a
    * legitimate call is not expected to land there. */
   costAboveCeiling: boolean;
+  /** § 9.6: a string of 1–32 characters is kept; anything else (missing,
+   *  wrong type, empty, or over 32 chars) becomes `null` — matching the
+   *  `ten_usage_ledger.finish_reason` column's own check. Never blocks the
+   *  insert (a parse problem gives `null`, never an exception). */
+  finishReason: string | null;
 }
 
 /** S1 (fix round 1) + the round-2 contract amendment (docs/design-web-agent.md
@@ -190,11 +222,14 @@ export function sanitizeUsageForLedger(parsed: ParsedUsage | null): LedgerAmount
   const costAboveCeiling = reportedInRange && cost > CEILING_USD;
   const token = (v: unknown): number =>
     typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= INT4_MAX ? v : 0;
+  const fr = parsed?.finishReason;
+  const finishReason = typeof fr === "string" && fr.length >= 1 && fr.length <= 32 ? fr : null;
   return {
     usd,
     costAboveCeiling,
     tokensIn: token(parsed?.tokensIn),
     tokensOut: token(parsed?.tokensOut),
     tokensCached: token(parsed?.tokensCached),
+    finishReason,
   };
 }

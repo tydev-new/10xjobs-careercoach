@@ -97,7 +97,11 @@ export type ErrorCode =
   | "model_error"
   | "tool_error"
   | "offline"
-  | "step_cap";
+  | "step_cap"
+  // A reply cut off at the output limit (design-web-agent.md § 9.3,
+  // amended 2026-09-24; design-web-ui.md § 2.7): its own code, a fixed
+  // message that already says what to do, so no `nextStep` entry below.
+  | "cut_off";
 
 export interface DataErrorData {
   code: ErrorCode;

@@ -308,7 +308,7 @@ dt("the allowlist drops fields and forces the rest", async () => {
     const sent = h.lastUpstreamBody as Record<string, unknown>;
     assertEquals(sent.model, MODEL);
     assertEquals(sent.stream, true);
-    assertEquals(sent.max_tokens, 4096); // capped from 100000
+    assertEquals(sent.max_tokens, 8192); // capped from 100000 (§ 9.5, amended 2026-09-24)
     assertEquals(sent.temperature, 0.4);
     assertEquals(sent.tool_choice, "auto");
     assert(Array.isArray(sent.tools));
@@ -493,11 +493,55 @@ dt("N1: a down ten_balance_for fails closed with 503 model_error, never throws",
   }
 });
 
-dt("N3: the ceiling is computed from § 8's own formula (64k in + 4,096 out + one search)", async () => {
+dt("N3/§ 9.5 (amended 2026-09-24): the ceiling is computed from the formula (64k in + 8,192 out + one search)", async () => {
   await Promise.resolve(); // pure check; dt() expects an async fn
-  const formula = (64_000 * 2) / 1e6 + (4_096 * 10) / 1e6 + 5 * 0.004;
+  const formula = (64_000 * 2) / 1e6 + (8_192 * 10) / 1e6 + 5 * 0.004;
   assertAlmostEquals(CEILING_USD, formula, 1e-9);
-  assert(CEILING_USD >= 0.18 && CEILING_USD < 0.2, `CEILING_USD ${CEILING_USD} should read "about $0.18"`);
+  assert(CEILING_USD >= 0.22 && CEILING_USD < 0.24, `CEILING_USD ${CEILING_USD} should read "about $0.23"`);
+});
+
+dt("§ 9.6 (amended 2026-09-24): the ledger row carries finish_reason off the metered stream's own last chunk", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ id: "gen-fr", cost: 0.02 }); // ends "stop", see sseChunks() above.
+
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+
+    assertEquals(h.state.ledgerInserts.length, 1);
+    assertEquals(h.state.ledgerInserts[0].finish_reason, "stop");
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("§ 9.6: no finish_reason anywhere in the stream -> the row carries finish_reason: null, and the insert still succeeds", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = [
+      `data: ${JSON.stringify({ id: "gen-no-fr", choices: [{ delta: { content: "hi" } }] })}`,
+      `data: ${JSON.stringify({ id: "gen-no-fr", choices: [], usage: { cost: 0.01, prompt_tokens: 5, completion_tokens: 2 } })}`,
+      "data: [DONE]",
+    ];
+
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+
+    assertEquals(h.state.ledgerInserts.length, 1);
+    assertEquals(h.state.ledgerInserts[0].finish_reason, null);
+  } finally {
+    await h.stop();
+  }
 });
 
 dt("the model allowlist: a different model is 400 model_not_allowed", async () => {

@@ -44,6 +44,9 @@ export interface ProxyDeps {
     tokens_out: number;
     tokens_cached: number;
     usd: number;
+    // § 9.6 (amended 2026-09-24): null when absent/malformed; never blocks
+    // the insert.
+    finish_reason: string | null;
   }): Promise<void>;
   /** Calls the one hard-coded upstream URL (core.ts's `UPSTREAM_URL`) with
    * the built body and the `TEN_OPENROUTER_API_KEY` secret. Never logs the key. */
@@ -149,6 +152,7 @@ async function meterUsage(
     tokens_out: amounts.tokensOut,
     tokens_cached: amounts.tokensCached,
     usd: amounts.usd,
+    finish_reason: amounts.finishReason,
   };
 
   // S1 (fix round 1): retry once before giving up, so a transient write

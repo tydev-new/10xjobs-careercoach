@@ -84,6 +84,9 @@ export interface LedgerRow {
   tokens_cached: number;
   usd: number;
   created_at: Date;
+  // § 9.6 (docs/design-web-agent.md, amended 2026-09-24; the
+  // 20260924000000 migration): nullable, ≤ 32 chars.
+  finish_reason: string | null;
 }
 export interface SbState {
   authUsers: Set<string>;
@@ -149,6 +152,7 @@ export function credit(st: SbState, uid: string, usd = 5) {
     tokens_out: 0,
     tokens_cached: 0,
     usd,
+    finish_reason: null,
     created_at: st.now(),
   });
 }
@@ -163,6 +167,7 @@ export function call(st: SbState, uid: string, usd: number, at?: Date, rid?: str
     tokens_out: 0,
     tokens_cached: 0,
     usd,
+    finish_reason: null,
     created_at: at ?? st.now(),
   });
 }
@@ -230,7 +235,7 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
       if (step === "fail") return pgErr(503, "XX000", "injected: ledger insert failed, nothing written");
       const row = json();
       if (!row || typeof row !== "object") return pgErr(400, "PGRST102", "Empty or invalid json");
-      const cols = new Set(["id", "user_id", "kind", "request_id", "model", "tokens_in", "tokens_out", "tokens_cached", "usd", "created_at"]);
+      const cols = new Set(["id", "user_id", "kind", "request_id", "model", "tokens_in", "tokens_out", "tokens_cached", "usd", "finish_reason", "created_at"]);
       for (const k of Object.keys(row)) if (!cols.has(k)) return pgErr(400, "PGRST204", `Could not find the '${k}' column`);
       if (!st.authUsers.has(row.user_id)) return pgErr(409, "23503", "violates foreign key constraint");
       if (row.kind !== "credit" && row.kind !== "call") return pgErr(400, "23514", "ten_usage_ledger_kind");
@@ -240,6 +245,9 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
       if (typeof row.usd !== "number") return pgErr(400, "23502", "null value in column usd");
       if (Math.abs(row.usd) >= 1e6) return pgErr(400, "22003", "numeric field overflow");
       if (row.usd < 0) return pgErr(400, "23514", "violates check constraint ten_usage_ledger_usd");
+      if (row.finish_reason != null && (typeof row.finish_reason !== "string" || row.finish_reason.length > 32)) {
+        return pgErr(400, "23514", "violates check constraint ten_usage_ledger_finish_reason");
+      }
       if (row.request_id != null && st.ledger.some((x) => x.request_id === row.request_id)) {
         return pgErr(409, "23505", "duplicate key value violates unique constraint");
       }
@@ -253,6 +261,7 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
         tokens_out: row.tokens_out ?? 0,
         tokens_cached: row.tokens_cached ?? 0,
         usd: Math.round(row.usd * 1e6) / 1e6,
+        finish_reason: row.finish_reason ?? null,
         created_at: st.now(),
       });
       if (step === "commit-then-fail") return pgErr(503, "XX000", "injected: committed, response lost");

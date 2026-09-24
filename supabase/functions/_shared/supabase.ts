@@ -126,6 +126,11 @@ export interface LedgerCallRow {
   tokens_out: number;
   tokens_cached: number;
   usd: number;
+  // § 9.6 (docs/design-web-agent.md, amended 2026-09-24): the last
+  // non-null `choices[0].finish_reason` seen in the metered SSE stream;
+  // `null` when absent/malformed. Nullable in the ledger (the
+  // 20260924000000 migration), so this never blocks the insert.
+  finish_reason: string | null;
 }
 
 /** Inserts the one `ten_usage_ledger` 'call' row for a proxy request

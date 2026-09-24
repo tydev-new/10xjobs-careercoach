@@ -95,7 +95,7 @@ export interface GateStatusData {
   status: GateStatus;
 }
 
-export type ErrorCode = "over_balance" | "model_error" | "tool_error" | "offline" | "step_cap";
+export type ErrorCode = "over_balance" | "model_error" | "tool_error" | "offline" | "step_cap" | "cut_off";
 
 export interface DataErrorData {
   code: ErrorCode;

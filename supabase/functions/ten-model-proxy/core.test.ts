@@ -1,5 +1,5 @@
 // Unit tests for the pure helpers in core.ts — no network, no mocks.
-import { assert, assertEquals } from "jsr:@std/assert@1";
+import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
 import { CEILING_USD, MODEL, buildUpstreamBody, parseUsageFromSSE, pathTail, sanitizeUsageForLedger } from "./core.ts";
 
 Deno.test("buildUpstreamBody: copies the allowlist and forces the rest", () => {
@@ -13,21 +13,21 @@ Deno.test("buildUpstreamBody: copies the allowlist and forces the rest", () => {
   if (!r.ok) return;
   assertEquals(r.body.model, MODEL);
   assertEquals(r.body.stream, true);
-  assertEquals(r.body.max_tokens, 4096);
+  assertEquals(r.body.max_tokens, 8192);
   assertEquals(r.body.provider, { data_collection: "deny", zdr: true });
   assertEquals(r.body.cache_control, { type: "ephemeral" });
   assertEquals(r.body.temperature, 0.7);
   assertEquals(r.body.tool_choice, "auto");
 });
 
-Deno.test("buildUpstreamBody: max_tokens is capped at 4096, never raised", () => {
+Deno.test("buildUpstreamBody: max_tokens is capped at 8192, never raised (§ 9.5, amended 2026-09-24)", () => {
   const low = buildUpstreamBody({ max_tokens: 100 });
   assert(low.ok);
   if (low.ok) assertEquals(low.body.max_tokens, 100);
 
   const high = buildUpstreamBody({ max_tokens: 999999 });
   assert(high.ok);
-  if (high.ok) assertEquals(high.body.max_tokens, 4096);
+  if (high.ok) assertEquals(high.body.max_tokens, 8192);
 });
 
 Deno.test("buildUpstreamBody: drops fields outside the allowlist", () => {
@@ -237,4 +237,71 @@ Deno.test("sanitizeUsageForLedger: token sanitizing is independent of the cost o
   const r = sanitizeUsageForLedger({ cost: CEILING_USD * 20, tokensIn: -5, tokensOut: 3.5, tokensCached: 2 });
   assertEquals(r.usd, CEILING_USD);
   assertEquals([r.tokensIn, r.tokensOut, r.tokensCached], [0, 0, 2]);
+});
+
+// -------------------------------------------------- § 9.5: the cap and its ceiling ----
+
+Deno.test("§ 9.5: CEILING_USD is $0.22992 (64,000 × $2/M + 8,192 × $10/M + one 5-result search at $0.004/result)", () => {
+  assertAlmostEquals(CEILING_USD, 0.22992, 1e-9);
+});
+
+// -------------------------------------------------- § 9.6: finish_reason parsing ----
+
+Deno.test("§ 9.6: parseUsageFromSSE reads finish_reason off a content chunk, kept through a trailing usage chunk with empty choices", () => {
+  const text = [
+    `data: ${JSON.stringify({ id: "gen-5", choices: [{ delta: { content: "hi" }, finish_reason: "length" }] })}`,
+    // the usage chunk that so often follows has NO choices at all.
+    `data: ${JSON.stringify({ id: "gen-5", usage: { cost: 0.01 } })}`,
+    "data: [DONE]",
+  ].join("\n");
+  const parsed = parseUsageFromSSE(text);
+  assertEquals(parsed?.finishReason, "length");
+});
+
+Deno.test("§ 9.6: parseUsageFromSSE keeps the LAST non-null finish_reason — a later null/empty choices entry never blanks an earlier real one", () => {
+  const text = [
+    `data: ${JSON.stringify({ id: "gen-6", choices: [{ delta: {}, finish_reason: null }] })}`,
+    `data: ${JSON.stringify({ id: "gen-6", choices: [{ delta: {}, finish_reason: "stop" }] })}`,
+    `data: ${JSON.stringify({ id: "gen-6", choices: [] })}`,
+    `data: ${JSON.stringify({ id: "gen-6", usage: { cost: 0.01 } })}`,
+  ].join("\n");
+  const parsed = parseUsageFromSSE(text);
+  assertEquals(parsed?.finishReason, "stop");
+});
+
+Deno.test("§ 9.6: parseUsageFromSSE with no finish_reason anywhere leaves it undefined", () => {
+  const text = `data: ${JSON.stringify({ id: "gen-7", usage: { cost: 0.01 } })}`;
+  const parsed = parseUsageFromSSE(text);
+  assertEquals(parsed?.finishReason, undefined);
+});
+
+Deno.test("§ 9.6: parseUsageFromSSE stops at whatever finish_reason it last saw before a mid-line cut-off", () => {
+  const text = [
+    `data: ${JSON.stringify({ id: "gen-8", choices: [{ delta: {}, finish_reason: "length" }] })}`,
+    `data: {"id": "gen-8", "choices": [{"finish_reason"`, // cut off mid-object
+  ].join("\n");
+  const parsed = parseUsageFromSSE(text);
+  assertEquals(parsed?.finishReason, "length");
+});
+
+// -------------------------------------------------- § 9.6: finish_reason sanitizing ----
+
+Deno.test("§ 9.6: sanitizeUsageForLedger keeps a 1–32 char finish_reason string", () => {
+  assertEquals(sanitizeUsageForLedger({ finishReason: "length" }).finishReason, "length");
+  assertEquals(sanitizeUsageForLedger({ finishReason: "s" }).finishReason, "s");
+  assertEquals(sanitizeUsageForLedger({ finishReason: "x".repeat(32) }).finishReason, "x".repeat(32));
+});
+
+Deno.test("§ 9.6: sanitizeUsageForLedger: none, a number, empty string, or 33 chars -> null", () => {
+  assertEquals(sanitizeUsageForLedger(null).finishReason, null);
+  assertEquals(sanitizeUsageForLedger({}).finishReason, null);
+  assertEquals(sanitizeUsageForLedger({ finishReason: 42 as unknown as string }).finishReason, null);
+  assertEquals(sanitizeUsageForLedger({ finishReason: "" }).finishReason, null);
+  assertEquals(sanitizeUsageForLedger({ finishReason: "x".repeat(33) }).finishReason, null);
+});
+
+Deno.test("§ 9.6: sanitizeUsageForLedger never blocks the insert — finishReason sanitizing is independent of cost/token sanitizing", () => {
+  const r = sanitizeUsageForLedger({ cost: -1, tokensIn: -5, finishReason: "stop" });
+  assertEquals(r.usd, CEILING_USD, "cost still sanitized independently");
+  assertEquals(r.finishReason, "stop", "a valid finish_reason survives a garbled cost");
 });

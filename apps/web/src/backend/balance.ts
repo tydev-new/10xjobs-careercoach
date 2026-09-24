@@ -2,6 +2,8 @@
 // a `security definer` wrapper (`ten_balance()`) that passes `auth.uid()`
 // itself, so it takes no argument and shows only the caller's own balance.
 // Browser-safe: only `fetch`. No window/document/localStorage/node:*.
+import { boundFetch } from "./bound-fetch.ts";
+
 export interface BalanceOptions {
   /** The Supabase project URL, e.g. https://xxxx.supabase.co. */
   url: string;
@@ -19,7 +21,7 @@ export interface BalanceOptions {
  *  decides when to call it. */
 export function createBalanceFn(opts: BalanceOptions): () => Promise<number> {
   const url = opts.url.replace(/\/+$/, "");
-  const fetchImpl = opts.fetchImpl ?? fetch;
+  const fetchImpl = opts.fetchImpl ?? boundFetch();
   return async () => {
     const token = await opts.accessToken();
     const res = await fetchImpl(`${url}/rest/v1/rpc/ten_balance`, {

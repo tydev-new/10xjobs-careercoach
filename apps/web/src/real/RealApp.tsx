@@ -2,15 +2,15 @@
 // not-a-member OR first-run/chat (design-web-ui.md § 1.4-1.6). No
 // separate route or spinner screen for the membership check — it happens
 // once, on this same shell, before the chat ever mounts.
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
-import type { Coach } from "../../../../packages/agent/src/types.ts";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { createCoach, type Coach } from "../../../../packages/agent/src/index.ts";
 import { accessTokenFrom, checkMembership, createTenAuthClient, siteRedirectUrl, signOut } from "../backend/auth.ts";
 import { toAuthClientLike } from "../backend/auth-client-adapter.ts";
 import type { TenEnv } from "../backend/env.ts";
 import { createRootClaudeMd } from "../backend/supabase-workspace-store.ts";
 import { buildSkillBundle } from "../backend/skills-bundle.ts";
 import { TIER0_PATH } from "../../../../packages/agent/src/skills/system-prompt.ts";
-import { buildRealCoach, buildRealDeps } from "./deps.ts";
+import { buildRealDeps } from "./deps.ts";
 import { SignIn } from "./SignIn";
 import { NotAMember } from "./NotAMember";
 import { RealChatShell } from "./RealChatShell";
@@ -26,7 +26,17 @@ type Screen =
   | { kind: "signed-out" }
   | { kind: "checking-membership" }
   | { kind: "not-a-member" }
+  // Fix round 1, item 4: every setup failure (membership, the root
+  // CLAUDE.md create, the first balance() call) lands here — a plain
+  // message, Retry, and Sign out — never a blank page.
+  | { kind: "error"; message: string }
   | { kind: "member"; userId: string };
+
+/** A plain, candidate-facing message for a setup failure — never the raw
+ *  error text (matches upload-errors.ts's own posture). */
+function setupErrorMessage(err: unknown): string {
+  return "Something went wrong setting up your account. " + (err instanceof Error && err.message ? err.message : "Try again.");
+}
 
 export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactElement {
   const client = useMemo(() => createTenAuthClient({ url: env.supabaseUrl, anonKey: env.supabaseAnonKey }), [env]);
@@ -35,8 +45,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   // fake) — the real SupabaseClient satisfies it at runtime but not
   // structurally (`rpc()` returns a thenable, not a real Promise; see
   // auth-client-adapter.ts). `client` itself stays around for
-  // `.auth.getSession()`/`.auth.onAuthStateChange()`, which aren't part
-  // of AuthClientLike at all.
+  // `.auth.onAuthStateChange()`, which isn't part of AuthClientLike.
   const authClient = useMemo(() => toAuthClientLike(client), [client]);
   const [screen, setScreen] = useState<Screen>({ kind: "loading" });
   // A reload starts a new chat (design-web-agent.md § 3, § 7) — a fresh id
@@ -48,41 +57,72 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
 
   const accessToken = useMemo(() => accessTokenFrom(authClient), [authClient]);
 
+  // Fix round 1, item 3: which user id setup has already run (or is
+  // running) for, so a same-user re-fire of onAuthStateChange (most
+  // commonly TOKEN_REFRESHED, which Supabase emits on every silent JWT
+  // refresh — roughly hourly, and it carries a real session, so it is
+  // NOT distinguishable from SIGNED_IN by session shape alone) never
+  // re-runs setup, rebuilds the Coach, or touches the mounted chat.
+  // Cleared on sign-out and on a setup FAILURE (so Retry can re-run it).
+  const checkedUserIdRef = useRef<string | undefined>(undefined);
+
   const checkAndAdvance = useCallback(
     async (userId: string) => {
       setScreen({ kind: "checking-membership" });
-      const isMember = await checkMembership(authClient);
-      if (!isMember) {
-        setScreen({ kind: "not-a-member" });
-        return;
-      }
-      // § 7: "The app creates the workspace CLAUDE.md (create-only) at
-      // first run or import" — from the bundled Tier 0 template, once,
-      // idempotent (createRootClaudeMd resolves `created: false` if a row
-      // already exists, e.g. a reload or a prior import).
-      const skills = buildSkillBundle();
-      const tier0 = skills[TIER0_PATH] ?? "";
-      await createRootClaudeMd({ url: env.supabaseUrl, anonKey: env.supabaseAnonKey, userId, accessToken }, tier0);
+      try {
+        const isMember = await checkMembership(authClient);
+        if (!isMember) {
+          setScreen({ kind: "not-a-member" });
+          return;
+        }
+        // § 7: "The app creates the workspace CLAUDE.md (create-only) at
+        // first run or import" — from the bundled Tier 0 template, once,
+        // idempotent (createRootClaudeMd resolves `created: false` if a
+        // row already exists, e.g. a reload or a prior import).
+        const skills = buildSkillBundle();
+        const tier0 = skills[TIER0_PATH] ?? "";
+        await createRootClaudeMd({ url: env.supabaseUrl, anonKey: env.supabaseAnonKey, userId, accessToken }, tier0);
 
-      const deps = buildRealDeps({ env, userId, accessToken });
-      setWorkspace(deps.workspace);
-      setBalanceFn(() => deps.balance);
-      setCoach(buildRealCoach({ env, userId, accessToken }));
-      setScreen({ kind: "member", userId });
+        const deps = buildRealDeps({ env, userId, accessToken });
+        // Proves the balance pipeline actually works BEFORE the chat
+        // mounts (item 4: "the balance" is one of the setup steps that
+        // must fail into the error screen, not silently once the chat is
+        // already up).
+        await deps.balance();
+
+        setWorkspace(deps.workspace);
+        setBalanceFn(() => deps.balance);
+        setCoach(createCoach(deps));
+        setScreen({ kind: "member", userId });
+      } catch (err) {
+        checkedUserIdRef.current = undefined;
+        setScreen({ kind: "error", message: setupErrorMessage(err) });
+      }
     },
     [authClient, env, accessToken],
   );
 
   useEffect(() => {
     let cancelled = false;
-    client.auth.getSession().then(({ data }) => {
+    // ONE listener is the ONE source of the session (removes the
+    // "double check at startup": Supabase's own onAuthStateChange fires
+    // once immediately with INITIAL_SESSION, carrying exactly what a
+    // separate getSession() call would have — a second call was a
+    // redundant race, not a second real check).
+    const { data: sub } = client.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
-      if (data.session?.user.id) void checkAndAdvance(data.session.user.id);
-      else setScreen({ kind: "signed-out" });
-    });
-    const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
-      if (session?.user.id) void checkAndAdvance(session.user.id);
-      else setScreen({ kind: "signed-out" });
+      if (event === "SIGNED_OUT" || !session) {
+        checkedUserIdRef.current = undefined;
+        setScreen({ kind: "signed-out" });
+        return;
+      }
+      // Fix round 1, item 3: react to SIGNED_IN/INITIAL_SESSION, or a
+      // genuine user change — NEVER a same-user TOKEN_REFRESHED (the
+      // common case) or any other same-user event.
+      const uid = session.user.id;
+      if (checkedUserIdRef.current === uid) return;
+      checkedUserIdRef.current = uid;
+      void checkAndAdvance(uid);
     });
     return () => {
       cancelled = true;
@@ -92,7 +132,10 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   }, [client]);
 
   const handleSignOut = useCallback(() => {
-    void signOut(authClient).then(() => setScreen({ kind: "signed-out" }));
+    void signOut(authClient).then(() => {
+      checkedUserIdRef.current = undefined;
+      setScreen({ kind: "signed-out" });
+    });
   }, [authClient]);
 
   if (screen.kind === "loading" || screen.kind === "checking-membership") {
@@ -103,6 +146,34 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   }
   if (screen.kind === "not-a-member") {
     return <NotAMember onSignOut={handleSignOut} />;
+  }
+  if (screen.kind === "error") {
+    return (
+      <div className="app-shell app-shell--config-error">
+        <div>
+          <p>{screen.message}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void client.auth.getSession().then(({ data }) => {
+                const uid = data.session?.user.id;
+                if (uid) {
+                  checkedUserIdRef.current = uid;
+                  void checkAndAdvance(uid);
+                } else {
+                  setScreen({ kind: "signed-out" });
+                }
+              });
+            }}
+          >
+            Retry
+          </button>
+          <button type="button" onClick={handleSignOut}>
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
   }
   if (!coach || !workspace || !balanceFn) {
     return <div className="app-shell app-shell--loading" />;

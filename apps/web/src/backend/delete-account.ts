@@ -4,6 +4,8 @@
 // JWT and reports back exactly what the function returned.
 //
 // Browser-safe: only `fetch`. No window/document/localStorage/node:*.
+import { boundFetch } from "./bound-fetch.ts";
+
 export interface DeleteAccountSummary {
   message: string;
   deleted: {
@@ -25,7 +27,7 @@ export interface DeleteAccountOptions {
 
 export async function deleteBetaAccount(opts: DeleteAccountOptions): Promise<DeleteAccountSummary> {
   const token = await opts.accessToken();
-  const fetchImpl = opts.fetchImpl ?? fetch;
+  const fetchImpl = opts.fetchImpl ?? boundFetch();
   const res = await fetchImpl(`${opts.url.replace(/\/+$/, "")}/functions/v1/ten-delete-account`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },

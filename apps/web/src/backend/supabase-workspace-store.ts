@@ -33,6 +33,7 @@ import {
   isUploadExt,
   validateRef,
 } from "../../../../packages/agent/src/workspace/path-rules.ts";
+import { boundFetch } from "./bound-fetch.ts";
 
 export const TEN_WORKSPACES_BUCKET = "ten-workspaces";
 
@@ -455,23 +456,107 @@ async function uploadOne(o: Internal, rawPath: string, bytes: Uint8Array): Promi
   } catch {
     parsed = text;
   }
-  // Storage refusals don't carry ten_ws_write's clean PT-code taxonomy —
-  // they come straight off storage.objects' RLS policies (§ 2, § 8's
-  // header). Confirmed against the LIVE project (the coder's hand-back):
-  // a duplicate-path upload comes back as an OUTER HTTP 400 with a NESTED
-  // `{ statusCode: "409", error: "Duplicate", code: "KeyAlreadyExists" }`
-  // body — not a bare HTTP 409 the way ten_ws_write's PTxxx codes work —
-  // so the duplicate check reads the body, not `res.status`. Every other
-  // refusal (403 not a member, the RLS violation the caps/path-rules/
-  // extension checks baked into the insert policy produce) is reported
-  // generically; see the coder's hand-back — this is a real gap vs.
-  // "map exactly" that only ten_ws_write's own PT-code path fully closes.
+  throw await classifyUploadRefusal(o, relPath, res.status, parsed);
+}
+
+// ---------------------------------------------------------------------
+// Fix round 1, item 7: Storage refusals don't carry ten_ws_write's clean
+// PT-code taxonomy — they come straight off storage.objects' RLS policies
+// (§ 2, § 8's header), and the OUTER HTTP status is always 400 (confirmed
+// against the LIVE project, and matched by the tester's PGlite stand-in),
+// with the real cause NESTED in the body: `{ statusCode, error, message }`.
+//
+//   nested "409" / code "KeyAlreadyExists" -> already_exists (exact path:
+//     an exact re-upload isn't a ten_path_clash() "clash" per the
+//     migration's own definition, it's a literal unique-index violation,
+//     so Postgres raises 23505 -> 409 after the INSERT policy's WITH
+//     CHECK already passed).
+//   nested "413" -> upload_too_large (a backstop; the client already
+//     refuses via assertUploadSize before any network call).
+//   nested "415" -> unsupported_type (a backstop; ditto isUploadExt).
+//   nested "403" -> the ambiguous one: the insert policy's WITH CHECK
+//     ANDs together membership, "not a case-variant clash of an existing
+//     path", and "under the 50-object cap" (see the migration's
+//     ten_ws_objects_insert_own policy) — a bare 403 alone can't tell
+//     those apart, so three PRE-CHECKS run, in this order:
+//       1. membership, via the `ten_is_member` RPC (not_a_member wins
+//          first — a non-member's write would be refused for every other
+//          reason too, so it's the most informative cause to report);
+//       2. an existing case-variant clash, via `list()` (the store's own
+//          public read path — reuses it rather than adding a new
+//          server-side RPC route): any existing path that
+//          case-insensitively equals `relPath` but isn't the identical
+//          string. This is a SCOPED reproduction of the policy's own
+//          `ten_path_clash()` check (case-variant only) — not its
+//          parent-folder-is-a-file / path-is-a-folder-of-an-existing-path
+//          cases, which a plain file upload essentially never triggers
+//          (nothing above `documents/` is a file), and `list()`'s own
+//          depth<=3 limit applies here too, same as everywhere else this
+//          store uses it;
+//       3. the object count against the 50 cap, from that SAME `list()`
+//          call (one round trip covers both checks 2 and 3).
+//     If none of the three explains it (shouldn't happen — the policy has
+//     no other condition left), the refusal is reported generically
+//     rather than guessed at.
+// ---------------------------------------------------------------------
+
+async function isMember(o: Internal): Promise<boolean> {
+  const { status, body } = await rpc(o, "ten_is_member", {});
+  return status === 200 && body === true;
+}
+
+/** Mirrors `ten_path_clash(p_path)`'s three cases (client-side, off an
+ *  already-fetched `list()`, § the comment above `classifyUploadRefusal`):
+ *  an existing path is a PARENT folder of `relPath` (i.e. an existing FILE
+ *  sits where a folder segment needs to be), an existing path would need
+ *  `relPath` to be ITS parent folder, or an existing path is a
+ *  case-variant of `relPath` itself. */
+function clashesWith(relPath: string, existingPaths: readonly string[]): boolean {
+  const lowerRel = relPath.toLowerCase();
+  const relParts = lowerRel.split("/");
+  const parents = relParts.slice(0, -1).map((_, i) => relParts.slice(0, i + 1).join("/"));
+  for (const p of existingPaths) {
+    const lp = p.toLowerCase();
+    if (parents.includes(lp)) return true;
+    if (lp.startsWith(`${lowerRel}/`)) return true;
+    if (lp === lowerRel && p !== relPath) return true;
+  }
+  return false;
+}
+
+async function classify403(o: Internal, relPath: string): Promise<WorkspaceError | undefined> {
+  if (!(await isMember(o))) {
+    return new WorkspaceError("not_a_member", "not a member.");
+  }
+  const existing = await listAll(o);
+  if (clashesWith(relPath, existing.map((f) => f.path))) {
+    return new WorkspaceError("path_conflict", `${relPath} clashes with an existing file or folder (case-insensitive).`);
+  }
+  const objectCount = existing.filter((f) => isUploadExt(f.path)).length;
+  if (objectCount >= 50) {
+    return new WorkspaceError("workspace_full", "the workspace is at its object cap.");
+  }
+  return undefined;
+}
+
+async function classifyUploadRefusal(o: Internal, relPath: string, httpStatus: number, parsed: unknown): Promise<WorkspaceError | Error> {
   const nestedStatusCode = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).statusCode : undefined;
   const errorCode = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>).code : undefined;
-  if (res.status === 409 || nestedStatusCode === "409" || errorCode === "KeyAlreadyExists") {
-    throw new WorkspaceError("already_exists", `${relPath} already exists.`);
+
+  if (httpStatus === 409 || nestedStatusCode === "409" || errorCode === "KeyAlreadyExists") {
+    return new WorkspaceError("already_exists", `${relPath} already exists.`);
   }
-  throw new Error(`upload failed: HTTP ${res.status} ${JSON.stringify(parsed)}`);
+  if (nestedStatusCode === "413") {
+    return new WorkspaceError("upload_too_large", `${relPath} is over the upload size limit.`);
+  }
+  if (nestedStatusCode === "415") {
+    return new WorkspaceError("unsupported_type", `${relPath} is not an uploadable file type.`);
+  }
+  if (httpStatus === 403 || nestedStatusCode === "403") {
+    const classified = await classify403(o, relPath);
+    if (classified) return classified;
+  }
+  return new Error(`upload failed: HTTP ${httpStatus} ${JSON.stringify(parsed)}`);
 }
 
 // ---------------------------------------------------------------------
@@ -501,7 +586,7 @@ export async function createRootClaudeMd(
     anonKey: opts.anonKey,
     userId: opts.userId,
     accessToken: opts.accessToken,
-    fetchImpl: opts.fetchImpl ?? fetch,
+    fetchImpl: opts.fetchImpl ?? boundFetch(),
   };
   assertEditSize(content);
   const { status, body } = await rpc(o, "ten_ws_write", { p_path: "CLAUDE.md", p_content: content, p_expected: null });
@@ -525,7 +610,7 @@ export function createSupabaseWorkspaceStore(opts: SupabaseWorkspaceStoreOptions
     anonKey: opts.anonKey,
     userId: opts.userId,
     accessToken: opts.accessToken,
-    fetchImpl: opts.fetchImpl ?? fetch,
+    fetchImpl: opts.fetchImpl ?? boundFetch(),
   };
   return {
     list: (dir?: string) => listAll(o, dir),

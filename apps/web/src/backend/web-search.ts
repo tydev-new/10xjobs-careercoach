@@ -12,6 +12,7 @@
 // Browser-safe: only `fetch`/`TextDecoder`. No window/document/
 // localStorage/node:*.
 import type { WebSearchInput, WebSearchOutput, WebSearchResult } from "../../../../packages/agent/src/types.ts";
+import { boundFetch } from "./bound-fetch.ts";
 
 export interface WebSearchOptions {
   /** The `ten-model-proxy` base URL (same as model.ts's `proxyUrl`). */
@@ -77,7 +78,7 @@ function toResult(a: RawAnnotation): WebSearchResult | null {
 
 export function createWebSearch(opts: WebSearchOptions): (input: WebSearchInput) => Promise<WebSearchOutput> {
   const url = `${opts.proxyUrl.replace(/\/+$/, "")}/chat/completions`;
-  const fetchImpl = opts.fetchImpl ?? fetch;
+  const fetchImpl = opts.fetchImpl ?? boundFetch();
 
   return async (input: WebSearchInput): Promise<WebSearchOutput> => {
     const token = await opts.getAccessToken();

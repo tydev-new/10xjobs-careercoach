@@ -409,6 +409,26 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     tools,
     stopWhen: stop,
     abortSignal,
+    // Fix round 1, item 5 (flagged, outside this slice's own directory):
+    // ONE proxy call per step. The AI SDK's default `maxRetries: 2`
+    // auto-retries any APICallError with `isRetryable === true`, and the
+    // installed @openrouter/ai-sdk-provider's own default for that is
+    // "statusCode is 408/409/429/>=500" — ten-model-proxy's own
+    // deliberate refusals (over_balance 402, not_a_member 403, 413) are
+    // already outside that set and were never retried, but its 503
+    // (model_error — both the beta ceiling AND a genuinely-down upstream
+    // share this one status, § 8) IS >= 500, so the SDK silently retried
+    // a single refused turn 2-3 times against the proxy before ever
+    // reaching this package's own error handling. A raw network failure
+    // (fetch() itself throwing — offline, DNS, connection reset) is
+    // NEVER auto-retried by the SDK's default `shouldRetry` either way
+    // (it only fires for an APICallError/GatewayError instance, not a
+    // bare thrown error) — so `maxRetries: 0` costs nothing for "genuine
+    // network errors"; there was no SDK-level retry safety net for them
+    // to begin with. The candidate's own retry (typing again; the
+    // `retryable: true` flag on the resulting data-error) is the actual
+    // recovery path, same as it already is for every other error code.
+    maxRetries: 0,
   });
 
   const tapped = tapErrorParts(result.fullStream, (error) => {

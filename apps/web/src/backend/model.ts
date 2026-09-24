@@ -9,6 +9,7 @@
 // on a server, same posture as packages/agent (design-web-agent.md § 1).
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import type { LanguageModel } from "ai";
+import { boundFetch } from "./bound-fetch.ts";
 
 /** MVP default model (plan decision #3; spike 1, 2026-09-22/23). */
 export const COACH_MODEL_ID = "anthropic/claude-sonnet-5";
@@ -39,7 +40,7 @@ export interface CoachModelOptions {
  *  whatever the OpenRouter provider itself set from its own (unused,
  *  placeholder) `apiKey` option. This is the ONLY place a bearer token is
  *  attached to a model call; the browser never holds an OpenRouter key. */
-export function authedFetch(getAccessToken: () => Promise<string>, base: typeof fetch = fetch): typeof fetch {
+export function authedFetch(getAccessToken: () => Promise<string>, base: typeof fetch = boundFetch()): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const token = await getAccessToken();
     const headers = new Headers(init?.headers);
@@ -52,7 +53,7 @@ export function authedFetch(getAccessToken: () => Promise<string>, base: typeof 
  *  `Deps.model` (§ 1) — routed through `ten-model-proxy`, never
  *  `openrouter.ai` directly, and authenticated with the live session JWT. */
 export function createCoachModel(opts: CoachModelOptions): LanguageModel {
-  const base = opts.fetchImpl ?? fetch;
+  const base = opts.fetchImpl ?? boundFetch();
   const openrouter = createOpenRouter({
     // Never read for auth (authedFetch below always overwrites the
     // Authorization header) — a non-empty placeholder only satisfies the

@@ -10,6 +10,7 @@
 // trivially unit-testable with a fake `fetch`). Browser-safe: only
 // `fetch`/`URL`. No window/document/localStorage/node:*.
 import type { Gate, GateRequest } from "../../../../packages/agent/src/types.ts";
+import { boundFetch } from "./bound-fetch.ts";
 
 export interface SupabaseGateOptions {
   /** The Supabase project URL, e.g. https://xxxx.supabase.co. */
@@ -91,7 +92,7 @@ export function createSupabaseGate(opts: SupabaseGateOptions): Gate {
     url: opts.url.replace(/\/+$/, ""),
     anonKey: opts.anonKey,
     accessToken: opts.accessToken,
-    fetchImpl: opts.fetchImpl ?? fetch,
+    fetchImpl: opts.fetchImpl ?? boundFetch(),
   };
 
   return {

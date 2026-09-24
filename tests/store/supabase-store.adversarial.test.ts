@@ -459,7 +459,10 @@ test("C3b paging: the keyset cursor survives PostgREST-special and unicode chara
   for (const h of hostile) assert.ok(got.includes(h), `missing ${h}`);
 });
 
-test("C3c paging must not stop early when the server's max_rows is below the client page size (never silently truncate)", { todo: "LOW: listText breaks on rows.length < 1000; a project max_rows < 1000 would truncate silently" }, async () => {
+// FIXED (fix round 2, C3c): listText now breaks on an EMPTY page, not
+// "fewer than the page size" — a project max_rows below the page size no
+// longer truncates silently.
+test("C3c paging must not stop early when the server's max_rows is below the client page size (never silently truncate)", async () => {
   const b = await createBackend({ maxRows: 500 });
   const { uid, store } = await member(b);
   const seed: Record<string, string> = {};

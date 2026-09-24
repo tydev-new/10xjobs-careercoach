@@ -340,7 +340,11 @@ test("I6 a STORED entry that under-declares its size (3 MB declared as 10 bytes)
   }
 });
 
-test("I7 a DEFLATED entry that under-declares its size is refused (not silently truncated to the declared size)", { todo: "LOW (tester, fix round 1): fflate inflates into a buffer of the DECLARED size and checks no CRC, so a crafted/corrupt entry imports truncated without an error" }, async () => {
+// FIXED (fix round 2, M-new-2/I7): the second import pass verifies each
+// entry's CRC32 against the central directory's own declared value, which
+// catches exactly this case (a DEFLATEd entry silently truncated to a
+// forged declared size).
+test("I7 a DEFLATED entry that under-declares its size is refused (not silently truncated to the declared size)", async () => {
   const real = new Uint8Array(3 * 1024 * 1024).fill(0x61);
   const zip = lieAboutSize(zipSync({ "plan.md": enc("# plan\n"), "notes/big.md": real }, { level: 9 }), "notes/big.md", 100);
   const store = createInMemoryWorkspaceStore();
@@ -369,7 +373,11 @@ test("I8 a CLAUDE.md entry in the zip is skipped with a note, and the app's own 
   assert.deepEqual((await store.list()).map((f) => f.path).sort(), ["CLAUDE.md", "plan.md"]);
 });
 
-test("I9 entries that clash with the app's existing root CLAUDE.md (CLAUDE.md/x.md, claude.md) refuse the whole import, nothing written (Supabase)", { todo: "LOW (tester, fix round 1): the pre-check ignores the existing root CLAUDE.md, so CLAUDE.md/x.md passes it and the server refuses mid-import (WorkspaceImportPartialError)" }, async () => {
+// FIXED (fix round 2, I9): the pre-check now seeds the existing root
+// CLAUDE.md as an already-claimed path before validating the zip, so a
+// clash with it is a WorkspaceImportError up front, not a
+// WorkspaceImportPartialError mid-write.
+test("I9 entries that clash with the app's existing root CLAUDE.md (CLAUDE.md/x.md, claude.md) refuse the whole import, nothing written (Supabase)", async () => {
   const obs: string[] = [];
   for (const bad of ["CLAUDE.md/x.md", "claude.md", "Claude.md"]) {
     const be = await createBackend();

@@ -18,8 +18,12 @@ export const MAX_EDIT_BYTES = 2 * 1024 * 1024;
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const MAX_REF_CHARS = 512;
 
-// POSIX [:cntrl:]: 0x00-0x1F and 0x7F.
-const CONTROL_CHAR_RE = /[\x00-\x1F\x7F]/;
+// POSIX [:cntrl:]: 0x00-0x1F, 0x7F, AND the C1 control range 0x80-0x9F
+// (fix round 2, M-new-1: PostgreSQL's [[:cntrl:]] character class in the
+// server's own ten_path_ok regex is locale-aware and includes C1 — a
+// BMP-wide sweep against the live migration (D7) confirmed U+0080-009F
+// are refused server-side; the client must match exactly, not just ASCII).
+const CONTROL_CHAR_RE = /[\x00-\x1F\x7F-\x9F]/;
 
 // The migration's invisible/format-character class, verbatim (Cf plus
 // U+2028/2029 and the code points HFS+ ignores when comparing names --

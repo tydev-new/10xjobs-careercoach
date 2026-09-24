@@ -151,3 +151,4 @@ for (const [label, pol, unsafe] of [
   expect("nothing ten_ remains (policies, functions, relations incl. indexes)", left.p === 0 && left.f === 0 && left.c === 0, left);
 }
 console.log(`\nround-3 own-case failures: ${fails}`);
+if (fails) process.exitCode = 1; // M-new-3 (fix round 2)

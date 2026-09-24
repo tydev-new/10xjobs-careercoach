@@ -700,6 +700,9 @@ text**:
 - **Which parts:** every `tool-input-start` id and every `tool-call` id the
   tap saw in the cut-off step. A finished call has both; an unfinished one
   has only the first.
+- The tap's list starts empty at each step, so a tool call that ran in
+  an earlier step keeps its real result, on screen and in the
+  continuation.
 - The "ran …" line then shows the closing text, not an empty output
   (rule 11).
 - Later turns turn each one into a small, valid call-and-error pair
@@ -856,7 +859,15 @@ This lets a cut-off show in the data without anyone reading a chat.
     `20260923000000_ten_beta_init.sql` is never edited.
   - The owner applies it, never an agent, **before** deploying the proxy
     that writes the column. Otherwise every insert would name an unknown
-    column and fail.
+    column and fail: the meter retries once, then logs the row as lost,
+    so the call is never charged to the balance or the $5 daily ceiling.
+  - Then reload PostgREST's schema cache (`NOTIFY pgrst, 'reload
+    schema';` in the SQL editor) before the proxy deploy. Supabase's DDL
+    trigger normally does this, but open Supabase issues report new
+    columns missed (**UNVERIFIED** on this project; the reload is cheap).
+  - The full order is **migration → reload → proxy → site**. Only the
+    first three must go in that order: the site (the agent change) works
+    with either proxy, and the old site works with the new proxy.
   - The teardown needs no new statement (the column goes with the table),
     but its header names both files. The SQL harness applies both files in
     order.
@@ -925,6 +936,13 @@ model, the in-memory store and a fake gate, never a real workspace.
     - the note-carrying request holds one synthesized `error-text`
       result, for the finished call;
     - it is sent with no `MissingToolResultsError`.
+  - A cut-off step whose only call finished, and one with three finished
+    calls plus one cut off (the receipt's batch write). Pass when none
+    runs and there is one synthesized result per finished call, in call
+    order.
+  - A tool call that ran in an earlier step, before the cut-off step.
+    Pass when it keeps its real result: no closing chunk and no
+    synthesized result.
 - **(ii) Cut off twice.** The continuation's first reply also ends on
   `length`. Pass when:
   - there are exactly two requests;

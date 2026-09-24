@@ -149,9 +149,10 @@ typed `yes` standing in for a button the same way it does at a spend
 gate (§ 2.5):
 
 1. **The complete thing** — named, not summarized: "your workspace
-   files, your gate log, and your credit" (C § 8: `ten_ws_files` and the
-   Storage bucket, `ten_gate_log`, the `credit` ledger rows; the `call`
-   rows are kept).
+   files, your conversation, your gate log, and your credit" (C § 8:
+   `ten_ws_files` and the Storage bucket, `ten_conversations` (C § 11.7,
+   amended 2026-09-24), `ten_gate_log`, the `credit` ledger rows; the
+   `call` rows are kept).
 2. **The one plain sentence** — C § 8's own wording, word for word:
    "This deletes your Ten beta data. Your sign-in stays because it's
    shared with the older app. Unused credit is forfeited. Your usage
@@ -176,31 +177,53 @@ composer. It blocks nothing, uses neutral styling (never error or alarm,
 rule 8), and can't be dismissed. It shows only when no turn is running:
 the agent runs in this tab, so a reload mid-turn would stop the run.
 
-**What a reload keeps and loses** (read in the code at `cbc9142`, 2026-09-24). Kept:
-workspace files (Supabase, C § 2), the balance (the ledger, C § 8), the
-sign-in (the Supabase session in the browser, `auth.ts`). Lost: the
-conversation on screen, which lives only in memory. `useChat` starts
-from `messages: []` (`apps/web/src/real/RealChatShell.tsx:61`), each load
-gets a fresh chat id (`apps/web/src/real/RealApp.tsx:63-65`), and nothing
-stores a chat (C § 7). A spend gate waiting for a yes goes with it (the
-new chat's first turn expires it, C § 3), and so does unsent composer
-text.
+**What a reload keeps and loses** (amended 2026-09-24 for C § 11). Kept:
+workspace files (C § 2), the balance (C § 8), the sign-in (`auth.ts`),
+and the conversation up to its last saved turn (C § 11), including a
+spend gate waiting for a yes (C § 11.6). Lost: unsent composer text, a
+turn still running (so the notice waits until none is), and any turn
+whose save failed. *(Before C § 11, read in the code at `cbc9142`: the
+whole conversation was lost — `RealChatShell.tsx:61` starts from
+`messages: []`, `RealApp.tsx:63-65` makes a fresh chat id per load.)*
 
 **Copy, word for word** (what happened and what the candidate can do,
-never what the agent will do: the L2 rule, § 2.7):
+never what the agent will do: the L2 rule, § 2.7). Amended 2026-09-24:
+the earlier ending, "Your files are saved; this conversation will clear
+from the screen.", is false once C § 11 ships. **This copy ships in the
+same site release as C § 11's save, never apart** (C § 11.8).
 
 - Notice, with a `Reload` button: "Ten has been updated. Reload to use
-  the new version. Your files are saved; this conversation will clear
-  from the screen."
+  the new version. Your files and this conversation are saved."
 - After a blocked send (C § 10.3): "Not sent: Ten has been updated since
   this page opened. Copy your message if you want to keep it, then reload
-  and send it again. Your files are saved; this conversation will clear
-  from the screen."
+  and send it again. Your files and this conversation are saved."
+- When this tab's latest save failed (C § 11.4), both lines end instead
+  with: "Your files are saved; your latest messages weren't saved and
+  will clear from the screen."
 
 **The Reload button is allowed.** Rule 7 covers what is sent as the
 candidate, submitted for them, or costs money (plus § 1.7's delete). A
 reload does none of these; it does what the browser's reload does, and
 the notice names what it loses.
+
+### 1.9 The saved conversation
+
+Mechanism: C § 11 (amended 2026-09-24). Each line is neutral, one line
+above the composer unless noted, and blocks nothing unless noted.
+
+- **Older turns not kept** (C § 11.4), at the top of the restored
+  transcript: "Older messages from this conversation weren't kept.
+  Everything Ten saved is in your files."
+- **A save failed** (C § 11.4): "The latest reply couldn't be saved. Your
+  files are saved. The app tries again after your next message."
+- **Stale tab, before a send** (C § 11.5; the message is not sent and its
+  text stays in the composer): "Not sent: this conversation continued in
+  another tab or device. Reload to see it, then send again."
+- **Save conflict** (C § 11.5): "This reply wasn't saved: the conversation
+  continued in another tab or device. Your files are saved. Reload to see
+  the latest."
+- **Load failed** (C § 11.6): the setup error screen with Retry and Sign
+  out, "Couldn't load your conversation. Try again in a moment."
 
 ## 2. The card catalog
 
@@ -367,6 +390,17 @@ copy is:
 The `nextStep` line mirrors `cut_off`'s "say continue" and says only
 what the candidate can do. "Already saved" is true because the note
 sends the model to the files.
+
+**Amended 2026-09-24 (C § 12).** A request the proxy refuses as too large
+is its own code, `too_large`, no longer a `model_error` showing the
+proxy's "Request too large.":
+
+- message, fixed (C § 12.2):
+  "This turn got too big to send, so it stopped partway."
+- `nextStep` line: "Say continue to carry on from what's already saved."
+
+It is true for the same reason as `step_cap`'s: the next turn starts
+small, and C § 9.4's note sends the model to the files.
 
 ## 3. The collapsed "ran …" line
 

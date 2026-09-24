@@ -23,6 +23,8 @@ import { exportWorkspace, importWorkspace, WorkspaceImportError, WorkspaceImport
 import { uploadWithClashRenumber } from "../backend/upload-errors.ts";
 import type { AppMessage, DataCardData, FileRead } from "../types.ts";
 import { DeleteBetaDataConfirm } from "./DeleteBetaDataConfirm";
+import { gatedSend, useVersionMonitor } from "./version-check.ts";
+import { VersionNotice } from "./VersionNotice";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,6 +76,13 @@ export function RealChatShell({
   const [attachError, setAttachError] = useState<string | undefined>(undefined);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [importError, setImportError] = useState<string | undefined>(undefined);
+  // § 10 / ui § 1.8 — a newer deployed build. `sendBlockedOnce` switches the
+  // notice's copy the moment a send is actually blocked (§ 10.3); it only
+  // ever flips true once newerVersionKnown is already true, so it never
+  // shows ahead of newerVersionKnown itself.
+  const { newerVersionKnown, checkBeforeSend } = useVersionMonitor();
+  const [sendBlockedOnce, setSendBlockedOnce] = useState(false);
+  const [checkingVersion, setCheckingVersion] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef(messages);
@@ -160,19 +169,40 @@ export function RealChatShell({
     setTimeout(() => iframeRef.current?.contentWindow?.print(), 200);
   };
 
-  const send = (text: string) => {
-    // Fix round 2, ruling 1: a pending attach rides as a real § 2 `file`
-    // part (url "workspace:<path>") — no pre-filled composer text. The
-    // Transcript already renders an `.attachment-chip` for any `file`
-    // part on a sent message (Transcript.tsx); packages/agent's coach.ts
-    // (stripWorkspaceFileParts) turns it into "The candidate attached
-    // `<path>`." for the model, word for word (confirmed unchanged —
-    // this is the tester's own e2e's exact expected text).
-    const files = pendingAttachment
-      ? [{ type: "file" as const, mediaType: pendingAttachment.mediaType, filename: pendingAttachment.filename, url: `workspace:${pendingAttachment.path}` }]
-      : undefined;
-    void sendMessage({ text, files, metadata: { origin: "typed" } });
-    setPendingAttachment(undefined);
+  const send = async (text: string) => {
+    // design-web-agent.md § 10.3: every send (a gate `yes` included) checks
+    // first, with the composer disabled as while a turn is submitted.
+    // gatedSend (version-check.ts) is the pure, unit-tested rule; this
+    // callback is only the real sendMessage/composer wiring.
+    setCheckingVersion(true);
+    try {
+      await gatedSend(text, {
+        checkBeforeSend,
+        // "Newer": no sendMessage/transport call, no proxy request, no
+        // model call, no spend — Composer.tsx's own send() clears
+        // composerValue synchronously right after calling this, so this
+        // restore (running after gatedSend's await) lands last.
+        restoreComposerText: setComposerValue,
+        markBlocked: () => setSendBlockedOnce(true),
+        sendMessage: (t) => {
+          // Fix round 2, ruling 1: a pending attach rides as a real § 2
+          // `file` part (url "workspace:<path>") — no pre-filled composer
+          // text. The Transcript already renders an `.attachment-chip`
+          // for any `file` part on a sent message (Transcript.tsx);
+          // packages/agent's coach.ts (stripWorkspaceFileParts) turns it
+          // into "The candidate attached `<path>`." for the model, word
+          // for word (confirmed unchanged — this is the tester's own
+          // e2e's exact expected text).
+          const files = pendingAttachment
+            ? [{ type: "file" as const, mediaType: pendingAttachment.mediaType, filename: pendingAttachment.filename, url: `workspace:${pendingAttachment.path}` }]
+            : undefined;
+          void sendMessage({ text: t, files, metadata: { origin: "typed" } });
+          setPendingAttachment(undefined);
+        },
+      });
+    } finally {
+      setCheckingVersion(false);
+    }
   };
 
   // Upload wiring (plan step 5b item 3): the composer's attach ->
@@ -232,6 +262,9 @@ export function RealChatShell({
   };
 
   const isFirstRun = messages.length === 0 && storeEmpty;
+  // § 10.3 / ui § 1.8: "a turn is running" — the same moments the composer
+  // is already disabled for (existing `disabled={status === ...}` below).
+  const turnRunning = status === "submitted" || status === "streaming";
 
   return (
     <div className="app-shell">
@@ -263,11 +296,17 @@ export function RealChatShell({
         ) : (
           <Transcript messages={messages} onOpen={handleOpen} onPrint={handlePrint} />
         )}
+        {/* ui § 1.8: one line above the composer, hidden while a turn is
+            running (the agent runs in THIS tab, so reload mid-turn would
+            stop the run), not dismissible, no error styling. */}
+        {newerVersionKnown && !turnRunning ? (
+          <VersionNotice mode={sendBlockedOnce ? "blocked" : "newer"} />
+        ) : null}
         <Composer
           value={composerValue}
           onChange={setComposerValue}
-          onSend={send}
-          disabled={status === "submitted" || status === "streaming"}
+          onSend={(text) => void send(text)}
+          disabled={turnRunning || checkingVersion}
           onAttach={(file) => void handleAttach(file)}
           attaching={attaching}
           attachError={attachError}

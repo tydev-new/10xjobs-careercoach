@@ -1367,14 +1367,13 @@ button {
   display: none;
 }
 
-/* ---- "A newer version is live" — style only (design-web-ui.md § 1.8).
-   This is a VISUAL placeholder for review; the mechanism (C § 10: when
-   it shows, what a reload keeps/loses, blocking a send) is a separate
-   agent's work and is NOT implemented here. Neutral styling, never
-   error/alarm coloring (rule 8) — it sits on --bg-sunken like an
-   ordinary status line, not a colored banner. The Reload button is the
-   one button rule 7 allows here: it does what the browser's own reload
-   does, not a send/submit/spend. */
+/* ---- BEGIN new-version notice (design-web-agent.md § 10, ui § 1.8) ----
+   The mechanism lives in src/real/version-check.ts + VersionNotice.tsx
+   (.version-notice-*); dev-preview.tsx's style-only scene uses the
+   .update-notice-* names — both share these v2 rules. Neutral styling
+   always (rule 8: never error/alarm, even for the "not sent" copy). The
+   Reload button is not a rule 7 moment: it sends, submits, spends nothing. */
+.version-notice,
 .update-notice {
   display: flex;
   align-items: center;
@@ -1387,10 +1386,13 @@ button {
   color: var(--fg);
 }
 
+.version-notice-text,
 .update-notice-text {
+  margin: 0;
   line-height: var(--leading-snug);
 }
 
+.version-notice-reload,
 .update-notice-reload {
   flex: none;
   border: none;
@@ -1401,4 +1403,6 @@ button {
   font-weight: var(--weight-semibold);
   font-size: var(--text-sm);
   min-height: 44px;
+  min-width: 44px;
 }
+/* ---- END new-version notice ---- */

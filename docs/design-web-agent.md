@@ -661,32 +661,59 @@ the same cap. Across ~140 calls, every reply that ended on its own used
   the reason is `tool-calls`.
 - The step then has no tool call, the `ai@7.0.111` loop ends, and
   `coach.ts` never read the finish reason.
-- The loop also **continues** after a `length` step that holds a finished
-  call (the provider emits a call once its arguments parse). So a later,
-  unfinished call can vanish mid-run.
+- `ai@7.0.111` runs tools only when a step ends on `stop` or `tool-calls`
+  (`isToolExecutionAllowedFinishReason`). On a `length` step **no** tool
+  runs, not even one whose input finished, and the loop ends without
+  calling `stopWhen`. *(Corrected 2026-09-24, fix round 1 of issue #2: the
+  tester showed this on the real packages; the first draft said a finished
+  call ran.)*
+- That finished call stays in the response messages, and in its UI part
+  (`input-available`), with no result. A request built from them fails
+  before sending with `MissingToolResultsError`, so every later turn in
+  the chat would fail too.
 - On the next turn, `convertToModelMessages` leaves out a tool part still in
   `input-streaming`, so the model sees no trace of the attempt.
 
 **Prevents:** work that is silently not saved; a next turn that says nothing
-was attempted; paying twice for the same cut-off.
+was attempted; paying twice for the same cut-off; a chat that fails on every
+later turn.
 
 ### 9.1 Detection (`packages/agent`)
 
-A step is **cut off** when its finish reason is `"length"` (the step result
-and the `finish-step` part both carry it). That is the whole test, and no
-proxy change is needed. A partial text reply with no tool call counts the
-same.
+A step is **cut off** when its finish reason is `"length"`. That is the
+whole test, and no proxy change is needed. A partial text reply with no
+tool call counts the same.
 
-- The stop condition checks this **first**, before the step cap. A cut-off
-  step stops the loop; its only other effect is recording the step's cost.
-- A tool part the cut-off left open is a `tool-input-start` with no
-  `tool-call` for its id (the existing stream tap sees both). Each one is
-  closed with the SDK's `tool-input-error` chunk: `input: {}` and
-  `errorText` "Cut off at the output limit before it ran. Nothing from it
-  was saved."
-  - The "ran …" line then shows that text, not an empty output (rule 11).
-  - Later turns carry a small, valid call-and-error pair, not the partial
-    arguments.
+- A cut-off step is always its call's last step, because the loop ends
+  there. So the coach checks after each call ends, using the last
+  `finish-step` part the tap saw (or the last of `result.steps`).
+- The stop condition never runs on a cut-off step and gets no new check.
+
+**Every tool call in a cut-off step is treated as not run**, whether or not
+its input finished, because none of them ran (above). The coach never runs
+a tool itself. In the UI, each one is closed with the SDK's
+`tool-input-error` chunk: `input: {}` and `errorText` = the **closing
+text**:
+
+> Cut off at the output limit before it ran. Nothing from it was saved.
+
+- **Which parts:** every `tool-input-start` id and every `tool-call` id the
+  tap saw in the cut-off step. A finished call has both; an unfinished one
+  has only the first.
+- The "ran …" line then shows the closing text, not an empty output
+  (rule 11).
+- Later turns turn each one into a small, valid call-and-error pair
+  (`input: {}`), not the partial or unrun arguments.
+
+**A chat is never left broken.** After any cut-off (continued, stopped with
+`cut_off`, or aborted), the next turn must reach the model. Two things
+make sure of it:
+
+- the closing above, so no part is left `input-available`;
+- every turn converts history with `convertToModelMessages(…,
+  { ignoreIncompleteToolCalls: true })`. A tool part that never got a
+  result (from a cut-off, an abort, or a closed tab) is then left out of
+  the request instead of failing it.
 
 ### 9.2 One continuation per turn
 
@@ -716,14 +743,27 @@ these hold:
   - the first call's input messages;
   - its response messages (drop a trailing assistant message with no
     content);
+  - right after the cut-off step's assistant message, one `tool` message
+    holding a synthesized result for **each** of that message's
+    `tool-call` parts: `{ type: "tool-result", toolCallId, toolName,
+    output: { type: "error-text", value: <the closing text> } }`;
   - one **user-role** message with this note, word for word:
 
   > Note from the Ten app, not the candidate: your last reply was cut off
-  > at the output limit. The part that was cut off never ran: a tool call
-  > it was writing did not happen, and nothing from it was saved. Tool calls
-  > that finished before it did run. Do the unfinished work in smaller
-  > pieces, one file per write, and check the files before repeating
-  > anything.
+  > at the output limit, so none of the actions in it ran. Every tool call
+  > in that reply was cancelled, including any that looked complete, and
+  > nothing from it was saved. Redo that reply's work in smaller pieces,
+  > one file per write. Actions from your earlier replies did run; check
+  > the files before repeating any of them.
+
+- Why the synthesized results:
+  - The SDK requires every tool call to have a result, and throws
+    `MissingToolResultsError` otherwise. The results keep the request
+    valid, and they show the model exactly which calls did not run.
+  - Each call keeps its own input, so the model can split that content
+    into smaller writes.
+  - Unfinished calls never reached the response messages, so they need
+    nothing.
 
 - The system prompt stays the same, so the continuation can reuse the
   prompt cache. A changed system prompt would re-bill the whole prefix.
@@ -731,7 +771,8 @@ these hold:
   `matchGateReply` never sees it.
 - **One assistant message on screen.** Every call's UI stream is merged
   with `sendFinish: false`, and every call after the first also has
-  `sendStart: false`. The coach writes one `{ type: "finish" }` last. No
+  `sendStart: false`. The coach writes one `{ type: "finish" }` last of
+  all, after any `cut_off` error. No
   `apps/web` code reads that chunk's fields (checked 2026-09-24).
 - Inside the continuation the normal loop runs, with the same stop
   condition, allowance, gate and step cap. Its calls are metered like any
@@ -825,7 +866,10 @@ This lets a cut-off show in the data without anyone reading a chat.
   - Reading only the last line would miss it: the usage chunk that follows
     often has no `choices`.
   - A string of 1–32 characters is kept. Anything else is null: another
-    type, no finish reason, or a meter that hit its deadline.
+    type, or no finish reason.
+  - At the meter's deadline, it records the last value seen before the
+    deadline, or null if there was none. (Lead ruling 3, 2026-09-24: this
+    tells more, and the deadline stop already has its own log line.)
 - **Never blocks the insert:** a parse problem gives null, never an
   exception, and the rest of the row is written as today. Credit rows leave
   it null. It is cost metadata, so `ten-delete-account` keeps it with the
@@ -859,21 +903,33 @@ model, the in-memory store and a fake gate, never a real workspace.
 - **(i) One continuation, then success.** The real
   `@openrouter/ai-sdk-provider` gets a stubbed `fetch` streaming SSE: text,
   a `write_file` whose arguments stop mid-string, then `finish_reason:
-  "length"`. The second response is a normal call, then `stop`. Pass when:
-  - there are exactly two requests;
-  - the second has the same system prompt, differs from the first, and ends
-    with the § 9.2 note word for word;
-  - the second call's tool runs;
-  - there is one message with one `start` and one `finish`;
-  - the dangling part is `output-error` with the § 9.1 text;
+  "length"`. The continuation replies with a normal call, then `stop`.
+  Pass when:
+  - exactly one request carries the § 9.2 note, word for word, as its last
+    message; that request has the same system prompt as the first and
+    differs from it;
+  - total requests are 2 when the continuation replies with text only, and
+    more when it calls tools (the SDK's normal loop);
+  - the continuation's tool runs;
+  - there is one message with one `start` and one `finish`, and `finish`
+    is the last chunk;
+  - the dangling part is `output-error` with the closing text;
   - there is no `cut_off`.
 
-  Variants: a text-only cut-off; a mid-run cut-off, where a step holds a
-  finished and an unfinished `write_file`. The finished one runs once, the
-  loop stops, and the continuation runs.
-- **(ii) Cut off twice.** Both requests end on `length`. Pass when there are
-  exactly two requests and one `cut_off`, with its fixed message and
-  `retryable: true`.
+  Variants:
+  - A text-only cut-off.
+  - A cut-off step holding a **finished** and an unfinished `write_file`.
+    Pass when:
+    - neither runs, and the store is unchanged;
+    - both UI parts end `output-error` with the closing text;
+    - the note-carrying request holds one synthesized `error-text`
+      result, for the finished call;
+    - it is sent with no `MissingToolResultsError`.
+- **(ii) Cut off twice.** The continuation's first reply also ends on
+  `length`. Pass when:
+  - there are exactly two requests;
+  - there is one `cut_off`, with its fixed message and `retryable: true`;
+  - `finish` comes after it.
 - **(iii) Continuation blocked.** In each case, pass when there is no
   second request and there is one `cut_off`:
   - (a) spent plus projected passes the allowance;
@@ -898,7 +954,7 @@ model, the in-memory store and a fake gate, never a real workspace.
     `"length"`.
   - None, a number, `""`, or 33 characters: null.
   - A stream cut mid-line: the last whole value, or null.
-  - A meter deadline: null.
+  - A meter deadline: the last value seen before it, or null if none.
   - In every case the insert carries the key and succeeds.
   - SQL harness: the column is nullable and refuses 33 characters, and
     teardown leaves no `ten_` object.
@@ -916,6 +972,17 @@ model, the in-memory store and a fake gate, never a real workspace.
   four planted JDs, 3 trials, majority rule. Pass when each role's
   `jobs.md` row lands before the next role's analysis file. The owner
   approves the spend first (rule 5).
+- **(x) The chat is never poisoned.** Take each outcome:
+  - continued and succeeded;
+  - `cut_off` from each of conditions 1–5;
+  - a second cut-off;
+  - aborted during the continuation.
+
+  Add a new typed user message to the resulting UI messages and run the
+  next turn. Pass when that turn's model request is sent, with no
+  `MissingToolResultsError` and no `model_error`. Also pass a hand-built
+  history with a tool part stuck in `input-available` (the shape before
+  this fix): it must reach the model too.
 
 **UNVERIFIED** (the named test settles each one):
 
@@ -924,8 +991,8 @@ model, the in-memory store and a fake gate, never a real workspace.
   confirms it next time;
 - that a late `tool-input-error` updates the open part rather than adding
   a second one (vii);
-- that OpenRouter accepts a user message right after tool results for
-  this model (i);
+- that OpenRouter accepts the synthesized error results followed by a
+  user message, for this model (i);
 - that the continuation reads the cache, i.e. its ledger `tokens_cached`
   is above 0 (viii);
 - that the model accepts `max_tokens` 8,192 (viii).
@@ -997,5 +1064,9 @@ spike replaced (owner, 2026-09-23).
 - The retry note is a user-role message, not a system-prompt change: the
   system prompt stays byte-identical, so the prompt cache survives. Prefill
   was rejected (it cannot resume a dropped tool call).
+- Every tool call in a cut-off step is treated as not run (lead ruling,
+  09-24, fix round 1 of issue #2): `ai@7.0.111` runs no tool on a `length`
+  step. Synthesized error results keep the continuation valid, and
+  `ignoreIncompleteToolCalls` keeps every later turn valid.
 - Cap 8,192 (owner, 09-24): the most the ~360 s meter allows at 30 tokens/s,
   with margin; more needs another host. The ledger records `finish_reason`.

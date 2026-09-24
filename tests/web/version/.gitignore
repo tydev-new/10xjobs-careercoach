@@ -1,0 +1,3 @@
+# A symlink to apps/web/node_modules, made at test time (version-notice.test.ts).
+# The root pattern `node_modules/` matches directories only, not a symlink.
+node_modules

@@ -92,6 +92,26 @@ function estimateCostStep(action: string, steps: number) {
   };
 }
 
+/** An in-memory store that counts every write per path — proves the
+ *  coach never executes a "finished" tool call in a cut-off step. */
+function countingStore(files: Record<string, string> = {}) {
+  const inner: any = createInMemoryWorkspaceStore(files);
+  const writes: Record<string, number> = {};
+  const store = new Proxy(inner, {
+    get(target, prop, recv) {
+      if (prop === "write") {
+        return async (p: string, ...rest: any[]) => {
+          writes[p] = (writes[p] ?? 0) + 1;
+          return target.write(p, ...rest);
+        };
+      }
+      const v = Reflect.get(target, prop, recv);
+      return typeof v === "function" ? v.bind(target) : v;
+    },
+  });
+  return { store, writes };
+}
+
 async function baseCoach(model: any, overrides: Record<string, unknown> = {}) {
   return createCoach({
     model,
@@ -127,8 +147,8 @@ test("§ 9.1/9.2: a text-only cut-off (no client tool call, so the SDK never cal
   assert.equal(tail.role, "user");
   assert.equal(
     tail.content[0].text,
-    "Note from the Ten app, not the candidate: your last reply was cut off at the output limit. The part that was cut off never ran: a tool call it was writing did not happen, and nothing from it was saved. Tool calls that finished before it did run. Do the unfinished work in smaller pieces, one file per write, and check the files before repeating anything.",
-    "the continuation's trailing message is § 9.2's note, word for word",
+    "Note from the Ten app, not the candidate: your last reply was cut off at the output limit, so none of the actions in it ran. Every tool call in that reply was cancelled, including any that looked complete, and nothing from it was saved. Redo that reply's work in smaller pieces, one file per write. Actions from your earlier replies did run; check the files before repeating any of them.",
+    "the continuation's trailing message is § 9.2's note, word for word (amended 2026-09-24, lead rulings 1-2)",
   );
 
   const texts = (last.parts as any[]).filter((p) => p.type === "text").map((p) => p.text);
@@ -152,6 +172,69 @@ test("§ 9.1: a dangling tool part (tool-input-start with no matching tool-call)
   assert.equal((last.parts as any[]).filter((p) => p.type === "data-error").length, 0);
 });
 
+// § 9.1 amended 2026-09-24 (the BLOCKER fix): "Every tool call in a
+// cut-off step is treated as not run, whether or not its input finished,
+// because none of them ran." ai@7.0.111 never executes ANY tool in a step
+// that ends "length" — even one whose JSON parsed cleanly — so a
+// FINISHED call must be closed exactly like an unfinished one, and its
+// finished input (still present in the step's own content/response
+// message) is what the continuation's synthesized tool-result carries.
+test("§ 9.1/9.2 (amended, the BLOCKER fix): a step holding a FINISHED and an unfinished tool call, both cut off — both close with the tool-input-error text, and the continuation's request carries a synthesized error tool-result for the finished one, right after its assistant message", async () => {
+  const model = new MockLanguageModelV4({
+    doStream: [
+      {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "stream-start", warnings: [] },
+            { type: "text-start", id: "t" },
+            { type: "text-delta", id: "t", delta: "Recording both." },
+            { type: "text-end", id: "t" },
+            { type: "tool-input-start", id: "call_done", toolName: "write_file" },
+            { type: "tool-input-delta", id: "call_done", delta: JSON.stringify({ path: "a.md", content: "alpha" }) },
+            { type: "tool-input-end", id: "call_done" },
+            { type: "tool-call", toolCallId: "call_done", toolName: "write_file", input: JSON.stringify({ path: "a.md", content: "alpha" }) },
+            { type: "tool-input-start", id: "call_cut", toolName: "write_file" },
+            { type: "tool-input-delta", id: "call_cut", delta: '{"path":"b.md","content":"be' },
+            { type: "finish", finishReason: { unified: "length", raw: "length" }, usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } },
+          ] as any,
+        }),
+      },
+      textStep("Redoing b.md now.", "stop"),
+    ] as any,
+  });
+  const { store, writes } = countingStore();
+  const coach = await baseCoach(model, { workspace: store });
+  const last = await run(coach, "chat-1", [userMsg("u1", "write a.md and b.md")]);
+
+  assert.equal((model as any).doStreamCalls.length, 2);
+  assert.equal(writes["a.md"] ?? 0, 0, "the coach never executes a tool itself — the FINISHED call still never ran");
+
+  for (const id of ["call_done", "call_cut"]) {
+    const p = (last.parts as any[]).find((x) => x.type === "tool-write_file" && x.toolCallId === id);
+    assert.ok(p, `${id}: still on the message`);
+    assert.equal(p.state, "output-error", `${id}: closed, not left input-available`);
+    assert.equal(p.errorText, "Cut off at the output limit before it ran. Nothing from it was saved.");
+  }
+
+  // the continuation's request: the cut-off step's assistant message
+  // (text + the finished tool-call), then a tool message with ONE
+  // synthesized error-text result for call_done only (call_cut never
+  // reached the response messages), then the note.
+  const call2 = (model as any).doStreamCalls[1];
+  const msgs = call2.prompt as any[];
+  const toolMsg = msgs.find((m) => m.role === "tool");
+  assert.ok(toolMsg, "a synthesized tool message is present");
+  assert.equal(toolMsg.content.length, 1, "exactly one synthesized result (call_done only)");
+  assert.equal(toolMsg.content[0].toolCallId, "call_done");
+  assert.equal(toolMsg.content[0].output.type, "error-text");
+  assert.equal(toolMsg.content[0].output.value, "Cut off at the output limit before it ran. Nothing from it was saved.");
+  const toolMsgIndex = msgs.indexOf(toolMsg);
+  assert.equal(msgs[toolMsgIndex - 1].role, "assistant", "right after the cut-off step's own assistant message");
+  assert.ok(!JSON.stringify(msgs).includes('"be"') && !JSON.stringify(msgs).includes("be\""), "call_cut's partial input never reaches the continuation");
+
+  assert.equal((last.parts as any[]).filter((p) => p.type === "data-error").length, 0, "no cut_off — the continuation succeeded");
+});
+
 test("§ 9.3: two cut-offs in one turn — exactly two requests, no third call, one visible cut_off with the fixed message and retryable: true", async () => {
   const model = new MockLanguageModelV4({
     doStream: [textStep("first cut", "length"), textStep("second cut", "length")] as any,
@@ -167,7 +250,7 @@ test("§ 9.3: two cut-offs in one turn — exactly two requests, no third call, 
   assert.equal(errs[0].retryable, true);
 });
 
-test("§ 9.2 precondition 2 / § 9.8(iii)(b): a cut-off on the very last allowed step opens no continuation and no step_cap — just the visible cut_off (cut-off is checked BEFORE the step cap)", async () => {
+test("§ 9.2 precondition 2 / § 9.8(iii)(b): a cut-off on the very last allowed step opens no continuation and no step_cap — just the visible cut_off (the stop condition never runs on a cut-off step, so step_cap's own check never fires for it)", async () => {
   const model = new MockLanguageModelV4({
     doStream: [textStep("cut off at the cap", "length")] as any,
   });

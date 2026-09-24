@@ -52,11 +52,12 @@ export const ERROR_MESSAGES: Record<ErrorCode, { message: string; retryable: boo
 // text — word for word.
 const CUT_OFF_TOOL_ERROR_TEXT = "Cut off at the output limit before it ran. Nothing from it was saved.";
 
-// § 9.2's continuation note, a USER-role message (never a UIMessage,
+// § 9.2's continuation note (fix round 1, lead rulings — amended
+// 2026-09-24, commit 7c1b1be), a USER-role message (never a UIMessage,
 // never seen by matchGateReply) appended to the continuation's own
 // `messages` — word for word, unwrapped from the doc's blockquote.
 const CUT_OFF_CONTINUATION_NOTE =
-  "Note from the Ten app, not the candidate: your last reply was cut off at the output limit. The part that was cut off never ran: a tool call it was writing did not happen, and nothing from it was saved. Tool calls that finished before it did run. Do the unfinished work in smaller pieces, one file per write, and check the files before repeating anything.";
+  "Note from the Ten app, not the candidate: your last reply was cut off at the output limit, so none of the actions in it ran. Every tool call in that reply was cancelled, including any that looked complete, and nothing from it was saved. Redo that reply's work in smaller pieces, one file per write. Actions from your earlier replies did run; check the files before repeating any of them.";
 
 // § 9.4's stateless next-turn note, appended to the system prompt (after
 // the gate-pending note, when both apply) when the assistant message just
@@ -131,13 +132,43 @@ function isEmptyAssistantContent(content: unknown): boolean {
   return false;
 }
 
-function dropTrailingEmptyAssistantMessage<T extends { role: string; content: unknown }>(messages: T[]): T[] {
-  if (messages.length === 0) return messages;
-  const last = messages[messages.length - 1];
-  if (last.role === "assistant" && isEmptyAssistantContent(last.content)) {
-    return messages.slice(0, -1);
+// § 9.2 (amended 2026-09-24, lead rulings 1–2): builds the continuation's
+// `messages`, in order — the first call's input messages; its response
+// messages (drop a trailing assistant message with no content); right
+// after the cut-off step's own assistant message (always the LAST entry
+// of `responseMessages` — a cut-off step is always the call's last step,
+// § 9.1, and nothing ran, so no tool message ever follows it), one `tool`
+// message holding a synthesized `error-text` result for EACH of that
+// message's `tool-call` parts (finished calls the SDK never executed —
+// unfinished ones never reached `responseMessages` at all, so they need
+// nothing); then the note. "The coach never executes tools itself."
+function buildContinuationMessages(firstInputMessages: any[], responseMessages: any[]): any[] {
+  const rm = [...responseMessages];
+  if (rm.length > 0) {
+    const last = rm[rm.length - 1];
+    if (last.role === "assistant" && isEmptyAssistantContent(last.content)) {
+      rm.pop();
+    }
   }
-  return messages;
+  const out: any[] = [...firstInputMessages, ...rm];
+  const cutOffStepMessage = rm[rm.length - 1];
+  if (cutOffStepMessage?.role === "assistant") {
+    const content = Array.isArray(cutOffStepMessage.content) ? cutOffStepMessage.content : [];
+    const toolCalls = content.filter((p: any) => p?.type === "tool-call");
+    if (toolCalls.length > 0) {
+      out.push({
+        role: "tool",
+        content: toolCalls.map((tc: any) => ({
+          type: "tool-result",
+          toolCallId: tc.toolCallId,
+          toolName: tc.toolName,
+          output: { type: "error-text", value: CUT_OFF_TOOL_ERROR_TEXT },
+        })),
+      });
+    }
+  }
+  out.push({ role: "user", content: CUT_OFF_CONTINUATION_NOTE });
+  return out;
 }
 
 // Step 5b coder's fix (flagged in the hand-back): design-web-ui.md § 2.7
@@ -241,37 +272,36 @@ function toPullReadableStream<T>(iterable: AsyncIterable<T>): ReadableStream<T> 
   });
 }
 
-// § 9.1: watches one call's raw `fullStream` for two things, alongside the
-// existing M4 error tap (unchanged — still runs on the RAW part, before
-// `toUIMessageStream` swallows the classifiable detail):
-//   - a dangling tool part: a `tool-input-start` whose id never gets a
-//     matching `tool-call` (the cut-off dropped it). Closed the moment
-//     the step that left it open reports `finishReason: "length"` — via a
-//     direct `tool-input-error` UI chunk (§ 9.1's exact text), not
-//     something `toUIMessageStream` can derive from the raw stream alone
-//     (there's no such raw `TextStreamPart`).
-//   - whether the CALL ends cut off (`finish` with `finishReason: "length"`,
-//     § 9.1's whole test) — read here too so a call with zero client tool
-//     calls (nothing ever reaches the stop condition, see § 9.2) is still
-//     caught the moment its OWN "finish" chunk streams by, same as
-//     `result.finishReason` would report once awaited.
+// § 9.1 (amended 2026-09-24, "Every tool call in a cut-off step is treated
+// as not run, whether or not its input finished, because none of them
+// ran"): watches one call's raw `fullStream`, alongside the existing M4
+// error tap (unchanged — still runs on the RAW part, before
+// `toUIMessageStream` swallows the classifiable detail), for every
+// `tool-input-start` id seen in the CURRENT step (reset at each
+// `start-step` — a step's own ids only, never an earlier, already-executed
+// step's). The moment that step's `finish-step` reports
+// `finishReason: "length"`, EVERY one of those ids — a finished call and
+// an unfinished one alike, ai@7.0.111 ran neither — is closed with a
+// direct `tool-input-error` UI chunk (§ 9.1's exact closing text), not
+// something `toUIMessageStream` can derive from the raw stream alone
+// (there's no such raw `TextStreamPart`).
 function tapCutOffAndErrors(
   stream: AsyncIterable<any>,
   onError: (error: unknown) => void,
-  onDanglingToolPart: (toolCallId: string, toolName: string) => void,
+  onCutOffToolPart: (toolCallId: string, toolName: string) => void,
 ): ReadableStream<any> {
   async function* gen() {
-    const pending = new Map<string, string>(); // toolCallId -> toolName
+    let stepToolIds = new Map<string, string>(); // toolCallId -> toolName, this step only.
     for await (const part of stream) {
       if (part?.type === "error") {
         onError(part.error);
+      } else if (part?.type === "start-step") {
+        stepToolIds = new Map();
       } else if (part?.type === "tool-input-start") {
-        pending.set(part.id, part.toolName);
-      } else if (part?.type === "tool-call") {
-        pending.delete(part.toolCallId);
-      } else if (part?.type === "finish-step" && part.finishReason === "length" && pending.size > 0) {
-        for (const [toolCallId, toolName] of pending) onDanglingToolPart(toolCallId, toolName);
-        pending.clear();
+        stepToolIds.set(part.id, part.toolName);
+      } else if (part?.type === "finish-step" && part.finishReason === "length") {
+        for (const [toolCallId, toolName] of stepToolIds) onCutOffToolPart(toolCallId, toolName);
+        stepToolIds = new Map();
       }
       yield part;
     }
@@ -437,7 +467,13 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
   // `tools` passed so tool RESULTS in history convert faithfully (a
   // dropped/mis-shaped tool-result would silently shrink what the
   // window-word accounting and the real request both see).
-  const modelMessages = await convertToModelMessages(windowed as any, { tools: tools as any });
+  // § 9.1 "A chat is never left broken" (amended 2026-09-24): the closing
+  // above keeps a NEW cut-off from ever leaving a part `input-available`,
+  // but this is the belt-and-suspenders for any OLDER history that still
+  // holds one (a cut-off before this fix shipped, an abort, a closed tab)
+  // — `ignoreIncompleteToolCalls: true` drops a tool part with no result
+  // from the request instead of failing it with `MissingToolResultsError`.
+  const modelMessages = await convertToModelMessages(windowed as any, { tools: tools as any, ignoreIncompleteToolCalls: true });
 
   /** § 4's "allowance" projection for the NEXT step's cost (H1/M6, fix
    *  round 1): this chat's own measured steps so far (persisted, worst
@@ -474,13 +510,16 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
   // than maxSteps steps are used, counting both calls (the continuation's
   // stop condition uses the turn's total)".
   //
-  // Returns both the condition itself and how many of ITS OWN steps it
-  // recorded — the AI SDK only calls this at all when the step it just
-  // ran has a client tool call to decide whether to continue past (see
-  // the hand-back): a text-only step, or one whose only tool call the
-  // cut-off dropped entirely, never reaches it, so the post-call
-  // catch-up below is what actually fixes § 9.2's "today the last step
-  // of every call goes uncounted" gap for those cases.
+  // § 9.1 (amended 2026-09-24): "A cut-off step is always its call's last
+  // step, because the loop ends there... The stop condition never runs on
+  // a cut-off step and gets no new check" — ai@7.0.111 only calls this at
+  // all when the step it just ran has a client tool call to decide
+  // whether to continue past, and a `length` step never has one that
+  // actually ran (see the hand-back). So cut-off detection lives entirely
+  // in the post-call read below, not here. Returns both the condition
+  // itself and how many of ITS OWN steps it recorded — a text-only step
+  // (a call's own last, ordinary step, § 9.2's own named gap) also never
+  // reaches this, which the post-call catch-up below fixes too.
   function makeStop(baseStepCount: number): { stop: StopCondition<typeof tools, any>; recordedCount: () => number } {
     let recordedThisCall = 0;
     const stop: StopCondition<typeof tools, any> = async ({ steps }) => {
@@ -489,10 +528,6 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
         recordStepCost(last as any);
         recordedThisCall = steps.length;
       }
-      // § 9.1: "The stop condition checks this first, before the step
-      // cap. A cut-off step stops the loop; its only other effect is
-      // recording the step's cost" (done above, unconditionally).
-      if ((last as any)?.finishReason === "length") return true;
 
       // 1. the hard step cap, counting steps used in EARLIER calls too.
       if (baseStepCount + steps.length >= maxSteps) {
@@ -669,14 +704,12 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
       !call1.hadError;
 
     if (preconditionsOk) {
-      // § 9.2: "messages are, in order: the first call's input messages;
-      // its response messages (drop a trailing assistant message with no
-      // content); one user-role message with this note, word for word."
-      const continuationMessages = [
-        ...(modelMessages as any[]),
-        ...dropTrailingEmptyAssistantMessage(call1.responseMessages),
-        { role: "user", content: CUT_OFF_CONTINUATION_NOTE },
-      ];
+      // § 9.2: messages, in order — the first call's input messages; its
+      // response messages (drop a trailing assistant message with no
+      // content); right after the cut-off step's own assistant message,
+      // one synthesized-error tool message per its tool-call parts; then
+      // the note, word for word (`buildContinuationMessages`, above).
+      const continuationMessages = buildContinuationMessages(modelMessages as any[], call1.responseMessages);
       // "There is never a third call" — this is the ONLY continuation
       // attempt this function ever makes, whatever call 2 itself ends on.
       const call2 = await runOneCall(continuationMessages, call1.steps.length, false);
@@ -686,10 +719,6 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     // the same visible § 9.3 `cut_off` below — no continuation, no gate.
   }
 
-  // § 9.2: "The coach writes one { type: 'finish' } last. No apps/web code
-  // reads that chunk's fields."
-  writer.write({ type: "finish" } as any);
-
   if (finalCutOff) {
     // § 9.3: "A cut-off that can't be continued writes data-error
     // { code: 'cut_off', ... }. That covers any of 1–5 failing, including
@@ -698,4 +727,9 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     const { message, retryable } = ERROR_MESSAGES.cut_off;
     writer.write({ type: "data-error", data: { code: "cut_off", message, retryable } });
   }
+
+  // § 9.2 (amended 2026-09-24): "The coach writes one { type: 'finish' }
+  // last of all, after any cut_off error." No apps/web code reads that
+  // chunk's fields.
+  writer.write({ type: "finish" } as any);
 }

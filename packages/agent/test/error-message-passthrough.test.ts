@@ -74,21 +74,26 @@ test("a proxy 503 (the beta ceiling) shows ITS OWN message under the same model_
   assert.equal(errs[0].message, "The beta has reached today's limit. Try again tomorrow.");
 });
 
-test("a different 503 cause (cut off reply) is told apart from the ceiling ONLY by its own message, same code", async () => {
+// § 9.3 (amended 2026-09-24): a cut-off reply is its OWN code, `cut_off`,
+// not a `model_error` cause any more — the old § 8 cut-off `model_error`
+// sentence this test used to exercise here is retired. The mechanism this
+// test proves (any distinct message under the SAME code passes through
+// verbatim) still needs a second, still-real 503 model_error cause.
+test("a different 503 cause (upstream unavailable) is told apart from the ceiling ONLY by its own message, same code", async () => {
   const { MockLanguageModelV4 } = await import("ai/test");
   const model = new MockLanguageModelV4({
     doStream: async () => {
       const e: any = new Error("Service Unavailable");
       e.statusCode = 503;
       e.responseBody = JSON.stringify({
-        error: { code: "model_error", message: "The reply was cut off. Nothing from it was saved. Try again." },
+        error: { code: "model_error", message: "The model is temporarily unavailable. Try again." },
       });
       throw e;
     },
   });
   const errs = await runAndGetErrors(model);
   assert.equal(errs[0].code, "model_error");
-  assert.equal(errs[0].message, "The reply was cut off. Nothing from it was saved. Try again.");
+  assert.equal(errs[0].message, "The model is temporarily unavailable. Try again.");
 });
 
 test("no responseBody at all falls back to the generic ERROR_MESSAGES sentence (pre-existing behavior, unchanged)", async () => {

@@ -816,3 +816,36 @@ button {
 .composer-attach-input {
   display: none;
 }
+
+/* ---- BEGIN new-version notice (design-web-agent.md § 10, ui § 1.8) ----
+   Minimal, token-based only — another agent is restyling the app; this
+   block exists so that pass can find and replace it in one place. Neutral
+   styling always (rule 8: never error/alarm, even for the "not sent"
+   copy) — reuses --border/--bg-panel/--fg, never --red/--red-soft. */
+.version-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  padding: 8px 14px;
+  font-size: 0.9em;
+}
+
+.version-notice-text {
+  margin: 0;
+}
+
+.version-notice-reload {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: 8px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+}
+/* ---- END new-version notice ---- */

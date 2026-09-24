@@ -7,25 +7,16 @@
   </head>
   <body>
     <div id="root"></div>
-    <!-- Fix round 1, item 1 (BLOCKER, "Illegal invocation"): binds
-         window.fetch to window ONCE, before any bundled or third-party
-         code ever captures a reference to it. Real browsers (confirmed in
-         Chromium too, not just Firefox/WebKit — see the tester's own
-         `tests/e2e-real/e2e.ts` "browser: calling window.fetch as
-         o.fetchImpl(...)" check) throw "Illegal invocation" the moment
-         `fetch` is called through a stored reference whose receiver isn't
-         the realm's global object — exactly the `fetchImpl ?? fetch`
-         pattern this app's own backend adapters used to have (now fixed
-         individually too, via src/backend/bound-fetch.ts), but this plain
-         inline script (loaded and run BEFORE the module script below, so
-         nothing — ours or a dependency's — can grab the unbound original
-         first) is the one place that also protects any OTHER code path
-         that captures `window.fetch` directly. -->
-    <script>
-      if (typeof window !== "undefined" && typeof window.fetch === "function") {
-        window.fetch = window.fetch.bind(window);
-      }
-    </script>
+    <!-- Fix round 1 added an inline window.fetch.bind() script here as a
+         belt-and-suspenders fix for "Illegal invocation"
+         (src/backend/bound-fetch.ts's per-call-site fix). Fix round 2
+         removed it: the tester's own e2e proved it unneeded (419/440 with
+         E2E_STRIP_INLINE_FETCH=1, same failures as with it) — every real
+         fetch capture site in this app already goes through boundFetch(),
+         and the tester's e2e now runs a STATIC check (tests/e2e-real/e2e.ts,
+         "B1 static") over apps/web/src, packages/agent/src and
+         packages/checkers/src instead, so a regression is caught at the
+         source, not papered over globally at the page level. -->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

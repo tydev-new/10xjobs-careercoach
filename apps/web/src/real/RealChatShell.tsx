@@ -62,6 +62,9 @@ export function RealChatShell({
   const { messages, sendMessage, status } = chat;
 
   const [composerValue, setComposerValue] = useState("");
+  // Fix round 2, ruling 1: a successful attach is held here (not injected
+  // into composerValue) until the next send().
+  const [pendingAttachment, setPendingAttachment] = useState<{ path: string; mediaType: string; filename: string } | undefined>(undefined);
   const [storeEmpty, setStoreEmpty] = useState(false);
   const [openRef, setOpenRef] = useState<string | undefined>(undefined);
   const [openFile, setOpenFile] = useState<FileRead | undefined>(undefined);
@@ -158,19 +161,23 @@ export function RealChatShell({
   };
 
   const send = (text: string) => {
-    void sendMessage({ text, metadata: { origin: "typed" } });
+    // Fix round 2, ruling 1: a pending attach rides as a real § 2 `file`
+    // part (url "workspace:<path>") — no pre-filled composer text. The
+    // Transcript already renders an `.attachment-chip` for any `file`
+    // part on a sent message (Transcript.tsx); packages/agent's coach.ts
+    // (stripWorkspaceFileParts) turns it into "The candidate attached
+    // `<path>`." for the model, word for word (confirmed unchanged —
+    // this is the tester's own e2e's exact expected text).
+    const files = pendingAttachment
+      ? [{ type: "file" as const, mediaType: pendingAttachment.mediaType, filename: pendingAttachment.filename, url: `workspace:${pendingAttachment.path}` }]
+      : undefined;
+    void sendMessage({ text, files, metadata: { origin: "typed" } });
+    setPendingAttachment(undefined);
   };
 
   // Upload wiring (plan step 5b item 3): the composer's attach ->
-  // upload("documents/<name>") BEFORE sending — the message text that
-  // follows just names the file; the bytes never go through the model
-  // (packages/agent's coach.ts strips a `file` part to one text line, and
-  // this text-note form conveys the same "attached `<path>`" line without
-  // one — the tester's own e2e (tests/e2e-real/e2e.ts, "journey: attach
-  // uploads to documents/<name> before sending") drives this exact flow:
-  // it reads the composer's own pre-filled value for the "documents/"
-  // path, then fills in the rest of the message itself, so the note is
-  // appended to composerValue, not sent as a separate file part).
+  // upload("documents/<name>") BEFORE sending, held as `pendingAttachment`
+  // until the next send() attaches it as a real file part (ruling 1).
   const handleAttach = async (file: File) => {
     setAttaching(true);
     setAttachError(undefined);
@@ -181,9 +188,11 @@ export function RealChatShell({
         setAttachError(outcome.message);
         return;
       }
-      const current = composerValue.trim();
-      const note = `Attached \`${outcome.path}\`.`;
-      setComposerValue(current ? `${current}\n${note}` : note);
+      const mediaType = file.name.toLowerCase().endsWith(".docx")
+        ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        : "application/pdf";
+      const filename = outcome.path!.split("/").pop() ?? outcome.path!;
+      setPendingAttachment({ path: outcome.path!, mediaType, filename });
     } catch (err) {
       setAttachError(err instanceof Error ? err.message : "Couldn't upload that file. Try again.");
     } finally {

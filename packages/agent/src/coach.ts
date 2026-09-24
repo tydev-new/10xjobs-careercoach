@@ -431,6 +431,20 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     maxRetries: 0,
   });
 
+  // Fix round 2, item 7: a refused first call (e.g. `recordedSteps.length
+  // === 0`, § 8's own 402/503 refusals) makes streamText's OWN internal
+  // deferred promises (finishReason/rawFinishReason/totalUsage/steps/
+  // initialResponseMessages — see @ai-sdk/provider-utils' own
+  // rejectResultPromises) reject with a NoOutputGeneratedError. This
+  // package never reads any of `result`'s promise-shaped getters (only
+  // `result.fullStream`, consumed below) — so nothing else ever attaches
+  // a `.catch` to them, and Node/the browser can report an unhandled
+  // rejection for a promise this code technically "caused" but never
+  // otherwise touches. Reading + settling them here (never throwing,
+  // never awaited by anything that matters) gives every one of them a
+  // handler, independent of whether this turn actually finishes.
+  void Promise.allSettled([result.steps, result.totalUsage, result.finishReason]);
+
   const tapped = tapErrorParts(result.fullStream, (error) => {
     const { code, serverMessage } = classifyError(error);
     const { message, retryable } = ERROR_MESSAGES[code];

@@ -10,21 +10,19 @@
 // gate would.
 import { useState, type FormEvent, type ReactElement } from "react";
 import { matchGateReply } from "../../../../packages/agent/src/helpers.ts";
-import { deleteBetaAccount, type DeleteAccountSummary } from "../backend/delete-account.ts";
+import { deleteBetaAccount } from "../backend/delete-account.ts";
 
 export interface DeleteBetaDataConfirmProps {
   supabaseUrl: string;
   accessToken: () => Promise<string>;
   onClose: () => void;
-  /** Performs the actual sign-out; called from the report-back's own OK
-   *  button (the tester's e2e — tests/e2e-real/e2e.ts "delete: typed yes
-   *  -> the function ran -> the report-back line" — waits for the
-   *  report-back TEXT the instant ten-delete-account returns, then
-   *  separately clicks OK and waits for the sign-in screen: showing the
-   *  report-back only AFTER an awaited sign-out would unmount this dialog,
-   *  from its OWN parent unmounting on the resulting SIGNED_OUT event,
-   *  before the report-back could ever render — so sign-out stays gated
-   *  on the explicit OK click, same as before this fix round). */
+  /** Called once ten-delete-account returns; performs the actual sign-out
+   *  AND shows the report-back — both owned by RealApp now (fix round 2,
+   *  item 3: sign out FIRST, awaited, then the report-back, which must
+   *  survive this component's OWN unmount once RealApp's screen leaves
+   *  "member" — so RealApp renders it, not this dialog). This component
+   *  has nothing left to show once it calls this; it just awaits it so
+   *  the Submit button stays disabled ("Deleting…") until then. */
   onDeleted: () => Promise<void>;
 }
 
@@ -34,7 +32,7 @@ const ONE_SENTENCE =
   "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. " +
   "Your usage records, which show only amounts spent and no content, are kept.";
 
-type Phase = "confirming" | "declined" | "deleting" | "error" | "done";
+type Phase = "confirming" | "declined" | "deleting" | "error";
 
 export function DeleteBetaDataConfirm({
   supabaseUrl,
@@ -45,7 +43,6 @@ export function DeleteBetaDataConfirm({
   const [typed, setTyped] = useState("");
   const [phase, setPhase] = useState<Phase>("confirming");
   const [error, setError] = useState<string | undefined>(undefined);
-  const [summary, setSummary] = useState<DeleteAccountSummary | undefined>(undefined);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -58,25 +55,21 @@ export function DeleteBetaDataConfirm({
       return;
     }
     if (reply !== "approve") {
-      // "none": stays open, same as a spend gate's off-script reply.
+      // "none": stays open, same as a spend gate's own off-script reply.
       return;
     }
     setPhase("deleting");
     setError(undefined);
     try {
-      const result = await deleteBetaAccount({ url: supabaseUrl, accessToken });
-      setSummary(result);
-      setPhase("done");
+      await deleteBetaAccount({ url: supabaseUrl, accessToken });
+      await onDeleted(); // sign-out, then RealApp shows the report-back.
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      // Fix round 2, item 2's own posture applied here too: never the raw
+      // error text on screen — log it, show a plain sentence.
+      console.error("[Ten] delete beta data failed:", err);
+      setError("Something went wrong deleting your data.");
       setPhase("error");
     }
-  };
-
-  const [signingOut, setSigningOut] = useState(false);
-  const handleOk = () => {
-    setSigningOut(true);
-    void onDeleted(); // RealApp's SIGNED_OUT listener unmounts this dialog once it resolves.
   };
 
   if (phase === "declined") {
@@ -86,22 +79,6 @@ export function DeleteBetaDataConfirm({
           <p>Declined — nothing was deleted.</p>
           <button type="button" onClick={onClose}>
             Close
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "done" && summary) {
-    return (
-      <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
-        <div className="delete-confirm-card">
-          {/* § 1.7 point 4: the report-back, once ten-delete-account
-              returns. OK is what actually signs out (handleOk) — the
-              sentence itself already states what OK is about to do. */}
-          <p>Deleted. You're signed out of Ten — your sign-in for the older app is untouched.</p>
-          <button type="button" onClick={handleOk} disabled={signingOut}>
-            {signingOut ? "Signing out…" : "OK"}
           </button>
         </div>
       </div>

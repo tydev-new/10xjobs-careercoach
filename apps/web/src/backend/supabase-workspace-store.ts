@@ -275,6 +275,49 @@ async function listBinaries(o: Internal, prefix: string): Promise<FileInfo[]> {
   return out;
 }
 
+// Fix round 2, item 4: the 50-object CAP the insert policy enforces
+// (ten_ws_objects_insert_own's `ten_object_count() < 50`) counts every
+// object for the user, at ANY depth — but list()'s own contract (§ 2:
+// "recursive, depth <= 3") caps at 3, so a classify403() built on listAll()
+// alone would undercount a workspace with objects deeper than that (e.g.
+// from an import) and miss the cap. This walks the same Storage list
+// endpoint as listBinaries() but with NO depth cutoff, counting only —
+// never used for the public list() API, which stays depth-limited.
+async function countAllBinaries(o: Internal): Promise<number> {
+  const token = await o.accessToken();
+  const base = `users/${o.userId}/ws`;
+  let count = 0;
+
+  async function walk(relDir: string): Promise<void> {
+    const storagePrefix = relDir ? `${base}/${relDir}` : base;
+    const res = await o.fetchImpl(`${o.url}/storage/v1/object/list/${TEN_WORKSPACES_BUCKET}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: o.anonKey,
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ prefix: storagePrefix, limit: 1000, offset: 0, sortBy: { column: "name", order: "asc" } }),
+    });
+    if (!res.ok) {
+      throw new Error(`count (storage) failed: HTTP ${res.status} ${await res.text()}`);
+    }
+    const entries = (await res.json()) as StorageListEntry[];
+    for (const e of entries) {
+      const childRel = relDir ? `${relDir}/${e.name}` : e.name;
+      if (e.id === null) {
+        await walk(childRel);
+        continue;
+      }
+      if (!isUploadExt(childRel)) continue;
+      count += 1;
+    }
+  }
+
+  await walk("");
+  return count;
+}
+
 async function listAll(o: Internal, dir?: string): Promise<FileInfo[]> {
   const startRel = dir ? validateRef(dir) : "";
   const prefix = startRel ? `${startRel}/` : "";
@@ -438,9 +481,25 @@ async function uploadOne(o: Internal, rawPath: string, bytes: Uint8Array): Promi
     // store relies on — no HEAD/info endpoint assumed) so all three agree
     // by construction.
     const etagFromUploadResponse = res.headers.get("etag");
-    const version = etagFromUploadResponse
-      ? normalizeEtag(etagFromUploadResponse)
-      : (await readBinary(o, relPath)).version;
+    // Fix round 2, item 8 (WebKit 0-byte watch item): the upload response
+    // being 200/201 only means Storage ACCEPTED the request — it doesn't
+    // prove the bytes actually landed intact (observed: a WebKit body
+    // stream can complete short). Always read the object back — the
+    // version-only fast path this used to take when an ETag was already
+    // present is gone; verifying the size is worth the extra round trip —
+    // and never silently trust the local byte count for what's now stored.
+    const back = await readBinary(o, relPath);
+    const version = etagFromUploadResponse ? normalizeEtag(etagFromUploadResponse) : back.version;
+    const readBackSize = back.binary ? back.bytes.byteLength : -1;
+    if (readBackSize !== bytes.byteLength) {
+      // No delete policy exists for members on storage.objects (create-only
+      // — see the migration's own comment), so the corrupted object can't
+      // be removed client-side; failing loudly here is what prevents it
+      // from being silently treated as a good upload.
+      throw new Error(
+        `upload verification failed for ${relPath}: sent ${bytes.byteLength} bytes, storage reports ${readBackSize}.`,
+      );
+    }
     return {
       path: relPath,
       version,
@@ -532,8 +591,9 @@ async function classify403(o: Internal, relPath: string): Promise<WorkspaceError
   if (clashesWith(relPath, existing.map((f) => f.path))) {
     return new WorkspaceError("path_conflict", `${relPath} clashes with an existing file or folder (case-insensitive).`);
   }
-  const objectCount = existing.filter((f) => isUploadExt(f.path)).length;
-  if (objectCount >= 50) {
+  // Counted at ALL depths (countAllBinaries), not listAll()'s depth<=3 —
+  // the insert policy's own cap counts every object for the user.
+  if ((await countAllBinaries(o)) >= 50) {
     return new WorkspaceError("workspace_full", "the workspace is at its object cap.");
   }
   return undefined;

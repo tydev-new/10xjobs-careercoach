@@ -22,17 +22,19 @@ export function corsHeaders(origin: string | null, allowed: string[]): HeadersIn
   if (origin && allowed.includes(origin)) {
     return {
       "Access-Control-Allow-Origin": origin,
-      // Fix round 1, item 2 (BLOCKER, Firefox/WebKit): the browser's own
-      // OpenRouter provider (@openrouter/ai-sdk-provider) always sets a
-      // `user-agent` header on every chat-completions request (see
+      // Fix round 1, item 2 (BLOCKER): the browser's own OpenRouter
+      // provider (@openrouter/ai-sdk-provider) always sets a `user-agent`
+      // header on every chat-completions request (see
       // withUserAgentSuffix in the installed package) — a real header on
       // the wire, not silently dropped, confirmed empirically by
       // intercepting an actual streamText() call through this exact
       // provider/proxy path (no x-stainless-* or other custom header is
       // sent; the full set is authorization, content-type, user-agent).
-      // Chrome tolerates a preflight that doesn't list it; Firefox and
-      // WebKit refuse the real request outright when it isn't listed —
-      // this is what made the e2e fail only in those two browsers.
+      // Without it listed here, the real request is refused in Firefox
+      // and WebKit; fix round 1's original note that "Chrome tolerates
+      // it" was never actually verified there and shouldn't be trusted —
+      // list it for every browser, not just the two the first e2e run
+      // happened to fail in.
       "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info, user-agent",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Vary": "Origin",

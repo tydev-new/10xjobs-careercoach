@@ -30,12 +30,24 @@ type Screen =
   // CLAUDE.md create, the first balance() call) lands here — a plain
   // message, Retry, and Sign out — never a blank page.
   | { kind: "error"; message: string }
-  | { kind: "member"; userId: string };
+  | { kind: "member"; userId: string }
+  // Fix round 2, item 3: sign-out has ALREADY happened (awaited) by the
+  // time this screen renders — the report-back never claims a sign-out
+  // that hasn't happened yet. Rendered as the sign-in screen with the
+  // report-back on top (not a separate route), so it survives the
+  // member -> signed-out screen change instead of unmounting with
+  // DeleteBetaDataConfirm (which lived inside the now-gone member
+  // screen).
+  | { kind: "deleted"; message: string };
 
-/** A plain, candidate-facing message for a setup failure — never the raw
- *  error text (matches upload-errors.ts's own posture). */
-function setupErrorMessage(err: unknown): string {
-  return "Something went wrong setting up your account. " + (err instanceof Error && err.message ? err.message : "Try again.");
+/** Fix round 2, item 2: a plain, candidate-facing message PER FAILING
+ *  STEP — never `err.message` (the tester's e2e, "setup" section, checks
+ *  the shown text contains none of HTTP/{/failed:/rpc/ten_xxx(, which a
+ *  raw RPC failure message like "checkMembership: ten_is_member() failed:
+ *  HTTP 500 {...}" would all trip). The raw error is logged to the
+ *  console only, for whoever's actually debugging it. */
+function logSetupError(step: string, err: unknown): void {
+  console.error(`[Ten setup] ${step} failed:`, err);
 }
 
 export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactElement {
@@ -69,35 +81,53 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   const checkAndAdvance = useCallback(
     async (userId: string) => {
       setScreen({ kind: "checking-membership" });
+
+      let isMember: boolean;
       try {
-        const isMember = await checkMembership(authClient);
-        if (!isMember) {
-          setScreen({ kind: "not-a-member" });
-          return;
-        }
-        // § 7: "The app creates the workspace CLAUDE.md (create-only) at
-        // first run or import" — from the bundled Tier 0 template, once,
-        // idempotent (createRootClaudeMd resolves `created: false` if a
-        // row already exists, e.g. a reload or a prior import).
+        isMember = await checkMembership(authClient);
+      } catch (err) {
+        logSetupError("checking membership", err);
+        checkedUserIdRef.current = undefined;
+        setScreen({ kind: "error", message: "Couldn't check your membership. Try again in a moment." });
+        return;
+      }
+      if (!isMember) {
+        setScreen({ kind: "not-a-member" });
+        return;
+      }
+
+      // § 7: "The app creates the workspace CLAUDE.md (create-only) at
+      // first run or import" — from the bundled Tier 0 template, once,
+      // idempotent (createRootClaudeMd resolves `created: false` if a
+      // row already exists, e.g. a reload or a prior import).
+      try {
         const skills = buildSkillBundle();
         const tier0 = skills[TIER0_PATH] ?? "";
         await createRootClaudeMd({ url: env.supabaseUrl, anonKey: env.supabaseAnonKey, userId, accessToken }, tier0);
-
-        const deps = buildRealDeps({ env, userId, accessToken });
-        // Proves the balance pipeline actually works BEFORE the chat
-        // mounts (item 4: "the balance" is one of the setup steps that
-        // must fail into the error screen, not silently once the chat is
-        // already up).
-        await deps.balance();
-
-        setWorkspace(deps.workspace);
-        setBalanceFn(() => deps.balance);
-        setCoach(createCoach(deps));
-        setScreen({ kind: "member", userId });
       } catch (err) {
+        logSetupError("setting up your workspace", err);
         checkedUserIdRef.current = undefined;
-        setScreen({ kind: "error", message: setupErrorMessage(err) });
+        setScreen({ kind: "error", message: "Couldn't set up your workspace. Try again in a moment." });
+        return;
       }
+
+      const deps = buildRealDeps({ env, userId, accessToken });
+      // Proves the balance pipeline actually works BEFORE the chat mounts
+      // (item 4: "the balance" is one of the setup steps that must fail
+      // into the error screen, not silently once the chat is already up).
+      try {
+        await deps.balance();
+      } catch (err) {
+        logSetupError("checking your balance", err);
+        checkedUserIdRef.current = undefined;
+        setScreen({ kind: "error", message: "Couldn't check your balance. Try again in a moment." });
+        return;
+      }
+
+      setWorkspace(deps.workspace);
+      setBalanceFn(() => deps.balance);
+      setCoach(createCoach(deps));
+      setScreen({ kind: "member", userId });
     },
     [authClient, env, accessToken],
   );
@@ -131,15 +161,27 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
-  // Returns a Promise (not fire-and-forget) so DeleteBetaDataConfirm can
-  // await the REAL sign-out before its own report-back claims "you're
-  // signed out" (fix round 1, item 8) — every other caller (Header's ⋯
+  // Returns a Promise (not fire-and-forget) — every caller (Header's ⋯
   // menu, NotAMember, the error screen) is a plain onClick and ignores
   // the return value, which TS allows (Promise<void> satisfies () => void).
   const handleSignOut = useCallback(async () => {
     await signOut(authClient);
     checkedUserIdRef.current = undefined;
     setScreen({ kind: "signed-out" });
+  }, [authClient]);
+
+  // Fix round 2, item 3: sign out FIRST (awaited), THEN show the
+  // report-back — never the reverse. Called from DeleteBetaDataConfirm
+  // once ten-delete-account itself has already returned; by the time
+  // this resolves, the session is genuinely gone (the tester's e2e reads
+  // localStorage directly to confirm this before checking the text).
+  const handleDeleted = useCallback(async () => {
+    await signOut(authClient);
+    checkedUserIdRef.current = undefined;
+    setScreen({
+      kind: "deleted",
+      message: "Deleted. You're signed out of Ten — your sign-in for the older app is untouched.",
+    });
   }, [authClient]);
 
   if (screen.kind === "loading" || screen.kind === "checking-membership") {
@@ -150,6 +192,25 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   }
   if (screen.kind === "not-a-member") {
     return <NotAMember onSignOut={handleSignOut} />;
+  }
+  if (screen.kind === "deleted") {
+    // The sign-in screen underneath (sign-out already happened — § 1.7
+    // point 4's report-back is never shown ahead of the real sign-out,
+    // fix round 2 item 3), with the report-back on top; OK just closes
+    // the overlay onto the now-ordinary sign-in screen.
+    return (
+      <>
+        <SignIn client={authClient} redirectTo={siteRedirectUrl()} />
+        <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
+          <div className="delete-confirm-card">
+            <p>{screen.message}</p>
+            <button type="button" onClick={() => setScreen({ kind: "signed-out" })}>
+              OK
+            </button>
+          </div>
+        </div>
+      </>
+    );
   }
   if (screen.kind === "error") {
     return (
@@ -192,7 +253,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         supabaseUrl={env.supabaseUrl}
         accessToken={accessToken}
         onSignOut={handleSignOut}
-        onDeleted={handleSignOut}
+        onDeleted={handleDeleted}
         theme={theme}
         onThemeToggle={onThemeToggle}
       />

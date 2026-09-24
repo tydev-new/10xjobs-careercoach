@@ -40,9 +40,11 @@ const STATE_LABEL: Record<Status["state"], string> = {
 // real deployed build must not ship a way to switch fixtures or auto-type
 // a candidate's replies. `import.meta.env.DEV` covers `npm run dev`;
 // `VITE_SHOW_MOCK_CONTROLS` is the explicit preview flag for a *built*
-// bundle that still wants them (this whole app is a preview tool, so the
-// default build sets it — see apps/web/.env and the README for how to
-// build without it, which is what proves they're absent from dist/).
+// bundle that still wants them — set by `npm run build:preview`'s own
+// script (package.json: `VITE_SHOW_MOCK_CONTROLS=1 npm run build`), not
+// a committed `.env` (there is none — see the README for how the default
+// `npm run build` omits the flag, which is what proves they're absent
+// from dist/).
 //
 // Fix round 1, item 8: `VITE_REAL=1` is a dev-only escape hatch — set it
 // (alongside VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY/VITE_SITE_URL) to

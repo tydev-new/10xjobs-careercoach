@@ -474,6 +474,10 @@ async function checkLanguageTool(deps: Deps, ctx: ToolContext, input: CheckLangu
       model: deps.model,
       system: instructions,
       prompt: contents.join("\n\n---\n\n"),
+      // Fix round 2, item 5: same reasoning as coach.ts's streamText()
+      // call — ONE proxy call, no SDK-internal retry of a deliberate
+      // proxy refusal (402/403/413/503).
+      maxRetries: 0,
     });
     const usd = (result.providerMetadata as any)?.openrouter?.usage?.cost ?? DEFAULT_CHECK_LANGUAGE_COST_USD;
     output = { report: result.text, usd };

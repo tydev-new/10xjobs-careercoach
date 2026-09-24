@@ -22,7 +22,16 @@ import { normalizeGlobBundle } from "./skills-bundle-normalize.ts";
 // use (spikes/1-browser-loop/src/main.ts). `eager: true` inlines every
 // match at build time (no dynamic import, no runtime fetch — the bundle is
 // read-only and fully present the moment the app boots, per § 1).
-const modules = import.meta.glob("../../../../skills/**/*", {
+// The negations keep machine-local build junk out of the bundle. Earned
+// 2026-09-23: the first production deploy inlined Python's __pycache__/*.pyc
+// (git-ignored, but on disk), and .pyc files embed the builder's absolute
+// home path. tests/test_invariants.py's no-candidate-data scan caught it in
+// .vercel/output.
+const modules = import.meta.glob([
+  "../../../../skills/**/*",
+  "!../../../../skills/**/__pycache__/**",
+  "!../../../../skills/**/*.pyc",
+], {
   query: "?raw",
   import: "default",
   eager: true,

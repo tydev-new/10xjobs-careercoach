@@ -321,14 +321,15 @@ from `packages/` and bundles `skills/` at build time, and a plain upload of
 `apps/web` carries neither.
 
 ```sh
-cd apps/web
-npx vercel pull --yes --environment=production   # env vars into .vercel/ (git-ignored)
-npx vercel build --prod                          # builds with this repo's node_modules
-npx vercel deploy --prebuilt --prod
+apps/web/scripts/deploy-prod.sh
 ```
 
+The script pulls the production env, builds with this repo's
+`node_modules`, refuses to upload a bundle holding a home-directory path or
+missing the skill text, then deploys.
+
 `VITE_*` values are baked in at build time, so any env change on Vercel
-needs a fresh `pull` + `build` + `deploy`. The Edge Functions deploy
+needs a fresh run of the script. The Edge Functions deploy
 separately (`supabase/functions/README.md`); `TEN_APP_ORIGIN` must equal the
 production origin above or the browser's calls are refused by CORS.
 

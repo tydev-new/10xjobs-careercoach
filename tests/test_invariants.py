@@ -127,7 +127,9 @@ PII = re.compile(
     r"|linkedin\.com/in/[A-Za-z0-9-]+"                        # a profile URL
 )
 SHIPPED = ("skills", "plugins", "kit", ".claude-plugin", "apps")
-SKIP_DIRS = {"node_modules", "dist", "__pycache__"}
+# Build output is skipped here like dist/. The upload itself is scanned by
+# apps/web/scripts/deploy-prod.sh, which refuses to ship a home path.
+SKIP_DIRS = {"node_modules", "dist", "__pycache__", ".vercel"}
 
 
 def pii_hits(text):

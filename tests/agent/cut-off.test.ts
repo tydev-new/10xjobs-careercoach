@@ -272,6 +272,43 @@ test("(i) variant: three finished calls + one cut off (the receipt's batch write
   assert.deepEqual(errorsOf(chunks), []);
 });
 
+// § 9.1 "Which parts: every tool-input-start id and every tool-call id the
+// tap saw IN THE CUT-OFF STEP" and § 9.2 "a synthesized result for each of
+// THAT message's tool-call parts": a tool that ran in an EARLIER step of the
+// same call keeps its real result — on screen and in the continuation.
+test("(i) variant: a tool that ran in an earlier step keeps its real result; only the cut-off step's calls close and get synthesized results", async () => {
+  const EARLY = { path: "evaluations/early.md", content: "# Early\n\nsaved for real" };
+  const m = stubbedOpenRouter([
+    toolReply("write_file", EARLY, 0.01, "call_early"),
+    sse()
+      .text("Now the rest.")
+      .toolCall(0, "call_done", "write_file", DONE_INPUT)
+      .toolCallCutOff(1, "call_cut", "write_file", PARTIAL)
+      .finish("length")
+      .usage(0.05, 8192),
+    textReply("Early is saved; redoing the rest.", 0.01),
+  ]);
+  const { store, writes } = countingStore();
+  const { coach } = makeCoach({ model: m.model, workspace: store });
+  const { chunks, message } = await runTurn(coach, "c-i-early", [user("u1", "Evaluate three")]);
+
+  assert.deepEqual(writes, { "evaluations/early.md": 1 }, "the earlier step's write ran once; the cut-off step's did not");
+  const early = toolParts(message, "call_early");
+  assert.equal(early.length, 1);
+  assert.equal(early[0].state, "output-available", "the earlier, executed call is NOT re-closed as cut off");
+  assert.equal(early[0].errorText, undefined);
+  assert.deepEqual(chunks.filter((c) => c.type === "tool-input-error" && c.toolCallId === "call_early"), [], "no closing chunk for an earlier step's id");
+  for (const id of ["call_done", "call_cut"]) assert.equal(toolParts(message, id)[0]?.errorText, TOOL_CLOSE_TEXT, id);
+
+  assert.equal(m.requests.length, 3);
+  const r3 = noteRequests(m.requests)[0];
+  assert.ok(r3, "the continuation was sent");
+  const results = r3.messages.filter((x: any) => x.role === "tool").map((x: any) => [x.tool_call_id, x.content === TOOL_CLOSE_TEXT ? "CLOSING" : "REAL"]);
+  assert.deepEqual(results, [["call_early", "REAL"], ["call_done", "CLOSING"]], "one result per call: the earlier call's real one, a synthesized one for the cut-off step's finished call");
+  assertValidRequests(m.requests);
+  assert.deepEqual(errorsOf(chunks), []);
+});
+
 // (the next-turn check after these shapes lives in cut-off-never-poisoned.test.ts, § 9.8 (x))
 
 // ------------------------------------------------------------------ (ii) cut off twice

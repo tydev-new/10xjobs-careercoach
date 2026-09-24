@@ -66,7 +66,9 @@ const metas = (html: string) => [...html.matchAll(/<p class="card-meta">([^<]*)<
 
 const OVER = "Your beta credit is used up. Ask the person who invited you for more.";
 const CEILING = "The beta has reached today's limit. Try again tomorrow.";
-const CUTOFF = "The reply was cut off. Nothing from it was saved. Try again.";
+// The proxy's other real model_error sentence (handler.ts MESSAGES.modelError). The old
+// cut-off model_error sentence is retired: a cut-off is its own code, cut_off (§ 9.3).
+const UNAVAILABLE = "The model is temporarily unavailable. Try again.";
 
 test("error card: over_balance shows the proxy's sentence verbatim and NO extra next-step line", () => {
   const html = renderErrorPart({ code: "over_balance", message: OVER, retryable: false });
@@ -74,7 +76,7 @@ test("error card: over_balance shows the proxy's sentence verbatim and NO extra 
   assert.deepEqual(metas(html), []);
   assert.ok(!/add funds/i.test(html));
 });
-for (const [label, msg, retryable] of [["beta ceiling", CEILING, false], ["cut-off reply", CUTOFF, true]] as const) {
+for (const [label, msg, retryable] of [["beta ceiling", CEILING, false], ["upstream unavailable", UNAVAILABLE, true]] as const) {
   test(`error card: model_error (${label}) shows its own sentence verbatim, no static next-step`, () => {
     const html = renderErrorPart({ code: "model_error", message: msg, retryable });
     assert.ok(html.includes(`<p class="card-body">${esc(msg)}</p>`), html);

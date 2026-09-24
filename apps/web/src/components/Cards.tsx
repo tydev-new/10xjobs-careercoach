@@ -40,10 +40,16 @@ function VerdictCard({
   const isQuickScan = props.reason.toLowerCase().startsWith("quick-scan:");
   return (
     <div className="card card--verdict">
-      <div className="card-title">
-        {props.company} — {props.title}: {label}
+      {/* v2: the tier is the headline (design-web-ui-refresh.md § v2 —
+          "recognizable at a glance"), colored by category (§ 2.4's own
+          tier mapping), never a background/stripe. The kicker keeps the
+          company/title/track context that used to lead the old title
+          line — no fact dropped, just reordered by what matters first. */}
+      <div className="card-kicker">
+        Verdict · {props.company} — {props.title}
         {props.track ? ` (Track ${props.track})` : ""}
       </div>
+      <div className={`card-headline card-headline--${props.verdict}`}>{label}</div>
       {isQuickScan ? <span className="badge badge--quick-scan">quick-scan</span> : null}
       <p className="card-body">{props.reason}</p>
       <p className="card-meta">
@@ -71,7 +77,8 @@ function PlanCard({
   const planRef = fileRef ?? "plan.md";
   return (
     <div className="card card--plan">
-      <div className="card-title">Plan — {props.stage}</div>
+      <div className="card-kicker">Plan</div>
+      <div className="card-title">{props.stage}</div>
       <ol className="plan-items">
         {props.items.map((item, i) => (
           <li key={i}>
@@ -109,6 +116,7 @@ function DocumentCard({
       {/* The file name IS the receipt (design-web-ui-refresh.md — the
           ChatGPT file-edit-card pattern, filename-led): rule#8, no
           field this card didn't get from `props`/`ref`. */}
+      <div className="card-kicker">Document</div>
       <div className="card-title">
         {fileRef ? <span className="card-title-file">{fileRef}</span> : "Document"}
       </div>
@@ -144,8 +152,9 @@ function CheckerCard({
   const clean = props.failCount === 0 && props.warnCount === 0;
   return (
     <div className="card card--checker">
+      <div className="card-kicker">Checker · {props.label}</div>
       <div className="card-title">
-        {props.label} <span className="card-title-file">{props.name}</span>
+        <span className="card-title-file">{props.name}</span>
       </div>
       <p className="card-meta">
         <span className={`badge badge--${props.status === "pass" ? "pass" : "fail"}`}>
@@ -170,13 +179,23 @@ function CheckerCard({
 function CostCard({ props }: { props: CostCardProps }): ReactElement {
   return (
     <div className="card card--cost">
-      <div className="card-title">Cost estimate — {props.action}</div>
-      <p className="card-body">
-        {/* Straight off estimate_cost's own return — no widening by the
-            UI (design-web-ui.md § 2.6). formatUsd only ever ADDS decimals
-            (at least 2), never rounds one off (L3). */}
-        ${formatUsd(props.lowUsd)}–${formatUsd(props.highUsd)}, balance ${formatUsd(props.balanceUsd)}
-      </p>
+      <div className="card-kicker">Cost estimate</div>
+      <div className="card-title">{props.action}</div>
+      {/* A Stripe-informed receipt line (design-web-ui-refresh.md § v2):
+          money as an ordinary fact, label left, amount right, tabular
+          figures. Straight off estimate_cost's own return — no widening
+          by the UI (design-web-ui.md § 2.6). formatUsd only ever ADDS
+          decimals (at least 2), never rounds one off (L3). */}
+      <div className="receipt-row">
+        <span className="receipt-label">Estimated range</span>
+        <span className="receipt-amount">
+          ${formatUsd(props.lowUsd)}–${formatUsd(props.highUsd)}
+        </span>
+      </div>
+      <div className="receipt-row receipt-row--total">
+        <span className="receipt-label">Your balance</span>
+        <span className="receipt-amount">${formatUsd(props.balanceUsd)}</span>
+      </div>
     </div>
   );
 }

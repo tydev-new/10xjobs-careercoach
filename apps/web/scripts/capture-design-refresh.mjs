@@ -190,12 +190,18 @@ async function runViewport(browser, width, height, label) {
   }
 }
 
-async function runSignInScreens(browser, width, height, label) {
-  for (const kind of ["sign-in", "not-a-member"]) {
+const PREVIEW_SELECTOR = {
+  "sign-in": ".sign-in-screen",
+  "not-a-member": ".not-a-member-screen",
+  "update-notice": ".update-notice",
+};
+
+async function runSignInScreens(browser, width, height, label, kinds = ["sign-in", "not-a-member"]) {
+  for (const kind of kinds) {
     for (const theme of ["light", "dark"]) {
       const page = await browser.newPage({ viewport: { width, height } });
       await page.goto(`${BASE_URL}?preview=${kind}&theme=${theme}`);
-      await page.waitForSelector(kind === "sign-in" ? ".sign-in-screen" : ".not-a-member-screen");
+      await page.waitForSelector(PREVIEW_SELECTOR[kind]);
       await page.screenshot({ path: shot(`${label}-${kind}-${theme}`), fullPage: false });
       console.log("saved", shot(`${label}-${kind}-${theme}`));
       await page.close();
@@ -221,8 +227,9 @@ async function main() {
     // ?preview= sign-in harness (src/dev-preview.tsx) — only the AFTER
     // pass sets INCLUDE_SIGNIN=1.
     if (process.env.INCLUDE_SIGNIN === "1") {
-      await runSignInScreens(browser, 1440, 900, "1440");
-      await runSignInScreens(browser, 375, 812, "375");
+      const kinds = ["sign-in", "not-a-member", "update-notice"];
+      await runSignInScreens(browser, 1440, 900, "1440", kinds);
+      await runSignInScreens(browser, 375, 812, "375", kinds);
     }
 
     await browser.close();

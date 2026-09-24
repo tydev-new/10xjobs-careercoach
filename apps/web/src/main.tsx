@@ -5,8 +5,11 @@ import { SHOW_MOCK_CONTROLS } from "./components/Header";
 import { MissingEnvError, readEnv } from "./backend/env.ts";
 import { RealApp } from "./real/RealApp";
 import { DevScreenPreview, devPreviewKind } from "./dev-preview";
-// Three openly licensed (SIL OFL) families, bundled via @fontsource —
+// Four openly licensed (SIL OFL) families, bundled via @fontsource —
 // never an external font CDN (design-web-ui-refresh.md's token table).
+// v2: Fraunces is the characterful heading/display face; Inter stays the
+// body/UI face (the brief excludes Inter only as the DISPLAY choice).
+import "@fontsource-variable/fraunces";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/source-serif-4";
 import "@fontsource/jetbrains-mono/400.css";

@@ -123,7 +123,7 @@ else is dropped); calls the one hard-coded OpenRouter URL with
 client while metering a `tee()`'d copy in the background (`waitUntil`, a
 360 s deadline timed from the request's start), inserting exactly one
 `ten_usage_ledger` `'call'` row keyed by the response id: a finite reported
-cost from $0 to 10× the ~$0.18 ceiling is recorded **as reported** (a cost
+cost from $0 to 10× the ~$0.23 ceiling is recorded **as reported** (a cost
 above the ceiling also logs an anomaly line — no key or content in it); a
 missing, non-finite, negative, or >10×-the-ceiling cost, or the meter
 deadline, records the ceiling instead. An upstream 402/5xx maps to 503

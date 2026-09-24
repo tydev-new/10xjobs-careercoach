@@ -16,10 +16,14 @@ import type { DataErrorData, ErrorCode } from "../types";
 // would be the boilerplate rule 8 rules out. It also can't be one static
 // line: `model_error` alone covers at least two different real messages
 // ("The beta has reached today's limit. Try again tomorrow." vs. "The
-// reply was cut off. Nothing from it was saved. Try again.") — a fixed
-// `nextStep` would contradict whichever one didn't apply. There is no
-// "add funds" step in the beta (one shared app key, no per-candidate
-// spend), so the old over_balance line is gone outright, not reworded.
+// model is temporarily unavailable. Try again.", handler.ts's own
+// MESSAGES) — a fixed `nextStep` would contradict whichever one didn't
+// apply. There is no "add funds" step in the beta (one shared app key,
+// no per-candidate spend), so the old over_balance line is gone outright,
+// not reworded. `cut_off` (§ 9.3, amended 2026-09-24) is its own code,
+// not a `model_error` cause any more — the old § 8 cut-off `model_error`
+// sentence this comment used to cite here is retired; its own fixed
+// message already says what to do, so it has no entry below either.
 const NEXT_STEP: Partial<Record<ErrorCode, string>> = {
   tool_error: "A tool call failed.",
   offline: "Check your connection and try again.",

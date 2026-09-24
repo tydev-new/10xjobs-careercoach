@@ -174,7 +174,7 @@ dt("403 for a signed-in non-member", async () => {
     assertEquals(res.status, 403);
     const body = await res.json();
     assertEquals(body.error.code, "not_a_member");
-    assert(body.error.message.includes("private beta"));
+    assert(body.error.message.includes("invite-only"));
   } finally {
     await h.stop();
   }

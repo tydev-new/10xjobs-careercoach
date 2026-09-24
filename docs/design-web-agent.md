@@ -364,7 +364,8 @@ into `tests/run.py`, plus the coverage check.
 | gate status | `data-gate-status` | `{ gateId, status }`; the latest one wins |
 | error | `data-error` | `{ code: "over_balance" \| "model_error" \| "tool_error" \| "offline" \| "step_cap", message, retryable }` |
 
-- `data-error.message` is one fixed sentence per `code`. What was finished is
+- `data-error.message` is the proxy's or tool's own sentence for the cause
+  (§ 8) when one exists, else a fixed fallback per `code`. What was finished is
   the model's to say next turn, from the files.
 - User messages carry `metadata.origin` and may carry `workspace:` file parts.
   The SDK's tool-approval chunks are not used (a UI boolean, rule 7).
@@ -528,8 +529,8 @@ a signed-in session; membership (a `credit` row an admin inserts, $5.00,
 checked by `ten_is_member()`) is the **only barrier** to beta data. The proxy
 (403) and every `ten_` function and policy that reads or writes beta data
 check it; the one exception is the ledger's own-row read, where membership
-itself lives. The app says: "Ten is in a private beta. Ask the person who
-invited you for access."
+itself lives. The app says: "You're signed in, but this beta is invite-only. Ask the
+person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
 
 **`ten-model-proxy`** accepts `POST …/ten-model-proxy/chat/completions` and
 `OPTIONS`. Any other path or method gets 404. In order:
@@ -602,7 +603,9 @@ migration). Users select their own rows; only the service role writes.
   forfeited. Your usage records, which show only amounts spent and no
   content, are kept."
 - **CORS:** the proxy allows only the production Vercel origin and
-  `http://localhost:5173`.
+  `http://localhost:5173`; its allowed headers include every header the AI
+  SDK sends (at least `authorization`, `content-type`, `user-agent`), since
+  Firefox and WebKit preflight them.
 - **The browser holds** only the Supabase session. A custom `fetch` sets
   `Authorization: Bearer <current JWT>` on each call (§ 1).
 

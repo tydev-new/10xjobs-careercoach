@@ -140,7 +140,7 @@ test("checkMembership: throws (does not silently say non-member) on an RPC error
 });
 
 test("NON_MEMBER_MESSAGE is the exact § 8 wording", () => {
-  assert.equal(NON_MEMBER_MESSAGE, "Ten is in a private beta. Ask the person who invited you for access.");
+  assert.equal(NON_MEMBER_MESSAGE, "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.");
 });
 
 // ---------------------------------------------------------------------

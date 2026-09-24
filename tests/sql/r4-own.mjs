@@ -1,7 +1,7 @@
 // Reviewer's round-3 cases, independent of tests/sql/*.
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
-const WT = "/Users/yongtian/Documents/PROJECTS/10xjobs-careercoach/.claude/worktrees/agent-af786d047289be04c";
+const WT = new URL("../../", import.meta.url).pathname.replace(/\/$/, ""); // the repo root (was a hard-coded path to another worktree, so it tested THAT checkout's files)
 const MIG = readFileSync(`${WT}/supabase/migrations/20260923000000_ten_beta_init.sql`, "utf8");
 const TEAR = readFileSync(`${WT}/supabase/teardown/ten_beta_teardown.sql`, "utf8");
 const STUB = readFileSync(`${WT}/tests/sql/stub.sql`, "utf8");

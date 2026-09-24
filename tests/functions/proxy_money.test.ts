@@ -127,7 +127,7 @@ t("meter: usage missing entirely -> the ceiling cost is recorded", async () => {
   await run(tok);
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
-  assert(rows[0].usd >= 0.18, `usd ${rows[0].usd}`);
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6, `usd ${rows[0].usd}`); // § 9.5: $0.22992 (was a loose >= 0.18)
   assertEquals(rows[0].request_id, "gen-nousage");
 });
 
@@ -243,7 +243,7 @@ t("meter: a 200 whose body is JSON, not SSE -> one row at the ceiling", async ()
   await run(tok);
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
-  assert(rows[0].usd >= 0.18);
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6); // § 9.5 ceiling
 });
 
 t("meter: an upstream connection reset mid-stream still writes one row (ceiling), keyed by the id", async () => {
@@ -257,7 +257,7 @@ t("meter: an upstream connection reset mid-stream still writes one row (ceiling)
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
   assertEquals(rows[0].request_id, "gen-reset");
-  assert(rows[0].usd >= 0.18);
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6); // § 9.5 ceiling
 });
 
 t("meter: a client disconnect (real HTTP, abort after the first chunk) still meters the full call", async () => {

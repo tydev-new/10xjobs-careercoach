@@ -14,6 +14,8 @@ npm install          # @electric-sql/pglite 0.5.8, pinned
 node run.mjs         # the round-1 review's cases (unchanged)
 node run-r2.mjs      # the fix rounds' cases: guard, CAS, codes, caps, paths, pins, teardown
 node r3-own.mjs      # the round-2 review's own cases: guard bypasses, lookalikes, membership, pins
+node r4-own.mjs      # the round-3 review's own cases
+node r5-finish-reason.mjs  # § 9.6: 20260924000000_ten_ledger_finish_reason.sql applied AFTER the init file
 ```
 
 Each prints `[PASS]` / `[FAIL]` / `[OBSERVED]` lines and a failure count.

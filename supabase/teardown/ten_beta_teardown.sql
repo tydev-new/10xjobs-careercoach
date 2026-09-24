@@ -1,7 +1,11 @@
 -- Ten web beta teardown: drops exactly what
--- supabase/migrations/20260923000000_ten_beta_init.sql created, and nothing else.
--- Applied by the OWNER, never by an agent. DESTROYS all beta data (workspace
--- files, ledger, gate log). The shared auth users are NOT touched.
+-- supabase/migrations/20260923000000_ten_beta_init.sql and
+-- supabase/migrations/20260924000000_ten_ledger_finish_reason.sql created,
+-- and nothing else. The second file adds no object of its own to drop —
+-- ten_usage_ledger.finish_reason is one column on a table this file already
+-- drops, so it goes with the table; no new statement here. Applied by the
+-- OWNER, never by an agent. DESTROYS all beta data (workspace files, ledger,
+-- gate log). The shared auth users are NOT touched.
 --
 -- STEP 1 — THROUGH THE STORAGE API, FIRST (service role key, never in a browser).
 -- Supabase refuses direct SQL deletes from storage.objects/buckets

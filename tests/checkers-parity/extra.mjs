@@ -17,7 +17,7 @@
 //   node tests/checkers-parity/extra.mjs --json     # machine-readable
 //   node tests/checkers-parity/extra.mjs <filter>   # cases whose id contains <filter>
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, rmSync, utimesSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, readdirSync, statSync, rmSync, utimesSync, existsSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -25,7 +25,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
 const SKILLS = join(ROOT, "skills");
 const PKG = join(ROOT, "packages", "checkers");
-const SCRATCH = process.env.PARITY_SCRATCH || join(process.env.TMPDIR || "/tmp", "checkers-parity-extra");
+// A fresh dir per run (2026-09-24): a FIXED $TMPDIR/checkers-parity-extra was shared by
+// every checkout and session on the host, so concurrent runs deleted each other's ws
+// (intermittent ENOENT crashes, and a 144/156 run).
+const SCRATCH = process.env.PARITY_SCRATCH || mkdtempSync(join(process.env.TMPDIR || "/tmp", "checkers-parity-extra-"));
 const FROZEN = "2026-09-23T12:34:56+00:00";
 
 const { Bash, InMemoryFs } = await import(pathToFileURL(join(PKG, "node_modules", "just-bash", "dist", "bundle", "index.js")).href);

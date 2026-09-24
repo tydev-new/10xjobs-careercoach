@@ -38,6 +38,14 @@ that a decode without it matches an unskilled read.
    --company … --title … --verdict … --score … --reasons …
    --dealbreakers …` (`--help` for all flags) — on the row's exact
    strings (rule 6).
+
+   In a run over several roles, record each one as soon as its verdict is
+   decided (its analysis file and its `record_verdict.py` call), then move
+   to the next role. Never hold verdicts back to write together at the end:
+   a batch cut off partway (a reply limit, a closed session) saves nothing,
+   and the next session finds no sign the work was done. *(Receipt: web
+   beta, 2026-09-24: three four-role runs lost everything at the final
+   batch write.)*
 8. **The summary card** (`schema.md`) is the reply — decision-ready;
    the files carry the depth.
 

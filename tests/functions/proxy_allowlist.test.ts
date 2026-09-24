@@ -35,7 +35,7 @@ function assertForced(up: Record<string, any>) {
   assertEquals(up.stream, true);
   assertEquals(up.provider, { data_collection: "deny", zdr: true });
   assertEquals(up.cache_control, { type: "ephemeral" });
-  assert(typeof up.max_tokens === "number" && up.max_tokens <= 4096 && up.max_tokens >= 1, `max_tokens ${up.max_tokens}`);
+  assert(typeof up.max_tokens === "number" && up.max_tokens <= 8192 && up.max_tokens >= 1, `max_tokens ${up.max_tokens}`);
   const extra = Object.keys(up).filter((k) => !ALLOWED.has(k));
   assertEquals(extra, [], "fields outside the allowlist reached upstream");
 }
@@ -80,7 +80,7 @@ t("allowlist: a body stuffed with every smuggling field -> only the allowlist re
   assertEquals(res.status, 200);
   assertEquals(hits, 1);
   assertForced(up!);
-  assertEquals(up!.max_tokens, 4096);
+  assertEquals(up!.max_tokens, 8192);
   assertEquals(up!.plugins, [{ id: "web", engine: "exa", max_results: 5 }]);
   assertEquals(up!.messages, evil.messages);
   assertEquals(up!.tools, evil.tools);
@@ -120,16 +120,16 @@ t("allowlist: model omitted -> the forced model is used", async () => {
   assertForced(up!);
 });
 
-t("allowlist: max_tokens = min(client, 4096); absent/garbage -> 4096; max_completion_tokens ignored", async () => {
+t("allowlist: max_tokens = min(client, 8192); absent/garbage -> 8192; max_completion_tokens ignored", async () => {
   const cases: Array<[unknown, number]> = [
     [1, 1],
-    [4096, 4096],
-    [4097, 4096],
-    [1e12, 4096],
-    [Infinity, 4096], // JSON can't carry it; serialises as null
-    ["100000", 4096],
-    [null, 4096],
-    [{ "$gt": 1 }, 4096],
+    [8192, 8192],
+    [8193, 8192],
+    [1e12, 8192],
+    [Infinity, 8192], // JSON can't carry it; serialises as null
+    ["100000", 8192],
+    [null, 8192],
+    [{ "$gt": 1 }, 8192],
   ];
   for (const [v, want] of cases) {
     const { up } = await send({ ...baseBody(), max_tokens: v, max_completion_tokens: 99999 });
@@ -139,17 +139,17 @@ t("allowlist: max_tokens = min(client, 4096); absent/garbage -> 4096; max_comple
   const b: Record<string, unknown> = baseBody();
   delete b.max_tokens;
   const { up } = await send({ ...b, max_completion_tokens: 50000 });
-  assertEquals(up!.max_tokens, 4096);
+  assertEquals(up!.max_tokens, 8192);
 });
 
-t("allowlist: max_tokens is clamped to a positive integer ≤ 4096 (fractional, zero, negative)", async () => {
+t("allowlist: max_tokens is clamped to a positive integer ≤ 8192 (fractional, zero, negative)", async () => {
   const out: Record<string, unknown> = {};
-  for (const v of [1.5, 0, -10, 4095.9, 0.2]) {
+  for (const v of [1.5, 0, -10, 8191.9, 0.2]) {
     const { up } = await send({ ...baseBody(), max_tokens: v });
     out[String(v)] = up!.max_tokens;
   }
   observe("max_tokens client->upstream", out);
-  assertEquals(out, { "1.5": 1, "0": 1, "-10": 1, "4095.9": 4095, "0.2": 1 });
+  assertEquals(out, { "1.5": 1, "0": 1, "-10": 1, "8191.9": 8191, "0.2": 1 });
 });
 
 t("allowlist: plugins — only an id:'web' request yields exactly [{id:'web',engine:'exa',max_results:min(n,5)}]", async () => {
@@ -206,7 +206,7 @@ t("allowlist: duplicate JSON keys cannot smuggle a second model", async () => {
   const b = await send(undefined, raw2);
   assertEquals(b.res.status, 200);
   assertForced(b.up!);
-  assertEquals(b.up!.max_tokens, 4096);
+  assertEquals(b.up!.max_tokens, 8192);
   assert(!b.hits || !b.h.upstreamHits[0].bodyText.includes("gpt-5"), "raw upstream text must be re-serialised");
 });
 

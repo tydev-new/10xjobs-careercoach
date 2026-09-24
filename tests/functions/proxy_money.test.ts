@@ -1,9 +1,10 @@
 // § 8 points 3, 5, 6 and the ledger: 402 at zero/negative balance; the $5/day
 // beta-wide ceiling (UTC day, across users) -> 503 model_error; one ledger row
-// per call with the right cost; the ceiling cost (~$0.18) when no cost can be
-// read; a client disconnect still meters; upstream 402/5xx -> 503 model_error;
-// no row for a request that never reached upstream; duplicate request_id is
-// rejected without a crash.
+// per call with the right cost; the ceiling cost (~$0.23, § 9.5 amended
+// 2026-09-24: MAX_TOKENS_CAP 8,192) when no cost can be read; a client
+// disconnect still meters; upstream 402/5xx -> 503 model_error; no row for a
+// request that never reached upstream; duplicate request_id is rejected
+// without a crash.
 
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
 import {
@@ -126,23 +127,23 @@ t("meter: usage missing entirely -> the ceiling cost is recorded", async () => {
   await run(tok);
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
-  assert(rows[0].usd >= 0.18, `usd ${rows[0].usd}`);
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6, `usd ${rows[0].usd}`); // § 9.5: $0.22992 (was a loose >= 0.18)
   assertEquals(rows[0].request_id, "gen-nousage");
 });
 
-t("meter: the ceiling constant vs § 8's own formula (64k×$2/M + 4,096×$10/M + one search)", async () => {
-  // 64,000 × 2e-6 = 0.128; 4,096 × 1e-5 = 0.04096; one Exa search at 5 results ($4/1000 results) = 0.02
-  const formula = 64_000 * 2e-6 + 4_096 * 1e-5 + 5 * 0.004;
+t("meter: the ceiling constant vs § 9.5's own formula (64k×$2/M + 8,192×$10/M + one search)", async () => {
+  // 64,000 × 2e-6 = 0.128; 8,192 × 1e-5 = 0.08192; one Exa search at 5 results ($4/1000 results) = 0.02
+  const formula = 64_000 * 2e-6 + 8_192 * 1e-5 + 5 * 0.004;
   const h = await harness();
   h.reset();
   const [, tok] = await member(h);
   h.setUpstream(() => sse(okStream("gen-c", null)));
   await run(tok);
-  observe(`recorded ceiling ${callRows(h.st)[0].usd} vs formula ${formula.toFixed(5)} (spec: "about $0.18")`);
+  observe(`recorded ceiling ${callRows(h.st)[0].usd} vs formula ${formula.toFixed(5)} (spec: "about $0.23")`);
   assertAlmostEquals(callRows(h.st)[0].usd, formula, 1e-6);
 });
 
-const CEILING = 64_000 * 2e-6 + 4_096 * 1e-5 + 5 * 0.004; // § 8's formula, ≈ 0.18896
+const CEILING = 64_000 * 2e-6 + 8_192 * 1e-5 + 5 * 0.004; // § 9.5's formula (amended 2026-09-24), = 0.22992
 
 // § 8 (amended, main eb523bf): a finite cost from 0 to 10× the ceiling is recorded
 // AS REPORTED (never undercounted); above the ceiling it is also logged as an
@@ -155,11 +156,11 @@ const GARBLED: Array<[string, Record<string, unknown> | string, number, boolean]
   ["cost astronomically large", { prompt_tokens: 10, completion_tokens: 5, cost: 1e9 }, CEILING, false],
   ["cost above the ceiling (0.5)", { prompt_tokens: 10, completion_tokens: 5, cost: 0.5 }, 0.5, true],
   ["cost above the ceiling (1.5)", { prompt_tokens: 10, completion_tokens: 5, cost: 1.5 }, 1.5, true],
-  ["cost exactly 10x the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: 1.8896 }, 1.8896, true],
-  ["cost just beyond 10x the ceiling (1.9)", { prompt_tokens: 10, completion_tokens: 5, cost: 1.9 }, CEILING, false],
+  ["cost exactly 10x the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: CEILING * 10 }, CEILING * 10, true],
+  ["cost just beyond 10x the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: CEILING * 10 + 0.0001 }, CEILING, false],
   ["cost beyond 10x the ceiling (25)", { prompt_tokens: 10, completion_tokens: 5, cost: 25 }, CEILING, false],
   ["cost exactly 0", { prompt_tokens: 10, completion_tokens: 5, cost: 0 }, 0, false],
-  ["cost exactly the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: 0.18896 }, 0.18896, false],
+  ["cost exactly the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: CEILING }, CEILING, false],
   ["tokens negative", { prompt_tokens: -1, completion_tokens: 5, cost: 0.01 }, 0.01, false],
   ["tokens fractional", { prompt_tokens: 10.5, completion_tokens: 5, cost: 0.01 }, 0.01, false],
   ["tokens over int4", { prompt_tokens: 3e9, completion_tokens: 5, cost: 0.01 }, 0.01, false],
@@ -242,7 +243,7 @@ t("meter: a 200 whose body is JSON, not SSE -> one row at the ceiling", async ()
   await run(tok);
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
-  assert(rows[0].usd >= 0.18);
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6); // § 9.5 ceiling
 });
 
 t("meter: an upstream connection reset mid-stream still writes one row (ceiling), keyed by the id", async () => {
@@ -256,7 +257,7 @@ t("meter: an upstream connection reset mid-stream still writes one row (ceiling)
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
   assertEquals(rows[0].request_id, "gen-reset");
-  assert(rows[0].usd >= 0.18);
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6); // § 9.5 ceiling
 });
 
 t("meter: a client disconnect (real HTTP, abort after the first chunk) still meters the full call", async () => {

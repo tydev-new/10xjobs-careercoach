@@ -89,8 +89,16 @@ agent never runs these either):
 1. `supabase/migrations/20260923000000_ten_beta_init.sql` applied (creates
    `ten_ws_files`, `ten_gate_log`, `ten_usage_ledger`, the `ten-workspaces`
    bucket, and every `ten_` function these Edge Functions call).
-2. Auth → URL Configuration → Redirect URLs has the production Vercel URL.
-3. The first `credit` row inserted only after spike 3's isolation re-run
+2. `supabase/migrations/20260924000000_ten_ledger_finish_reason.sql` applied
+   (adds `ten_usage_ledger.finish_reason`, docs/design-web-agent.md § 9.6),
+   then `NOTIFY pgrst, 'reload schema';` so the API sees the new column.
+   This MUST precede deploying a `ten-model-proxy` that writes
+   `finish_reason`: otherwise every ledger insert fails, the meter logs the
+   row as lost, and every call goes unbilled (balance and the $5/day
+   ceiling stop being enforced). Rolling the proxy back with the column in
+   place is safe.
+3. Auth → URL Configuration → Redirect URLs has the production Vercel URL.
+4. The first `credit` row inserted only after spike 3's isolation re-run
    passes on the real project (see the migration's checklist) — until then
    `ten_ws_write`/the bucket policies refuse every write, but the proxy
    itself only needs `ten_balance_for`/`ten_beta_spend_today`/the ledger

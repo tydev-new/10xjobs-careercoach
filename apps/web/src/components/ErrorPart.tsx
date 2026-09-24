@@ -44,6 +44,11 @@ const NEXT_STEP: Partial<Record<ErrorCode, string>> = {
   // can do. This line is verbatim from design-web-ui.md § 2.7 as amended;
   // C § 9.4 is what makes "already saved" actually true.
   step_cap: "Say continue to carry on from what's already saved.",
+  // Amended 2026-09-24 (C § 12, ui § 2.7): a proxy 413 — the turn's own
+  // request grew too large to send. Same line as step_cap's, true for the
+  // same reason: the next turn starts small (the window drops the long
+  // turn) and C § 9.4's note sends the model to the files.
+  too_large: "Say continue to carry on from what's already saved.",
 };
 
 export function ErrorPart({ data }: { data: DataErrorData }): ReactElement {

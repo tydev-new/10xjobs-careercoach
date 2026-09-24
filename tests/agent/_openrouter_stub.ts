@@ -18,6 +18,18 @@ const ID = () => `gen-stub-${++seq}`;
 export class SseScript {
   readonly id = ID();
   readonly events: Sse[] = [];
+  /** ms between SSE events (0 = one buffered body). A slow script honours
+   *  the request's abort signal the way a real fetch body does. */
+  delayMs = 0;
+  slow(ms: number): this {
+    this.delayMs = ms;
+    return this;
+  }
+  /** An upstream error chunk mid-stream (OpenRouter's `{ error: {...} }`). */
+  upstreamError(message = "upstream overloaded", code = 502): this {
+    this.events.push({ ...this.base(), error: { message, code } } as any);
+    return this;
+  }
   private base() {
     return { id: this.id, model: "anthropic/claude-sonnet-5", object: "chat.completion.chunk", created: 1_790_000_000 };
   }
@@ -67,6 +79,24 @@ export class SseScript {
   body(): string {
     return this.events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join("") + "data: [DONE]\n\n";
   }
+  stream(signal?: AbortSignal): ReadableStream<Uint8Array> {
+    const enc = new TextEncoder();
+    const frames = [...this.events.map((e) => `data: ${JSON.stringify(e)}\n\n`), "data: [DONE]\n\n"];
+    const delay = this.delayMs;
+    return new ReadableStream({
+      async start(c) {
+        const abortErr = () => new DOMException("This operation was aborted", "AbortError");
+        if (signal?.aborted) return c.error(abortErr());
+        signal?.addEventListener("abort", () => { try { c.error(abortErr()); } catch {} });
+        for (const f of frames) {
+          if (signal?.aborted) return;
+          c.enqueue(enc.encode(f));
+          await new Promise((r) => setTimeout(r, delay));
+        }
+        if (!signal?.aborted) c.close();
+      },
+    });
+  }
 }
 
 export const sse = () => new SseScript();
@@ -93,7 +123,8 @@ export function stubbedOpenRouter(script: SseScript[]): StubbedModel {
     requests.push(JSON.parse(String(init?.body ?? "{}")));
     const s = script[i++];
     if (!s) throw new Error(`stubbed fetch: request #${i} has no scripted response (script has ${script.length})`);
-    return new Response(s.body(), { status: 200, headers: { "content-type": "text/event-stream" } });
+    const body = s.delayMs > 0 ? s.stream(init?.signal) : s.body();
+    return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
   };
   const openrouter = createOpenRouter({ apiKey: "unused-stub", baseURL: "http://127.0.0.1:9/ten-model-proxy", fetch: fetchStub as any });
   const model = openrouter.chat("anthropic/claude-sonnet-5", { provider: { data_collection: "deny", zdr: true }, cache_control: { type: "ephemeral" } } as any);

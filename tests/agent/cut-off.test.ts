@@ -1,5 +1,5 @@
 // Tester-owned acceptance suite for issue #2: docs/design-web-agent.md § 9
-// (cut-off replies, amended 2026-09-24, commit 0d8588a) — § 9.8 items
+// (cut-off replies, amended 2026-09-24; fix round 1 amendment 7c1b1be) — § 9.8 items
 // (i)–(iv) plus the § 9.2 accounting rules (cost once, step cap and
 // allowance across both calls). Written from the spec, not the code.
 //
@@ -64,7 +64,7 @@ function assertFinishLast(chunks: any[]) {
 
 // ------------------------------------------------------------------ (i) one continuation, then success
 
-test("(i) a write_file cut off mid-string: one continuation with the § 9.2 note, its tool runs, one message, part closed with the § 9.1 text, no cut_off", async () => {
+test("(i) a write_file cut off mid-string: exactly one note-carrying request, the continuation's tool runs, one message, part closed with the closing text, no cut_off", async () => {
   const m = stubbedOpenRouter([
     sse().text("Writing the Beta Corp verdict now.").toolCallCutOff(0, "call_cut", "write_file", PARTIAL).finish("length").usage(0.05, 8192),
     toolReply("write_file", { path: "evaluations/beta.md", content: "# Beta Corp\n\nVerdict: strong fit." }, 0.02, "call_retry"),
@@ -151,72 +151,132 @@ test("(i) variant: a cut-off holding nothing but the unfinished call sends no em
   assert.deepEqual(errorsOf(chunks), []);
 });
 
-// § 9.8(i) variant, word for word: "a mid-run cut-off, where a step holds a
-// finished and an unfinished write_file. The finished one runs once, the
-// loop stops, and the continuation runs." This is the receipt's own shape:
-// the final batch write of several verdicts, the last one cut off.
-test("(i) variant: mid-run cut-off — a finished and an unfinished write_file in one step: the finished one runs once, the continuation runs", async () => {
+// § 9.8(i) variant (amended 7c1b1be, lead ruling 1): "A cut-off step
+// holding a finished and an unfinished write_file. Pass when: neither runs,
+// and the store is unchanged; both UI parts end output-error with the
+// closing text; the note-carrying request holds one synthesized error-text
+// result, for the finished call; it is sent with no MissingToolResultsError."
+// This is the receipt's own shape: the final batch write of several
+// verdicts, the last one cut off.
+
+const DONE_INPUT = { path: "evaluations/alpha.md", content: "# Alpha\n\nVerdict: apply." };
+
+/** The note-carrying request's view of the cut-off step: the assistant
+ *  message holding `callId`, and the tool messages right after it. */
+function synthesizedResults(req: any, callId: string) {
+  const msgs: any[] = req.messages;
+  const ai = msgs.findIndex((x) => x.role === "assistant" && (x.tool_calls ?? []).some((tc: any) => tc.id === callId));
+  assert.ok(ai >= 0, `the cut-off step's assistant message (with ${callId}) is in the request`);
+  const tools: any[] = [];
+  let j = ai + 1;
+  while (j < msgs.length && msgs[j].role === "tool") tools.push(msgs[j++]);
+  return { assistant: msgs[ai], tools, next: msgs[j], nextIndex: j };
+}
+
+test("(i) variant: a cut-off step with a finished AND an unfinished write_file — neither runs, both close with the closing text, one synthesized error-text result, the continuation is sent", async () => {
   const m = stubbedOpenRouter([
     sse()
       .text("Recording both verdicts.")
-      .toolCall(0, "call_done", "write_file", { path: "evaluations/alpha.md", content: "# Alpha\n\nVerdict: apply." })
+      .toolCall(0, "call_done", "write_file", DONE_INPUT)
       .toolCallCutOff(1, "call_cut", "write_file", PARTIAL)
       .finish("length")
       .usage(0.05, 8192),
-    textReply("Alpha is saved; I will redo Beta in smaller pieces.", 0.01),
+    textReply("Neither saved; redoing Alpha, then Beta, one file per write.", 0.01),
   ]);
   const { store, writes } = countingStore();
   const { coach } = makeCoach({ model: m.model, workspace: store });
   const { chunks, message } = await runTurn(coach, "c-i-mid", [user("u1", "Evaluate Alpha and Beta")]);
-
   const errs = errorsOf(chunks).map((c) => c.data);
-  assert.equal(writes["evaluations/alpha.md"] ?? 0, 1, `the finished write_file runs exactly once (errors: ${JSON.stringify(errs)})`);
-  assert.equal(noteRequests(m.requests).length, 1, `the continuation runs (requests sent: ${m.requests.length}; errors: ${JSON.stringify(errs)})`);
+
+  // neither runs; the store is unchanged.
+  assert.deepEqual(writes, {}, "no write at all — not even the finished call");
+  const listed = (await store.list()).map((f: any) => f.path).filter((p: string) => !p.startsWith("skills/"));
+  assert.deepEqual(listed, [], "store unchanged");
+
+  // both UI parts end output-error with the closing text (one part per id).
+  for (const id of ["call_done", "call_cut"]) {
+    const p = toolParts(message, id);
+    assert.equal(p.length, 1, `${id}: one part`);
+    assert.equal(p[0].state, "output-error", `${id}: output-error`);
+    assert.equal(p[0].errorText, TOOL_CLOSE_TEXT, `${id}: the closing text`);
+    const close = chunks.filter((c) => c.type === "tool-input-error" && c.toolCallId === id);
+    assert.equal(close.length, 1, `${id}: closed by exactly one tool-input-error chunk`);
+    assert.deepEqual(close[0].input, {}, `${id}: closed with input: {}`);
+  }
+
+  // it is sent (no MissingToolResultsError), exactly once, text-only reply -> 2 requests.
+  assert.equal(m.requests.length, 2, `the continuation was sent (errors: ${JSON.stringify(errs)})`);
+  const notes = noteRequests(m.requests);
+  assert.equal(notes.length, 1, "exactly one note-carrying request");
+  const r2 = notes[0];
+  assert.equal(systemOf(r2), systemOf(m.requests[0]));
   assertValidRequests(m.requests);
-  assert.equal(toolParts(message, "call_cut")[0]?.errorText, TOOL_CLOSE_TEXT);
-  assert.notEqual(toolParts(message, "call_done")[0]?.state, "input-available", "the finished call's part is never left open");
-  assert.deepEqual(errs, [], "no error");
+
+  // one synthesized error-text result, for the finished call, right after its
+  // assistant message, followed by the note.
+  const s = synthesizedResults(r2, "call_done");
+  assert.deepEqual(s.assistant.tool_calls.map((tc: any) => tc.id), ["call_done"], "only the finished call reached the response messages");
+  assert.deepEqual(JSON.parse(s.assistant.tool_calls[0].function.arguments), DONE_INPUT, "the finished call keeps its own input");
+  assert.deepEqual(s.tools.map((t: any) => [t.tool_call_id, t.content]), [["call_done", TOOL_CLOSE_TEXT]], "one synthesized error-text result, for the finished call");
+  assert.equal(s.nextIndex, r2.messages.length - 1, "the note follows the synthesized result directly");
+  assert.equal(contentText(s.next.content), CONTINUATION_NOTE);
+  assert.ok(!JSON.stringify(r2).includes("call_cut"), "the unfinished call never reached the request");
+  assert.ok(!JSON.stringify(r2).includes(PARTIAL_MARK), "nor its partial arguments");
+
+  assertOneMessage(chunks, message);
+  assertFinishLast(chunks);
+  assert.deepEqual(errs, [], "no error (no model_error, no cut_off)");
 });
 
-test("(i) variant: after a mid-run cut-off, the NEXT turn in the chat still reaches the model (history is not poisoned)", async () => {
+test("(i) variant: a cut-off step whose ONLY tool call finished — it does not run, closes with the closing text, gets one synthesized result, and the continuation is sent", async () => {
   const m = stubbedOpenRouter([
-    sse()
-      .toolCall(0, "call_done", "write_file", { path: "evaluations/alpha.md", content: "# Alpha" })
-      .toolCallCutOff(1, "call_cut", "write_file", PARTIAL)
-      .finish("length")
-      .usage(0.05, 8192),
-    textReply("continuation reply", 0.01),
-    textReply("next turn reply", 0.01),
+    sse().toolCall(0, "call_done", "write_file", DONE_INPUT).finish("length").usage(0.05, 8192),
+    textReply("Not saved; redoing it.", 0.01),
   ]);
-  const { coach } = makeCoach({ model: m.model });
-  const t1 = await runTurn(coach, "c-i-mid-next", [user("u1", "Evaluate Alpha and Beta")]);
-  const before = m.requests.length;
-  const t2 = await runTurn(coach, "c-i-mid-next", [user("u1", "Evaluate Alpha and Beta"), t1.message, user("u2", "continue")]);
-  assert.equal(m.requests.length, before + 1, `the next turn made its model call (its errors: ${JSON.stringify(errorsOf(t2.chunks).map((c) => c.data))})`);
-  assert.deepEqual(errorsOf(t2.chunks, "model_error"), []);
-  assertValidRequests(m.requests);
-});
-
-// Same SDK rule, no unfinished call at all: the reply hit the cap right
-// after a call's arguments closed. § 9.1: a `length` step is cut off, full
-// stop — the turn must still end visibly or continue, never error out.
-test("(i) edge: a length step whose only tool call finished — continues or stops visibly, never a model_error", async () => {
-  const m = stubbedOpenRouter([
-    sse().toolCall(0, "call_done", "write_file", { path: "evaluations/alpha.md", content: "# Alpha" }).finish("length").usage(0.05, 8192),
-    textReply("continuation reply", 0.01),
-  ]);
-  const { coach } = makeCoach({ model: m.model });
+  const { store, writes } = countingStore();
+  const { coach } = makeCoach({ model: m.model, workspace: store });
   const { chunks, message } = await runTurn(coach, "c-i-edge", [user("u1", "Evaluate Alpha")]);
-  assert.deepEqual(errorsOf(chunks, "model_error").map((c) => c.data), [], "no model_error");
-  const continued = noteRequests(m.requests).length === 1;
-  const visibleStop = errorsOf(chunks, "cut_off").length === 1;
-  assert.ok(continued || visibleStop, "either one continuation or one visible cut_off");
-  assert.notEqual(toolParts(message, "call_done")[0]?.state, "input-available", "no part left open");
+  assert.deepEqual(writes, {}, "the finished call did not run");
+  const p = toolParts(message, "call_done");
+  assert.equal(p.length, 1);
+  assert.equal(p[0].state, "output-error");
+  assert.equal(p[0].errorText, TOOL_CLOSE_TEXT);
+  assert.equal(noteRequests(m.requests).length, 1, `the continuation was sent (errors: ${JSON.stringify(errorsOf(chunks).map((c) => c.data))})`);
+  assert.equal(m.requests.length, 2);
+  const s = synthesizedResults(m.requests[1], "call_done");
+  assert.deepEqual(s.tools.map((t: any) => [t.tool_call_id, t.content]), [["call_done", TOOL_CLOSE_TEXT]]);
+  assertValidRequests(m.requests);
+  assertFinishLast(chunks);
+  assert.deepEqual(errorsOf(chunks), []);
 });
+
+test("(i) variant: three finished calls + one cut off (the receipt's batch write) — none runs, three synthesized results in call order", async () => {
+  const inputs = ["a", "b", "c"].map((k) => ({ path: `evaluations/${k}.md`, content: `# ${k}` }));
+  const script = sse().text("Writing all four verdicts.");
+  inputs.forEach((inp, i) => script.toolCall(i, `call_${i}`, "write_file", inp));
+  script.toolCallCutOff(3, "call_3", "write_file", PARTIAL).finish("length").usage(0.3, 8192);
+  const m = stubbedOpenRouter([script, textReply("Redoing one at a time.", 0.01)]);
+  const { store, writes } = countingStore();
+  const { coach } = makeCoach({ model: m.model, workspace: store });
+  const { chunks, message } = await runTurn(coach, "c-i-batch", [user("u1", "Evaluate all four")]);
+  assert.deepEqual(writes, {});
+  for (const id of ["call_0", "call_1", "call_2", "call_3"]) {
+    const p = toolParts(message, id);
+    assert.equal(p.length, 1, id);
+    assert.equal(p[0].errorText, TOOL_CLOSE_TEXT, id);
+  }
+  assert.equal(m.requests.length, 2);
+  const s = synthesizedResults(m.requests[1], "call_0");
+  assert.deepEqual(s.tools.map((t: any) => [t.tool_call_id, t.content]), [0, 1, 2].map((i) => [`call_${i}`, TOOL_CLOSE_TEXT]));
+  assertValidRequests(m.requests);
+  assert.deepEqual(errorsOf(chunks), []);
+});
+
+// (the next-turn check after these shapes lives in cut-off-never-poisoned.test.ts, § 9.8 (x))
 
 // ------------------------------------------------------------------ (ii) cut off twice
 
-test("(ii) both requests end on length: exactly two requests, one cut_off with the fixed message, retryable", async () => {
+test("(ii) the continuation's first reply also ends on length: exactly two requests, one cut_off (fixed message, retryable), finish after it", async () => {
   const m = stubbedOpenRouter([
     sse().text("Writing.").toolCallCutOff(0, "call_1", "write_file", PARTIAL).finish("length").usage(0.04, 8192),
     sse().text("Retrying smaller.").toolCallCutOff(0, "call_2", "write_file", PARTIAL).finish("length").usage(0.04, 8192),
@@ -231,16 +291,20 @@ test("(ii) both requests end on length: exactly two requests, one cut_off with t
   assert.deepEqual(cut[0].data, { code: "cut_off", message: CUT_OFF_MESSAGE, retryable: true });
   assert.equal(errorsOf(chunks).length, 1, "no other error");
   assertOneMessage(chunks, message);
+  const cutAt = chunks.findIndex((c) => c.type === "data-error" && c.data.code === "cut_off");
+  const finAt = chunks.findIndex((c) => c.type === "finish");
+  assert.ok(finAt > cutAt, "finish comes after the cut_off error");
+  assertFinishLast(chunks);
   for (const id of ["call_1", "call_2"]) {
     const p = toolParts(message, id);
     assert.equal(p.length, 1, `${id}: one part`);
-    assert.equal(p[0].errorText, TOOL_CLOSE_TEXT, `${id}: closed with the § 9.1 text`);
+    assert.equal(p[0].errorText, TOOL_CLOSE_TEXT, `${id}: closed with the closing text`);
   }
   assert.ok(message.parts.some((p: any) => p.type === "data-error" && p.data.code === "cut_off"), "the cut_off part is in the assembled message");
   assert.deepEqual(rg.events.filter((e) => e.op !== "expireOtherChats"), [], "no gate open/decide");
 });
 
-test("(ii) § 9.2: the one finish chunk is written last, also when the turn ends on cut_off", async () => {
+test("(ii) text-only twice: finish is still the last chunk, after the cut_off", async () => {
   const m = stubbedOpenRouter([
     sse().text("a").finish("length").usage(0.04, 8192),
     sse().text("b").finish("length").usage(0.04, 8192),

@@ -1,6 +1,6 @@
 // Tester-owned: docs/design-web-agent.md § 9.5 (the cap and its ceiling)
 // and § 9.6 (recording why each call ended) — § 9.8 items (v) and (vi),
-// amended 2026-09-24 (commit 0d8588a). Written from the spec.
+// amended 2026-09-24 (0d8588a; § 9.6 deadline rule amended at 7c1b1be). Written from the spec.
 //
 // Every case runs the DEPLOYED entry (index.ts, via the harness) against
 // the tester's mock Supabase, which refuses an unknown column (PGRST204) and
@@ -206,11 +206,15 @@ t("(vi) a meter that hit its deadline with no finish_reason seen -> null, ceilin
   assertAlmostEquals(rows[0].usd, FORMULA, 1e-6);
 });
 
-// § 9.6, word for word: "Anything else is null: another type, no finish
-// reason, OR A METER THAT HIT ITS DEADLINE." A value seen before the
-// deadline does not survive it.
-t("(vi) a meter that hit its deadline -> null, even when a finish_reason arrived before it", async () => {
-  const { rows, inserts } = await withShortDeadline([content("gen-dl1", "x", "length")]);
-  assertRowWithKey(rows, inserts, null, "deadline after a finish_reason");
-  assertAlmostEquals(rows[0].usd, FORMULA, 1e-6, "the ceiling is recorded");
+// § 9.6 (amended 7c1b1be, lead ruling 3): "At the meter's deadline, it
+// records the last value seen before the deadline, or null if there was none."
+t("(vi) a meter that hit its deadline records the last finish_reason seen before it (ceiling cost, row written)", async () => {
+  const { rows, inserts } = await withShortDeadline([content("gen-dl1", "x", "tool_calls"), content("gen-dl1", "y", "length"), content("gen-dl1", "z", null)]);
+  assertRowWithKey(rows, inserts, "length", "deadline after a finish_reason");
+  assertAlmostEquals(rows[0].usd, FORMULA, 1e-6, "the ceiling is recorded (no usage chunk arrived)");
+});
+
+t("(vi) a meter that hit its deadline: a malformed last-seen value (33 chars) is still null", async () => {
+  const { rows, inserts } = await withShortDeadline([content("gen-dl2", "x", "z".repeat(33))]);
+  assertRowWithKey(rows, inserts, null, "deadline, invalid value");
 });

@@ -1,5 +1,5 @@
 // Tester-owned: the § 9 sentences, read from THE CONTRACT
-// (docs/design-web-agent.md § 9, commit 0d8588a) — never copied from the
+// (docs/design-web-agent.md § 9, amended at 7c1b1be) — never copied from the
 // code — so a test compares the code's text to the spec's, word for word.
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -39,12 +39,9 @@ const S92 = section("### 9.2 One continuation per turn");
 const S93 = section("### 9.3 A visible stop");
 const S94 = section("### 9.4 The next turn knows");
 
-/** § 9.1: the errorText a cut-off tool part is closed with. */
-export const TOOL_CLOSE_TEXT = (() => {
-  const m = S91.replace(/\s+/g, " ").match(/`errorText` "([^"]+)"/);
-  if (!m) throw new Error("§ 9.1 errorText not found");
-  return m[1];
-})();
+/** § 9.1 (amended 7c1b1be): the "closing text" every tool call in a
+ *  cut-off step is closed with (UI errorText and synthesized tool result). */
+export const TOOL_CLOSE_TEXT = quoteAfter(S91, "`errorText` = the **closing\ntext**:");
 /** § 9.2: the continuation's user-role note. */
 export const CONTINUATION_NOTE = quoteAfter(S92, "one **user-role** message with this note, word for word:");
 /** § 9.3: the fixed cut_off message. */

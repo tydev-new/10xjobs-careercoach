@@ -81,6 +81,24 @@ function bareToolCallStep() {
   };
 }
 
+// A step with a real tool call that never conflicts on repeat (unlike
+// write_file to a fixed path) — used to drive the loop through several
+// steps to a genuine step_cap, without a cut-off in the mix.
+function listFilesStep(id: string) {
+  return {
+    stream: simulateReadableStream({
+      chunks: [
+        { type: "stream-start", warnings: [] },
+        { type: "tool-input-start", id, toolName: "list_files" },
+        { type: "tool-input-delta", id, delta: "{}" },
+        { type: "tool-input-end", id },
+        { type: "tool-call", toolCallId: id, toolName: "list_files", input: "{}" },
+        { type: "finish", finishReason: { unified: "tool-calls", raw: "tool-calls" }, usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } },
+      ] as any,
+    }),
+  };
+}
+
 function writeFileStep(cost?: number) {
   return {
     stream: simulateReadableStream({
@@ -381,6 +399,77 @@ test("§ 9.4: no cut_off part on the prior assistant message -> no note is appen
   await run(coach, "chat-1", [userMsg("u1", "hi"), t1, userMsg("u2", "and then?")]);
   const call2 = (model as any).doStreamCalls[1];
   assert.ok(!String(call2.prompt[0].content).includes("was cut off at the output limit"), "no note when the prior assistant message has no cut_off part");
+});
+
+const STEP_CAP_NOTE_RE =
+  /Your previous turn in this chat stopped at its step limit before it finished\. The actions it finished did run; nothing after the stop ran\. Check the files for what was actually saved before redoing anything, tell the candidate plainly where it stopped, then carry on from there, unless they asked for something else\. If the files don't show what that turn was working on, ask the candidate in one line\.$/;
+
+// Item 4 (round 2 follow-up): coder's own unit tests for the generalized
+// § 9.4 check — the step_cap note, a window-drop case, and both-codes
+// ordering. Written from docs/design-web-agent.md § 9.4 as amended
+// (round 2), not from the code.
+test("§ 9.4 (generalized, round 2): a step_cap part on the prior assistant message adds the step_cap note, word for word", async () => {
+  const model = new MockLanguageModelV4({
+    doStream: [listFilesStep("s1"), listFilesStep("s2"), listFilesStep("s3"), textStep("noted", "stop")] as any,
+  });
+  const coach = await baseCoach(model, { limits: { maxSteps: 3 } });
+
+  const t1 = await run(coach, "chat-1", [userMsg("u1", "look around three times")]);
+  const hasStepCap = (t1.parts as any[]).some((p) => p.type === "data-error" && p.data.code === "step_cap");
+  assert.ok(hasStepCap, "turn 1 stopped at the step cap");
+  assert.equal((t1.parts as any[]).filter((p) => p.type === "data-error" && p.data.code === "cut_off").length, 0, "not a cut_off — a genuine step_cap");
+
+  await run(coach, "chat-1", [userMsg("u1", "look around three times"), t1, userMsg("u2", "keep going")]);
+  const call4 = (model as any).doStreamCalls[3];
+  assert.match(call4.prompt[0].content, STEP_CAP_NOTE_RE, "§ 9.4's step_cap note, word for word, appended to the system prompt");
+});
+
+test("§ 9.4 (round 2): the step_cap note survives even when the window drops the WHOLE capped turn (the named receipt: a 25-step evaluate turn was dropped whole)", async () => {
+  const model = new MockLanguageModelV4({ doStream: [textStep("ok", "stop")] as any });
+  const coach = await baseCoach(model, { limits: { windowWords: 5 } });
+
+  const bigWords = Array.from({ length: 500 }, (_, i) => `role${i}requirement`).join(" ");
+  const priorUser = userMsg("u1", `Evaluate this huge JD: ${bigWords}`);
+  const priorAssistant: AppMessage = {
+    id: "a1",
+    role: "assistant",
+    parts: [
+      { type: "text", text: `Worked through it: ${bigWords}` } as any,
+      { type: "data-error", data: { code: "step_cap", message: ERROR_MESSAGES.step_cap.message, retryable: true } } as any,
+    ],
+  } as AppMessage;
+  const nextUser = userMsg("u2", "keep going");
+
+  await run(coach, "chat-1", [priorUser, priorAssistant, nextUser]);
+  const call = (model as any).doStreamCalls[0];
+  const sentContent = JSON.stringify(call.prompt);
+  assert.ok(!sentContent.includes("role0requirement"), "the tiny window dropped the whole capped turn's own huge content");
+  assert.match(call.prompt[0].content, STEP_CAP_NOTE_RE, "the step_cap note is appended anyway — § 9.4 runs BEFORE the window trims (checked on messages as sent)");
+});
+
+test("§ 9.4 (round 2): a hand-built prior message carrying BOTH codes gets each note once, cut_off first", async () => {
+  const model = new MockLanguageModelV4({ doStream: [textStep("ok", "stop")] as any });
+  const coach = await baseCoach(model);
+
+  const priorAssistant: AppMessage = {
+    id: "a1",
+    role: "assistant",
+    parts: [
+      { type: "data-error", data: { code: "step_cap", message: ERROR_MESSAGES.step_cap.message, retryable: true } } as any,
+      { type: "data-error", data: { code: "cut_off", message: ERROR_MESSAGES.cut_off.message, retryable: true } } as any,
+    ],
+  } as AppMessage;
+
+  await run(coach, "chat-1", [userMsg("u1", "hi"), priorAssistant, userMsg("u2", "keep going")]);
+  const call = (model as any).doStreamCalls[0];
+  const content = String(call.prompt[0].content);
+
+  const cutOffIndex = content.indexOf("was cut off at the output limit");
+  const stepCapIndex = content.indexOf("stopped at its step limit");
+  assert.ok(cutOffIndex >= 0 && stepCapIndex >= 0, "both notes are present");
+  assert.ok(cutOffIndex < stepCapIndex, "cut_off's note comes first, even though step_cap's data-error part was listed first on the message");
+  assert.equal(content.match(/was cut off at the output limit/g)?.length, 1, "the cut_off note appears exactly once");
+  assert.equal(content.match(/stopped at its step limit/g)?.length, 1, "the step_cap note appears exactly once");
 });
 
 test("§ 9.2 precondition 3: a gate already pending when the cut-off happens blocks the continuation, and the gate is untouched (still pending, not opened/decided/expired by this path)", async () => {

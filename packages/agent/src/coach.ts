@@ -71,6 +71,22 @@ const CUT_OFF_CONTINUATION_NOTE =
 const CUT_OFF_NEXT_TURN_NOTE =
   '\n\n---\nYour previous reply in this chat was cut off at the output limit and could not be finished, so part of that work was never saved. Check the files for what is actually there. Tell the candidate plainly what was saved and what wasn\'t (never that nothing was attempted), then do what\'s missing in smaller pieces, one file per write, unless they asked for something else.';
 
+// § 9.4's step_cap next-turn note (generalized 2026-09-24, round 2 lead
+// ruling: "the same check now also covers step_cap" — the window can drop
+// the WHOLE capped turn, so without this the model has no idea it ever
+// ran) — word for word, unwrapped from the doc's blockquote.
+const STEP_CAP_NEXT_TURN_NOTE =
+  "\n\n---\nYour previous turn in this chat stopped at its step limit before it finished. The actions it finished did run; nothing after the stop ran. Check the files for what was actually saved before redoing anything, tell the candidate plainly where it stopped, then carry on from there, unless they asked for something else. If the files don't show what that turn was working on, ask the candidate in one line.";
+
+// § 9.4 (generalized 2026-09-24, round 2): "For each code below that
+// appears on a data-error part of that message, the coach appends that
+// code's note... each code's note at most once; in the order below,
+// after the gate-pending note when that applies." cut_off comes first.
+const NEXT_TURN_NOTES: ReadonlyArray<{ code: "cut_off" | "step_cap"; note: string }> = [
+  { code: "cut_off", note: CUT_OFF_NEXT_TURN_NOTE },
+  { code: "step_cap", note: STEP_CAP_NEXT_TURN_NOTE },
+];
+
 /** § 3.2's note, added to the system prompt (not a canned USER-FACING
  *  reply — the lead's fix-round-1 ruling: "the fixed line is the MOCK's
  *  behaviour only"). The model answers the candidate's real message; it
@@ -108,11 +124,13 @@ function originOf(m: AppMessage): "typed" | "ui" {
   return (m.metadata as AppMessageMetadata | undefined)?.origin ?? "ui";
 }
 
-// § 9.4: "The check is stateless and runs at the start of each turn. It
-// looks at the assistant message just before the latest user message, in
-// the history AS SENT, before the window trims it." No stored flag (rule
-// 12) — this reads straight off the history the client resent.
-function cutOffJustBeforeLatestUser(messages: AppMessage[]): boolean {
+// § 9.4 (generalized 2026-09-24, round 2): "One stateless check runs at
+// the start of each turn. It looks at the assistant message just before
+// the latest user message, in the history as sent, before the window
+// trims it." No stored flag (rule 12) — this reads straight off the
+// history the client resent. Returns every data-error `code` on that one
+// message (a hand-built history could carry more than one; § 9.8 (xi)).
+function dataErrorCodesOnMessageBeforeLatestUser(messages: AppMessage[]): Set<string> {
   let lastUserIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") {
@@ -120,11 +138,15 @@ function cutOffJustBeforeLatestUser(messages: AppMessage[]): boolean {
       break;
     }
   }
-  if (lastUserIndex <= 0) return false;
+  if (lastUserIndex <= 0) return new Set();
   const prev = messages[lastUserIndex - 1];
-  if (prev.role !== "assistant") return false;
+  if (prev.role !== "assistant") return new Set();
   const parts = prev.parts as unknown as Array<{ type: string; data?: { code?: string } }>;
-  return parts.some((p) => p.type === "data-error" && p.data?.code === "cut_off");
+  const codes = new Set<string>();
+  for (const p of parts) {
+    if (p.type === "data-error" && p.data?.code) codes.add(p.data.code);
+  }
+  return codes;
 }
 
 // § 9.2: "drop a trailing assistant message with no content" — an
@@ -372,10 +394,16 @@ export function createCoach(deps: Deps): Coach {
             // § 9.2 says one { type: "finish" } is always written last, but
             // runTurn's own finish write is its very last statement — a
             // throw anywhere before it (caught here) used to leave the
-            // stream with a data-error and no finish at all. This is the
-            // only other place a turn's UI stream ends, so it's mutually
+            // stream with a data-error and no finish at all. Tester NIT
+            // (round 2) fixed: this comment used to call this catch "the
+            // only other place a turn's UI stream ends" — false. runTurn's
+            // own declined-gate and wrong-origin-reply branches also
+            // `return` early, before its own finish write, with no
+            // start/finish either (pre-existing, unchanged here). This
+            // write only guarantees THIS path (a throw) is mutually
             // exclusive with runTurn's own finish write: at most one
-            // "finish" is ever written per turn, still last of all.
+            // "finish" is ever written per turn from here, still last of
+            // all in the path that reaches this catch.
             writer.write({ type: "finish" } as any);
           }
         },
@@ -465,12 +493,15 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     }
   }
 
-  // § 9.4: checked on `messages` — the history AS SENT — before the
-  // window trims it (a multi-JD turn's tool results can push `windowWords`
-  // past exactly the cut-off turn). After the gate-pending note, when both
-  // apply.
-  if (cutOffJustBeforeLatestUser(messages)) {
-    systemNote += CUT_OFF_NEXT_TURN_NOTE;
+  // § 9.4 (generalized 2026-09-24, round 2): checked on `messages` — the
+  // history AS SENT — before the window trims it (a multi-JD turn's tool
+  // results, or a step-capped turn's own steps, can push past
+  // `windowWords` and drop the whole turn that stopped). After the
+  // gate-pending note, when it applies; each code's note at most once, in
+  // NEXT_TURN_NOTES's order (cut_off first).
+  const priorTurnCodes = dataErrorCodesOnMessageBeforeLatestUser(messages);
+  for (const { code, note } of NEXT_TURN_NOTES) {
+    if (priorTurnCodes.has(code)) systemNote += note;
   }
 
   const windowed = trimHistoryToWindow(messages, windowWords);

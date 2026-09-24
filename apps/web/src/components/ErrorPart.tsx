@@ -34,7 +34,16 @@ const NEXT_STEP: Partial<Record<ErrorCode, string>> = {
   // allowance stop (C § 4) opens that gate, and it carries no step_cap
   // error. The line now says only what's true and what the candidate
   // can do next: no gate, no "type yes".
-  step_cap: "Send another message to pick up where it left off.",
+  //
+  // Amended again 2026-09-24 (issue #2, round 2; lead ruling): the round-1
+  // line, "Send another message to pick up where it left off.", was still
+  // wrong on two counts — untrue after a long turn (the window can drop
+  // the whole capped turn, so nothing told the model it stopped, until
+  // coach.ts's now-generalized § 9.4 check fixed that), and it promised
+  // what the AGENT would do (the L2 rule above), not what the candidate
+  // can do. This line is verbatim from design-web-ui.md § 2.7 as amended;
+  // C § 9.4 is what makes "already saved" actually true.
+  step_cap: "Say continue to carry on from what's already saved.",
 };
 
 export function ErrorPart({ data }: { data: DataErrorData }): ReactElement {

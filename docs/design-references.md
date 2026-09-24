@@ -26,7 +26,7 @@ composer is the entire page — no history, no sidebar, until a first
 message exists; a `+` (attach) and a model-speed dropdown sit inside the
 same pill as the input, so the whole "start a turn" surface is one
 object. An owner-provided screenshot
-(`_from-owner/grok-agent-jobby-screen-routines.webp`) shows a different
+(`_from-owner/grok-agent-screen-routines.webp`) shows a different
 Grok surface: a sidebar of several named agents; the open agent's pane
 pairs chat bubbles with a live mirror of its own browser tab, captioned
 "<agent>'s screen," plus a short "Routines" list — named scheduled jobs,

@@ -823,10 +823,9 @@ sent, **before** the window trims it. For each code below that appears on a
 the turn's system prompt:
 
 - each code's note at most once;
-- in this order;
-- after the gate-pending note, when that applies.
+- in the order below, after the gate-pending note when that applies.
 
-**`cut_off`** (§ 9.3):
+**`cut_off`** (§ 9.3; it comes first, after the gate-pending note when both apply):
 
 > Your previous reply in this chat was cut off at the output limit and
 > could not be finished, so part of that work was never saved. Check the

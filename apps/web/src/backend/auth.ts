@@ -118,9 +118,8 @@ export function accessTokenFrom(client: AuthClientLike): () => Promise<string> {
   };
 }
 
-/** § 8: "the app says: 'Ten is in a private beta. Ask the person who
- *  invited you for access.'" — word for word. */
-export const NON_MEMBER_MESSAGE = "Ten is in a private beta. Ask the person who invited you for access.";
+/** design-web-ui § 1.6 (canonical; contract § 8 quotes it) — word for word. */
+export const NON_MEMBER_MESSAGE = "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.";
 
 /** Membership = has a credit row, per `ten_is_member()` (the migration's
  *  one definition — § 8, § 2). Throws on any RPC error (network, 401 for a

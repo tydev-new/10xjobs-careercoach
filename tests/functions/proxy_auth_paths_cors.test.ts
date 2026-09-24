@@ -79,7 +79,7 @@ t("auth: a signed-in NON-member -> 403 not_a_member with the § 8 text", async (
   h.reset();
   const [, tok] = await nonMember(h);
   const txt = await expectRefused(403, preq(baseBody(), { token: tok }));
-  assert(txt.includes("Ten is in a private beta. Ask the person who invited you for access."), txt);
+  assert(txt.includes("You're signed in, but this beta is invite-only. Ask the person who invited you to add you."), txt);
 });
 
 t("auth: the service-role key sent by a client grants nothing (401, no upstream, no row)", async () => {

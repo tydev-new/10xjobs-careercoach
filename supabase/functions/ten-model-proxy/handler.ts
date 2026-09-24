@@ -18,7 +18,7 @@ import {
 export const MESSAGES = {
   overBalance: "Your beta credit is used up. Ask the person who invited you for more.",
   ceiling: "The beta has reached today's limit. Try again tomorrow.",
-  notMember: "Ten is in a private beta. Ask the person who invited you for access.",
+  notMember: "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.",
   modelError: "The model is temporarily unavailable. Try again.",
 } as const;
 

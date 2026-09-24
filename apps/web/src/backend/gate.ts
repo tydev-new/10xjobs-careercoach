@@ -9,7 +9,7 @@
 // exact PTxxx status is visible to the caller and the module stays
 // trivially unit-testable with a fake `fetch`). Browser-safe: only
 // `fetch`/`URL`. No window/document/localStorage/node:*.
-import type { Gate, GateRequest } from "../../../../packages/agent/src/types.ts";
+import type { Gate, GateRequest, GateStatus } from "../../../../packages/agent/src/types.ts";
 import { boundFetch } from "./bound-fetch.ts";
 
 export interface SupabaseGateOptions {
@@ -85,6 +85,35 @@ function messageOf(body: unknown): string {
     if (typeof m === "string") return m;
   }
   return typeof body === "string" ? body : JSON.stringify(body);
+}
+
+/**
+ * § 11.6's gate reconciliation on restore: "the app reads its own
+ * ten_gate_log row" for ONE specific gateId, regardless of its status
+ * (unlike `Gate.pending`, which only ever returns a row that is still
+ * `pending`) — a turn that decided the gate may never have been saved (a
+ * closed tab), so the row can already be approved/declined/expired even
+ * though the restored messages still show it pending. Returns null if no
+ * row exists at all (RLS-scoped to the caller's own rows, same as
+ * `pending()`).
+ */
+export async function readGateStatus(opts: SupabaseGateOptions, gateId: string): Promise<GateStatus | null> {
+  const o: Required<SupabaseGateOptions> = {
+    url: opts.url.replace(/\/+$/, ""),
+    anonKey: opts.anonKey,
+    accessToken: opts.accessToken,
+    fetchImpl: opts.fetchImpl ?? boundFetch(),
+  };
+  const token = await o.accessToken();
+  const query = new URLSearchParams({ select: "status", id: `eq.${gateId}`, limit: "1" });
+  const res = await o.fetchImpl(`${o.url}/rest/v1/ten_gate_log?${query.toString()}`, {
+    headers: { apikey: o.anonKey, Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(`ten_gate_log select (readGateStatus) failed: HTTP ${res.status} ${await res.text()}`);
+  }
+  const rows = (await res.json()) as Array<{ status: GateStatus }>;
+  return rows[0]?.status ?? null;
 }
 
 export function createSupabaseGate(opts: SupabaseGateOptions): Gate {

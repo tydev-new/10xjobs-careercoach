@@ -13,6 +13,11 @@
 // 200 with a zeroed summary. The shared auth user is kept. No
 // `window`/`document`/`localStorage`/`node:` API here, so this runs the
 // same in tests and on the Edge Runtime.
+//
+// Amended 2026-09-24 (docs/design-web-agent.md § 11.7): also deletes the
+// caller's `ten_conversations` row (§ 11.2 — one row per user, so this is
+// the same `deleteOwnRows` call shape as `ten_ws_files`/`ten_gate_log`, no
+// new deps method needed).
 
 import { allowedOrigins, corsHeaders } from "../_shared/cors.ts";
 
@@ -90,10 +95,14 @@ export async function handleRequest(
   // own cost history survive a self-delete.
   let files = 0;
   let gateLog = 0;
+  let conversationRows = 0;
   let creditRows = 0;
   try {
     files = await deps.deleteOwnRows("ten_ws_files", user.id);
     gateLog = await deps.deleteOwnRows("ten_gate_log", user.id);
+    // § 11.7: "ten-delete-account deletes the row" (ten_conversations, one
+    // row per user, § 11.2) — the same shape as the two deletes above.
+    conversationRows = await deps.deleteOwnRows("ten_conversations", user.id);
     creditRows = await deps.deleteOwnRows("ten_usage_ledger", user.id, "kind=eq.credit");
   } catch (e) {
     deps.log?.warn({ msg: "ten-delete-account: row delete failed", err: String(e) });
@@ -107,6 +116,7 @@ export async function handleRequest(
         storageObjects: objects.length,
         textFiles: files,
         gateLogRows: gateLog,
+        conversationRows,
         creditRows,
       },
     }),

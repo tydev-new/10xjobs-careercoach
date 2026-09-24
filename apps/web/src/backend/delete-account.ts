@@ -12,6 +12,9 @@ export interface DeleteAccountSummary {
     storageObjects: number;
     textFiles: number;
     gateLogRows: number;
+    // § 11.7 (amended 2026-09-24): ten-delete-account also deletes the
+    // caller's ten_conversations row.
+    conversationRows: number;
     creditRows: number;
   };
 }

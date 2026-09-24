@@ -149,6 +149,27 @@ Deno.test("deletes only this user's storage objects, DB rows, and keeps the auth
   }
 });
 
+// § 11.7 (amended 2026-09-24): "ten-delete-account deletes the row"
+// (ten_conversations, one row per user, § 11.2).
+Deno.test("deletes the caller's ten_conversations row only, never another user's", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-a"] = { id: "user-a" };
+    h.state.users["tok-b"] = { id: "user-b" };
+    h.state.rowCounts["ten_conversations:user-a"] = 1;
+    h.state.rowCounts["ten_conversations:user-b"] = 1;
+
+    const res = await handleRequest(req({ token: "tok-a" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    const body = await res.json();
+    assertEquals(body.deleted.conversationRows, 1);
+    // user-b's row count, seeded separately, is untouched.
+    assertEquals(h.state.rowCounts["ten_conversations:user-b"], 1);
+  } finally {
+    await h.stop();
+  }
+});
+
 Deno.test("a workspace with no files/objects still returns a zeroed summary, not an error", async () => {
   const h = await harness();
   try {
@@ -157,7 +178,7 @@ Deno.test("a workspace with no files/objects still returns a zeroed summary, not
     const res = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(res.status, 200);
     const body = await res.json();
-    assertEquals(body.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, creditRows: 0 });
+    assertEquals(body.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, conversationRows: 0, creditRows: 0 });
   } finally {
     await h.stop();
   }
@@ -174,12 +195,12 @@ Deno.test("idempotent: a second call finds nothing left and still returns 200 wi
     const first = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(first.status, 200);
     const firstBody = await first.json();
-    assertEquals(firstBody.deleted, { storageObjects: 1, textFiles: 3, gateLogRows: 0, creditRows: 1 });
+    assertEquals(firstBody.deleted, { storageObjects: 1, textFiles: 3, gateLogRows: 0, conversationRows: 0, creditRows: 1 });
 
     const second = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(second.status, 200);
     const secondBody = await second.json();
-    assertEquals(secondBody.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, creditRows: 0 });
+    assertEquals(secondBody.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, conversationRows: 0, creditRows: 0 });
   } finally {
     await h.stop();
   }

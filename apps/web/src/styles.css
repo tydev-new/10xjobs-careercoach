@@ -1406,3 +1406,29 @@ button {
   min-width: 44px;
 }
 /* ---- END new-version notice ---- */
+
+/* ---- BEGIN saved-conversation notices (design-web-agent.md § 11, ui
+   § 1.9). Mechanism: src/real/ConversationNotice.tsx. Neutral styling
+   always (rule 8) — same v2 tokens as .version-notice, but no button (none
+   of § 1.9's lines carry an action; "load failed" is the setup error
+   screen instead). ".conversation-notice--older-dropped" sits at the top
+   of the transcript (Transcript.tsx); the other three sit above the
+   composer, the same slot as .version-notice. */
+.conversation-notice {
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--border);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--fg);
+}
+
+.conversation-notice--older-dropped {
+  border-top: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.conversation-notice-text {
+  margin: 0;
+  line-height: var(--leading-snug);
+}
+/* ---- END saved-conversation notices ---- */

@@ -111,13 +111,24 @@ function toEntryName(path: string): string {
 // picking a date safely mid-range avoids that off-by-one regardless of TZ.
 const ZIP_ENTRY_MTIME = new Date(Date.UTC(2000, 0, 2, 12));
 
-export async function exportWorkspace(store: WorkspaceStore): Promise<Uint8Array> {
+/**
+ * § 11.7: "Export adds .ten/conversation.json (the saved array) when a row
+ * exists." `conversationJson` is the caller's own pre-serialized saved
+ * array (RealChatShell.tsx reads it from ConversationStore.load(), never
+ * re-derived here — this module has no Supabase access of its own); when
+ * omitted (or when there is no row yet), the export is unchanged — "the
+ * fixture round trip is byte-identical" for every existing caller/test.
+ */
+export async function exportWorkspace(store: WorkspaceStore, conversationJson?: string): Promise<Uint8Array> {
   const files = await listAllFiles(store);
   const zippable: Zippable = {};
   for (const info of files) {
     const read = await store.read(info.path);
     const bytes = read.binary ? read.bytes : new TextEncoder().encode(read.content);
     zippable[toEntryName(info.path)] = [bytes, { mtime: ZIP_ENTRY_MTIME }];
+  }
+  if (conversationJson !== undefined) {
+    zippable[".ten/conversation.json"] = [new TextEncoder().encode(conversationJson), { mtime: ZIP_ENTRY_MTIME }];
   }
   return zipSync(zippable, { level: 6 });
 }
@@ -310,6 +321,16 @@ export async function importWorkspace(store: WorkspaceStore, zipBytes: Uint8Arra
       filter(file: UnzipFileInfo): boolean {
         const zipName = file.name;
         if (zipName.endsWith("/")) return false; // a directory pseudo-entry; nothing to inflate or write
+
+        // § 11.7: "Import skips .ten/ entries instead of refusing; an
+        // import starts a new conversation." NOT counted toward
+        // entryCount/caps (it was never a workspace file to begin with) —
+        // mirrors the CLAUDE.md skip below, which is also uncounted, and
+        // checked BEFORE validateRef (a leading "." segment is exactly
+        // what the path rules refuse, so this must run first).
+        if (zipName === ".ten" || zipName.startsWith(".ten/")) {
+          return false;
+        }
 
         entryCount++;
         if (entryCount > MAX_ENTRIES) fail(zipName, `workspace_full: the import has more than ${MAX_ENTRIES} entries`);

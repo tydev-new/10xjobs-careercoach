@@ -10,7 +10,7 @@
 // path (see their file-header comments) from Node-only code such as
 // bin/run.mjs or this package's own tests.
 export { createCoach, ERROR_MESSAGES } from "./coach.ts";
-export { matchGateReply, statusOf, parsePlanTodo, latestGateStatuses } from "./helpers.ts";
+export { matchGateReply, statusOf, parsePlanTodo, latestGateStatuses, gateIdsWithCards } from "./helpers.ts";
 export type { GateReplyResult, ChatStatus, PlanTodoItem } from "./helpers.ts";
 export { createInMemoryWorkspaceStore } from "./workspace/in-memory-store.ts";
 export { validateRef, isReadOnlyPath, isEditableExt, isUploadExt } from "./workspace/path-rules.ts";
@@ -19,6 +19,16 @@ export { CardBuilder } from "./cards.ts";
 export { parseJobsMdRows, findJobsMdRow } from "./jobs-md.ts";
 export { computeCostEstimate, needsGate, DEFAULT_STEP_COST_MEDIAN_USD, DEFAULT_STEP_COST_MAX_USD } from "./estimate-cost.ts";
 export { trimHistoryToWindow } from "./window.ts";
+export {
+  conversationToSave,
+  capConversationSize,
+  prepareConversationForSave,
+  stubFor,
+  STUB_THRESHOLD_CHARS,
+  STOPPED_BEFORE_RESULT_TEXT,
+  CONVERSATION_BYTE_CAP,
+} from "./conversation.ts";
+export type { CapResult } from "./conversation.ts";
 export {
   buildAlwaysOnSystemPrompt,
   buildTier1,

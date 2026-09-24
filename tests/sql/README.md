@@ -16,6 +16,7 @@ node run-r2.mjs      # the fix rounds' cases: guard, CAS, codes, caps, paths, pi
 node r3-own.mjs      # the round-2 review's own cases: guard bypasses, lookalikes, membership, pins
 node r4-own.mjs      # the round-3 review's own cases
 node r5-finish-reason.mjs  # § 9.6: 20260924000000_ten_ledger_finish_reason.sql applied AFTER the init file
+node r6-conversations.mjs  # § 11: 20260924100000_ten_conversations.sql applied AFTER the first two migrations
 ```
 
 Each prints `[PASS]` / `[FAIL]` / `[OBSERVED]` lines and a failure count.

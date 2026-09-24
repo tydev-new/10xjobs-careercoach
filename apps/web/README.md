@@ -313,6 +313,25 @@ Nothing here is secret — the anon key is meant to ship in the client
 bundle (RLS is the actual boundary); no OpenRouter key, no Supabase
 service-role key ever reaches this package.
 
+### Deploying to Vercel (project `ten-coach`)
+
+Production is https://ten-coach.vercel.app. Deploy from this machine as a
+**prebuilt** upload, never a plain `vercel --prod`: the app imports source
+from `packages/` and bundles `skills/` at build time, and a plain upload of
+`apps/web` carries neither.
+
+```sh
+cd apps/web
+npx vercel pull --yes --environment=production   # env vars into .vercel/ (git-ignored)
+npx vercel build --prod                          # builds with this repo's node_modules
+npx vercel deploy --prebuilt --prod
+```
+
+`VITE_*` values are baked in at build time, so any env change on Vercel
+needs a fresh `pull` + `build` + `deploy`. The Edge Functions deploy
+separately (`supabase/functions/README.md`); `TEN_APP_ORIGIN` must equal the
+production origin above or the browser's calls are refused by CORS.
+
 ### Verifying the production build
 
 ```sh

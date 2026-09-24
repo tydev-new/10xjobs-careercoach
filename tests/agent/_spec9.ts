@@ -46,5 +46,14 @@ export const TOOL_CLOSE_TEXT = quoteAfter(S91, "`errorText` = the **closing\ntex
 export const CONTINUATION_NOTE = quoteAfter(S92, "one **user-role** message with this note, word for word:");
 /** § 9.3: the fixed cut_off message. */
 export const CUT_OFF_MESSAGE = quoteAfter(S93, "The\nmessage is fixed:");
-/** § 9.4: the next-turn system-prompt note. */
-export const NEXT_TURN_NOTE = quoteAfter(S94, "when both apply):");
+/** § 9.4: the `cut_off` next-turn system-prompt note. */
+export const NEXT_TURN_NOTE = quoteAfter(S94, "**`cut_off`** (§ 9.3; it comes first, after the gate-pending note when both apply):");
+/** § 9.4 (generalized 2026-09-24, round 2): the `step_cap` next-turn note. */
+export const STEP_CAP_NOTE = quoteAfter(S94, "**`step_cap`** (the turn used `maxSteps` steps):");
+
+/** § 6.1 (amended round 2): step_cap's fixed message. */
+export const STEP_CAP_MESSAGE = (() => {
+  const m = DOC.replace(/\s+/g, " ").match(/`step_cap` \(the turn used `maxSteps` steps\) has a fixed message, "([^"]+)"/);
+  if (!m) throw new Error("§ 6.1 step_cap message not found");
+  return m[1];
+})();

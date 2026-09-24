@@ -7,13 +7,14 @@
 //   - § 9.2: "The coach writes one { type: "finish" } last of all" —
 //     including when a turn throws (lead's follow-up B(3)).
 //   - design-web-ui.md § 2.7 (amended): step_cap opens no gate.
+//   - § 9.4 generalized + § 9.8 (xi) (round 2, e78768d): the step_cap next-turn note.
 // Run: node --test tests/agent/cut-off-followups.test.ts
 import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createInMemoryGate } from "../../packages/agent/src/gate.ts";
-import { TOOL_CLOSE_TEXT } from "./_spec9.ts";
-import { sse, stubbedOpenRouter, textReply, toolReply } from "./_openrouter_stub.ts";
+import { NEXT_TURN_NOTE, STEP_CAP_MESSAGE, STEP_CAP_NOTE, TOOL_CLOSE_TEXT } from "./_spec9.ts";
+import { sse, stubbedOpenRouter, systemOf, textReply, toolReply } from "./_openrouter_stub.ts";
 import { AITEST, dataChunks, makeCoach, recordingGate, runTurn, user } from "./_support.ts";
 
 const USAGE = { inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 }, outputTokens: { total: 5, text: 5, reasoning: 0 } };
@@ -162,7 +163,7 @@ test("design-web-ui § 2.7 (amended): a step_cap stop writes step_cap and opens 
   assert.equal(m.requests.length, 3, "stopped at maxSteps");
   const cap = errorsOf(t1.chunks, "step_cap");
   assert.equal(cap.length, 1);
-  assert.deepEqual(cap[0].data, { code: "step_cap", message: "This turn ran out of steps before finishing.", retryable: true });
+  assert.deepEqual(cap[0].data, { code: "step_cap", message: STEP_CAP_MESSAGE, retryable: true });
   assert.deepEqual(dataChunks(t1.chunks, "data-gate"), [], "no gate card");
   assert.deepEqual(rg.events.filter((e) => e.op === "open"), [], "no gate logged");
   assert.equal(await rg.gate.pending("f-cap"), null, "nothing pending");
@@ -172,13 +173,86 @@ test("design-web-ui § 2.7 (amended): a step_cap stop writes step_cap and opens 
   assert.deepEqual(dataChunks(t2.chunks, "data-gate-status"), []);
 });
 
-// The copy's claim, measured (finding for the lead, not in the spec's test
-// plan): "Send another message to pick up where it left off." After a
-// step_cap on a realistic run (four ~1,200-word JDs), the window drops the
-// whole capped turn and nothing notes that it stopped — the next request
-// holds only the system prompt and "keep going". Kept as TODO so it reports
-// without failing the suite until the lead rules.
-test("step_cap: the next turn's request still carries the capped turn's work (or a note) — the copy says it will 'pick up where it left off'", { todo: "finding: window drops the capped turn; no step_cap note (§ 9.4 has one for cut_off only)" }, async () => {
+// ------------------------------------------------------------------ § 9.8 (xi) the next turn after a step cap
+// design-web-agent.md § 9.4 (generalized 2026-09-24, round 2) and § 9.8 (xi).
+// Notes are read from the doc (_spec9.ts), never from the code.
+
+const GATE_BIG = { action: "Evaluate six saved roles", steps: 500, webSearches: 6, items: ["Nimbus Robotics — Analytics Engineer"] };
+const errPart = (code: string, message = "x") => ({ type: "data-error", data: { code, message, retryable: true } });
+const asst = (id: string, parts: any[]) => ({ id, role: "assistant", parts: [{ type: "text", text: "Working on it." }, ...parts] });
+const count = (hay: string, needle: string) => hay.split(needle).length - 1;
+
+async function systemAfter(history: any[], opts: any = {}) {
+  const m = stubbedOpenRouter([textReply("reply")]);
+  const { coach } = makeCoach({ model: m.model, ...opts });
+  await runTurn(coach, `xi-${Math.random()}`, history);
+  return { m, system: m.requests[0] ? systemOf(m.requests[0]) : null };
+}
+
+test("(xi) a step_cap part on the last assistant message: the system prompt ends with the § 9.4 step_cap note, word for word", async () => {
+  const { system } = await systemAfter([user("u1", "Evaluate all four"), asst("a1", [errPart("step_cap", STEP_CAP_MESSAGE)]), user("u2", "continue")]);
+  assert.ok(system!.trimEnd().endsWith(STEP_CAP_NOTE), `tail: ${JSON.stringify(system!.slice(-300))}`);
+  assert.equal(count(system!, STEP_CAP_NOTE), 1);
+  assert.ok(!system!.includes(NEXT_TURN_NOTE), "no cut_off note");
+});
+
+test("(xi) a step_cap part only on an OLDER assistant message: no note", async () => {
+  const { system } = await systemAfter([user("u1", "a"), asst("a1", [errPart("step_cap")]), user("u2", "b"), asst("a2", []), user("u3", "c")]);
+  assert.ok(!system!.includes(STEP_CAP_NOTE));
+});
+
+test("(xi) no data-error at all, or another code (model_error): no note", async () => {
+  for (const parts of [[], [errPart("model_error")], [errPart("tool_error")]]) {
+    const { system } = await systemAfter([user("u1", "a"), asst("a1", parts), user("u2", "b")]);
+    assert.ok(!system!.includes(STEP_CAP_NOTE), JSON.stringify(parts));
+    assert.ok(!system!.includes(NEXT_TURN_NOTE), JSON.stringify(parts));
+  }
+});
+
+test("(xi) the same code twice on one message: its note once", async () => {
+  const { system } = await systemAfter([user("u1", "a"), asst("a1", [errPart("step_cap"), errPart("step_cap")]), user("u2", "b")]);
+  assert.equal(count(system!, STEP_CAP_NOTE), 1);
+});
+
+test("(xi) a hand-built message carrying both codes: each note once, cut_off first, step_cap last", async () => {
+  for (const order of [["step_cap", "cut_off"], ["cut_off", "step_cap"]]) {
+    const { system } = await systemAfter([user("u1", "a"), asst("a1", order.map((c) => errPart(c))), user("u2", "b")]);
+    assert.equal(count(system!, NEXT_TURN_NOTE), 1, `cut_off note once (${order})`);
+    assert.equal(count(system!, STEP_CAP_NOTE), 1, `step_cap note once (${order})`);
+    assert.ok(system!.indexOf(NEXT_TURN_NOTE) < system!.indexOf(STEP_CAP_NOTE), `cut_off first, whatever the part order (${order})`);
+    assert.ok(system!.trimEnd().endsWith(STEP_CAP_NOTE));
+  }
+});
+
+test("(xi) with a pending gate and both codes: gate-pending note, then cut_off, then step_cap", async () => {
+  const m = stubbedOpenRouter([toolReply("estimate_cost", GATE_BIG), textReply("baseline"), textReply("both")]);
+  const { coach } = makeCoach({ model: m.model });
+  const t1 = await runTurn(coach, "xi-gate", [user("u1", "evaluate all six")]);
+  assert.equal(dataChunks(t1.chunks, "data-gate").length, 1, "precondition: a pending gate");
+  const withBoth = { ...t1.message, parts: [...t1.message.parts, errPart("step_cap"), errPart("cut_off")] };
+  await runTurn(coach, "xi-gate", [user("u1", "evaluate all six"), withBoth, user("u2", "which six?")]);
+  const base = systemOf(m.requests[0]);
+  const sys = systemOf(m.requests[1]);
+  assert.ok(sys.startsWith(base));
+  const gateAt = sys.search(/pending/i);
+  assert.ok(gateAt > base.length - 1, "the gate-pending note is present after the base prompt");
+  assert.ok(gateAt < sys.indexOf(NEXT_TURN_NOTE) && sys.indexOf(NEXT_TURN_NOTE) < sys.indexOf(STEP_CAP_NOTE), "gate, cut_off, step_cap");
+});
+
+test("(xi) a declined gate reply: no model call, even with a step_cap on the last assistant message", async () => {
+  const m = stubbedOpenRouter([toolReply("estimate_cost", GATE_BIG), textReply("MUST NOT BE REQUESTED")]);
+  const { coach } = makeCoach({ model: m.model });
+  const t1 = await runTurn(coach, "xi-decl", [user("u1", "evaluate all six")]);
+  const withCap = { ...t1.message, parts: [...t1.message.parts, errPart("step_cap")] };
+  const t2 = await runTurn(coach, "xi-decl", [user("u1", "evaluate all six"), withCap, user("u2", "no")]);
+  assert.equal(m.requests.length, 1, "no model call on the declining turn");
+  assert.ok(dataChunks(t2.chunks, "data-gate-status").some((c) => c.data.status === "declined"));
+});
+
+// The measured case (§ 9.4, "Measured 2026-09-24"): a REAL capped turn —
+// 25 steps over four 1,200-word JDs — then "keep going". The window drops
+// the whole capped turn; the note must still be there.
+test("(xi) a real 25-step capped turn over four 1,200-word JDs: the window drops it, and the step_cap note is still there", async () => {
   const jd = (n: number) => `# Role ${n}\n\n` + Array.from({ length: 1200 }, (_, i) => `requirement${n}_${i}`).join(" ");
   const files: Record<string, string> = {};
   for (let n = 1; n <= 4; n++) files[`jd-inbox/role-${n}.md`] = jd(n);
@@ -187,11 +261,19 @@ test("step_cap: the next turn's request still carries the capped turn's work (or
   while (script.length < 25) script.push(toolReply("list_files", {}));
   script.push(textReply("NEXT"));
   const m = stubbedOpenRouter(script);
-  const { coach } = makeCoach({ model: m.model, files });
+  const { coach } = makeCoach({ model: m.model, files }); // default maxSteps (25) and windowWords (4,000)
   const h = [user("u1", "Evaluate the four roles in jd-inbox")];
-  const t1 = await runTurn(coach, "f-cap-window", h);
-  assert.equal(errorsOf(t1.chunks, "step_cap").length, 1, "precondition: step_cap");
-  await runTurn(coach, "f-cap-window", [...h, t1.message, user("u2", "keep going")]);
-  const r = JSON.stringify(m.requests.at(-1));
-  assert.ok(r.includes("Evaluate the four roles") || /ran out of steps|step.?cap/i.test(r), "the next request knows what it was doing, or that it was stopped");
+  const t1 = await runTurn(coach, "xi-window", h);
+  assert.equal(m.requests.length, 25, "precondition: 25 steps");
+  const cap = errorsOf(t1.chunks, "step_cap");
+  assert.equal(cap.length, 1, "precondition: step_cap");
+  assert.equal(cap[0].data.message, STEP_CAP_MESSAGE, "§ 6.1: the fixed message");
+  assert.ok(t1.message.parts.some((p: any) => p.type === "data-error" && p.data.code === "step_cap"), "the part is in the assembled message the client resends");
+
+  await runTurn(coach, "xi-window", [...h, t1.message, user("u2", "keep going")]);
+  const r = m.requests.at(-1);
+  const nonSystem = r.messages.filter((x: any) => x.role !== "system");
+  assert.deepEqual(nonSystem.map((x: any) => x.role), ["user"], "the capped turn's messages are gone from the request");
+  assert.ok(!JSON.stringify(r).includes("Evaluate the four roles"), "the candidate's original request was dropped too");
+  assert.ok(systemOf(r).trimEnd().endsWith(STEP_CAP_NOTE), "the step_cap note is still there");
 });

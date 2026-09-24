@@ -84,12 +84,19 @@ for (const [label, msg, retryable] of [["beta ceiling", CEILING, false], ["upstr
     assert.ok(!/try again in a moment/i.test(html));
   });
 }
-// ui § 2.7 as amended 2026-09-24 (follow-up A, lead ruling): step_cap's line
-// no longer promises a gate; the new line is read from the doc itself.
+// ui § 2.7 as amended again 2026-09-24 (issue #2 round 2) + C § 9.8 (xii):
+// step_cap's message and next-step line, read from the docs themselves.
 const UI_DOC = readFileSync(new URL("../../docs/design-web-ui.md", import.meta.url), "utf8").replace(/\s+/g, " ");
-const STEP_CAP_NEXT = UI_DOC.match(/no gate promise: "([^"]+)"/)?.[1] ?? "(not found in design-web-ui.md § 2.7)";
-test("ui § 2.7: the amended step_cap line is the doc's own sentence", () => {
-  assert.equal(STEP_CAP_NEXT, "Send another message to pick up where it left off.");
+const UI_27 = UI_DOC.slice(UI_DOC.indexOf("### 2.7 `data-error`"), UI_DOC.indexOf("## 3. The collapsed"));
+const STEP_CAP_NEXT = UI_27.match(/`nextStep` line: "([^"]+)"/)?.[1] ?? "(nextStep line not found in design-web-ui.md § 2.7)";
+const STEP_CAP_MSG = UI_27.match(/message, fixed \(C § 6\.1\): "([^"]+)"/)?.[1] ?? "(message not found in design-web-ui.md § 2.7)";
+const C_DOC = readFileSync(new URL("../../docs/design-web-agent.md", import.meta.url), "utf8").replace(/\s+/g, " ");
+test("ui § 2.7 / C § 6.1 / C § 9.8 (xii): the step_cap sentences agree across the docs", () => {
+  assert.equal(STEP_CAP_NEXT, "Say continue to carry on from what's already saved.");
+  assert.equal(STEP_CAP_MSG, "This turn ran out of steps before finishing.");
+  assert.ok(C_DOC.includes(`has a fixed message, "${STEP_CAP_MSG}"`), "C § 6.1 carries the same message");
+  assert.ok(C_DOC.includes(`The UI adds the line "${STEP_CAP_NEXT}"`), "C § 6.1 carries the same line");
+  assert.ok(C_DOC.includes(`the next-step line "${STEP_CAP_NEXT}" word for word`), "C § 9.8 (xii) carries the same line");
 });
 for (const [code, next] of [
   ["tool_error", "A tool call failed."],
@@ -101,11 +108,17 @@ for (const [code, next] of [
     assert.deepEqual(metas(html), [esc(next)]);
   });
 }
-test("error card: step_cap promises no gate and asks for no 'yes' (a step_cap stop opens none)", () => {
-  const html = renderErrorPart({ code: "step_cap", message: "This turn ran out of steps before finishing.", retryable: true });
-  assert.ok(html.includes(`<p class="card-body">${esc("This turn ran out of steps before finishing.")}</p>`), html);
+test("(xii) error card: step_cap shows the message and the next-step line word for word; no line mentions a gate or promises what the agent will do", () => {
+  const html = renderErrorPart({ code: "step_cap", message: STEP_CAP_MSG, retryable: true });
+  assert.ok(html.includes(`<p class="card-body">${esc(STEP_CAP_MSG)}</p>`), html);
   assert.deepEqual(metas(html), [esc(STEP_CAP_NEXT), "This can be retried."]);
-  assert.ok(!/\bgate\b|type yes|\byes\b/i.test(html), html);
+  const lines = [...html.matchAll(/<p class="card-(?:body|meta)">([^<]*)<\/p>/g)].map((m) => m[1]);
+  assert.equal(lines.length, 3, "message, next-step line, retryable line");
+  for (const line of lines) {
+    assert.ok(!/\bgate\b|type yes|\byes\b/i.test(line), `mentions a gate: ${line}`);
+    // L2 (ErrorPart.tsx; C § 9.3): what happened / what the candidate can do, never what the agent will do.
+    assert.ok(!/\bwill\b|\bI(?:'|&#x27;)ll\b|\bwe(?:'|&#x27;)ll\b|\bpick up where\b|\bI(?:'|&#x27;)m going\b|\bTen (?:will|is going)/i.test(line), `promises agent behaviour: ${line}`);
+  }
 });
 
 // ---- ui § 2.5 / fixture: over_balance is a pre-call refusal -> no model reply after it

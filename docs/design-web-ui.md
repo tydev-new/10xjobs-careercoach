@@ -302,9 +302,19 @@ boilerplate rule 8 rules out. `model_error` carries no `nextStep` line
 either, for the same reason — one static line can't fit both "try
 again in a moment" and "try again tomorrow" without contradicting
 whichever one is actually true. The remaining `nextStep` entries
-(`tool_error`, `offline`, `step_cap`) are unchanged. The UI never
+(`tool_error`, `offline`) are unchanged. The UI never
 computes a number into `message` that the part didn't carry (e.g. "2
 of 8 roles") — that belongs in the model's own next plain-text turn.
+
+**Amended 2026-09-24** (closing drift review of issue #2, follow-up A;
+lead ruling): `step_cap`'s `nextStep` line used to read "This opened a
+gate — type yes to continue the run.", but that's untrue — the
+step-cap stop (`coach.ts`'s combined stop condition, its hard-cap
+check) writes the `step_cap` error and ends the turn; it opens no
+gate. Only the *separate* mid-run allowance stop (§ 2.5, C § 4) opens
+a "Continue this run" gate, and that path never writes `step_cap`. The
+line now says only what's true and what the candidate can do next, no
+gate promise: "Send another message to pick up where it left off."
 
 ## 3. The collapsed "ran …" line
 

@@ -47,9 +47,14 @@ export const ERROR_MESSAGES: Record<ErrorCode, { message: string; retryable: boo
   },
 };
 
-// § 9.1: a tool part a cut-off left open (a `tool-input-start` with no
-// `tool-call` for its id) is closed with this exact `tool-input-error`
-// text — word for word.
+// § 9.1 (amended 2026-09-24, fix round 1 of issue #2): every tool call in
+// a cut-off step is closed with this exact `tool-input-error` text — word
+// for word — whether or not its input finished; none of them ran
+// (`ai@7.0.111` runs no tool on a `length` step). Stale comment fixed
+// 2026-09-24: this used to describe the pre-fix-round-1 rule, "a tool
+// part a cut-off left open (a `tool-input-start` with no `tool-call` for
+// its id)" — that only covered an unfinished call, not a finished one the
+// SDK also never ran.
 const CUT_OFF_TOOL_ERROR_TEXT = "Cut off at the output limit before it ran. Nothing from it was saved.";
 
 // § 9.2's continuation note (fix round 1, lead rulings — amended
@@ -175,15 +180,21 @@ function buildContinuationMessages(firstInputMessages: any[], responseMessages: 
 // requires `data-error.message` to be "the literal sentence the SERVER
 // sent" for over_balance/model_error — the proxy's own § 8 copy
 // ("Your beta credit is used up...", "The beta has reached today's
-// limit...", "The reply was cut off...") differs BY CAUSE even though the
-// `code` doesn't. `classifyError` used to return only the ErrorCode
-// (always the generic ERROR_MESSAGES sentence below); it now also
-// extracts the proxy's own `{ error: { code, message } }` body — from
+// limit...", "The model is temporarily unavailable. Try again."
+// — handler.ts's own MESSAGES) differs BY CAUSE even though the `code`
+// doesn't. `classifyError` used to return only the ErrorCode (always the
+// generic ERROR_MESSAGES sentence below); it now also extracts the
+// proxy's own `{ error: { code, message } }` body — from
 // `APICallError.responseBody` (the AI SDK provider's own error shape,
 // `@ai-sdk/provider`'s `APICallError`) when present — so a real refusal
 // shows its real cause. No change when there's no parseable server
 // message: the generic ERROR_MESSAGES sentence stands, exactly as before
 // (existing tests asserting a fixed `.message` still pass unmodified).
+// Stale comment fixed 2026-09-24: this used to quote a fourth proxy
+// message, "The reply was cut off...", that never existed in handler.ts's
+// MESSAGES — a cut-off reply is its own code, `cut_off` (§ 9, amended
+// 2026-09-24), with a fixed message from ERROR_MESSAGES.cut_off above,
+// never routed through this function.
 function serverMessageFrom(error: unknown): string | undefined {
   const responseBody = (error as any)?.responseBody;
   if (typeof responseBody !== "string") return undefined;
@@ -276,15 +287,24 @@ function toPullReadableStream<T>(iterable: AsyncIterable<T>): ReadableStream<T> 
 // as not run, whether or not its input finished, because none of them
 // ran"): watches one call's raw `fullStream`, alongside the existing M4
 // error tap (unchanged — still runs on the RAW part, before
-// `toUIMessageStream` swallows the classifiable detail), for every
-// `tool-input-start` id seen in the CURRENT step (reset at each
-// `start-step` — a step's own ids only, never an earlier, already-executed
-// step's). The moment that step's `finish-step` reports
-// `finishReason: "length"`, EVERY one of those ids — a finished call and
-// an unfinished one alike, ai@7.0.111 ran neither — is closed with a
-// direct `tool-input-error` UI chunk (§ 9.1's exact closing text), not
-// something `toUIMessageStream` can derive from the raw stream alone
-// (there's no such raw `TextStreamPart`).
+// `toUIMessageStream` swallows the classifiable detail), for every tool
+// call id seen in the CURRENT step (reset at each `start-step` — a step's
+// own ids only, never an earlier, already-executed step's). The moment
+// that step's `finish-step` reports `finishReason: "length"`, EVERY one of
+// those ids — a finished call and an unfinished one alike, ai@7.0.111 ran
+// neither — is closed with a direct `tool-input-error` UI chunk (§ 9.1's
+// exact closing text), not something `toUIMessageStream` can derive from
+// the raw stream alone (there's no such raw `TextStreamPart`).
+//
+// Follow-up B(1) (closing drift review of issue #2, 2026-09-24): § 9.1
+// says "the tap's list" is "every `tool-input-start` id and every
+// `tool-call` id the tap saw in the cut-off step" — a finished call has
+// both, an unfinished one has only the first. The tap used to record only
+// `tool-input-start`; a provider that emits a bare `tool-call` with no
+// preceding `tool-input-start` for a step (e.g. a call whose input never
+// streamed in pieces) would then close nothing for it. Both part types
+// write into the same id-keyed map, so a call seen via both stays a
+// single entry (dedup) and the reset-per-step behavior is unchanged.
 function tapCutOffAndErrors(
   stream: AsyncIterable<any>,
   onError: (error: unknown) => void,
@@ -299,6 +319,8 @@ function tapCutOffAndErrors(
         stepToolIds = new Map();
       } else if (part?.type === "tool-input-start") {
         stepToolIds.set(part.id, part.toolName);
+      } else if (part?.type === "tool-call") {
+        stepToolIds.set(part.toolCallId, part.toolName);
       } else if (part?.type === "finish-step" && part.finishReason === "length") {
         for (const [toolCallId, toolName] of stepToolIds) onCutOffToolPart(toolCallId, toolName);
         stepToolIds = new Map();
@@ -346,6 +368,15 @@ export function createCoach(deps: Deps): Coach {
             const { code, serverMessage } = classifyError(error);
             const { message, retryable } = ERROR_MESSAGES[code];
             writer.write({ type: "data-error", data: { code, message: serverMessage ?? message, retryable } });
+            // Follow-up B(3) (closing drift review of issue #2, 2026-09-24):
+            // § 9.2 says one { type: "finish" } is always written last, but
+            // runTurn's own finish write is its very last statement — a
+            // throw anywhere before it (caught here) used to leave the
+            // stream with a data-error and no finish at all. This is the
+            // only other place a turn's UI stream ends, so it's mutually
+            // exclusive with runTurn's own finish write: at most one
+            // "finish" is ever written per turn, still last of all.
+            writer.write({ type: "finish" } as any);
           }
         },
       });

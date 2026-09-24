@@ -57,6 +57,30 @@ function danglingToolStep() {
   };
 }
 
+// Follow-up B(1) (closing drift review of issue #2, 2026-09-24): § 9.1
+// says the tap's list is "every `tool-input-start` id and every
+// `tool-call` id" it saw in the cut-off step — a FINISHED call has both.
+// The real @openrouter/ai-sdk-provider always emits a `tool-input-start`
+// first, so this shape (a bare `tool-call` with none) is crafted by hand
+// here, the way the doc's own test-plan preamble allows for a shape the
+// real provider can't produce.
+function bareToolCallStep() {
+  return {
+    stream: simulateReadableStream({
+      chunks: [
+        { type: "stream-start", warnings: [] },
+        {
+          type: "tool-call",
+          toolCallId: "bare1",
+          toolName: "write_file",
+          input: JSON.stringify({ path: "bare.md", content: "hi" }),
+        },
+        { type: "finish", finishReason: { unified: "length", raw: "length" }, usage: { inputTokens: 5, outputTokens: 2, totalTokens: 7 } },
+      ] as any,
+    }),
+  };
+}
+
 function writeFileStep(cost?: number) {
   return {
     stream: simulateReadableStream({
@@ -170,6 +194,39 @@ test("§ 9.1: a dangling tool part (tool-input-start with no matching tool-call)
   assert.deepEqual(toolPart.rawInput ?? toolPart.input, {});
   assert.equal(toolPart.errorText, "Cut off at the output limit before it ran. Nothing from it was saved.");
   assert.equal((last.parts as any[]).filter((p) => p.type === "data-error").length, 0);
+});
+
+test("Follow-up B(1) (closing drift review of issue #2, 2026-09-24): a length step holding a bare `tool-call` with NO preceding `tool-input-start` is still closed — the tap records ids from tool-call parts too, deduped, still reset per step", async () => {
+  const model = new MockLanguageModelV4({
+    doStream: [bareToolCallStep(), textStep("recovered", "stop")] as any,
+  });
+  const { store, writes } = countingStore();
+  const coach = await baseCoach(model, { workspace: store });
+  const last = await run(coach, "chat-1", [userMsg("u1", "hi")]);
+
+  assert.equal((model as any).doStreamCalls.length, 2, "one continuation, then success — no gap left the chat stuck");
+  assert.equal(writes["bare.md"] ?? 0, 0, "the coach never executes a tool itself — a bare finished call still never ran");
+
+  const toolPart = (last.parts as any[]).find((p) => p.type === "tool-write_file" && p.toolCallId === "bare1");
+  assert.ok(toolPart, "the bare tool-call part is still on the message");
+  assert.equal(
+    toolPart.state,
+    "output-error",
+    "closed, not left input-available — before the fix, only tool-input-start ids were tracked, so a bare tool-call left this open",
+  );
+  assert.deepEqual(toolPart.rawInput ?? toolPart.input, {});
+  assert.equal(toolPart.errorText, "Cut off at the output limit before it ran. Nothing from it was saved.");
+  assert.equal((last.parts as any[]).filter((p) => p.type === "data-error").length, 0, "the continuation succeeded — no visible cut_off");
+
+  // buildContinuationMessages (§ 9.2) is unaffected by this fix (it reads
+  // content's own `tool-call` parts, not the tap) but a synthesized result
+  // must still exist for this finished call, or the continuation's request
+  // would throw MissingToolResultsError.
+  const call2 = (model as any).doStreamCalls[1];
+  const toolMsg = (call2.prompt as any[]).find((m) => m.role === "tool");
+  assert.ok(toolMsg, "a synthesized tool message is present");
+  assert.equal(toolMsg.content[0].toolCallId, "bare1");
+  assert.equal(toolMsg.content[0].output.type, "error-text");
 });
 
 // § 9.1 amended 2026-09-24 (the BLOCKER fix): "Every tool call in a

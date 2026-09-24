@@ -27,10 +27,14 @@ import type { DataErrorData, ErrorCode } from "../types";
 const NEXT_STEP: Partial<Record<ErrorCode, string>> = {
   tool_error: "A tool call failed.",
   offline: "Check your connection and try again.",
-  // A step_cap stop opens a "Continue this run" gate (C § 4) — the SAME
-  // gate protocol as a spend gate: only a typed exact "yes" approves it,
-  // never a free-text "go ahead".
-  step_cap: "This opened a gate — type yes to continue the run.",
+  // Amended 2026-09-24 (closing drift review of issue #2, follow-up A):
+  // this used to claim a step_cap stop opens a "Continue this run" gate,
+  // but coach.ts's step_cap check (the hard step cap) writes the error
+  // and ends the turn — it opens no gate. Only the SEPARATE mid-run
+  // allowance stop (C § 4) opens that gate, and it carries no step_cap
+  // error. The line now says only what's true and what the candidate
+  // can do next: no gate, no "type yes".
+  step_cap: "Send another message to pick up where it left off.",
 };
 
 export function ErrorPart({ data }: { data: DataErrorData }): ReactElement {

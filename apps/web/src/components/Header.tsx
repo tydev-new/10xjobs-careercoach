@@ -43,8 +43,17 @@ const STATE_LABEL: Record<Status["state"], string> = {
 // bundle that still wants them (this whole app is a preview tool, so the
 // default build sets it — see apps/web/.env and the README for how to
 // build without it, which is what proves they're absent from dist/).
+//
+// Fix round 1, item 8: `VITE_REAL=1` is a dev-only escape hatch — set it
+// (alongside VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY/VITE_SITE_URL) to
+// run the REAL app under `npm run dev`, which was otherwise impossible
+// (`import.meta.env.DEV` alone always forced the mock). This is the only
+// way to exercise `ten-model-proxy`'s CORS allowlist for
+// `http://localhost:5173` (design-web-agent.md § 8) against a real dev
+// server instead of only the production build.
 export const SHOW_MOCK_CONTROLS =
-  import.meta.env.DEV || import.meta.env.VITE_SHOW_MOCK_CONTROLS === "1";
+  import.meta.env.VITE_REAL !== "1" &&
+  (import.meta.env.DEV || import.meta.env.VITE_SHOW_MOCK_CONTROLS === "1");
 
 export function Header(props: HeaderProps): ReactElement {
   const {

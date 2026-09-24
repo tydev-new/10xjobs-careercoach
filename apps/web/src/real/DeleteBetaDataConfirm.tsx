@@ -16,10 +16,15 @@ export interface DeleteBetaDataConfirmProps {
   supabaseUrl: string;
   accessToken: () => Promise<string>;
   onClose: () => void;
-  /** Called once ten-delete-account returns; performs the actual sign-out
-   *  and resolves once it completes. Fix round 1, item 8: the report-back
-   *  says "you're signed out" only once this has actually resolved, not
-   *  the moment the delete call itself returns. */
+  /** Performs the actual sign-out; called from the report-back's own OK
+   *  button (the tester's e2e — tests/e2e-real/e2e.ts "delete: typed yes
+   *  -> the function ran -> the report-back line" — waits for the
+   *  report-back TEXT the instant ten-delete-account returns, then
+   *  separately clicks OK and waits for the sign-in screen: showing the
+   *  report-back only AFTER an awaited sign-out would unmount this dialog,
+   *  from its OWN parent unmounting on the resulting SIGNED_OUT event,
+   *  before the report-back could ever render — so sign-out stays gated
+   *  on the explicit OK click, same as before this fix round). */
   onDeleted: () => Promise<void>;
 }
 
@@ -29,7 +34,7 @@ const ONE_SENTENCE =
   "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. " +
   "Your usage records, which show only amounts spent and no content, are kept.";
 
-type Phase = "confirming" | "declined" | "deleting" | "signing-out" | "error" | "done";
+type Phase = "confirming" | "declined" | "deleting" | "error" | "done";
 
 export function DeleteBetaDataConfirm({
   supabaseUrl,
@@ -61,15 +66,17 @@ export function DeleteBetaDataConfirm({
     try {
       const result = await deleteBetaAccount({ url: supabaseUrl, accessToken });
       setSummary(result);
-      // Fix round 1, item 8: don't claim "you're signed out" until the
-      // sign-out itself has actually completed.
-      setPhase("signing-out");
-      await onDeleted();
       setPhase("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setPhase("error");
     }
+  };
+
+  const [signingOut, setSigningOut] = useState(false);
+  const handleOk = () => {
+    setSigningOut(true);
+    void onDeleted(); // RealApp's SIGNED_OUT listener unmounts this dialog once it resolves.
   };
 
   if (phase === "declined") {
@@ -89,11 +96,12 @@ export function DeleteBetaDataConfirm({
     return (
       <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
         <div className="delete-confirm-card">
-          {/* § 1.7 point 4: the report-back — shown only once the actual
-              sign-out (awaited above) has completed. */}
+          {/* § 1.7 point 4: the report-back, once ten-delete-account
+              returns. OK is what actually signs out (handleOk) — the
+              sentence itself already states what OK is about to do. */}
           <p>Deleted. You're signed out of Ten — your sign-in for the older app is untouched.</p>
-          <button type="button" onClick={onClose}>
-            OK
+          <button type="button" onClick={handleOk} disabled={signingOut}>
+            {signingOut ? "Signing out…" : "OK"}
           </button>
         </div>
       </div>
@@ -121,15 +129,15 @@ export function DeleteBetaDataConfirm({
               type="text"
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              disabled={phase === "deleting" || phase === "signing-out"}
+              disabled={phase === "deleting"}
               autoFocus
             />
           </label>
           <div className="delete-confirm-actions">
-            <button type="submit" disabled={phase === "deleting" || phase === "signing-out"}>
-              {phase === "deleting" ? "Deleting…" : phase === "signing-out" ? "Signing out…" : "Submit"}
+            <button type="submit" disabled={phase === "deleting"}>
+              {phase === "deleting" ? "Deleting…" : "Submit"}
             </button>
-            <button type="button" onClick={onClose} disabled={phase === "deleting" || phase === "signing-out"}>
+            <button type="button" onClick={onClose} disabled={phase === "deleting"}>
               Cancel
             </button>
           </div>

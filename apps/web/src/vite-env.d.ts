@@ -17,6 +17,11 @@ interface ImportMetaEnv {
    *  the app on the MOCK transport even in a built bundle. Absent (the
    *  default `npm run build`) is the real, production build. */
   readonly VITE_SHOW_MOCK_CONTROLS?: string;
+  /** Fix round 1, item 8: "1" runs the REAL app under `npm run dev`
+   *  (otherwise impossible — DEV alone always forces the mock) — the only
+   *  way to exercise the proxy's `http://localhost:5173` CORS entry
+   *  against a real dev server. Requires the real env vars too. */
+  readonly VITE_REAL?: string;
 }
 
 interface ImportMeta {

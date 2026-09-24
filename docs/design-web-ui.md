@@ -313,8 +313,27 @@ step-cap stop (`coach.ts`'s combined stop condition, its hard-cap
 check) writes the `step_cap` error and ends the turn; it opens no
 gate. Only the *separate* mid-run allowance stop (§ 2.5, C § 4) opens
 a "Continue this run" gate, and that path never writes `step_cap`. The
-line now says only what's true and what the candidate can do next, no
-gate promise: "Send another message to pick up where it left off."
+line says only what's true and what the candidate can do next, with no
+gate promise.
+
+**Amended again 2026-09-24** (issue #2, round 2; lead ruling). The line
+that replaced it, "Send another message to pick up where it left off.",
+was still wrong on two counts:
+
+- **Untrue after a long turn.** The window can drop the whole capped turn,
+  and nothing told the model the turn had stopped.
+- **It promised what the agent would do** (the L2 rule).
+
+The agent now adds a next-turn note after a `step_cap` (C § 9.4). The
+copy is:
+
+- message, fixed (C § 6.1): "This turn ran out of steps before
+  finishing."
+- `nextStep` line: "Say continue to carry on from what's already saved."
+
+The `nextStep` line mirrors `cut_off`'s "say continue" and says only
+what the candidate can do. "Already saved" is true because the note
+sends the model to the files.
 
 ## 3. The collapsed "ran …" line
 

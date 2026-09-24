@@ -370,6 +370,10 @@ into `tests/run.py`, plus the coverage check.
 - `data-error.message` is the proxy's or tool's own sentence for the cause
   (§ 8) when one exists, else a fixed fallback per `code`. What was finished is
   the model's to say next turn, from the files.
+- `step_cap` (the turn used `maxSteps` steps) has a fixed message, "This turn
+  ran out of steps before finishing.", with `retryable: true`. The UI adds the
+  line "Say continue to carry on from what's already saved." (`design-web-ui.md`
+  § 2.7). The next turn is told it stopped (§ 9.4; amended 2026-09-24, round 2).
 - User messages carry `metadata.origin` and may carry `workspace:` file parts.
   The SDK's tool-approval chunks are not used (a UI boolean, rule 7).
 
@@ -775,7 +779,8 @@ these hold:
 - **One assistant message on screen.** Every call's UI stream is merged
   with `sendFinish: false`, and every call after the first also has
   `sendStart: false`. The coach writes one `{ type: "finish" }` last of
-  all, after any `cut_off` error. No
+  all, after any `cut_off` error. That holds when the turn throws, too:
+  the outer catch writes its `data-error`, then the `finish`. No
   `apps/web` code reads that chunk's fields (checked 2026-09-24).
 - Inside the continuation the normal loop runs, with the same stop
   condition, allowance, gate and step cap. Its calls are metered like any
@@ -806,13 +811,22 @@ will do (the L2 rule in `apps/web/src/components/ErrorPart.tsx`).
   - `design-web-ui.md` § 2.7 is updated to match.
   - The old § 8 cut-off `model_error` sentence is retired.
 
-### 9.4 The next turn knows
+### 9.4 The next turn knows (a turn that ended early)
 
-The check is stateless and runs at the start of each turn. It looks at the
+*Generalized 2026-09-24, round 2 (lead ruling): the same check now also
+covers `step_cap`.*
+
+One stateless check runs at the start of each turn. It looks at the
 assistant message just before the latest user message, in the history as
-sent, **before** the window trims it. If that message has a `data-error`
-part with code `cut_off`, the coach appends this note to that turn's system
-prompt (after the gate-pending note, when both apply):
+sent, **before** the window trims it. For each code below that appears on a
+`data-error` part of that message, the coach appends that code's note to
+the turn's system prompt:
+
+- each code's note at most once;
+- in this order;
+- after the gate-pending note, when that applies.
+
+**`cut_off`** (§ 9.3):
 
 > Your previous reply in this chat was cut off at the output limit and
 > could not be finished, so part of that work was never saved. Check the
@@ -821,11 +835,27 @@ prompt (after the gate-pending note, when both apply):
 > missing in smaller pieces, one file per write, unless they asked for
 > something else.
 
+**`step_cap`** (the turn used `maxSteps` steps):
+
+> Your previous turn in this chat stopped at its step limit before it
+> finished. The actions it finished did run; nothing after the stop ran.
+> Check the files for what was actually saved before redoing anything,
+> tell the candidate plainly where it stopped, then carry on from there,
+> unless they asked for something else. If the files don't show what that
+> turn was working on, ask the candidate in one line.
+
 - **No stored flag (rule 12).** Data parts stay in the history: none is
-  transient, and the real transport sends every message.
-- **Before the window, on purpose.** A multi-JD turn's tool results can pass
-  `windowWords`. The window would then drop exactly the turn that was cut
-  off.
+  transient, and the real transport sends every message. They never reach
+  the model themselves: `convertToModelMessages` drops data parts, so
+  without a note the model cannot know a turn stopped.
+- **Before the window, on purpose.** A long turn's tool results can pass
+  `windowWords`, and the window then drops that whole turn, the candidate's
+  request included.
+  - *Measured 2026-09-24 (tester, issue #2 round 2):* a 25-step evaluate
+    turn over four 1,200-word JDs was dropped whole. The next request held
+    only the system prompt and "keep going".
+  - That is why the `step_cap` note says to ask when the files don't show
+    the task.
 - A turn whose continuation succeeded wrote no `cut_off`, so the next turn
   gets no note.
 
@@ -958,7 +988,7 @@ model, the in-memory store and a fake gate, never a real workspace.
   the cut-off step's cost is counted once, in both the turn and the chat.
 - **(iv) The next turn.**
   - A `cut_off` part on the last assistant message: the system prompt ends
-    with the § 9.4 note word for word.
+    with the § 9.4 `cut_off` note word for word.
   - No such part: no note.
   - The cut-off turn outside `windowWords`: the note is still there.
   - A declined gate: no model call.
@@ -1001,6 +1031,25 @@ model, the in-memory store and a fake gate, never a real workspace.
   `MissingToolResultsError` and no `model_error`. Also pass a hand-built
   history with a tool part stuck in `input-available` (the shape before
   this fix): it must reach the model too.
+- **(xi) The next turn after a step cap** (round 2), mirroring (iv):
+  - A `step_cap` part on the last assistant message: the system prompt ends
+    with the § 9.4 `step_cap` note word for word.
+  - A `step_cap` part only on an older assistant message, or none: no
+    note.
+  - A capped turn long enough that the window drops it (for example 25
+    steps over four 1,200-word JDs, then "keep going"): the turn's messages
+    are gone from the request, and the note is still there.
+  - A hand-built message carrying both codes: each note once, `cut_off`
+    first.
+  - A declined gate reply: no model call.
+- **(xii) The step-cap copy** (round 2). `ErrorPart` renders a `step_cap`
+  part with:
+  - the message "This turn ran out of steps before finishing." word for
+    word;
+  - the next-step line "Say continue to carry on from what's already
+    saved." word for word.
+
+  Pass when no line mentions a gate or promises what the agent will do.
 
 **UNVERIFIED** (the named test settles each one):
 
@@ -1086,5 +1135,8 @@ spike replaced (owner, 2026-09-23).
   09-24, fix round 1 of issue #2): `ai@7.0.111` runs no tool on a `length`
   step. Synthesized error results keep the continuation valid, and
   `ignoreIncompleteToolCalls` keeps every later turn valid.
+- A step-capped turn is told to the next turn the same way as a cut-off
+  (lead ruling, 09-24, round 2): § 9.4 is one check with one note per code,
+  because the window can drop the whole capped turn.
 - Cap 8,192 (owner, 09-24): the most the ~360 s meter allows at 30 tokens/s,
   with margin; more needs another host. The ledger records `finish_reason`.

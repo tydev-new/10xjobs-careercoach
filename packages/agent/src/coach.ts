@@ -77,14 +77,43 @@ function originOf(m: AppMessage): "typed" | "ui" {
   return (m.metadata as AppMessageMetadata | undefined)?.origin ?? "ui";
 }
 
-function classifyError(error: unknown): ErrorCode {
+// Step 5b coder's fix (flagged in the hand-back): design-web-ui.md § 2.7
+// requires `data-error.message` to be "the literal sentence the SERVER
+// sent" for over_balance/model_error — the proxy's own § 8 copy
+// ("Your beta credit is used up...", "The beta has reached today's
+// limit...", "The reply was cut off...") differs BY CAUSE even though the
+// `code` doesn't. `classifyError` used to return only the ErrorCode
+// (always the generic ERROR_MESSAGES sentence below); it now also
+// extracts the proxy's own `{ error: { code, message } }` body — from
+// `APICallError.responseBody` (the AI SDK provider's own error shape,
+// `@ai-sdk/provider`'s `APICallError`) when present — so a real refusal
+// shows its real cause. No change when there's no parseable server
+// message: the generic ERROR_MESSAGES sentence stands, exactly as before
+// (existing tests asserting a fixed `.message` still pass unmodified).
+function serverMessageFrom(error: unknown): string | undefined {
+  const responseBody = (error as any)?.responseBody;
+  if (typeof responseBody !== "string") return undefined;
+  try {
+    const parsed = JSON.parse(responseBody);
+    const message = parsed?.error?.message;
+    return typeof message === "string" ? message : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function classifyError(error: unknown): { code: ErrorCode; serverMessage?: string } {
   const status =
     (error as any)?.status ?? (error as any)?.statusCode ?? (error as any)?.response?.status;
-  if (status === 402) return "over_balance";
+  const serverMessage = serverMessageFrom(error);
+  if (status === 402) return { code: "over_balance", serverMessage };
   const message = String((error as any)?.message ?? error ?? "");
-  if (/\b402\b/.test(message)) return "over_balance";
-  if (/network|fetch failed|ECONNREFUSED|offline/i.test(message)) return "offline";
-  return "model_error";
+  if (/\b402\b/.test(message)) return { code: "over_balance", serverMessage };
+  if (/network|fetch failed|ECONNREFUSED|offline/i.test(message)) return { code: "offline", serverMessage };
+  // Every other proxy-originated HTTP failure (401/403/413/503, § 8) is
+  // shown as model_error, distinguished only by ITS OWN message text
+  // (design-web-ui.md § 2.7) — there's no dedicated ErrorCode for each.
+  return { code: "model_error", serverMessage };
 }
 
 // § 2 Uploads: "The package turns that part into one text line ('The
@@ -118,6 +147,20 @@ function stripWorkspaceFileParts(messages: AppMessage[]): AppMessage[] {
 // loses the classifiable detail (statusCode etc.) before it ever reaches
 // us. So the tap runs BEFORE that conversion, on the raw fullStream part,
 // where `error` still carries the real shape.
+// Step 5b coder's fix (flagged in the hand-back, outside this slice's own
+// directory): `ReadableStream.from(asyncIterable)` is missing from the
+// installed TypeScript's `lib.dom.d.ts` (no static `.from` on the
+// `ReadableStream` constructor type at all, in ANY lib combination this
+// repo tried — see the hand-back), which broke `apps/web`'s own
+// `tsc -b --noEmit` the moment its real-agent wiring (step 5b) pulled this
+// file into a browser (DOM-lib) TypeScript program for the first time;
+// packages/agent's OWN tsconfig has no DOM lib, so this compiled fine
+// there and the gap was invisible until now. A manual pull-based
+// ReadableStream construction is the fix — not just a typing workaround:
+// it also avoids depending on `ReadableStream.from` (a newer Streams API
+// addition) being present in every runtime this package ships to,
+// matching § 1's own "runs in the browser and on a server" bar. Same
+// async generator, same yielded values, same order.
 function tapErrorParts(stream: AsyncIterable<any>, onError: (error: unknown) => void): ReadableStream<any> {
   async function* gen() {
     for await (const part of stream) {
@@ -125,7 +168,20 @@ function tapErrorParts(stream: AsyncIterable<any>, onError: (error: unknown) => 
       yield part;
     }
   }
-  return ReadableStream.from(gen());
+  const iterator = gen();
+  return new ReadableStream({
+    async pull(controller) {
+      const { value, done } = await iterator.next();
+      if (done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(value);
+    },
+    async cancel(reason) {
+      await iterator.return?.(reason);
+    },
+  });
 }
 
 export function createCoach(deps: Deps): Coach {
@@ -162,9 +218,9 @@ export function createCoach(deps: Deps): Coach {
             await runTurn({ deps, chatId, messages, writer, state, isFirstTurn, maxSteps, spendGateUsd, windowWords, gateGrammarMd, systemPrompt: systemPrompt.text, abortSignal: input.abortSignal });
           } catch (error) {
             deps.logger?.error({ event: "coach.turn_failed", chatId, error: String((error as any)?.message ?? error) });
-            const code = classifyError(error);
+            const { code, serverMessage } = classifyError(error);
             const { message, retryable } = ERROR_MESSAGES[code];
-            writer.write({ type: "data-error", data: { code, message, retryable } });
+            writer.write({ type: "data-error", data: { code, message: serverMessage ?? message, retryable } });
           }
         },
       });
@@ -353,12 +409,46 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     tools,
     stopWhen: stop,
     abortSignal,
+    // Fix round 1, item 5 (flagged, outside this slice's own directory):
+    // ONE proxy call per step. The AI SDK's default `maxRetries: 2`
+    // auto-retries any APICallError with `isRetryable === true`, and the
+    // installed @openrouter/ai-sdk-provider's own default for that is
+    // "statusCode is 408/409/429/>=500" — ten-model-proxy's own
+    // deliberate refusals (over_balance 402, not_a_member 403, 413) are
+    // already outside that set and were never retried, but its 503
+    // (model_error — both the beta ceiling AND a genuinely-down upstream
+    // share this one status, § 8) IS >= 500, so the SDK silently retried
+    // a single refused turn 2-3 times against the proxy before ever
+    // reaching this package's own error handling. A raw network failure
+    // (fetch() itself throwing — offline, DNS, connection reset) is
+    // NEVER auto-retried by the SDK's default `shouldRetry` either way
+    // (it only fires for an APICallError/GatewayError instance, not a
+    // bare thrown error) — so `maxRetries: 0` costs nothing for "genuine
+    // network errors"; there was no SDK-level retry safety net for them
+    // to begin with. The candidate's own retry (typing again; the
+    // `retryable: true` flag on the resulting data-error) is the actual
+    // recovery path, same as it already is for every other error code.
+    maxRetries: 0,
   });
 
+  // Fix round 2, item 7: a refused first call (e.g. `recordedSteps.length
+  // === 0`, § 8's own 402/503 refusals) makes streamText's OWN internal
+  // deferred promises (finishReason/rawFinishReason/totalUsage/steps/
+  // initialResponseMessages — see @ai-sdk/provider-utils' own
+  // rejectResultPromises) reject with a NoOutputGeneratedError. This
+  // package never reads any of `result`'s promise-shaped getters (only
+  // `result.fullStream`, consumed below) — so nothing else ever attaches
+  // a `.catch` to them, and Node/the browser can report an unhandled
+  // rejection for a promise this code technically "caused" but never
+  // otherwise touches. Reading + settling them here (never throwing,
+  // never awaited by anything that matters) gives every one of them a
+  // handler, independent of whether this turn actually finishes.
+  void Promise.allSettled([result.steps, result.totalUsage, result.finishReason]);
+
   const tapped = tapErrorParts(result.fullStream, (error) => {
-    const code = classifyError(error);
+    const { code, serverMessage } = classifyError(error);
     const { message, retryable } = ERROR_MESSAGES[code];
-    writer.write({ type: "data-error", data: { code, message, retryable } });
+    writer.write({ type: "data-error", data: { code, message: serverMessage ?? message, retryable } });
   });
 
   await writer.merge(toUIMessageStream({ stream: tapped, tools }) as any);

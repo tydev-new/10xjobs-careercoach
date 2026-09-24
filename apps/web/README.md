@@ -1,12 +1,24 @@
-# apps/web — mock preview UI
+# apps/web — the web app
 
-**This is a mock preview, not wired to any model.** It replays the fixture
-conversations in `fixtures/*.json` through a `MockChatTransport` (the AI
-SDK's own `ChatTransport` interface) so the owner can see the layout, the
-avatar states, the cards, and the gate protocol before any real agent is
-wired in (`docs/plan-portable-skills-and-web-agent.md` step 5a). No network
-call is made, no API key is read, and no real candidate data is used —
-every fixture is an invented persona.
+Two builds from one codebase, switched by ONE line in `src/main.tsx`
+(`SHOW_MOCK_CONTROLS`, plan step 5b's "one-line swap"):
+
+- **`npm run dev` / `npm run build:preview`** — the **mock preview**,
+  unchanged from step 5a: it replays the fixture conversations in
+  `fixtures/*.json` through `MockChatTransport` (the AI SDK's own
+  `ChatTransport` interface) so the owner can see the layout, the avatar
+  states, the cards, and the gate protocol with no network call, no API
+  key, and no real candidate data — every fixture is an invented persona.
+- **`npm run build`** (the default, production build) — the **real app**
+  (step 5b): sign-in → one membership check → the chat, running
+  `packages/agent`'s `createCoach(deps)` **in the browser tab**, through
+  the `ten-model-proxy` Edge Function (never a model key in the bundle) and
+  `SupabaseWorkspaceStore`. See "The real backend (step 5b)" below.
+
+Both builds share every UI component (Header, Transcript, Composer,
+SidePanel, Cards, GateCard, ErrorPart) unchanged — the diff really is the
+transport, the store, and the balance/error wiring, per the step 5b exit
+criterion.
 
 ## Run it
 
@@ -191,3 +203,147 @@ it separately, as above, against a built preview server).
   (per the wireframe) but inert — the design doc marks the skill picker
   optional ("plain language always works", rule 18), and there's no real
   upload target in a mock preview.
+
+## The real backend (step 5b)
+
+`src/backend/` — pieces built against real Supabase/OpenRouter wire
+shapes, each with its own `node --test` unit tests (no live network, no
+real key):
+
+- `model.ts` — `createCoachModel({ proxyUrl, getAccessToken })`: the
+  `@openrouter/ai-sdk-provider` (pinned as in `spikes/1-browser-loop`)
+  pointed at `ten-model-proxy` instead of `openrouter.ai`; a custom
+  `authedFetch` sets `Authorization: Bearer <current Supabase JWT>` fresh
+  on every call (never a cached/baked-in key).
+- `gate.ts` — `createSupabaseGate(...)`: the `Gate` interface
+  (`docs/design-web-agent.md` § 3) over `ten_gate_open`/`ten_gate_decide`/
+  `ten_gate_expire_other_chats`, plus a plain `select` for `pending()`
+  (RLS: own rows readable — there's no dedicated read RPC).
+- `balance.ts` — `createBalanceFn(...)`: `deps.balance()` via the
+  `ten_balance()` RPC.
+- `script-runner.ts` — `createRealScriptRunner()`: the real `ScriptRunner`
+  the `bash` tool calls, backed by `just-bash` + `packages/checkers`'
+  file-name `python3` dispatch (`packages/checkers/src/just-bash-command.mjs`).
+  Its own tests run the REAL ported checkers (`check_materials.py`,
+  `record_verdict.py`, …), not canned output.
+- `web-search.ts` — `createWebSearch(...)`: `deps.webSearch`, one raw
+  `ten-model-proxy` call with `plugins: [{ id: "web" }]`, parsing the
+  forced-`stream: true` SSE response for `url_citation` annotations.
+  **UNVERIFIED** (design-web-agent.md § 4's own flag) how the provider
+  actually shapes them — this parser degrades to an empty result list
+  (never throws) on an unrecognized shape; needs a live-key re-check once
+  the proxy spike (§ Step-1 spikes, item 4) has a real budget.
+- `skills-bundle.ts` / `skills-bundle-normalize.ts` — the build-time
+  `SkillBundle`, via Vite's `import.meta.glob("../../../../skills/**/*",
+  { query: "?raw", eager: true })`. Split in two because
+  `import.meta.glob` is Vite-only syntax `node --test` can't even import;
+  `skills-bundle-normalize.ts` (the key-shape logic) IS unit-tested there,
+  and the glob's own file-discovery is verified by a real `npm run build`
+  + grepping the emitted bundle (see "Verifying the production build"
+  below), not by a `node --test` unit test.
+- `upload-errors.ts` — the composer's attach flow: `documents/<name>`,
+  then `-2`/`-3` on a clash (retried only for an actual `already_exists`),
+  and a plain-language message for every `WorkspaceError` code plus a
+  best-effort classification of `SupabaseWorkspaceStore`'s own
+  undocumented generic Storage refusals (403/413/400) — see that file's
+  header for exactly which half of "the known gap" (case clash, the
+  50-object cap, non-member) is closed here vs. still open at the store
+  layer.
+- `env.ts` — `readEnv()`/`hasTenEnv()`: `VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_ANON_KEY` required; `VITE_MODEL_PROXY_URL` optional,
+  defaulting to `<VITE_SUPABASE_URL>/functions/v1/ten-model-proxy`.
+  Throws `MissingEnvError` (never silently guesses); `src/main.tsx`
+  catches it and shows a plain config-error screen instead of a blank one.
+- `delete-account.ts` — calls the `ten-delete-account` Edge Function and
+  returns its summary.
+- `auth.ts`, `supabase-workspace-store.ts`, `workspace-export.ts` — from
+  step 2 (SupabaseWorkspaceStore, export/import, auth); not owned by this
+  slice, used as-is. `auth-client-adapter.ts` (this slice) adapts a real
+  `SupabaseClient` to `auth.ts`'s own `AuthClientLike` — `rpc()` on a real
+  client returns a thenable `PostgrestFilterBuilder`, not a structural
+  `Promise`, which fails `AuthClientLike`'s type; the adapter `await`s it
+  once, no behavior change, no edit to `auth.ts` itself.
+
+`src/real-transport.ts` — `AgentChatTransport`: wraps `Coach.stream()` as
+`ai@7`'s own `ChatTransport` interface. This really is the whole diff from
+`mock-transport.ts`'s shape — `Coach.stream({ chatId, messages,
+abortSignal })` already returns the exact `ReadableStream<UIMessageChunk>`
+`sendMessages` must resolve.
+
+`src/real/` — the real screens (`docs/design-web-ui.md` §§ 1.4-1.7):
+
+- `SignIn.tsx` — magic link or email+password, `redirectTo = VITE_SITE_URL`.
+- `NotAMember.tsx` — the exact § 1.6 copy, sign-out only.
+- `RealApp.tsx` — the state machine: loading → signed-in? → one
+  membership check → not-a-member OR (create the root `CLAUDE.md` from the
+  bundled Tier 0 once, build `Deps`, `createCoach`) → the chat.
+- `RealChatShell.tsx` — the real chat screen: `AgentChatTransport`,
+  `SupabaseWorkspaceStore`, `deps.balance()` for the chip, the ⋯ menu's
+  export/import/delete/sign out, the composer's attach → upload wiring.
+  Deliberately its OWN file, not a refactor of `ChatShell.tsx` (kept
+  unchanged, per the instruction that the mock preview must stay as-is) —
+  they share every child component (Header, Transcript, Composer,
+  SidePanel), so there's no screen rework, only duplicated hook-wiring
+  glue.
+- `DeleteBetaDataConfirm.tsx` — § 1.7's four-step confirmation (the
+  complete thing, the one sentence word for word, a typed `yes` matched
+  the same way `matchGateReply` matches a spend gate's reply, the
+  report-back). Its own component, not a reuse of `GateCard` (§ 1.7 marks
+  that choice "open for the architect"; C § 3's `GateRequest.kind` is
+  `"spend"` only, and this confirmation carries no `gateId` and never
+  touches `ten_gate_log`).
+- `deps.ts` — `buildRealDeps()`: wires every piece above into one `Deps`
+  object. `checkLanguage` is left **unset** on purpose — the tool's own
+  default (`packages/agent/src/tools/index.ts`) already does "a
+  fresh-context call using `deps.model`" (which already routes through
+  the proxy), matching § 4's "check_language ... through the same model"
+  with no separate wiring needed.
+
+### Env vars (production build only; the mock preview needs none)
+
+| var | required | default |
+|---|---|---|
+| `VITE_SUPABASE_URL` | yes | — |
+| `VITE_SUPABASE_ANON_KEY` | yes (the publishable/anon key, not service-role) | — |
+| `VITE_SITE_URL` | yes (read by `auth.ts`'s `siteRedirectUrl()`) | — |
+| `VITE_MODEL_PROXY_URL` | no | `<VITE_SUPABASE_URL>/functions/v1/ten-model-proxy` |
+| `VITE_SHOW_MOCK_CONTROLS` | no (Vercel Preview environment only) | unset (production) |
+
+Nothing here is secret — the anon key is meant to ship in the client
+bundle (RLS is the actual boundary); no OpenRouter key, no Supabase
+service-role key ever reaches this package.
+
+### Verifying the production build
+
+```sh
+npm run build          # the real app; the DEFAULT build
+grep -o "Preview: fixture" dist/assets/*.js   # -> nothing (mock UI tree-shaken out)
+grep -oE '"Autoplay"' dist/assets/*.js         # -> nothing
+grep -c "record_verdict\|check_materials" dist/assets/*.js  # -> >0 (the skills glob worked)
+grep -riE "sk-or-|service_role" dist/assets/*.js             # -> nothing (no secret baked in)
+
+npm run build:preview  # the mock; VITE_SHOW_MOCK_CONTROLS=1
+grep -o "Preview: fixture" dist/assets/*.js   # -> present
+```
+
+### Known gaps / open questions for the lead (step 5b)
+
+- **No Playwright e2e against a local stub proxy + stub/PGlite Supabase**
+  (the plan's step 5b test item) — not built this pass; see the coder's
+  hand-back for why and a suggested shape.
+- **`packages/agent/src/coach.ts`** — two small, flagged, tested fixes
+  outside this slice's own directory: (1) `data-error.message` now passes
+  through the proxy's own `{ error: { code, message } }` text when
+  present (design-web-ui.md § 2.7), falling back to the old generic
+  sentence otherwise; (2) `ReadableStream.from(...)` (missing from the
+  installed TypeScript's DOM lib entirely) replaced with a manual
+  pull-based `ReadableStream`, same behavior, no `.from()` dependency.
+  Both have their own tests in `packages/agent/test/`.
+- **`tests/store/*.test.ts`** (the tester's own step 2 suite, not part of
+  this slice, "still being updated" per the lead) has 3 pre-existing
+  failures once its own `node_modules` are installed (they were SKIPPED
+  before, for lack of `node_modules`, not green) — none caused by this
+  slice's changes: an NFD-normalization import case, a PGlite stand-in
+  that doesn't support keyset pagination's `gt.` operator, and a case
+  explicitly self-labeled `(known step 5b gap)` in its own test name —
+  see the coder's hand-back.

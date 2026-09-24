@@ -267,6 +267,5 @@ else:
     else:
         passed += 1
 
-
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

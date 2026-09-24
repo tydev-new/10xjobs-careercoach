@@ -680,3 +680,139 @@ button {
     width: 100%;
   }
 }
+
+/* ---- Real-mode screens (plan step 5b) ---- */
+
+.sign-in-screen,
+.not-a-member-screen,
+.app-shell--loading,
+.app-shell--config-error {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 24px;
+}
+
+.sign-in-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sign-in-logo {
+  margin: 0;
+  font-size: 1.8em;
+}
+
+.sign-in-tagline {
+  margin: 0 0 8px;
+  color: var(--fg-muted);
+}
+
+.sign-in-mode-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.sign-in-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sign-in-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9em;
+}
+
+.sign-in-form input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+  color: var(--fg);
+}
+
+.sign-in-error,
+.delete-confirm-error,
+.composer-attach-error,
+.import-error {
+  color: var(--red);
+  font-size: 0.9em;
+  margin: 0;
+}
+
+.sign-in-sent {
+  color: var(--fg-muted);
+}
+
+.sign-in-link-button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  font-size: 0.85em;
+}
+
+.sign-in-local {
+  margin-top: 8px;
+  font-size: 0.85em;
+  color: var(--fg-muted);
+}
+
+.not-a-member-message {
+  max-width: 420px;
+  text-align: center;
+}
+
+.menu-item-danger {
+  color: var(--red);
+}
+
+.delete-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.delete-confirm-card {
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: var(--radius);
+  padding: 20px;
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.delete-confirm-scope {
+  font-weight: 600;
+}
+
+.delete-confirm-sentence {
+  color: var(--fg-muted);
+}
+
+.delete-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.composer-attach-input {
+  display: none;
+}

@@ -5,6 +5,23 @@ interface ImportMetaEnv {
    *  Auth's Redirect URLs allowlist by the owner, out of band). Unset in
    *  dev/preview builds. */
   readonly VITE_SITE_URL?: string;
+  /** Step 5b, item 5 — the production env vars. Nothing here is secret:
+   *  the anon/publishable key is meant to ship in the client bundle (RLS
+   *  is the actual boundary). See src/backend/env.ts. */
+  readonly VITE_SUPABASE_URL?: string;
+  readonly VITE_SUPABASE_ANON_KEY?: string;
+  /** Optional — defaults to `<VITE_SUPABASE_URL>/functions/v1/ten-model-proxy`. */
+  readonly VITE_MODEL_PROXY_URL?: string;
+  /** Dev/preview-only (README.md, src/components/Header.tsx's
+   *  SHOW_MOCK_CONTROLS): "1" shows the fixture picker/Autoplay and keeps
+   *  the app on the MOCK transport even in a built bundle. Absent (the
+   *  default `npm run build`) is the real, production build. */
+  readonly VITE_SHOW_MOCK_CONTROLS?: string;
+  /** Fix round 1, item 8: "1" runs the REAL app under `npm run dev`
+   *  (otherwise impossible — DEV alone always forces the mock) — the only
+   *  way to exercise the proxy's `http://localhost:5173` CORS entry
+   *  against a real dev server. Requires the real env vars too. */
+  readonly VITE_REAL?: string;
 }
 
 interface ImportMeta {

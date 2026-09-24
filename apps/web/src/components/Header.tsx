@@ -16,6 +16,16 @@ export interface HeaderProps {
   onAutoplayToggle: () => void;
   theme: "light" | "dark";
   onThemeToggle: () => void;
+  /** Real-mode-only menu actions (design-web-ui.md § 1.1's ⋯ menu). Each
+   *  item stays `disabled` (the mock preview's existing behavior,
+   *  UNCHANGED) when its handler is omitted — App.tsx (the mock) never
+   *  passes these; only src/real/RealChatShell.tsx does. */
+  onExportWorkspace?: () => void;
+  onImportWorkspace?: () => void;
+  /** design-web-ui.md § 1.7 — opens the same four-step typed-yes
+   *  confirmation as a spend gate, never a click-to-confirm. */
+  onDeleteBetaData?: () => void;
+  onSignOut?: () => void;
 }
 
 const STATE_LABEL: Record<Status["state"], string> = {
@@ -30,11 +40,22 @@ const STATE_LABEL: Record<Status["state"], string> = {
 // real deployed build must not ship a way to switch fixtures or auto-type
 // a candidate's replies. `import.meta.env.DEV` covers `npm run dev`;
 // `VITE_SHOW_MOCK_CONTROLS` is the explicit preview flag for a *built*
-// bundle that still wants them (this whole app is a preview tool, so the
-// default build sets it — see apps/web/.env and the README for how to
-// build without it, which is what proves they're absent from dist/).
+// bundle that still wants them — set by `npm run build:preview`'s own
+// script (package.json: `VITE_SHOW_MOCK_CONTROLS=1 npm run build`), not
+// a committed `.env` (there is none — see the README for how the default
+// `npm run build` omits the flag, which is what proves they're absent
+// from dist/).
+//
+// Fix round 1, item 8: `VITE_REAL=1` is a dev-only escape hatch — set it
+// (alongside VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY/VITE_SITE_URL) to
+// run the REAL app under `npm run dev`, which was otherwise impossible
+// (`import.meta.env.DEV` alone always forced the mock). This is the only
+// way to exercise `ten-model-proxy`'s CORS allowlist for
+// `http://localhost:5173` (design-web-agent.md § 8) against a real dev
+// server instead of only the production build.
 export const SHOW_MOCK_CONTROLS =
-  import.meta.env.DEV || import.meta.env.VITE_SHOW_MOCK_CONTROLS === "1";
+  import.meta.env.VITE_REAL !== "1" &&
+  (import.meta.env.DEV || import.meta.env.VITE_SHOW_MOCK_CONTROLS === "1");
 
 export function Header(props: HeaderProps): ReactElement {
   const {
@@ -47,6 +68,10 @@ export function Header(props: HeaderProps): ReactElement {
     onAutoplayToggle,
     theme,
     onThemeToggle,
+    onExportWorkspace,
+    onImportWorkspace,
+    onDeleteBetaData,
+    onSignOut,
   } = props;
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -101,15 +126,31 @@ export function Header(props: HeaderProps): ReactElement {
           </button>
           {menuOpen ? (
             <div className="menu-panel" role="menu">
-              <button type="button" role="menuitem" disabled>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!onExportWorkspace}
+                onClick={() => {
+                  onExportWorkspace?.();
+                  setMenuOpen(false);
+                }}
+              >
                 Export workspace
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!onImportWorkspace}
+                onClick={() => {
+                  onImportWorkspace?.();
+                  setMenuOpen(false);
+                }}
+              >
+                Import workspace
               </button>
               {/* No per-candidate key to manage: one shared app key sits
                   behind the model proxy (design-web-agent.md § 8), so
-                  "Manage your usage key" is gone (design-web-ui.md § 1.1).
-                  "Delete my beta data" (design-web-ui.md § 1.7) is its own
-                  confirmation flow, out of scope for this pass — disabled
-                  here rather than added half-built. */}
+                  "Manage your usage key" is gone (design-web-ui.md § 1.1). */}
               <button
                 type="button"
                 role="menuitem"
@@ -120,7 +161,29 @@ export function Header(props: HeaderProps): ReactElement {
               >
                 {theme === "light" ? "Switch to dark" : "Switch to light"}
               </button>
-              <button type="button" role="menuitem" disabled>
+              {/* design-web-ui.md § 1.7: opens its own typed-yes
+                  confirmation flow — never fires anything itself. */}
+              <button
+                type="button"
+                role="menuitem"
+                className="menu-item-danger"
+                disabled={!onDeleteBetaData}
+                onClick={() => {
+                  onDeleteBetaData?.();
+                  setMenuOpen(false);
+                }}
+              >
+                Delete my beta data
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!onSignOut}
+                onClick={() => {
+                  onSignOut?.();
+                  setMenuOpen(false);
+                }}
+              >
                 Sign out
               </button>
             </div>

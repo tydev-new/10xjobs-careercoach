@@ -630,6 +630,26 @@ dt("CORS: an allowed origin gets the allow header on the real call and preflight
   }
 });
 
+dt("CORS: the preflight's Allow-Headers lists every header the real AI SDK/OpenRouter provider call sends (fix round 1, item 2)", async () => {
+  const h = await harness();
+  try {
+    const preflight = await handleRequest(req(undefined, { method: "OPTIONS", origin: PROD_ORIGIN }), h.deps, BASE_ENV);
+    const allow = (preflight.headers.get("access-control-allow-headers") ?? "").toLowerCase();
+    // Empirically confirmed (apps/web fix-round hand-back): a real
+    // streamText() call through createCoachModel sends EXACTLY
+    // authorization, content-type, user-agent — no x-stainless-* or any
+    // other custom header. `user-agent` is the one Chrome tolerates
+    // missing from Allow-Headers but Firefox/WebKit do not (a real
+    // browser-engine difference, not a flake) — this is the blocker the
+    // tester's e2e caught.
+    for (const needed of ["authorization", "content-type", "user-agent"]) {
+      assert(allow.includes(needed), `Allow-Headers missing "${needed}": ${allow}`);
+    }
+  } finally {
+    await h.stop();
+  }
+});
+
 dt("CORS: an unlisted origin's preflight gets no allow header", async () => {
   const h = await harness();
   try {

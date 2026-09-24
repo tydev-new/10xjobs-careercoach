@@ -4,7 +4,9 @@
 **Date:** 2026-09-22 · **Owner:** Yong · **Author:** architect
 **Amended:** 2026-09-24, § 9 (cut-off replies; owner-approved) and § 10
 (new-version notice; owner-approved). Where § 9 and an earlier section
-disagree, § 9 wins.
+disagree, § 9 wins. Again 2026-09-24: § 11 (the conversation is kept;
+owner requirement) and § 12 (a turn that grows too large). Each wins over
+earlier text it names.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -366,7 +368,7 @@ into `tests/run.py`, plus the coverage check.
 | card | `data-card` | `{ card: "verdict" \| "plan" \| "document" \| "checker" \| "cost", props, ref? }`, from code only (§ 6.2) |
 | gate | `data-gate` | `GateRequest` (§ 3) |
 | gate status | `data-gate-status` | `{ gateId, status }`; the latest one wins |
-| error | `data-error` | `{ code: "over_balance" \| "model_error" \| "tool_error" \| "offline" \| "step_cap" \| "cut_off", message, retryable }` (`cut_off`: § 9.3, amended 2026-09-24) |
+| error | `data-error` | `{ code: "over_balance" \| "model_error" \| "tool_error" \| "offline" \| "step_cap" \| "cut_off" \| "too_large", message, retryable }` (`cut_off`: § 9.3; `too_large`: § 12.2; both amended 2026-09-24) |
 
 - `data-error.message` is the proxy's or tool's own sentence for the cause
   (§ 8) when one exists, else a fixed fallback per `code`. What was finished is
@@ -476,7 +478,10 @@ cannot produce `data-card`/`data-gate`/`data-gate-status`; `parsePlanTodo` and
 **Window:** the package re-sends at most `windowWords` (4,000) of history,
 dropping whole older turns first and always keeping the latest user message.
 A `SKILL.md` that falls out is loaded again when needed; gate state lives in
-`ten_gate_log`. A reload starts a new chat.
+`ten_gate_log`. A reload restores the saved conversation, and the window
+applies to it the same way (§ 11, amended 2026-09-24; this used to say "A
+reload starts a new chat"). The window trims earlier turns only; § 12
+bounds the current one.
 
 **Prevents:** loading more than local does (rule 15); unbounded cost per turn
 (rule 5); a transcript the export leaves out (rule 9); **persistent prompt
@@ -602,8 +607,8 @@ person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
   signed-in user (not membership; anon/publishable key → 401), acts only on
   that user, and is idempotent. It removes `users/{uid}/` objects through the
   **Storage API** (listed and removed page by page; SQL deletes are refused
-  and would orphan the files), then the `ten_ws_files`, `ten_gate_log` and
-  `credit` ledger rows. It keeps the shared sign-in and the `call` ledger rows:
+  and would orphan the files), then the `ten_ws_files`, `ten_conversations`
+  (§ 11.7), `ten_gate_log` and `credit` ledger rows. It keeps the shared sign-in and the `call` ledger rows:
   cost records (tokens and USD, no career content), so the daily ceiling and
   the cost history stay intact. Rule 9 holds: career data is gone; cost
   metadata is not career data. The UI says: "This deletes your Ten beta data.
@@ -843,6 +848,8 @@ the turn's system prompt:
 > tell the candidate plainly where it stopped, then carry on from there,
 > unless they asked for something else. If the files don't show what that
 > turn was working on, ask the candidate in one line.
+
+**`too_large`** comes third; its note is in § 12.2 (amended 2026-09-24).
 
 - **No stored flag (rule 12).** Data parts stay in the history: none is
   transient, and the real transport sends every message. They never reach
@@ -1131,8 +1138,8 @@ disabled as while a turn is submitted.
 
 **Why block, not warn:** a warning still lets replaced code spend the
 candidate's money, as in the receipt (rule 5). A reload takes seconds and
-loses only the chat on screen, which is already disposable (§ 7). A
-failed check never blocks. **Known limit:** tabs opened before the first
+loses only unsent text and any turn not yet saved (§ 11; before § 11, the
+whole chat on screen). A failed check never blocks. **Known limit:** tabs opened before the first
 build with this check can't be reached.
 
 ### 10.4 Test plan
@@ -1168,6 +1175,286 @@ static root (the new refusal settles it on the first deploy).
 
 ---
 
+## 11. Keeping the conversation (amendment, 2026-09-24)
+
+Owner requirement (2026-09-24): the conversation survives reloads and
+sign-ins. This replaces § 7's "a reload starts a new chat" and the
+decision-log line "No saved chat". Candidate-facing copy: `design-web-ui.md`
+§ 1.7–1.9.
+
+**Prevents:** losing the conversation to a reload, a deploy notice or
+another device; a second conversation (rule 12); a saved copy of a file
+drifting from the file (rules 11, 12); a conversation the export or the
+delete leaves out (rule 9).
+
+### 11.1 One conversation per user
+
+One continuing conversation, restored on load; no list, no "start fresh"
+yet (it needs an archive and a viewer: owner question). Why: rule 12 and
+the cross-host contract's "one persistent canonical chat"
+(`design-cross-host-active-context.md`). The window (§ 7) keeps a long
+conversation's cost per turn flat. The key is the user, so the database
+enforces one.
+
+### 11.2 Storage: `ten_conversations`
+
+A **new** migration, `supabase/migrations/20260924100000_ten_conversations.sql`
+(3 s lock timeout; applied files are never edited).
+
+| column | rule |
+|---|---|
+| `user_id` | uuid, primary key, `references auth.users on delete cascade` |
+| `chat_id` | text ≤ 100; set when the row is created, never changed |
+| `messages` | jsonb array; `octet_length(messages::text)` ≤ 1,048,576 |
+| `older_dropped` | boolean, default false (§ 11.4) |
+| `version` | sha256 prefix of `messages::text`, computed in SQL (as `ten_ws_write`) |
+| `updated_at` | timestamptz, `now()` |
+
+- RLS on. Members select their own row only (`user_id = auth.uid()` and
+  `ten_is_member()`), like `ten_ws_files`. No insert, update or delete
+  grant.
+- Every write goes through `ten_conversation_save(chat_id, messages,
+  older_dropped, expected)`: security definer, `auth.uid()`'s row only,
+  members only (PT401/PT403). `expected` null inserts (`on conflict do
+  nothing`); otherwise it updates `where version = expected and chat_id =
+  chat_id`. No row changed is PT409 `version_conflict`; not an array is
+  PT400 `invalid_ref`; over the cap is PT413 `conversation_too_large`. It
+  returns the new version.
+- **Why a table, not a workspace file:** no agent tool reaches it (a job
+  post can't get its own history rewritten, the § 7 injection), and chat
+  stays out of the records folder (PROCESS: files are records, chat is the
+  interface).
+
+### 11.3 What is saved
+
+`conversationToSave(messages)`, a pure function in `packages/agent`:
+
+1. **Kept word for word:** text parts (both sides), `step-start`, every
+   `data-*` part (cards, gates, statuses, errors; § 9.4 and `statusOf` read
+   them), `metadata`, and `file` parts whose `url` starts `workspace:` (a
+   path, no bytes).
+2. **Dropped:** `reasoning` parts and every other `file` part.
+3. **Tool parts:** every string over 2,000 characters in `input`,
+   `output` or `errorText` becomes **the stub** (shared with § 12), with N
+   the removed length:
+
+   > [Removed to save space: N characters. The workspace files hold what
+   > was saved; read a file again if you need it.]
+
+   A tool part in any state but `output-available`/`output-error` is saved
+   as `output-error`, `errorText` "Stopped before a result came back.
+   Check the files for what was saved."
+
+**Why the stub:** a long tool string is mostly a copy of a file at one
+moment (`read_file`, `fetch_job`, a write's content). Restored days later
+it disagrees with the file, and the model may believe it (rules 11, 12).
+After a reload, the "ran …" line (UI § 3) shows the stub, which says what
+was removed.
+
+### 11.4 When, and how big
+
+- **Once per ended turn,** in `useChat`'s `onFinish`, however it ended
+  (`ai@7.0.111` passes the full `messages` and `isAbort`/`isDisconnect`/
+  `isError`). One write of the whole array. **Known limit:** a tab closed
+  mid-turn loses that turn from the conversation, not from the files.
+- **Cap:** the client keeps the sanitized array ≤ 900,000 bytes (UTF-8 of
+  `JSON.stringify`, leaving room for jsonb's own spacing under the 1 MB
+  check), dropping the oldest whole turns and setting `older_dropped`
+  (UI § 1.9's line shows). Outcomes are files, so none is lost. At ~5–20 KB
+  a turn (**UNVERIFIED**; (iv) measures), that is 45–180 turns.
+- **A failed save** shows UI § 1.9's line; the next save carries the whole
+  array.
+
+### 11.5 Two tabs or devices
+
+- Each tab remembers the version it loaded or last saved. **Before every
+  send**, beside § 10.3's check and under its rules (2 s; a failed check
+  never blocks), it reads the row's `version`. If it differs: not sent,
+  no model call, text back in the composer, UI § 1.9's "not sent" line.
+- The save's compare-and-swap is the backstop. On `version_conflict` the
+  tab never overwrites or merges (no tab saw a merged history); it shows
+  UI § 1.9's line, and the check blocks its later sends.
+
+### 11.6 Load, chat id, gates
+
+- **Setup** (before the chat mounts, like the membership check) reads the
+  row. None: a new `chat-<uuid>`, and the first save creates the row.
+  Found: its `chat_id`, and its messages checked with `validateUIMessages`
+  (exported by `ai@7.0.111`), then `useChat({ id, messages })`. A failed
+  read or check goes to the setup error screen (UI § 1.9). Never mount
+  empty over a saved conversation.
+- **A pending gate survives.** The chat id is stable, so
+  `gate.pending(chatId)` finds it and the first turn's
+  `expireOtherChats(chatId)` spares it (§ 3); a typed exact `yes` approves
+  it as before.
+- **The row owns gate status** (§ 3, rule 12), and a turn can run without
+  being saved (a closed tab). So before mounting, for each gate whose
+  latest restored status is `pending`, the app reads its own
+  `ten_gate_log` row and appends the row's status as a `data-gate-status`
+  part. A pending gate whose card is not in the restored messages (the cap
+  dropped it) is expired first: no yes without the complete thing on
+  screen (rule 7).
+- The coach's per-chat memory starts empty after a load; each part
+  already falls back safely (`read_first`, the `not-run` badge, the dated
+  cost constant). The model gets the window of the restored history, and
+  § 9.4 reads its `data-error` parts.
+
+### 11.7 Export, delete, logs
+
+- **Export** adds `.ten/conversation.json` (the saved array) when a row
+  exists; local `check_files` skips dot entries and no skill reads it.
+  **Import** skips `.ten/` entries instead of refusing; an import starts a
+  new conversation. With no row the export is unchanged (step 2's round
+  trip holds).
+- **Delete:** `ten-delete-account` deletes the caller's row (§ 8); UI § 1.7
+  names "your conversation". The `auth.users` cascade covers an old-app
+  account delete.
+- **Logs** never hold conversation content: save and load failures log
+  `{ event, code, bytes }` only, and no logger or console call gets a
+  message, a part, or an `APICallError` (its `requestBodyValues` is the
+  whole request). Postgres logs RPC parameters on error only if
+  `log_parameter_max_length_on_error` is set (default 0; **UNVERIFIED** on
+  this project), the same exposure `ten_ws_write` has today.
+
+### 11.8 Deploy order
+
+The owner applies: migration → `NOTIFY pgrst, 'reload schema';` →
+`ten-delete-account` → site (the delete must cover conversations before
+any site writes one, rule 9). The teardown drops
+`ten_conversation_save(text, jsonb, boolean, text)` and
+`ten_conversations` before the functions their policy calls; its header
+names all three files; the SQL harness applies them in order. **UI § 1.8's
+new copy ships in the same site release as the save**, never apart.
+
+### 11.9 Test plan
+
+Written from this section; fixture personas and fresh workspaces only.
+
+- **(i) RLS**, members A and B: B reads nothing of A's and B's save never
+  changes A's row; anon and a non-member read nothing, save PT401/PT403;
+  `authenticated` can't insert, update or delete directly.
+- **(ii) Save:** null `expected` twice, or a stale one: PT409; a non-array
+  PT400; 1 MB + 1 byte PT413; `version` = SQL's sha256 prefix.
+- **(iii) Sanitize table:** a 10,000-character output → the stub, N = 10000;
+  2,000 stays; text and `data-*` identical; `reasoning` and a `data:` file
+  part dropped; `input-available` → the fixed `output-error`.
+- **(iv) Restore** (browser e2e): two turns, reload: same sanitized
+  messages and chat id, avatar `done`, next request = the window of them.
+  Record bytes per turn.
+- **(v)** A `step_cap` or `cut_off` turn, reload: the next turn has its note.
+- **(vi) Pending gate:** reload: card and `needs-you`; typed `yes`
+  approves (allowance = amount), `ui` yes doesn't. Row approved, saved
+  status pending: shows approved. Card dropped by the cap: row expired.
+- **(vii) Cap:** over 900,000 bytes drops oldest turns only, sets
+  `older_dropped`, shows the line.
+- **(viii) Two tabs:** a stale tab's send: not sent, no proxy request,
+  text kept. Simultaneous saves: one wins, the other shows its line. A
+  failed check sends.
+- **(ix)** Delete (twice) leaves no row; teardown leaves no `ten_` object.
+- **(x) Export/import:** `.ten/conversation.json` parses; importing it
+  succeeds without it; the fixture round trip is byte-identical.
+- **(xi) Logs:** a sentinel string in a message reaches no logger or
+  console call (failed save, failed load, 413, turn error).
+- **(xii) Copy:** UI § 1.8–1.9 word for word, by saved state.
+
+---
+
+## 12. A turn that grows too large (amendment, 2026-09-24)
+
+**Receipt (live beta, 2026-09-24; numbers only).** An evaluate over three
+roles. **Worked (positive receipt for § 9):** every verdict was saved; the
+continuation fired once after an 8,192-token cut-off, and the model then
+wrote one file per reply, as § 9.2's note asks. **Failed:** after the turn
+reached ~69,800 input tokens, the proxy refused the final request, 413
+"Request too large." (over 256 KB, § 8). The candidate saw a generic
+`model_error` (`packages/agent/src/coach.ts:240-243`) plus "This can be
+retried." (`apps/web/src/components/ErrorPart.tsx:56`), with nothing about
+what was saved. The window (§ 7) trims only earlier turns, so one turn
+grows without bound (~10,000-character reads, web results, big writes),
+here past the 64k input tokens § 8's ceiling assumes.
+
+**Prevents:** a turn refused for size after its steps were paid for; a
+request past the ceiling's 64k-token assumption; an error that promises a
+retry that can't help.
+
+### 12.1 Trimming inside the turn (`packages/agent`)
+
+The proxy's 256 KB cap and the cost ceiling stay. Every `streamText` call
+(the first and § 9.2's continuation) gets a `prepareStep`. In
+`ai@7.0.111` it receives the step's `messages`, and a returned `messages`
+carries forward to later steps (read in the installed `index.d.ts`).
+
+- **Measure:** UTF-8 bytes of `JSON.stringify(messages)`. System prompt
+  and tools are fixed all turn (~30 KB), so this tracks the proxy's check.
+- **Budget:** over **160,000** bytes, trim down to **120,000**. With the
+  fixed ~30 KB and the provider's escaping, that stays well under 256 KB;
+  at 3–4 bytes per token it is ~48–63k tokens, inside the 64k.
+- **Why down to 120,000:** a change voids the prompt cache from that
+  point on, so trimming lower makes trims rare, not every step.
+- **What:** this turn's steps (its calls' response messages: an
+  assistant message plus its tool message), oldest first, except the
+  **last 2**, which the next step most likely needs. In a step, every
+  string over 2,000 characters in a tool call's input or a tool result's
+  output becomes § 11.3's stub. One step at a time, re-measuring after
+  each.
+- **Never touched:** the system prompt (byte-identical, § 9.2), every
+  user-role message (the candidate's, § 9.2's note), text the model wrote,
+  earlier turns (the window bounds them), the last 2 steps. If those alone
+  are over budget, the request goes as it is, and § 12.2 handles a refusal.
+- **Not taken:** the SDK's `pruneMessages` removes whole tool calls, so the
+  model loses the trace of what ran (rule 11). A larger proxy cap moves the
+  cost ceiling (rule 5).
+
+### 12.2 A refusal: `too_large`
+
+A new `data-error` code, `too_large`, for a proxy 413 (the status, or the
+body's `too_large` code) in either call. It is its own code because the
+remedy differs from `model_error`: the same request fails again, but a new
+turn starts small (the window drops the long turn).
+
+- Message, fixed: "This turn got too big to send, so it stopped partway."
+  `retryable: true`. UI § 2.7 adds the `nextStep` line.
+- No gate is touched; no continuation runs (§ 9.2 condition 5); `finish`
+  comes last.
+- § 9.4 gains a third note, after `step_cap`, word for word:
+
+  > Your previous turn in this chat stopped because its request grew too
+  > large to send. The actions it finished did run; nothing after the stop
+  > ran. Check the files for what was actually saved before redoing
+  > anything, tell the candidate plainly where it stopped, then carry on
+  > in smaller pieces, reading only what the next step needs, unless they
+  > asked for something else. If the files don't show what that turn was
+  > working on, ask the candidate in one line.
+
+- `apps/web/src/types.ts` adds the code; `ErrorPart` adds its line.
+
+### 12.3 Test plan
+
+- **(i) Trim:** a stubbed model, 12 steps each reading a 10,000-character
+  file. Every request's messages ≤ 160,000 bytes; stubs land oldest step
+  first; the last 2 steps, user messages and model text are byte-identical;
+  the system prompt is identical on every request; the stub word for word.
+- **(ii)** Under budget: no override. **(iii)** Between two trims, each
+  request's messages begin with the previous request's.
+- **(iv) Continuation:** a cut-off after a trim; call 2 also stays ≤ 160,000
+  and carries the note.
+- **(v) Refusal:** a stubbed fetch answers 413 with the proxy's body at
+  step 4: one `too_large`, fixed message, no `model_error`, no further
+  request, `finish` last, steps 1–3's files saved.
+- **(vi) Next turn:** the note word for word; order `cut_off`, `step_cap`,
+  `too_large`; still there when the window drops the long turn.
+- **(vii) UI:** the message and `nextStep` word for word.
+- **(viii) Live, once** (the owner approves the spend): the receipt's
+  three-role evaluate with a fixture persona. No 413; every ledger
+  `tokens_in` ≤ 64,000.
+
+**UNVERIFIED:** that the provider accepts a tool call whose input was
+shortened ((i) through the real `@openrouter/ai-sdk-provider`, then
+(viii)); the cache prices behind "down to 120,000" ((viii)'s
+`tokens_cached`).
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -1200,7 +1487,9 @@ spike replaced (owner, 2026-09-23).
 - Cards are code-built receipts of files (rule 11); the plan card shows lines
   word for word (rule 8).
 - Gate status lives in the row; UI status is derived (rule 12).
-- No saved chat: files are the memory, cost per turn is bounded.
+- ~~No saved chat: files are the memory, cost per turn is bounded.~~
+  Superseded 2026-09-24 by the owner's requirement (§ 11). Files stay the
+  memory: the saved chat keeps what ran, not copies of files.
 - Tier 0 from the bundle: a writable system prompt is a persistent injection.
 - `check_language` adopted (owner, 09-22): one fresh-context call per document
   set (~$0.015–$0.02, measured in step 4).
@@ -1232,3 +1521,11 @@ spike replaced (owner, 2026-09-23).
 - A deploy tells open tabs (owner, 09-24; § 10): one build id in the bundle
   and in `version.json`; a newer id blocks the next send, so no spend on
   replaced code; a failed check never blocks.
+- The conversation is kept (owner, 09-24; § 11): one row per user, so one
+  conversation (rule 12); tool data over 2,000 characters is not kept,
+  because a copy of a file drifts from the file (rules 11, 12); a table,
+  not a workspace file, so no agent tool can rewrite it; no "start fresh"
+  yet.
+- A long turn trims itself (§ 12): older tool data in the current turn
+  becomes a stub before a step would pass 160 KB; the proxy's 256 KB cap
+  and the cost ceiling stay. A refusal is its own code, `too_large`.

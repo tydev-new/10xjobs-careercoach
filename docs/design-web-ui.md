@@ -169,6 +169,39 @@ confirmation reuses the gate card's rendering (a `kind` value C § 3
 doesn't have yet) or is its own component that happens to follow the
 same four steps — either way, no button, ever.
 
+### 1.8 A newer version is live
+
+Mechanism: C § 10. On the member chat screen, one line above the
+composer. It blocks nothing, uses neutral styling (never error or alarm,
+rule 8), and can't be dismissed. It shows only when no turn is running:
+the agent runs in this tab, so a reload mid-turn would stop the run.
+
+**What a reload keeps and loses** (read in the code at `cbc9142`, 2026-09-24). Kept:
+workspace files (Supabase, C § 2), the balance (the ledger, C § 8), the
+sign-in (the Supabase session in the browser, `auth.ts`). Lost: the
+conversation on screen, which lives only in memory. `useChat` starts
+from `messages: []` (`apps/web/src/real/RealChatShell.tsx:61`), each load
+gets a fresh chat id (`apps/web/src/real/RealApp.tsx:63-65`), and nothing
+stores a chat (C § 7). A spend gate waiting for a yes goes with it (the
+new chat's first turn expires it, C § 3), and so does unsent composer
+text.
+
+**Copy, word for word** (what happened and what the candidate can do,
+never what the agent will do: the L2 rule, § 2.7):
+
+- Notice, with a `Reload` button: "Ten has been updated. Reload to use
+  the new version. Your files are saved; this conversation will clear
+  from the screen."
+- After a blocked send (C § 10.3): "Not sent: Ten has been updated since
+  this page opened. Copy your message if you want to keep it, then reload
+  and send it again. Your files are saved; this conversation will clear
+  from the screen."
+
+**The Reload button is allowed.** Rule 7 covers what is sent as the
+candidate, submitted for them, or costs money (plus § 1.7's delete). A
+reload does none of these; it does what the browser's reload does, and
+the notice names what it loses.
+
 ## 2. The card catalog
 
 Every card is a `data-card` part — `{ card: CardType, props, ref? }`

@@ -27,3 +27,9 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** design-web-agent.md § 10.1 — the one build id, inlined by vite.config.ts's
+ *  `define` from the SAME value its version.json plugin emits. Absent under
+ *  plain `node --test` (no Vite define pass), so browser-free modules that
+ *  read it (src/real/version-check.ts) guard with `typeof __TEN_VERSION__`. */
+declare const __TEN_VERSION__: string;

@@ -131,11 +131,15 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
-  const handleSignOut = useCallback(() => {
-    void signOut(authClient).then(() => {
-      checkedUserIdRef.current = undefined;
-      setScreen({ kind: "signed-out" });
-    });
+  // Returns a Promise (not fire-and-forget) so DeleteBetaDataConfirm can
+  // await the REAL sign-out before its own report-back claims "you're
+  // signed out" (fix round 1, item 8) — every other caller (Header's ⋯
+  // menu, NotAMember, the error screen) is a plain onClick and ignores
+  // the return value, which TS allows (Promise<void> satisfies () => void).
+  const handleSignOut = useCallback(async () => {
+    await signOut(authClient);
+    checkedUserIdRef.current = undefined;
+    setScreen({ kind: "signed-out" });
   }, [authClient]);
 
   if (screen.kind === "loading" || screen.kind === "checking-membership") {

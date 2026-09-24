@@ -16,9 +16,11 @@ export interface DeleteBetaDataConfirmProps {
   supabaseUrl: string;
   accessToken: () => Promise<string>;
   onClose: () => void;
-  /** Called once the delete succeeds and the report-back has been shown —
-   *  the caller (RealChatShell) signs out and returns to sign-in. */
-  onDeleted: () => void;
+  /** Called once ten-delete-account returns; performs the actual sign-out
+   *  and resolves once it completes. Fix round 1, item 8: the report-back
+   *  says "you're signed out" only once this has actually resolved, not
+   *  the moment the delete call itself returns. */
+  onDeleted: () => Promise<void>;
 }
 
 const COMPLETE_THING = "your workspace files, your gate log, and your credit";
@@ -27,7 +29,7 @@ const ONE_SENTENCE =
   "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. " +
   "Your usage records, which show only amounts spent and no content, are kept.";
 
-type Phase = "confirming" | "declined" | "deleting" | "error" | "done";
+type Phase = "confirming" | "declined" | "deleting" | "signing-out" | "error" | "done";
 
 export function DeleteBetaDataConfirm({
   supabaseUrl,
@@ -59,6 +61,10 @@ export function DeleteBetaDataConfirm({
     try {
       const result = await deleteBetaAccount({ url: supabaseUrl, accessToken });
       setSummary(result);
+      // Fix round 1, item 8: don't claim "you're signed out" until the
+      // sign-out itself has actually completed.
+      setPhase("signing-out");
+      await onDeleted();
       setPhase("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -83,9 +89,10 @@ export function DeleteBetaDataConfirm({
     return (
       <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
         <div className="delete-confirm-card">
-          {/* § 1.7 point 4: the report-back, once ten-delete-account returns. */}
+          {/* § 1.7 point 4: the report-back — shown only once the actual
+              sign-out (awaited above) has completed. */}
           <p>Deleted. You're signed out of Ten — your sign-in for the older app is untouched.</p>
-          <button type="button" onClick={onDeleted}>
+          <button type="button" onClick={onClose}>
             OK
           </button>
         </div>
@@ -104,20 +111,25 @@ export function DeleteBetaDataConfirm({
         {error ? <p className="delete-confirm-error">{error} Nothing more was deleted than the summary above — try again.</p> : null}
         <form onSubmit={submit}>
           <label>
-            Type <strong>yes</strong> to go ahead. There is no button.
+            {/* Fix round 1, item 8: this form DOES have a Submit button —
+                claiming "there is no button" next to one was self-
+                contradicting. The button only ever submits whatever was
+                actually TYPED (matchGateReply decides, same as a spend
+                gate); it never approves anything by itself. */}
+            Type <strong>yes</strong>, then press Enter or Submit.
             <input
               type="text"
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
-              disabled={phase === "deleting"}
+              disabled={phase === "deleting" || phase === "signing-out"}
               autoFocus
             />
           </label>
           <div className="delete-confirm-actions">
-            <button type="submit" disabled={phase === "deleting"}>
-              {phase === "deleting" ? "Deleting…" : "Submit"}
+            <button type="submit" disabled={phase === "deleting" || phase === "signing-out"}>
+              {phase === "deleting" ? "Deleting…" : phase === "signing-out" ? "Signing out…" : "Submit"}
             </button>
-            <button type="button" onClick={onClose} disabled={phase === "deleting"}>
+            <button type="button" onClick={onClose} disabled={phase === "deleting" || phase === "signing-out"}>
               Cancel
             </button>
           </div>

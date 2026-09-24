@@ -3,10 +3,29 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ten — mock preview</title>
+    <title>Ten</title>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Fix round 1, item 1 (BLOCKER, "Illegal invocation"): binds
+         window.fetch to window ONCE, before any bundled or third-party
+         code ever captures a reference to it. Real browsers (confirmed in
+         Chromium too, not just Firefox/WebKit — see the tester's own
+         `tests/e2e-real/e2e.ts` "browser: calling window.fetch as
+         o.fetchImpl(...)" check) throw "Illegal invocation" the moment
+         `fetch` is called through a stored reference whose receiver isn't
+         the realm's global object — exactly the `fetchImpl ?? fetch`
+         pattern this app's own backend adapters used to have (now fixed
+         individually too, via src/backend/bound-fetch.ts), but this plain
+         inline script (loaded and run BEFORE the module script below, so
+         nothing — ours or a dependency's — can grab the unbound original
+         first) is the one place that also protects any OTHER code path
+         that captures `window.fetch` directly. -->
+    <script>
+      if (typeof window !== "undefined" && typeof window.fetch === "function") {
+        window.fetch = window.fetch.bind(window);
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

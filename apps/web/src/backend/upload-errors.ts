@@ -8,27 +8,26 @@
 // Two tiers of mapping, both exercised by the tests:
 //   1. EXACT — a `WorkspaceError` with one of § 2's own codes maps
 //      one-to-one to a plain sentence. Every backend (in-memory,
-//      local-folder, and, for the one case it throws — `already_exists`
-//      on the outer HTTP 409 / nested duplicate-key body —
-//      SupabaseWorkspaceStore) raises these.
-//   2. BEST-EFFORT — SupabaseWorkspaceStore's own comments say plainly
-//      that Storage's OTHER refusals (case clash -> `path_conflict`, the
-//      50-object cap -> `workspace_full`, a revoked membership ->
-//      `not_a_member`) come back as a generic `Error` with the raw HTTP
-//      status baked into its `message` (no WorkspaceError code) — "a real
-//      gap vs. 'map exactly' that only ten_ws_write's own PT-code path
-//      fully closes" (that store's own hand-back). This module's
-//      `classifyGenericStorageError` recognizes the status codes that
-//      file's own code paths are documented to produce (403, 409, 413,
-//      400) and gives each a plain, best-effort message rather than
-//      surfacing "upload failed: HTTP 403 {...}" to a candidate. It
-//      cannot tell "50-object cap" apart from "case clash" from the HTTP
-//      status alone (both would be a 400 RLS violation with no coded
-//      body) — flagged in the hand-back as the residual part of the gap,
-//      unresolved until SupabaseWorkspaceStore itself gains real codes.
+//      local-folder, and SupabaseWorkspaceStore) raises these — as of
+//      fix round 1 item 7, SupabaseWorkspaceStore's own `uploadOne`
+//      disambiguates a Storage RLS 403 (membership lost, a case-variant/
+//      parent-folder clash, or the 50-object cap) via `ten_is_member()`
+//      and its own `list()`, and raises the real code, so this tier now
+//      covers those causes too, not just `already_exists`.
+//   2. BEST-EFFORT — a fallback for any OTHER generic `Error` the store
+//      might still throw (a genuinely unclassified Storage refusal, or a
+//      different backend's own generic errors): `classifyGenericStorageError`
+//      recognizes the raw HTTP status baked into the message (403, 409,
+//      413, 400) and gives each a plain message rather than surfacing
+//      "upload failed: HTTP 403 {...}" to a candidate.
+//
+// NON_MEMBER_MESSAGE is imported from auth.ts (the one canonical string,
+// design-web-ui.md § 1.6) rather than duplicated here, so the two can
+// never drift.
 //
 // Browser-safe: no window/document/localStorage/node:*.
 import { WorkspaceError, type FileInfo, type WorkspaceStore } from "../../../../packages/agent/src/types.ts";
+import { NON_MEMBER_MESSAGE } from "./auth.ts";
 
 function isWorkspaceError(e: unknown): e is WorkspaceError {
   return typeof e === "object" && e !== null && "code" in e && (e as { name?: string }).name === "WorkspaceError";
@@ -43,7 +42,7 @@ const EXACT_MESSAGES: Partial<Record<WorkspaceError["code"], (name: string) => s
   path_conflict: (name) =>
     `${name} clashes with an existing file or folder (a name that only differs by capitalization counts as a clash).`,
   workspace_full: () => "Your workspace is at its file limit. Remove something before uploading more.",
-  not_a_member: () => "Ten is in a private beta. Ask the person who invited you for access.",
+  not_a_member: () => NON_MEMBER_MESSAGE,
   already_exists: (name) => `${name} already exists.`,
   invalid_ref: (name) => `${name} isn't a valid file name.`,
   outside_workspace: () => "That upload would land outside your workspace.",
@@ -62,15 +61,17 @@ export function classifyGenericStorageError(name: string, message: string): stri
   const status = Number(m[1]);
   switch (status) {
     case 403:
-      return "Ten is in a private beta. Ask the person who invited you for access.";
+      return NON_MEMBER_MESSAGE;
     case 413:
       return `${name} is over the 10 MB upload limit.`;
     case 400:
-      // Storage's own insert policy folds several distinct refusals (a
-      // name that only differs by case, the 50-object cap, a path under
-      // ws/skills/, …) into one generic RLS-violation 400 with no coded
-      // body to tell them apart (see the file header) — this is the
-      // residual, unresolved half of "the known gap".
+      // SupabaseWorkspaceStore's own uploadOne (fix round 1, item 7) now
+      // disambiguates its 403 RLS refusals into real WorkspaceError codes
+      // (not_a_member / path_conflict / workspace_full) BEFORE they ever
+      // reach this best-effort fallback — this branch only fires for a
+      // genuinely unclassified 400 (a bug, or a backend this module
+      // doesn't know about), so it stays a general "check the name"
+      // message rather than guessing a specific cause.
       return `${name} couldn't be uploaded. Check the name (a matching file may already exist, even with different capitalization) and try again.`;
     default:
       return null;

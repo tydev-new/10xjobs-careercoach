@@ -93,7 +93,7 @@ test("uploadErrorMessage: every § 2 WorkspaceError code has a plain, candidate-
   const cases: [WorkspaceError["code"], RegExp][] = [
     ["unsupported_type", /file type/],
     ["upload_too_large", /10 MB/],
-    ["not_a_member", /private beta/],
+    ["not_a_member", /invite-only/],
     ["path_conflict", /clashes with an existing file/],
     ["workspace_full", /file limit/],
   ];
@@ -105,7 +105,7 @@ test("uploadErrorMessage: every § 2 WorkspaceError code has a plain, candidate-
 });
 
 test("classifyGenericStorageError: maps the documented Storage HTTP statuses to plain text", () => {
-  assert.match(classifyGenericStorageError("r.pdf", "upload failed: HTTP 403 {}")!, /private beta/);
+  assert.match(classifyGenericStorageError("r.pdf", "upload failed: HTTP 403 {}")!, /invite-only/);
   assert.match(classifyGenericStorageError("r.pdf", "upload failed: HTTP 413 {}")!, /10 MB/);
   assert.match(classifyGenericStorageError("r.pdf", "upload failed: HTTP 400 {}")!, /couldn't be uploaded/);
   assert.equal(classifyGenericStorageError("r.pdf", "upload failed: HTTP 500 {}"), null);

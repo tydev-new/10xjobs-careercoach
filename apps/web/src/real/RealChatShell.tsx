@@ -40,7 +40,7 @@ export interface RealChatShellProps {
   onSignOut: () => void;
   /** Once ten-delete-account returns, the caller signs out and returns to
    *  sign-in (design-web-ui.md § 1.7 point 4). */
-  onDeleted: () => void;
+  onDeleted: () => Promise<void>;
   theme: "light" | "dark";
   onThemeToggle: () => void;
 }
@@ -164,7 +164,13 @@ export function RealChatShell({
   // Upload wiring (plan step 5b item 3): the composer's attach ->
   // upload("documents/<name>") BEFORE sending — the message text that
   // follows just names the file; the bytes never go through the model
-  // (packages/agent's coach.ts strips the `file` part to one text line).
+  // (packages/agent's coach.ts strips a `file` part to one text line, and
+  // this text-note form conveys the same "attached `<path>`" line without
+  // one — the tester's own e2e (tests/e2e-real/e2e.ts, "journey: attach
+  // uploads to documents/<name> before sending") drives this exact flow:
+  // it reads the composer's own pre-filled value for the "documents/"
+  // path, then fills in the rest of the message itself, so the note is
+  // appended to composerValue, not sent as a separate file part).
   const handleAttach = async (file: File) => {
     setAttaching(true);
     setAttachError(undefined);

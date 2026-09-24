@@ -124,3 +124,4 @@ for (const [label, pol, unsafe] of cases) {
   r = await as(db, B, "authenticated", "select count(*)::int n from storage.objects where bucket_id='avatars'"); expect("pin: the old app's avatars access is unchanged", r.ok && r.rows[0].n === 1, r.rows ?? r.e);
 }
 console.log(`\nown-case failures: ${fails}`);
+if (fails) process.exitCode = 1; // M-new-3 (fix round 2)

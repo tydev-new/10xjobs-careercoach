@@ -1,0 +1,9 @@
+{
+  "name": "ten-store-tester-harness",
+  "private": true,
+  "type": "module",
+  "description": "Tester-owned step 2 checks: SupabaseWorkspaceStore against a PGlite-backed fake of PostgREST/Storage running the APPLIED migration; export/import adversarial cases; auth; a live concurrent-write check.",
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}

@@ -185,5 +185,88 @@ else:
         else:
             passed += 1
 
+# tests/sql and tests/store both need `npm install` once before their
+# suites can run (@electric-sql/pglite is a real download). Fix round 2,
+# M-new-3: when `node` is on PATH, a missing node_modules is no longer a
+# silent/loud SKIP — it's a FAIL, unless it can be fixed automatically.
+#
+# Decision: auto-install with `npm ci` (not "fail and print the command")
+# when a package-lock.json is present, which it is in both directories.
+# Justification: CLAUDE.md's own rule is "Tests: python3 tests/run.py" —
+# ONE command, with every other suite in this file already auto-discovered
+# and run with no separate setup step; making these two the sole exception
+# that requires a manual `npm install` first would be a surprise on a
+# fresh checkout and break that "one command" property. `npm ci` (not
+# `npm install`) keeps it deterministic — exactly the pinned lockfile
+# versions, not whatever `npm install` might resolve to — and is a no-op
+# past the first run (node_modules already present). If the install
+# itself fails (e.g. no network), that is reported as a genuine FAIL with
+# the manual command to run, not swallowed.
+def ensure_node_modules(dir_path, label):
+    if os.path.isdir(os.path.join(dir_path, "node_modules")):
+        return True
+    rel = os.path.relpath(dir_path, os.path.join(HERE, ".."))
+    if not npm:
+        print(f"\nFAIL {label}: node_modules not installed and no `npm` on PATH to install it. Run: (cd {rel} && npm install)")
+        return False
+    lockfile_present = os.path.isfile(os.path.join(dir_path, "package-lock.json"))
+    install_cmd = [npm, "ci"] if lockfile_present else [npm, "install"]
+    print(f"\n{label}: node_modules not installed — running `{' '.join(install_cmd)}` (auto-install, M-new-3)...")
+    result = subprocess.run(install_cmd, cwd=dir_path)
+    if result.returncode != 0:
+        print(f"FAIL {label}: `{' '.join(install_cmd)}` failed — see output above. Run it manually: (cd {rel} && {' '.join(install_cmd)})")
+        return False
+    return True
+
+npm = shutil.which("npm")
+
+# tests/sql — the PGlite SQL harness over the APPLIED migration ("spike 3
+# turned into CI"). Its own package.json "test" script now chains all
+# FOUR runners (run.mjs && run-r2.mjs && r3-own.mjs && r4-own.mjs) — each
+# sets process.exitCode = 1 on any FAIL (fix round 2, M-new-3); run.mjs's
+# 3 KNOWN legacy teardown cases (the migration's teardown now refuses an
+# in-SQL storage.* delete on purpose) are named and treated as expected,
+# so it still exits 0 when only those differ. Skips loudly (not silently)
+# only when `node` itself isn't on PATH at all (nothing here could ever
+# run); a missing node_modules with `node` present is a FAIL, per above.
+sql_dir = os.path.join(HERE, "sql")
+if not node:
+    print("\nSKIPPED tests/sql (PGlite SQL harness): no `node` on PATH")
+elif not ensure_node_modules(sql_dir, "tests/sql"):
+    failed += 1
+else:
+    print("\n--- npm test (tests/sql) ---")
+    result = subprocess.run([npm, "test"], cwd=sql_dir)
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/sql (npm test) — see output above")
+    else:
+        passed += 1
+
+# tests/store/*.test.ts — the independent tester's step 2 suite: SupabaseWorkspaceStore
+# driven against a PGlite stand-in that runs the APPLIED migration (not a
+# hand-written fake), export/import adversarial cases (path rules, caps,
+# zip-bomb/CRC32 defense), isolation, and auth. Owned by the tester, not
+# this script — don't edit those files. Skips loudly only when `node`
+# itself isn't on PATH; a missing node_modules with `node` present is a
+# FAIL (auto-installed first, per above).
+store_dir = os.path.join(HERE, "store")
+store_tests = sorted(glob.glob(os.path.join(store_dir, "*.test.ts")))
+if not node:
+    print("\nSKIPPED tests/store/*.test.ts: no `node` on PATH")
+elif not store_tests:
+    print("\nSKIPPED tests/store/*.test.ts: no test files found")
+elif not ensure_node_modules(store_dir, "tests/store"):
+    failed += 1
+else:
+    print(f"\n--- node --test tests/store/*.test.ts ({len(store_tests)} file(s)) ---")
+    result = subprocess.run([node, "--test", *store_tests], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/store/*.test.ts (node --test) — see output above")
+    else:
+        passed += 1
+
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

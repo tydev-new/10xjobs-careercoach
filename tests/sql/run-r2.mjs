@@ -197,3 +197,4 @@ for (const [label, pol, shouldRefuse] of [
 // regex \x00 compiles?
 { const db = new PGlite(); const r = await run(db, "select 'a' !~ '(^/|^\\.|/\\.|\\x00)' as ok"); note("regex with \\x00 compiles", r.ok ? JSON.stringify(r.r[0].rows) : r.e); }
 console.log(`\nfailures: ${failures}`);
+if (failures) process.exitCode = 1; // M-new-3 (fix round 2)

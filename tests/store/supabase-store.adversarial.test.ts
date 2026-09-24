@@ -358,7 +358,7 @@ test("F1 upload name clash: the store reports already_exists so the UI's -2, -3 
 // a duplicate still surface as a generic Error, so the UI's -2/-3 loop throws
 // on CV.pdf vs cv.pdf instead of moving on. Kept visible as a todo: it runs
 // and reports, but does not fail tests/run.py until 5b maps the code.
-test("F2 SPEC (known step 5b gap): a case-variant upload clash (CV.pdf vs cv.pdf) is a WorkspaceError the UI can act on", { todo: "step 5b: map Storage RLS refusals (case-variant clash) to a WorkspaceError" }, async () => {
+test("F2 SPEC (closed in step 5b fix round 1): a case-variant upload clash (CV.pdf vs cv.pdf) is a WorkspaceError the UI can act on", async () => {
   const b = await be();
   const { store } = await member(b);
   await store.upload("documents/cv.pdf", PDF);
@@ -387,7 +387,7 @@ test("G2 upload size and type are checked client-side (0 bytes, >10 MB, .md, ski
   assert.equal(await codeOf(store.upload("skills/x.pdf", PDF)), "WorkspaceError:not_editable");
 });
 
-test("G3 (known step 5b gap, confirm the description) non-member / 50-object cap / path clash uploads surface as a generic Error", async () => {
+test("G3 (step 5b fix round 1) Storage's generic 403 refusals are told apart: non-member / 50-object cap / path clash / case clash map to exact WorkspaceError codes", async () => {
   const b = await be();
   const non = await b.newUser({ member: false });
   const obs: Record<string, string> = {};
@@ -395,10 +395,24 @@ test("G3 (known step 5b gap, confirm the description) non-member / 50-object cap
   const { uid, store } = await member(b);
   for (let i = 0; i < 50; i++) await b.seedObject(uid, `documents/f${i}.pdf`, PDF);
   obs.cap = await codeOf(store.upload("documents/f50.pdf", PDF));
+  // at the cap AND a case clash: the clash is the more specific cause
+  obs.capAndCaseClash = await codeOf(store.upload("documents/F1.pdf", PDF));
   const m2 = await member(b);
   await m2.store.write("plan.md", "x", null);
-  obs.clash = await codeOf(m2.store.upload("plan.md/x.pdf", PDF));
-  for (const [k, v] of Object.entries(obs)) assert.match(v, /^Error:upload failed: HTTP 400 .*403/, `${k}: ${v}`);
+  obs.underTextFile = await codeOf(m2.store.upload("plan.md/x.pdf", PDF));
+  await m2.store.upload("documents/cv.pdf", PDF);
+  obs.caseClash = await codeOf(m2.store.upload("documents/CV.pdf", PDF));
+  obs.folderOfExisting = await codeOf(m2.store.upload("documents/cv.pdf/inner.pdf", PDF));
+  assert.deepEqual(obs, {
+    nonMember: "WorkspaceError:not_a_member",
+    cap: "WorkspaceError:workspace_full",
+    capAndCaseClash: "WorkspaceError:path_conflict",
+    underTextFile: "WorkspaceError:path_conflict",
+    caseClash: "WorkspaceError:path_conflict",
+    folderOfExisting: "WorkspaceError:path_conflict",
+  });
+  // an exact re-upload is still already_exists (the -2/-3 renumber relies on it)
+  assert.equal(await codeOf(m2.store.upload("documents/cv.pdf", PDF)), "WorkspaceError:already_exists");
 });
 
 // ---------------------------------------------------------------- misc

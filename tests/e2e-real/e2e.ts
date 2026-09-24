@@ -23,17 +23,21 @@
 //
 // Run from the repo root (needs node >= 22, deno, python3, apps/web and
 // tests/store node_modules, Playwright browsers):
-//   node tests/e2e-real/e2e.ts            # everything (4 builds, ~4 min)
-//   E2E_ONLY=journey,gate node tests/e2e-real/e2e.ts
-//   E2E_FETCH_SHIM=1 node tests/e2e-real/e2e.ts   # DIAGNOSTIC: see newPage()
-//   E2E_KEEP=1 keeps the temp dir (builds, failure screenshots)
-// Sections: journey import gate balance ceiling member delete refresh phone
-// browsers (firefox + webkit: `npx playwright install firefox webkit` in
-// apps/web) env preview. Exit code 0 = all PASS; one PASS/FAIL line per assertion.
+//   node tests/e2e-real/e2e.ts            # everything, in chromium, firefox, webkit (~13 min)
+//   E2E_BROWSERS=chromium E2E_ONLY=journey,gate node tests/e2e-real/e2e.ts
+//   E2E_STRIP_INLINE_FETCH=1   serve the build without index.html's inline
+//                              window.fetch bind (is it still needed?)
+//   E2E_FETCH_SHIM=1           DIAGNOSTIC only (see newPage)
+//   E2E_KEEP=1 keeps the temp dir (builds, failure screenshots);
+//   E2E_CONSOLE=1 echoes browser console errors; E2E_STACKS=1 page-error stacks.
+// Per-browser sections: journey import gate balance ceiling member delete
+// refresh phone cors setup uploads env; then once: preview. Firefox/WebKit
+// need `npx playwright install firefox webkit` in apps/web.
+// Exit code 0 = all PASS; one PASS/FAIL line per assertion.
 // Also here: upload-errors.test.ts (node --test), the upload messages over PGlite.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -51,16 +55,27 @@ const WEB = path.join(REPO, "apps/web");
 const ONLY = (process.env.E2E_ONLY ?? "").split(",").filter(Boolean);
 const want = (s: string) => ONLY.length === 0 || ONLY.includes(s);
 const SHIM = process.env.E2E_FETCH_SHIM === "1";
+// Strips index.html's inline `window.fetch = window.fetch.bind(window)` to
+// answer "is the inline script still needed once every capture site uses
+// boundFetch()?" (lead ruling 3, fix round 1).
+const STRIP_INLINE_FETCH = process.env.E2E_STRIP_INLINE_FETCH === "1";
+const BROWSER_LIST = (process.env.E2E_BROWSERS ?? "chromium,firefox,webkit").split(",").filter(Boolean);
+let BROWSER = "chromium";
+let TAG = "";
+let SECTION = "";
+const em = (local: string) => `${local}.${BROWSER}@example.com`;
 
 // A canary standing in for the real OpenRouter key: it lives ONLY in the
 // deno host's env. If it ever shows up in the bundle, a browser-visible
 // response, or a request the browser makes, the key leaked.
 const OPENROUTER_CANARY = "sk-or-v1-E2E-CANARY-0a1b2c3d4e5f60718293a4b5c6d7e8f9";
 const PASSWORD = "correct horse battery";
+const NON_MEMBER = "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.";
 
 // ------------------------------------------------------------------ results
 const results: { ok: boolean; name: string; detail: string }[] = [];
-function rec(ok: boolean, name: string, detail = "") {
+function rec(ok: boolean, name0: string, detail = "") {
+  const name = TAG ? `[${TAG}] ${name0}` : name0;
   results.push({ ok, name, detail });
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  — " + detail : ""}`);
 }
@@ -209,6 +224,7 @@ function staticServer(): Promise<{ port: number; setRoot(dir: string): void; clo
 }
 
 function build(outDir: string, env: Record<string, string | undefined>): { ok: boolean; out: string; ms: number } {
+  if (existsSync(path.join(outDir, "index.html"))) return { ok: true, out: "(cached)", ms: 0 };
   const t0 = Date.now();
   const cleanEnv: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) if (!k.startsWith("VITE_") && v !== undefined) cleanEnv[k] = v;
@@ -276,7 +292,25 @@ const prodEnv = {
 const b1 = build(prodDir, prodEnv);
 rec(b1.ok, "production build (npm run build) with local stand-in env", b1.ok ? `${b1.ms} ms` : b1.out.slice(-2000));
 if (!b1.ok) process.exit(1);
-web.setRoot(prodDir);
+let currentRoot = prodDir;
+let servedProdDir = prodDir;
+if (STRIP_INLINE_FETCH) {
+  // A copy of the production build whose index.html lacks the inline
+  // fetch-binding script, served from the same local origin (a
+  // route.fulfill()ed document would trip Chromium's loopback-access
+  // checks and confound the result).
+  servedProdDir = prodDir + "-stripped";
+  cpSync(prodDir, servedProdDir, { recursive: true });
+  const html = readFileSync(path.join(servedProdDir, "index.html"), "utf8");
+  const stripped = html.replace(/<script>\s*if \(typeof window[\s\S]*?<\/script>/, "<!-- inline fetch bind stripped by the e2e -->");
+  rec(stripped !== html, "E2E_STRIP_INLINE_FETCH: the inline window.fetch bind was found and stripped from the served index.html");
+  writeFileSync(path.join(servedProdDir, "index.html"), stripped);
+}
+const setRoot = (d: string) => {
+  currentRoot = d;
+  web.setRoot(d);
+};
+setRoot(servedProdDir);
 
 // ---- bundle: no secret, no mock controls (step 5b exit 3; Goal post exit 2)
 {
@@ -293,13 +327,25 @@ web.setRoot(prodDir);
 
 // ------------------------------------------------------------ browsers
 const browsers: Record<string, any> = { chromium: await chromium.launch() };
+const browserTypes: Record<string, any> = { chromium, firefox, webkit };
+// Browsers for the no-interception CORS section; Chromium's host resolver
+// maps every name but 127.0.0.1 to NOTFOUND so nothing can leave the box.
+const noRouteBrowsers: Record<string, any> = {};
+async function noRouteBrowser(b: string) {
+  noRouteBrowsers[b] ??= await browserTypes[b].launch(b === "chromium" ? { args: ["--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE 127.0.0.1"] } : {});
+  return noRouteBrowsers[b];
+}
 const external: string[] = [];
 const atsHits: string[] = [];
 const pageErrors: string[] = [];
 
-async function newPage(opts: { browser?: string; viewport?: { width: number; height: number } } = {}) {
-  const ctx = await browsers[opts.browser ?? "chromium"].newContext({ viewport: opts.viewport ?? { width: 1280, height: 860 }, acceptDownloads: true });
-  await ctx.route("**/*", async (route: any) => {
+async function newPage(opts: { browser?: string; viewport?: { width: number; height: number }; noRoute?: boolean } = {}) {
+  const bname = opts.browser ?? BROWSER;
+  // noRoute: no Playwright request interception at all. Chromium answers
+  // CORS preflights itself while interception is on (none reach the
+  // server), so a real preflight check needs a context without routes.
+  const ctx = await (opts.noRoute ? noRouteBrowsers[bname] : browsers[bname]).newContext({ viewport: opts.viewport ?? { width: 1280, height: 860 }, acceptDownloads: true });
+  if (!opts.noRoute) await ctx.route("**/*", async (route: any) => {
     const u = new URL(route.request().url());
     if (u.hostname === "127.0.0.1" || u.protocol === "data:" || u.protocol === "blob:") return route.continue();
     if (u.hostname === "boards-api.greenhouse.io") {
@@ -328,8 +374,28 @@ async function newPage(opts: { browser?: string; viewport?: { width: number; hei
     });
   }
   const page = await ctx.newPage();
-  page.on("pageerror", (e: Error) => pageErrors.push(`${opts.browser ?? "chromium"}: ${e.message}`));
+  if (process.env.E2E_CONSOLE) page.on("console", (m: any) => { if (m.type() === "error" || m.type() === "warning") console.log(`  [console ${bname}] ${m.text().slice(0, 300)}`); });
+  page.on("pageerror", (e: Error) => pageErrors.push(`${bname} [${SECTION}]: ${e.message}${process.env.E2E_STACKS ? "\n      " + String(e.stack ?? "").split("\n").slice(0, 8).join("\n      ") : ""}`));
   await page.addInitScript(() => {
+    // The panel iframe is same-origin (allow-same-origin), so the parent can
+    // replace its print(): headless Firefox/WebKit otherwise open a modal
+    // print dialog that freezes the page. Counts calls so the e2e can assert
+    // "Print / Save as PDF" really invoked print() on the rendered résumé.
+    (window as any).__printed = [];
+    document.addEventListener(
+      "load",
+      (ev) => {
+        const t = ev.target as HTMLIFrameElement;
+        if (t && t.tagName === "IFRAME" && t.classList.contains("side-panel-iframe")) {
+          try {
+            (t.contentWindow as any).print = () => (window as any).__printed.push(t.srcdoc.slice(0, 2000));
+          } catch {
+            /* cross-origin: leave it */
+          }
+        }
+      },
+      true,
+    );
     (window as any).__states = new Set();
     setInterval(() => {
       const a = document.querySelector(".avatar");
@@ -412,28 +478,32 @@ function toolResultsIn(body: any, toolName: string): any[] {
 
 const failShots: string[] = [];
 
-// B1 mechanism, always run WITHOUT the shim: a store/gate built as
-// { fetchImpl: fetch } and called as o.fetchImpl(...) — what
-// apps/web/src/backend/supabase-workspace-store.ts and gate.ts do.
+// B1 (fix round 1): every fetch capture site in the app is bound. Static
+// part: no bare `fetch` handed out as a default or stored on an object in
+// the browser-shipped sources (apps/web/src, packages/agent/src,
+// packages/checkers/src), tests excluded.
 {
-  const ctx = await browsers.chromium.newContext();
-  const pg = await ctx.newPage();
-  await pg.goto(ORIGIN + "/");
-  const r = await pg.evaluate(async () => {
-    const o = { fetchImpl: window.fetch };
-    try {
-      await o.fetchImpl(location.href);
-      return "ok";
-    } catch (e) {
-      return String((e as Error).message);
+  const offenders: string[] = [];
+  const walk = (d: string) => {
+    for (const f of readdirSync(d)) {
+      const p = path.join(d, f);
+      if (statSync(p).isDirectory()) {
+        if (!/node_modules|test-support|^test$/.test(f)) walk(p);
+      } else if (/\.(ts|tsx|mjs|js)$/.test(f) && !/\.test\./.test(f)) {
+        readFileSync(p, "utf8").split("\n").forEach((line, i) => {
+          if (/^\s*(\/\/|\*)/.test(line)) return;
+          if (/\?\?\s*fetch\b(?!\s*\()|[:=]\s*fetch\s*[,;)]|typeof fetch\s*=\s*fetch\b/.test(line)) offenders.push(`${path.relative(REPO, p)}:${i + 1}: ${line.trim()}`);
+        });
+      }
     }
-  });
-  rec(r === "ok", "browser: calling window.fetch as o.fetchImpl(...) (the store's/gate's call shape) works", r);
-  await ctx.close();
+  };
+  for (const d of ["apps/web/src", "packages/agent/src", "packages/checkers/src"]) walk(path.join(REPO, d));
+  rec(offenders.length === 0, "B1 static: no unbound `fetch` stored/defaulted in browser-shipped sources", offenders.slice(0, 8).join(" | "));
 }
 if (SHIM) console.log("\n*** E2E_FETCH_SHIM=1: window.fetch is shimmed to ignore its receiver (diagnostic run; see B1) ***");
 async function section(name: string, fn: () => Promise<void>) {
   if (!want(name)) return;
+  SECTION = `${BROWSER}/${name}`;
   console.log(`\n=== ${name}`);
   try {
     await fn();
@@ -442,10 +512,10 @@ async function section(name: string, fn: () => Promise<void>) {
     for (const b of Object.values(browsers)) {
       for (const c of b.contexts()) {
         for (const pg of c.pages()) {
-          const f = path.join(tmpRoot, `fail-${name}-${failShots.length}.png`);
+          const f = path.join(tmpRoot, `fail-${BROWSER}-${name}-${failShots.length}.png`);
           await pg.screenshot({ path: f, fullPage: true }).catch(() => {});
           failShots.push(f);
-          console.log("  screenshot:", f, " body:", ((await pg.locator("body").textContent().catch(() => "")) ?? "").slice(0, 300));
+          console.log("  screenshot:", f, " root:", ((await pg.locator("#root").textContent().catch(() => "")) ?? "").slice(0, 300));
         }
         await c.close().catch(() => {});
       }
@@ -456,13 +526,17 @@ async function section(name: string, fn: () => Promise<void>) {
 let journeyUid = "";
 let exportZip: Buffer | undefined;
 
+async function runSuite() {
 // ================================================================ JOURNEY
 await section("journey", async () => {
-  const uid = await standIn.createUser({ email: "jordan.alvarez.demo@example.com" });
+  const uid = await standIn.createUser({ email: em("jordan.alvarez.demo") });
   journeyUid = uid;
+  const atsAtStart = atsHits.length;
+  const hitsAtStart = stub.hits.length;
+  const proxyAtStart = proxyCalls().length;
   const { page } = await newPage();
   rec(await page.locator(".sign-in-screen").waitFor({ timeout: 15000 }).then(() => true, () => false), "journey: signed out -> the sign-in screen (design-web-ui § 1.4)");
-  await signIn(page, "jordan.alvarez.demo@example.com");
+  await signIn(page, em("jordan.alvarez.demo"));
   await page.locator(".empty-state").waitFor({ timeout: 20000 });
   rec(true, "journey: sign in (password) -> membership check -> first-run state");
   const empty = (await page.locator(".empty-state").textContent()) ?? "";
@@ -474,25 +548,34 @@ await section("journey", async () => {
   rec(files0[0]?.content === TIER0, "journey: root CLAUDE.md == bundled skills/profile/templates/workspace-CLAUDE.md, byte for byte");
   rec(!(await page.locator(".fixture-picker").count()) && !(await page.getByText("Autoplay").count()), "journey: no fixture picker / Autoplay on screen");
 
-  // ---- upload a résumé PDF
+  // startup: ONE membership check (fix round 1, item 3)
+  const checksAtStart = standIn.log.filter((l) => l.path === "/rest/v1/rpc/ten_is_member" && l.origin !== "" && verifyJwt(/^Bearer (.+)$/.exec(l.auth)?.[1] ?? "")?.sub === uid).length;
+  rec(checksAtStart === 1, "journey: exactly one membership check at sign-in (no duplicate setup)", String(checksAtStart));
+
+  // ---- upload a résumé PDF (lead ruling 1: § 2 — upload BEFORE sending,
+  // then the message carries a `file` part url "workspace:documents/<name>";
+  // the package turns it into one text line; the attachment chip shows)
   await page.locator(".composer-attach-input").setInputFiles({ name: "jordan-alvarez-resume.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
-  await page.waitForFunction(() => (document.querySelector(".composer-input") as HTMLTextAreaElement).value.includes("documents/"), null, { timeout: 15000 });
-  const composerAfterAttach = await page.locator(".composer-input").inputValue();
-  rec(composerAfterAttach.includes("documents/jordan-alvarez-resume.pdf"), "journey: attach uploads to documents/<name> before sending", composerAfterAttach);
+  const up1 = await until(async () => ((await db.objects(uid)).length === 1 ? true : false), 15000);
+  rec(!!up1, "journey: attach uploads to documents/<name> before sending");
   const objs = await db.objects(uid);
   eq(objs.map((o) => o.name), [`users/${uid}/ws/documents/jordan-alvarez-resume.pdf`], "journey: the PDF is one Storage object at users/{uid}/ws/documents/…");
   const stored = standIn.backend.objectBytes.get(`users/${uid}/ws/documents/jordan-alvarez-resume.pdf`);
-  rec(!!stored && Buffer.from(stored).equals(PDF_BYTES), "journey: stored bytes == uploaded bytes");
-  // a second attach of the same name -> -2 (§ 2: then -2, -3 on a clash)
-  await page.locator(".composer-input").fill("");
-  await page.locator(".composer-attach-input").setInputFiles({ name: "jordan-alvarez-resume.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
-  await page.waitForFunction(() => (document.querySelector(".composer-input") as HTMLTextAreaElement).value.includes("documents/"), null, { timeout: 15000 });
-  rec((await page.locator(".composer-input").inputValue()).includes("documents/jordan-alvarez-resume-2.pdf"), "journey: re-attaching the same name lands at …-2.pdf", await page.locator(".composer-input").inputValue());
-  await page.locator(".composer-input").fill("hi, here's my resume\nAttached `documents/jordan-alvarez-resume.pdf`.");
+  const upReq = standIn.log.filter((l) => l.method === "POST" && l.path.endsWith(`/users/${uid}/ws/documents/jordan-alvarez-resume.pdf`));
+  console.log("  upload request(s):", JSON.stringify(upReq.map((l) => ({ cl: l.cl, got: l.bodyLen, status: l.status }))));
+  rec(!!stored && Buffer.from(stored).equals(PDF_BYTES), "journey: stored bytes == uploaded bytes", stored ? `stored ${stored.length} B (sha ${sha256(Buffer.from(stored)).slice(0, 12)}) head ${JSON.stringify(Buffer.from(stored).subarray(0, 24).toString("latin1"))} vs uploaded ${PDF_BYTES.length} B` : "none");
+  const composerAfterAttach = await page.locator(".composer-input").inputValue();
+  rec(!composerAfterAttach.includes("Attached `documents/"), "journey (ruling 1): attaching does not pre-fill composer text — the file rides as a § 2 file part", JSON.stringify(composerAfterAttach));
+  await page.locator(".composer-input").fill("hi, here's my resume");
   const hitsBefore = stub.hits.length;
   await page.locator(".composer-input").press("Enter");
   await waitSettled(page);
+  const chipText = (await page.locator(".bubble--user").last().locator(".attachment-chip").allTextContents().catch(() => [])).join(" ");
+  rec(chipText.includes("jordan-alvarez-resume.pdf"), "journey (ruling 1): the sent message shows the attachment chip", JSON.stringify(chipText));
   const turnHits = stub.hits.slice(hitsBefore);
+  const firstBody = turnHits[0]?.body;
+  const lastUserMsg = [...(firstBody?.messages ?? [])].reverse().find((m: any) => m.role === "user");
+  rec(textOfContent(lastUserMsg?.content).includes("The candidate attached `documents/jordan-alvarez-resume.pdf`."), "journey (ruling 1): the model sees the package's one text line for the file part (§ 2)", JSON.stringify(textOfContent(lastUserMsg?.content)).slice(0, 200));
   rec(turnHits.length === 5 && turnHits.every((h) => h.scenario === "upload+intake"), "journey/intake: 5 model calls, all through the proxy", turnHits.map((h) => `${h.scenario}#${h.step}`).join(" "));
   const pdfRead = toolResultsIn(turnHits[1]?.body, "read_file")[0];
   rec(pdfRead?.error?.code === "unsupported_type", "journey/intake: read_file on the PDF returns unsupported_type to the model (§ 4)", JSON.stringify(pdfRead));
@@ -508,7 +591,8 @@ await section("journey", async () => {
   const h2 = stub.hits.length;
   await say(page, `found this one: ${JD_URL}`);
   const t2 = stub.hits.slice(h2);
-  rec(atsHits.length === 1 && atsHits[0] === "https://boards-api.greenhouse.io/v1/boards/acme/jobs/4102938", "journey/verdict: fetch_job called the Greenhouse board API (stubbed)", atsHits.join(" "));
+  const myAts = atsHits.slice(atsAtStart);
+  rec(myAts.length === 1 && myAts[0] === "https://boards-api.greenhouse.io/v1/boards/acme/jobs/4102938", "journey/verdict: fetch_job called the Greenhouse board API (stubbed)", myAts.join(" "));
   rec(t2.some((h) => h.kind === "web_search"), "journey/verdict: web_search went through the proxy with the web plugin");
   const ws = t2.find((h) => h.kind === "web_search");
   eq(ws?.body?.plugins, [{ id: "web", engine: "exa", max_results: 4 }], "journey/verdict: the proxy rewrote the plugin (engine exa, max_results ≤ 5)");
@@ -552,7 +636,9 @@ await section("journey", async () => {
   const htmlRow = (await db.files(uid)).find((f) => f.path === "applications/acme-staff-pm-resume.html");
   rec(!!htmlRow && htmlRow.content.includes("Jordan Alvarez"), "journey/tailor: the rendered .html is written to the workspace");
   await doc.getByText("Print / Save as PDF").click();
-  await page.waitForTimeout(700);
+  await page.waitForTimeout(900);
+  const printed: string[] = await page.evaluate(() => (window as any).__printed);
+  rec(printed.length === 1 && printed[0].includes("Jordan Alvarez"), "journey/tailor: Print / Save as PDF calls print() on the rendered résumé's iframe", `${printed.length} print() call(s)`);
   const iframe = page.locator(".side-panel-iframe");
   const srcdoc = (await iframe.getAttribute("srcdoc").catch(() => null)) ?? "";
   const sandbox = (await iframe.getAttribute("sandbox").catch(() => null)) ?? "";
@@ -571,7 +657,7 @@ await section("journey", async () => {
   void h4;
 
   // ---- the JWT is what reaches the proxy; the OpenRouter key never leaves the host
-  const pc = proxyCalls();
+  const pc = proxyCalls().slice(proxyAtStart);
   const allUserJwt = pc.every((l) => {
     const tok = /^Bearer (.+)$/.exec(l.auth)?.[1] ?? "";
     const c = verifyJwt(tok);
@@ -579,16 +665,28 @@ await section("journey", async () => {
   });
   rec(pc.length > 0 && allUserJwt, "auth: every proxy call carries the user's Supabase session JWT (§ 8)", `${pc.length} calls`);
   rec(pc.every((l) => l.path === "/functions/v1/ten-model-proxy/chat/completions"), "env: VITE_MODEL_PROXY_URL unset -> <SUPABASE_URL>/functions/v1/ten-model-proxy (the default)");
-  rec(stub.hits.every((h) => h.auth === `Bearer ${OPENROUTER_CANARY}`), "auth: upstream calls carry the host-side OpenRouter key only (never the JWT)");
+  rec(stub.hits.slice(hitsAtStart).every((h) => h.auth === `Bearer ${OPENROUTER_CANARY}`), "auth: upstream calls carry the host-side OpenRouter key only (never the JWT)");
   rec(stub.hits.every((h) => !JSON.stringify(h.body).includes("eyJ")), "auth: no JWT in any upstream body");
   rec(stub.hits.filter((h) => h.kind === "chat").every((h) => h.body.model === "anthropic/claude-sonnet-5" && h.body.stream === true && h.body.provider?.zdr === true), "proxy: upstream body forced (model, stream, provider zdr)");
+
+  // ---- CORS: every preflight's requested headers are all allowed (fix round 1, item 2)
+  const pre = standIn.log.filter((l) => l.method === "OPTIONS" && l.path.startsWith("/functions/v1/ten-model-proxy") && l.at >= (pc[0]?.at ?? 0) - 60000);
+  const bad = pre.filter((l) => {
+    const allowed = (l.acah ?? "").toLowerCase().split(",").map((x) => x.trim());
+    return l.acrh.toLowerCase().split(",").map((x) => x.trim()).filter(Boolean).some((h) => !allowed.includes(h)) || l.status !== 204;
+  });
+  const allOptions = standIn.log.filter((l) => l.method === "OPTIONS").map((l) => l.path);
+  if (process.env.E2E_CONSOLE) console.log("  OPTIONS seen so far:", allOptions.length, [...new Set(allOptions)].slice(0, 6).join(" "));
+  // Under interception Chromium answers preflights itself (0 reach the
+  // server); the "cors" section checks Chromium without interception.
+  rec(bad.length === 0 && (BROWSER === "chromium" || pre.length > 0), "CORS (journey, interception on): every proxy preflight that reached the server had all requested headers allowed", `${pre.length} preflight(s); requested: ${[...new Set(pre.map((l) => l.acrh))].join(" / ") || "(no preflight)"}; allowed: ${pre[0]?.acah ?? "-"}`);
 
   // ---- balance chip from ten_balance(), after metering lands
   const metered = await until(async () => {
     const l = (await db.ledger(uid)).filter((r) => r.kind === "call");
-    return l.length === stub.hits.length ? l : false;
+    return l.length === stub.hits.length - hitsAtStart ? l : false;
   }, 15000);
-  rec(!!metered, "meter: one ledger call row per proxy call", `${(await db.ledger(uid)).filter((r) => r.kind === "call").length} rows / ${stub.hits.length} calls`);
+  rec(!!metered, "meter: one ledger call row per proxy call", `${(await db.ledger(uid)).filter((r) => r.kind === "call").length} rows / ${stub.hits.length - hitsAtStart} calls`);
   await focusRefresh(page);
   const bal = await db.balance(uid);
   rec((await chip(page)) === `$${floorCents(bal)}`, "balance chip == ten_balance() rounded down to the cent, refreshed on focus", `chip ${await chip(page)} ledger ${bal}`);
@@ -620,14 +718,14 @@ await section("journey", async () => {
 // ================================================================ IMPORT
 await section("import", async () => {
   if (!(exportZip)) return;
-  const uid = await standIn.createUser({ email: "import.target@example.com" });
+  const uid = await standIn.createUser({ email: em("import.target") });
   const { page } = await newPage();
-  await signIn(page, "import.target@example.com");
+  await signIn(page, em("import.target"));
   await page.locator(".empty-state").waitFor({ timeout: 20000 });
   const zipPath = path.join(tmpRoot, "export-a.zip");
   await page.locator('input[accept=".zip"]').setInputFiles(zipPath);
   const got = await until(async () => ((await db.files(uid)).length > 3 ? true : false), 20000);
-  rec(!!got, "import: the exported zip imports into a fresh workspace (holding only CLAUDE.md)");
+  rec(!!got, "import: the exported zip imports into a fresh workspace (holding only CLAUDE.md)", got ? "" : `import-error: ${(await page.locator(".import-error").textContent().catch(() => "")) ?? ""}`);
   const a = await db.files(journeyUid);
   const b = await db.files(uid);
   eq(b.map((f) => [f.path, sha256(f.content)]), a.map((f) => [f.path, sha256(f.content)]), "import: text files identical to the source workspace");
@@ -643,9 +741,9 @@ await section("import", async () => {
 
 // ================================================================ SPEND GATE
 await section("gate", async () => {
-  const uid = await standIn.createUser({ email: "gate.user@example.com" });
+  const uid = await standIn.createUser({ email: em("gate.user") });
   const { page } = await newPage();
-  await signIn(page, "gate.user@example.com");
+  await signIn(page, em("gate.user"));
   await page.locator(".empty-state").waitFor({ timeout: 20000 });
   await say(page, "hello there"); // one measured step, so estimate_cost prices from this chat
   const hBefore = stub.hits.length;
@@ -707,10 +805,10 @@ await section("gate", async () => {
 // ================================================================ OVER BALANCE
 await section("balance", async () => {
   // (a) already at zero -> the proxy's 402 copy, no model reply
-  const uid = await standIn.createUser({ email: "broke.user@example.com" });
+  const uid = await standIn.createUser({ email: em("broke.user") });
   await db.addCall(uid, 5.0);
   const { page } = await newPage();
-  await signIn(page, "broke.user@example.com");
+  await signIn(page, em("broke.user"));
   await page.locator(".composer-input").waitFor({ timeout: 20000 });
   const c = await until(async () => ((await chip(page)) !== "—" ? await chip(page) : false), 8000);
   rec(c === "$0.00", "balance: chip reads $0.00 at zero balance", String(c));
@@ -724,7 +822,7 @@ await section("balance", async () => {
   rec(stub.hits.length === h0, "over_balance: nothing reached the model");
   rec((await lastAssistant(page).locator("p:not(.card-body):not(.card-meta)").count()) === 0, "over_balance: no model reply after the refusal");
   // (b) mid-run: the balance runs out between steps -> the finished tool stays, error, no reply after
-  const uid2 = await standIn.createUser({ email: "midrun.user@example.com" });
+  const uid2 = await standIn.createUser({ email: em("midrun.user") });
   stub.setScenarios(
     scenarios([
       {
@@ -738,7 +836,7 @@ await section("balance", async () => {
     ]),
   );
   const { page: p2 } = await newPage();
-  await signIn(p2, "midrun.user@example.com");
+  await signIn(p2, em("midrun.user"));
   await p2.locator(".composer-input").waitFor({ timeout: 20000 });
   const hm = stub.hits.length;
   await say(p2, "run the long job");
@@ -753,10 +851,10 @@ await section("balance", async () => {
   rec((await chip(p2)) === "$0.00", "over_balance mid-run: chip clamps to $0.00 (never negative)", await chip(p2));
   stub.setScenarios(scenarios());
   // chip rounding down
-  const uid3 = await standIn.createUser({ email: "rounding.user@example.com" });
+  const uid3 = await standIn.createUser({ email: em("rounding.user") });
   await db.addCall(uid3, 0.433);
   const { page: p3 } = await newPage();
-  await signIn(p3, "rounding.user@example.com");
+  await signIn(p3, em("rounding.user"));
   await p3.locator(".composer-input").waitFor({ timeout: 20000 });
   const c3 = await until(async () => ((await chip(p3)) !== "—" ? await chip(p3) : false), 8000);
   rec(c3 === "$4.56", "balance: $4.567 shows $4.56 (rounded down to the cent)", String(c3));
@@ -767,11 +865,12 @@ await section("balance", async () => {
 
 // ================================================================ BETA CEILING
 await section("ceiling", async () => {
-  const other = await standIn.createUser({ email: "ceiling.other@example.com" });
-  const uid = await standIn.createUser({ email: "ceiling.user@example.com" });
+  const other = await standIn.createUser({ email: em("ceiling.other") });
+  const uid = await standIn.createUser({ email: em("ceiling.user") });
   await db.addCall(other, 5.0, 0); // today: the beta-wide $5 is spent
+  try {
   const { page } = await newPage();
-  await signIn(page, "ceiling.user@example.com");
+  await signIn(page, em("ceiling.user"));
   await page.locator(".composer-input").waitFor({ timeout: 20000 });
   const h0 = stub.hits.length;
   const p0 = proxyCalls().length;
@@ -782,19 +881,21 @@ await section("ceiling", async () => {
   rec(errText.includes("model_error") && errText.includes("The beta has reached today's limit. Try again tomorrow."), "ceiling: 503 shown as model_error with the proxy's own sentence", errText);
   rec(!errText.includes("over_balance"), "ceiling: NOT shown as over_balance");
   rec(stub.hits.length === h0, "ceiling: nothing reached the model");
-  await standIn.sql("delete from public.ten_usage_ledger where user_id = $1", [other]);
   void uid;
   await page.context().close();
+  } finally {
+    await standIn.sql("delete from public.ten_usage_ledger where user_id = $1", [other]);
+  }
 });
 
 // ================================================================ NOT A MEMBER
 await section("member", async () => {
-  await standIn.createUser({ email: "not.member@example.com", member: false });
+  await standIn.createUser({ email: em("not.member"), member: false });
   const { page } = await newPage();
-  await signIn(page, "not.member@example.com");
+  await signIn(page, em("not.member"));
   await page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
   const t = (await page.locator(".not-a-member-screen").textContent()) ?? "";
-  rec(t.includes("Ten is in a private beta. Ask the person who invited you for access."), "not-a-member: C § 8's sentence", t);
+  rec(t.includes(NON_MEMBER), "not-a-member: the contract's sentence (§ 8, design-web-ui § 1.6; lead ruling 5dab77d)", t);
   rec(!(await page.locator(".composer-input").count()) && !(await page.locator(".balance-chip").count()) && !(await page.locator(".avatar").count()), "not-a-member: no composer, no chip, no avatar (§ 1.6)");
   // the proxy refuses a non-member directly (403) even with a valid session
   const status = await page.evaluate(async (u: string) => {
@@ -803,7 +904,7 @@ await section("member", async () => {
     const r = await fetch(`${u}/functions/v1/ten-model-proxy/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) });
     return [r.status, await r.text()];
   }, standIn.url);
-  rec(status[0] === 403 && String(status[1]).includes("private beta"), "not-a-member: the proxy answers 403 to a signed-in non-member", JSON.stringify(status));
+  rec(status[0] === 403 && String(status[1]).includes(NON_MEMBER), "not-a-member: the proxy answers 403 with the same sentence", JSON.stringify(status));
   await page.locator(".not-a-member-screen button", { hasText: "Sign out" }).click();
   await page.locator(".sign-in-screen").waitFor({ timeout: 10000 });
   rec(true, "not-a-member: sign out returns to sign-in");
@@ -812,16 +913,19 @@ await section("member", async () => {
 
 // ================================================================ DELETE BETA DATA
 await section("delete", async () => {
-  const uid = await standIn.createUser({ email: "delete.user@example.com" });
+  const uid = await standIn.createUser({ email: em("delete.user") });
   const { page } = await newPage();
-  await signIn(page, "delete.user@example.com");
+  await signIn(page, em("delete.user"));
   await page.locator(".empty-state").waitFor({ timeout: 20000 });
-  await page.locator(".composer-attach-input").setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
-  await page.waitForFunction(() => (document.querySelector(".composer-input") as HTMLTextAreaElement).value.includes("documents/"), null, { timeout: 15000 });
+  for (const n of [1, 2]) {
+    await page.locator(".composer-attach-input").setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
+    await until(async () => ((await db.objects(uid)).length === n ? true : false), 15000);
+  }
+  eq((await db.objects(uid)).map((o) => o.name.replace(`users/${uid}/ws/`, "")), ["documents/cv-2.pdf", "documents/cv.pdf"], "upload: re-attaching the same name lands at …-2.pdf (§ 2)");
   await say(page, "hello there"); // one measured step so the next estimate prices from this chat
   await say(page, "find me roles at five more companies"); // a gate row + call rows
   const before = { files: (await db.files(uid)).length, objs: (await db.objects(uid)).length, gates: (await db.gates(uid)).length, ledger: await db.ledger(uid) };
-  rec(before.files >= 1 && before.objs === 1 && before.gates === 1 && before.ledger.some((r) => r.kind === "call"), "delete: seeded workspace, object, gate row, call rows", JSON.stringify({ ...before, ledger: before.ledger.length }));
+  rec(before.files >= 1 && before.objs === 2 && before.gates === 1 && before.ledger.some((r) => r.kind === "call"), "delete: seeded workspace, object, gate row, call rows", JSON.stringify({ ...before, ledger: before.ledger.length }));
   await page.locator(".menu-trigger").click();
   await page.getByRole("menuitem", { name: "Delete my beta data" }).click();
   const dlg = page.locator(".delete-confirm-card");
@@ -831,7 +935,8 @@ await section("delete", async () => {
     dText.includes("This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. Your usage records, which show only amounts spent and no content, are kept."),
     "delete: C § 8's sentence word for word, incl. the kept-usage sentence (§ 1.7.2)",
   );
-  const fnCalls = () => standIn.log.filter((l) => l.path === "/functions/v1/ten-delete-account" && l.method === "POST").length;
+  const fnBase = standIn.log.filter((l) => l.path === "/functions/v1/ten-delete-account" && l.method === "POST").length;
+  const fnCalls = () => standIn.log.filter((l) => l.path === "/functions/v1/ten-delete-account" && l.method === "POST").length - fnBase;
   const input = dlg.locator("input[type=text]");
   await input.fill("sure");
   await input.press("Enter");
@@ -841,28 +946,32 @@ await section("delete", async () => {
   await dlg.locator("button[type=submit]").click();
   await page.waitForTimeout(400);
   rec(fnCalls() === 0, "delete: clicking the button with no typed yes does nothing");
+  rec(!dText.includes("There is no button"), "delete: the copy no longer claims 'there is no button' next to a Submit button (item 8)", dText.slice(0, 300));
   const btnLabels = await dlg.locator("button").allTextContents();
   rec(!btnLabels.some((b) => /^(delete|confirm|yes)/i.test(b.trim())), "delete: no button that confirms by itself", btnLabels.join(" | "));
   await input.fill("yes");
   await input.press("Enter");
   const done = await until(async () => ((await page.getByText("Deleted. You're signed out of Ten").count()) ? true : false), 15000);
   rec(!!done, "delete: typed yes -> the function ran -> the report-back line (§ 1.7.4)");
-  const call = standIn.log.find((l) => l.path === "/functions/v1/ten-delete-account" && l.method === "POST");
+  const sessionWhenToldSignedOut = await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes("auth-token") && localStorage.getItem(k)));
+  rec(!sessionWhenToldSignedOut, "delete: when the report-back says \"You're signed out of Ten\", the session is actually gone (sign-out ordering)", sessionWhenToldSignedOut ? "session still stored until OK is clicked" : "");
+  const call = standIn.log.filter((l) => l.path === "/functions/v1/ten-delete-account" && l.method === "POST").slice(-1)[0];
   rec(fnCalls() === 1 && verifyJwt(/^Bearer (.+)$/.exec(call?.auth ?? "")?.[1] ?? "")?.sub === uid && call?.status === 200, "delete: ten-delete-account called once, with the user's JWT, 200", JSON.stringify({ n: fnCalls(), status: call?.status }));
   const afterL = await db.ledger(uid);
   rec((await db.files(uid)).length === 0 && (await db.objects(uid)).length === 0 && (await db.gates(uid)).length === 0, "delete: no text rows, no objects, no gate rows left");
   rec(!afterL.some((r) => r.kind === "credit") && afterL.filter((r) => r.kind === "call").length === before.ledger.filter((r) => r.kind === "call").length, "delete: credit rows gone, call rows kept (§ 8)");
   rec((await standIn.sql("select 1 from auth.users where id = $1", [uid])).length === 1, "delete: the shared sign-in (auth user) is kept");
-  await page.locator(".delete-confirm-card button", { hasText: "OK" }).click();
+  if (await page.locator(".delete-confirm-card button", { hasText: "OK" }).count()) await page.locator(".delete-confirm-card button", { hasText: "OK" }).click();
   await page.locator(".sign-in-screen").waitFor({ timeout: 10000 });
+  rec(!(await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes("auth-token") && localStorage.getItem(k)))), "delete: session cleared after sign-out");
   rec(true, "delete: OK -> signed out to the sign-in screen");
-  await signIn(page, "delete.user@example.com");
+  await signIn(page, em("delete.user"));
   await page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
   rec(true, "delete: signing back in -> not a member (the credit is gone)");
   // decline path, fresh user
-  const uid2 = await standIn.createUser({ email: "delete.decline@example.com" });
+  const uid2 = await standIn.createUser({ email: em("delete.decline") });
   const { page: p2 } = await newPage();
-  await signIn(p2, "delete.decline@example.com");
+  await signIn(p2, em("delete.decline"));
   await p2.locator(".empty-state").waitFor({ timeout: 20000 });
   await p2.locator(".menu-trigger").click();
   await p2.getByRole("menuitem", { name: "Delete my beta data" }).click();
@@ -878,9 +987,9 @@ await section("delete", async () => {
 await section("refresh", async () => {
   // expires_in 95 s: supabase-js refreshes when <= 3 ticks (90 s) remain,
   // so a refresh fires within one 30 s tick of sign-in (and every tick after).
-  const uid = await standIn.createUser({ email: "refresh.user@example.com", expiresIn: 95 });
+  const uid = await standIn.createUser({ email: em("refresh.user"), expiresIn: 95 });
   const { page } = await newPage();
-  await signIn(page, "refresh.user@example.com");
+  await signIn(page, em("refresh.user"));
   await page.locator(".composer-input").waitFor({ timeout: 20000 });
   await say(page, "hello before refresh");
   const firstCount = standIn.issued.get(uid)?.length ?? 0;
@@ -888,8 +997,8 @@ await section("refresh", async () => {
   const refreshed = await until(async () => ((standIn.issued.get(uid)?.length ?? 0) > firstCount ? true : false), 70000, 500);
   rec(!!refreshed, "refresh: supabase-js refreshed the session (a new JWT was issued)", `${standIn.issued.get(uid)?.length} token(s)`);
   await page.waitForTimeout(2500);
-  const memberChecks = standIn.log.filter((l) => l.path === "/rest/v1/rpc/ten_is_member" && verifyJwt(/^Bearer (.+)$/.exec(l.auth)?.[1] ?? "")?.sub === uid).length;
-  rec(true, "refresh: ten_is_member() calls for this user so far (info: 1 = checked once at sign-in)", String(memberChecks));
+  const memberChecks = standIn.log.filter((l) => l.path === "/rest/v1/rpc/ten_is_member" && l.origin !== "" && verifyJwt(/^Bearer (.+)$/.exec(l.auth)?.[1] ?? "")?.sub === uid).length;
+  rec(memberChecks === 1, "refresh: no re-setup on TOKEN_REFRESHED (ten_is_member() called once, at sign-in)", String(memberChecks));
   const bubblesAfter = await page.locator(".bubble").count().catch(() => 0);
   rec(bubblesAfter === bubblesBefore && bubblesBefore >= 2, "refresh: the transcript survives a TOKEN_REFRESHED (the chat is not torn down)", `bubbles before ${bubblesBefore} after ${bubblesAfter}`);
   await page.locator(".composer-input").waitFor({ timeout: 20000 });
@@ -903,9 +1012,9 @@ await section("refresh", async () => {
 
 // ================================================================ PHONE (375px)
 await section("phone", async () => {
-  await standIn.createUser({ email: "phone.user@example.com" });
+  await standIn.createUser({ email: em("phone.user") });
   const { page } = await newPage({ viewport: { width: 375, height: 812 } });
-  await signIn(page, "phone.user@example.com");
+  await signIn(page, em("phone.user"));
   await page.locator(".empty-state").waitFor({ timeout: 20000 });
   await say(page, "hello from a phone");
   const last = (await lastAssistant(page).textContent().catch(() => "")) ?? "";
@@ -915,25 +1024,89 @@ await section("phone", async () => {
   await page.context().close();
 });
 
-// ================================================================ OTHER BROWSERS (CORS)
-await section("browsers", async () => {
-  for (const [name, bt] of [["firefox", firefox], ["webkit", webkit]] as const) {
-    try {
-      browsers[name] = await bt.launch();
-    } catch (e) {
-      rec(false, `${name}: launch`, String(e).slice(0, 200));
-      continue;
-    }
-    await standIn.createUser({ email: `${name}.user@example.com` });
-    const { page } = await newPage({ browser: name });
-    await signIn(page, `${name}.user@example.com`);
-    await page.locator(".composer-input").waitFor({ timeout: 30000 });
-    await say(page, "hello from another browser");
-    const last = (await lastAssistant(page).textContent().catch(() => "")) ?? "";
-    const pre = standIn.log.filter((l) => l.method === "OPTIONS" && l.path.startsWith("/functions/v1/ten-model-proxy")).slice(-1)[0];
-    rec(last.includes("Hi — I'm here."), `${name}: a model turn streams through the proxy (CORS preflight passes)`, `${last.slice(0, 200)} | last preflight asked for: ${pre?.acrh ?? "(none)"}`);
+// ================================================================ CORS without interception (item 2)
+await section("cors", async () => {
+  await noRouteBrowser(BROWSER);
+  await standIn.createUser({ email: em("cors.user") });
+  const t0 = Date.now();
+  const { page } = await newPage({ noRoute: true });
+  await signIn(page, em("cors.user"));
+  await page.locator(".composer-input").waitFor({ timeout: 20000 });
+  await say(page, "hello, real preflight");
+  const last = (await lastAssistant(page).textContent().catch(() => "")) ?? "";
+  const pre = standIn.log.filter((l) => l.at >= t0 && l.method === "OPTIONS" && l.path.startsWith("/functions/v1/ten-model-proxy"));
+  const bad = pre.filter((l) => {
+    const allowed = (l.acah ?? "").toLowerCase().split(",").map((x) => x.trim());
+    return l.status !== 204 || l.acrh.toLowerCase().split(",").map((x) => x.trim()).filter(Boolean).some((h) => !allowed.includes(h));
+  });
+  rec(last.includes("Hi — I'm here.") && pre.length > 0 && bad.length === 0, "CORS (no interception): a real preflight reaches the proxy and every requested header is allowed; the turn streams", `${pre.length} preflight(s); requested: ${[...new Set(pre.map((l) => l.acrh))].join(" / ")}; allowed: ${pre[0]?.acah ?? "-"}; reply: ${last.slice(0, 60)}`);
+  await page.context().close();
+});
+
+// ================================================================ SETUP ERRORS (fix round 1, item 4)
+await section("setup", async () => {
+  // Force each post-sign-in setup step to fail; expect a plain error screen
+  // with Retry and Sign out (never blank), then Retry recovers.
+  for (const fn of ["ten_is_member", "ten_ws_write", "ten_balance"]) {
+    await standIn.createUser({ email: em(`setup.${fn.replace(/_/g, "")}`) });
+    const { page } = await newPage();
+    const url = `${standIn.url}/rest/v1/rpc/${fn}`;
+    await page.route(url, (r: any) => r.fulfill({ status: 500, headers: { "content-type": "application/json", "access-control-allow-origin": "*" }, body: JSON.stringify({ code: "XX000", message: "stand-in: forced failure" }) }));
+    await signIn(page, em(`setup.${fn.replace(/_/g, "")}`));
+    const shown = await page.locator(".app-shell--config-error").waitFor({ timeout: 15000 }).then(() => true, () => false);
+    const text = ((await page.locator(".app-shell--config-error p").allTextContents().catch(() => [])) ?? []).join(" ").trim();
+    rec(shown && text.length > 0, `setup: a failing ${fn} -> an error screen, not blank`, text.slice(0, 200));
+    const buttons = await page.locator(".app-shell--config-error button").allTextContents();
+    rec(buttons.includes("Retry") && buttons.includes("Sign out"), `setup: ${fn} failure offers Retry and Sign out`, buttons.join(" | "));
+    rec(!/HTTP|\{|failed:|rpc|ten_[a-z_]+\(/.test(text), `setup: ${fn} failure message is plain (no raw error text)`, text.slice(0, 200));
+    await page.unroute(url);
+    await page.locator(".app-shell--config-error button", { hasText: "Retry" }).click();
+    const recovered = await page.locator(".empty-state").waitFor({ timeout: 15000 }).then(() => true, () => false);
+    rec(recovered, `setup: Retry after the ${fn} failure reaches the chat`);
     await page.context().close();
   }
+  // Sign out from the error screen
+  await standIn.createUser({ email: em("setup.signout") });
+  const { page } = await newPage();
+  await page.route(`${standIn.url}/rest/v1/rpc/ten_is_member`, (r: any) => r.fulfill({ status: 500, headers: { "access-control-allow-origin": "*" }, body: "{}" }));
+  await signIn(page, em("setup.signout"));
+  await page.locator(".app-shell--config-error").waitFor({ timeout: 15000 });
+  await page.locator(".app-shell--config-error button", { hasText: "Sign out" }).click();
+  rec(await page.locator(".sign-in-screen").waitFor({ timeout: 10000 }).then(() => true, () => false), "setup: Sign out from the error screen returns to sign-in");
+  await page.context().close();
+});
+
+// ================================================================ UPLOAD ERRORS via the UI (item 7)
+await section("uploads", async () => {
+  const attachErr = async (page: any) =>
+    until(async () => ((await page.locator(".composer-attach-error").count()) ? ((await page.locator(".composer-attach-error").textContent()) ?? "") : false), 15000);
+  // case-variant clash
+  const u1 = await standIn.createUser({ email: em("upload.clash") });
+  await standIn.backend.seedObject(u1, "documents/CV.pdf", PDF_BYTES);
+  let { page } = await newPage();
+  await signIn(page, em("upload.clash"));
+  await page.locator(".composer-input").waitFor({ timeout: 20000 });
+  await page.locator(".composer-attach-input").setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
+  eq(await attachErr(page), "cv.pdf clashes with an existing file or folder (a name that only differs by capitalization counts as a clash).", "upload: a case-variant clash reads the path_conflict message");
+  await page.context().close();
+  // the 50-object cap
+  const u2 = await standIn.createUser({ email: em("upload.cap") });
+  for (let i = 0; i < 50; i++) await standIn.backend.seedObject(u2, `documents/f${i}.pdf`, PDF_BYTES);
+  ({ page } = await newPage());
+  await signIn(page, em("upload.cap"));
+  await page.locator(".composer-input").waitFor({ timeout: 20000 });
+  await page.locator(".composer-attach-input").setInputFiles({ name: "one-more.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
+  eq(await attachErr(page), "Your workspace is at its file limit. Remove something before uploading more.", "upload: the 51st object reads the workspace-full message");
+  await page.context().close();
+  // membership lost mid-session
+  const u3 = await standIn.createUser({ email: em("upload.lapsed") });
+  ({ page } = await newPage());
+  await signIn(page, em("upload.lapsed"));
+  await page.locator(".composer-input").waitFor({ timeout: 20000 });
+  await standIn.sql("delete from public.ten_usage_ledger where user_id = $1 and kind = 'credit'", [u3]);
+  await page.locator(".composer-attach-input").setInputFiles({ name: "cv.pdf", mimeType: "application/pdf", buffer: PDF_BYTES });
+  eq(await attachErr(page), NON_MEMBER, "upload: membership lost mid-session reads the non-member sentence");
+  await page.context().close();
 });
 
 // ================================================================ ENV HANDLING
@@ -941,25 +1114,45 @@ await section("env", async () => {
   const noEnvDir = path.join(tmpRoot, "dist-noenv");
   const b = build(noEnvDir, {});
   rec(b.ok, "env: a production build with no VITE_ env still builds", `${b.ms} ms`);
-  web.setRoot(noEnvDir);
+  setRoot(noEnvDir);
   const { page } = await newPage();
   await page.waitForTimeout(1500);
-  const t = (await page.locator("body").textContent()) ?? "";
+  const t = (await page.locator("#root").textContent()) ?? "";
   rec(t.includes("Ten isn't configured") && t.includes("VITE_SUPABASE_URL") && t.includes("VITE_SUPABASE_ANON_KEY"), "env: missing Supabase vars -> a plain config-error screen, not blank", t.trim().slice(0, 200));
   await page.context().close();
 
   const noSiteDir = path.join(tmpRoot, "dist-nosite");
   const b2 = build(noSiteDir, { VITE_SUPABASE_URL: standIn.url, VITE_SUPABASE_ANON_KEY: ANON_KEY });
   rec(b2.ok, "env: build without VITE_SITE_URL", `${b2.ms} ms`);
-  web.setRoot(noSiteDir);
+  setRoot(noSiteDir);
   const errsBefore = pageErrors.length;
   const { page: p2 } = await newPage();
   await p2.waitForTimeout(2500);
-  const t2 = ((await p2.locator("body").textContent()) ?? "").trim();
+  const t2 = ((await p2.locator("#root").textContent()) ?? "").trim();
   rec(t2.includes("VITE_SITE_URL"), "env: VITE_SITE_URL is required -> missing it names it on a config screen (README: required)", `body=${JSON.stringify(t2.slice(0, 200))} pageerrors=${JSON.stringify(pageErrors.slice(errsBefore)).slice(0, 300)}`);
   await p2.context().close();
-  web.setRoot(prodDir);
+  setRoot(servedProdDir);
 });
+
+}
+
+for (const b of BROWSER_LIST) {
+  BROWSER = b;
+  TAG = b;
+  exportZip = undefined;
+  if (!browsers[b]) {
+    try {
+      browsers[b] = await browserTypes[b].launch();
+    } catch (e) {
+      rec(false, `${b}: launch (npx playwright install ${b} in apps/web)`, String(e).slice(0, 200));
+      continue;
+    }
+  }
+  console.log(`\n######## ${b}`);
+  await runSuite();
+}
+TAG = "";
+BROWSER = "chromium";
 
 // ================================================================ PREVIEW BUILD
 await section("preview", async () => {
@@ -968,7 +1161,7 @@ await section("preview", async () => {
   rec(b.ok, "preview: npm run build with VITE_SHOW_MOCK_CONTROLS=1", `${b.ms} ms`);
   const txt = bundleText(prevDir);
   rec(txt.includes("Preview: fixture"), "preview: the preview bundle still has the mock's fixture picker");
-  web.setRoot(prevDir);
+  setRoot(prevDir);
   // async spawn: this process also serves the build (a sync spawn would block it)
   const r: { status: number | null; stdout: string } = await new Promise((resolve) => {
     const c = spawn("node", [path.join(REPO, "tests/web/e2e.mjs"), ORIGIN + "/"], { cwd: REPO, env: { ...process.env, SHOTS: tmpRoot } });
@@ -981,7 +1174,7 @@ await section("preview", async () => {
   const passes = (r.stdout.match(/^PASS /gm) ?? []).length;
   if (r.status !== 0 && !fails.length) console.log(r.stdout.slice(-1500));
   rec(r.status === 0 && fails.length === 0, "preview: tests/web/e2e.mjs (the 5a mock e2e) against the preview build", `${passes} pass, ${fails.length} fail${fails.length ? ": " + fails.join(" | ").slice(0, 600) : ""}`);
-  web.setRoot(prodDir);
+  setRoot(servedProdDir);
 });
 
 // ------------------------------------------------------------------ wrap up
@@ -991,9 +1184,9 @@ const responsesWithKey = standIn.log.filter((l) => l.auth.includes(OPENROUTER_CA
 rec(responsesWithKey.length === 0, "secrets: the OpenRouter key never appears on any request through the Supabase origin");
 const browserSvc = standIn.log.filter((l) => l.origin && (l.auth.includes(SERVICE_KEY) || l.apikey.includes(SERVICE_KEY)));
 rec(browserSvc.length === 0, "secrets: no browser (Origin-bearing) request ever carries the service-role key");
-if (pageErrors.length) console.log("page errors:\n  " + pageErrors.slice(0, 20).join("\n  "));
+if (pageErrors.length) console.log("page errors:\n  " + pageErrors.slice(0, 40).join("\n  "));
 
-for (const b of Object.values(browsers)) await b.close();
+for (const b of [...Object.values(browsers), ...Object.values(noRouteBrowsers)]) await b.close();
 deno.kill();
 await stub.close();
 await standIn.close();

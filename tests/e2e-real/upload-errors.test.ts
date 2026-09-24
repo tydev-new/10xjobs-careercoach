@@ -16,7 +16,7 @@ import { uploadWithClashRenumber } from "../../apps/web/src/backend/upload-error
 import { ANON, SUPABASE_URL, createBackend, type Backend } from "../store/pglite-backend.ts";
 
 const PDF = new TextEncoder().encode("%PDF-1.4 tester fixture\n%%EOF");
-const NON_MEMBER = "Ten is in a private beta. Ask the person who invited you for access.";
+const NON_MEMBER = "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.";
 
 let shared: Backend | undefined;
 async function be(): Promise<Backend> {
@@ -66,7 +66,7 @@ test("SPEC: the 51st object reads the workspace-full message, not 'check the nam
   assert.equal(out.message, "Your workspace is at its file limit. Remove something before uploading more.", `got: ${out.message}`);
 });
 
-test("a case-variant clash (CV.pdf vs cv.pdf) mentions capitalization (best-effort 400 branch)", async () => {
+test("a case-variant clash (CV.pdf vs cv.pdf) reads the path_conflict message (mentions capitalization)", async () => {
   const b = await be();
   const uid = await b.newUser({ member: true });
   const s = storeOn(b, uid);
@@ -74,4 +74,16 @@ test("a case-variant clash (CV.pdf vs cv.pdf) mentions capitalization (best-effo
   const out = await uploadWithClashRenumber(s, "CV.pdf", PDF);
   assert.equal(out.ok, false);
   assert.match(out.message ?? "", /capitali[sz]ation/, `got: ${out.message}`);
+});
+
+test("SPEC: the cap is recognized even when some objects sit deeper than list()'s depth 3 (ten_object_count counts every object)", async () => {
+  // A zip import can create deep paths; the policy counts them, so the
+  // classifier (which counts from list(), depth <= 3) must too.
+  const b = await be();
+  const uid = await b.newUser({ member: true });
+  for (let i = 0; i < 45; i++) await b.seedObject(uid, `documents/f${i}.pdf`, PDF);
+  for (let i = 0; i < 5; i++) await b.seedObject(uid, `archive/2025/q1/deep/d${i}.pdf`, PDF);
+  const out = await uploadWithClashRenumber(storeOn(b, uid), "one-more.pdf", PDF);
+  assert.equal(out.ok, false);
+  assert.equal(out.message, "Your workspace is at its file limit. Remove something before uploading more.", `got: ${out.message}`);
 });

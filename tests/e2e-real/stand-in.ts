@@ -69,6 +69,11 @@ export interface LoggedRequest {
   origin: string;
   /** Access-Control-Request-Headers on a preflight */
   acrh: string;
+  /** Access-Control-Allow-Headers on the function's response */
+  acah?: string;
+  /** declared Content-Length / Transfer-Encoding, and bytes actually received */
+  cl?: string;
+  bodyLen?: number;
   status?: number;
 }
 
@@ -191,6 +196,7 @@ export async function startStandIn(): Promise<StandIn> {
       const headers = { ...req.headers, host: target.host };
       const up = http.request(target, { method: req.method, headers }, (ur) => {
         entry.status = ur.statusCode;
+        entry.acah = String(ur.headers["access-control-allow-headers"] ?? "");
         res.writeHead(ur.statusCode ?? 502, ur.headers);
         ur.pipe(res);
       });
@@ -220,6 +226,8 @@ export async function startStandIn(): Promise<StandIn> {
     const chunks: Buffer[] = [];
     for await (const c of req) chunks.push(c as Buffer);
     const raw = Buffer.concat(chunks);
+    entry.cl = String(req.headers["content-length"] ?? (req.headers["transfer-encoding"] ? "te:" + req.headers["transfer-encoding"] : ""));
+    entry.bodyLen = raw.length;
     const send = (status: number, body: unknown, extra: Record<string, string> = {}) => {
       entry.status = status;
       if (status === 204) {

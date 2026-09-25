@@ -18,12 +18,19 @@
 //   - any of the above cited with a trailing :N or :N-M line reference
 //     (the hand-back report format) — the line ref is stripped before
 //     checking, e.g. apps/web/src/x.tsx:433, /abs/coach.ts:272
+//   - any of the above cited with a trailing #fragment (a Markdown anchor,
+//     e.g. docs/PROCESS.md#the-ritual-in-order) — stripped the same way
+//     (fragment first, then line ref)
 //   - any of the above as a Markdown link target — [text](path/to/file.md)
 //   - any of the above wrapped in backticks or double quotes as a single
 //     token, spaces allowed — `has space/real file.md`, "docs/my notes.md"
-//     (single quotes are deliberately NOT a delimiter: an ordinary
-//     contraction like "don't" pairs unpredictably and would swallow
-//     prose as a false path candidate)
+//     — but ONLY when the whole trimmed span itself is one path: a
+//     backticked COMMAND like `node scripts/x.mjs --seed 7` or a
+//     double-quoted SENTENCE like "I wrote docs/x.md and more" is left to
+//     the plain tokenizer below instead, which finds the real path inside
+//     it word by word (single quotes are deliberately never a delimiter:
+//     an ordinary contraction like "don't" pairs unpredictably and would
+//     swallow prose as a false path candidate)
 //
 // URLs (http/https/mailto) and code-looking tokens (no slash, or a slash
 // with no trailing extension — division, "and/or", SCREAMING_CASE, a bare
@@ -45,6 +52,9 @@ const TRAILING_TRIM = /[`'"()[\]{}.,;:!?*_<>]+$/;
 // A trailing "report format" line reference — :433 or :20-24 — stripped
 // before a path is checked, not treated as part of the path itself.
 const LINE_REF = /:\d+(?:-\d+)?$/;
+// A trailing Markdown anchor — #section — stripped the same way, and
+// before the line-ref strip (fragment first, then line ref).
+const FRAGMENT_REF = /#\S*$/;
 // Whole-token delimiters: content between a matching pair is one
 // candidate, internal spaces preserved. Deliberately backtick + double
 // quote only (see the file-header note on single quotes).
@@ -59,12 +69,32 @@ function cleanToken(tok) {
   return tok.replace(LEADING_TRIM, "").replace(TRAILING_TRIM, "");
 }
 
+function stripFragment(tok) {
+  return tok.replace(FRAGMENT_REF, "");
+}
+
 function stripLineRef(tok) {
   return tok.replace(LINE_REF, "");
 }
 
 function isUrlLike(tok) {
   return /^https?:\/\//i.test(tok) || /^mailto:/i.test(tok) || /^www\./i.test(tok);
+}
+
+// A candidate with an internal space is only a single real path if the
+// path itself starts immediately — i.e. a "/" appears before the first
+// space. That's true of a genuinely spaced filename (`docs/my notes.md`,
+// `/tmp/has space/real file.md`, both start with a path segment) and
+// false of a command line (`node scripts/x.mjs --seed 7`, `python3
+// tests/run.py` — a bare word with no slash comes before the first
+// space). A token with no space at all trivially passes (nothing to
+// check) — this only ever matters for backtick/quote span candidates;
+// a plain whitespace-split token can never contain a space to begin with.
+function hasSlashBeforeFirstSpace(tok) {
+  const spaceIdx = tok.indexOf(" ");
+  if (spaceIdx === -1) return true;
+  const slashIdx = tok.indexOf("/");
+  return slashIdx !== -1 && slashIdx < spaceIdx;
 }
 
 /**
@@ -95,29 +125,40 @@ export function classify(tok) {
   const afterSlash = tok.slice(lastSlash + 1);
   if (!/\.[A-Za-z0-9]+$/.test(afterSlash)) return null; // slash but no extension: "and/or", "N/A"
   if (!/^[A-Za-z0-9_.\-/ ]+$/.test(tok)) return null; // leftover punctuation: not a clean path
+  if (!hasSlashBeforeFirstSpace(tok)) return null; // a command line, not a spaced filename
   return { kind: "repo", raw: tok };
 }
 
+/** cleanToken -> stripFragment -> stripLineRef -> classify, in that order — the one pipeline every candidate (whitespace token, Markdown link target, or quoted span) goes through. */
+function toCandidate(raw) {
+  return classify(stripLineRef(stripFragment(cleanToken(raw))));
+}
+
 /**
- * Pull out backtick- and double-quote-delimited spans as whole candidates
- * (spaces preserved), and return the text with those spans blanked out —
- * so the plain whitespace tokenizer below never also sees, and mis-splits,
- * the same spaced path into bogus fragments.
+ * Pull out backtick- and double-quote-delimited spans. A span becomes ONE
+ * whole candidate (spaces preserved) — and is blanked out of the
+ * returned text, so the plain whitespace tokenizer below never also sees
+ * and mis-splits it — only when the ENTIRE trimmed span itself classifies
+ * as a path. Otherwise the span is left untouched in the returned text,
+ * so its contents (e.g. a command's script argument, or a path named
+ * mid-sentence) go through the normal whitespace tokenizer like any other
+ * text.
  */
 function extractQuotedSpans(text) {
   const spans = [];
-  for (const re of [BACKTICK_RE, DOUBLE_QUOTE_RE]) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(text))) spans.push(m[1]);
-  }
-  const remaining = text.replace(BACKTICK_RE, " ").replace(DOUBLE_QUOTE_RE, " ");
+  const maybeBlank = (full, inner) => {
+    const candidate = toCandidate(inner);
+    if (!candidate) return full; // not a whole path itself — leave it in place
+    spans.push(candidate);
+    return " ";
+  };
+  const remaining = text.replace(BACKTICK_RE, maybeBlank).replace(DOUBLE_QUOTE_RE, maybeBlank);
   return { spans, remaining };
 }
 
 /** Extract an ordered, de-duplicated list of classified path candidates from free text. */
 export function extractPaths(text) {
-  const { spans: quotedSpans, remaining: withoutQuoted } = extractQuotedSpans(text);
+  const { spans: quotedCandidates, remaining: withoutQuoted } = extractQuotedSpans(text);
 
   // Strip whole URLs so a URL's own /path/segments never get
   // mis-tokenized as a separate path reference.
@@ -131,18 +172,18 @@ export function extractPaths(text) {
     if (target) mdLinkTargets.push(target);
   }
 
-  const rawCandidates = [...quotedSpans, ...mdLinkTargets, ...withoutUrls.split(/\s+/)];
-
   const seen = new Set();
   const out = [];
-  for (const rawTok of rawCandidates) {
-    const cleaned = stripLineRef(cleanToken(rawTok));
-    const c = classify(cleaned);
-    if (!c) continue;
-    if (seen.has(c.raw)) continue;
+  const add = (c) => {
+    if (!c || seen.has(c.raw)) return;
     seen.add(c.raw);
     out.push(c);
-  }
+  };
+
+  for (const c of quotedCandidates) add(c);
+  for (const rawTarget of mdLinkTargets) add(toCandidate(rawTarget));
+  for (const rawTok of withoutUrls.split(/\s+/)) add(toCandidate(rawTok));
+
   return out;
 }
 

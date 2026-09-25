@@ -7,7 +7,8 @@
 disagree, § 9 wins. Again 2026-09-24: § 11 (the conversation is kept;
 owner requirement) and § 12 (a turn that grows too large), both approved
 by the owner as written (2026-09-24). Each wins over earlier text it names.
-Again 2026-09-24: § 13 (the site's model is a setting; PENDING OWNER).
+Again 2026-09-24: § 13 (the site's model is a setting; approved by the owner,
+2026-09-24, with the answers in § 13.6).
 Again 2026-09-24: § 14 (web search is billed per request; owner request).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
@@ -1496,8 +1497,9 @@ shortened ((i) through the real `@openrouter/ai-sdk-provider`, then
 
 ## 13. The site's model is a setting (amendment, 2026-09-24)
 
-**PENDING OWNER.** Owner request (2026-09-24): "change the LLM to deepseek
-to save testing cost". Where this section and an earlier one disagree,
+**Approved by the owner (2026-09-24)**, with the four answers in § 13.6.
+Owner request (2026-09-24): "change the LLM to deepseek to save testing
+cost". Where this section and an earlier one disagree,
 this one wins; § 8 and § 9.5 point here. It ships after § 10–12.
 
 **What changes.** The proxy allows exactly two models. One build setting
@@ -1577,8 +1579,8 @@ ceiling constants. Everything else in § 8 is unchanged.
   **This raises Claude's ceiling** from § 9.5's $0.21692, which used the
   global $2/$10 and no cache write. A regional host plus a cache write can
   cost up to $0.273 per call today, so § 8's "each ≤ the ceiling" was not
-  true. **PENDING OWNER** as its own decision: if the owner declines, the
-  Claude row stays $0.21692 and § 8's bound carries that caveat.
+  true. **Approved** (owner, 2026-09-24; § 13.6 (1)): Claude's ceiling is
+  $0.273112, so § 8's bound holds again.
 - **Ceiling uses:** the meter's fallback charge (missing cost, deadline)
   and the 10× sanity bound both use the **request's** model's ceiling.
   A DeepSeek cost above $0.43288 is recorded as that model's ceiling.
@@ -1677,7 +1679,7 @@ live dogfood receipt. DeepSeek is for testing plumbing and cost. A DeepSeek
 run is evidence about the pipes, never about coaching quality, and no B1
 deletion may be justified by a DeepSeek run. The plan's B2 still holds: a
 model offered to beta members must pass the conduct subset first, or it
-is dropped (see open question 2).
+is dropped (§ 13.6 (2)).
 
 What to watch in DeepSeek runs (ledger and chat, numbers only):
 
@@ -1714,8 +1716,8 @@ What to watch in DeepSeek runs (ledger and chat, numbers only):
   `{ data_collection: "deny", zdr: true, require_parameters: true }`;
   `max_tokens` 8,192 for a client 20,000 and 100 for 100; `stream: true`;
   the web plugin rewrite is the same as Claude's.
-- **(iv) Ceiling per model:** the table's values are 0.273112 (or
-  0.21692 if declined) and 0.043288 (1e-9). A DeepSeek call with no
+- **(iv) Ceiling per model:** the table's values are 0.273112 and
+  0.043288 (1e-9). A DeepSeek call with no
   `usage.cost` and one that passes the deadline both record $0.043288; a
   Claude call records Claude's ceiling. A DeepSeek cost of $0.60 is
   recorded as $0.043288; the same $0.60 on Claude is recorded as $0.60
@@ -1756,14 +1758,56 @@ worst case (the meter's deadline fallback covers a slow host); whether
 `require_parameters` interacts with the web plugin ((xi)); that § 12's
 160,000-byte budget stays under 64k DeepSeek tokens ((xi)'s `tokens_in`).
 
-**Open for the owner:** (1) Claude's ceiling to $0.273112, or keep
-$0.21692 (both with § 14's search term). (2) While the site runs DeepSeek, will outside beta members use
-it? B2 says a model offered to them passes the conduct subset first. The
-recommendation: DeepSeek only while the owner and informed testers are
-the active users, with the menu line in place. (3) The processors change:
-about 20 hosting companies (Together, Fireworks, DeepInfra, …), all
-no-data-kept. The plan's Risks section says to name them in the privacy
-terms. (4) The menu wording "(testing)".
+### 13.6 Resolved (owner, 2026-09-24)
+
+The owner approved § 13 as written, with these four answers.
+
+1. **Claude's ceiling is raised** to the dearest allowed host, including the
+   cache-write price: **$0.273112**, using § 14's search term. The approval
+   quoted $0.286112, the figure § 13 showed before § 14 changed the search
+   term from $0.02 to $0.007. The approved basis is the same. § 8's "each
+   call ≤ the ceiling" holds again.
+2. **DeepSeek runs only while the owner and testers who know about it are
+   the active users.** Before any outside beta member is invited, the
+   site goes back to Claude (remove `VITE_COACH_MODEL`, run
+   `deploy-prod.sh`). Plan step B2 stands: a model offered to outside
+   members passes the conduct subset first.
+3. **The privacy terms name the processors**, as described below.
+4. **The menu label keeps "(testing)"**, word for word as in § 13.3.
+
+**Where the processor list lives.** The product has no privacy terms yet.
+This starts them, and they **ship with § 13**, in the same site deploy.
+
+- **One page:** `apps/web/public/privacy.html`, served at `/privacy.html`.
+  It is the only copy candidates see. The `⋯` menu gets a `Privacy` link
+  to it, just above the model line, in real and mock mode.
+- **What it says**, in plain words:
+  - what the model's host receives: the turn's messages, the files the
+    coach reads, and tool results;
+  - that every call goes through OpenRouter, routed only to hosts that
+    keep no data and don't collect it for training;
+  - that web searches go to Exa through OpenRouter;
+  - the hosts for each model, as read from `GET /api/v1/endpoints/zdr`
+    on 2026-09-24, with that date:
+    - **Claude Sonnet 5:** Amazon Bedrock, Google Vertex AI.
+    - **DeepSeek V4.1 Flash:** BaseTen, CoreWeave, DeepInfra, DekaLLM
+      (web-search calls only: it lists no tool support, so § 13.1's
+      `require_parameters` keeps tool calls off it), DigitalOcean,
+      Fireworks, Krea, Makora, Modal, Morph, NextBit, Novita,
+      OpenInference, Parasail, Phala, Relace, Sail Research, SiliconFlow,
+      Together, Venice, Wafer.
+  - that OpenRouter picks among the hosts that keep no data at the time of
+    each call, so the list can change, and that DeepSeek's own API is
+    never used.
+- **One place per fact** (rule 12): this section holds the list to copy,
+  and the page is the only candidate-facing copy. The menu line (§ 13.3)
+  says which model runs, and the page says who can process it.
+- **Refresh:** read the list again, with the new date, whenever a model
+  is added to § 13's table or the site switches models.
+
+Test (xii), added to § 13.5: the build output has `/privacy.html`. It
+names OpenRouter, Exa, every host above and the date, and the `⋯` menu
+links to it in both modes.
 
 ---
 
@@ -1953,10 +1997,17 @@ spike replaced (owner, 2026-09-23).
 - A long turn trims itself (§ 12; approved as written, owner, 09-24): older tool data in the current turn
   becomes a stub before a step would pass 160 KB; the proxy's 256 KB cap
   and the cost ceiling stay. A refusal is its own code, `too_large`.
-- The site's model is a setting (§ 13, PENDING OWNER, 09-24): the proxy
-  allows Claude Sonnet 5 and DeepSeek V4.1 Flash; `VITE_COACH_MODEL` picks
-  one, unset means Claude, a bad value refuses to start. The ceiling and
-  the turn-1 estimate are per model; Claude's request body is unchanged.
+- The site's model is a setting (§ 13, approved by the owner, 09-24): the
+  proxy allows Claude Sonnet 5 and DeepSeek V4.1 Flash; `VITE_COACH_MODEL`
+  picks one, unset means Claude, a bad value refuses to start. The ceiling
+  and the turn-1 estimate are per model; Claude's request body is unchanged.
+  Resolved with it (§ 13.6): Claude's ceiling is raised to the dearest
+  allowed host with a cache write ($0.273112 with § 14's search term; the
+  approval quoted the pre-§ 14 $0.286112); DeepSeek only while the owner and
+  informed testers are the active users, so switch back to Claude before
+  outside members are invited (B2 stands); the privacy terms start as
+  `/privacy.html`, naming OpenRouter, Exa and each model's hosts, and ship
+  with § 13; the menu keeps "(testing)".
 - Fix round 2 of § 10–12 (lead rulings, 09-24): § 9.4 skips an assistant
   message made only of `data-gate-status` parts, so § 11.6's
   reconciliation message can't hide a stop; each reconciliation message

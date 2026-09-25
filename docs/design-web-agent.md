@@ -2214,12 +2214,14 @@ request.
 ### 17.6 Secrets, sandbox, the older app, privacy
 
 Function secrets, owner-set (§ 15): `TEN_PAYPAL_CLIENT_ID`,
-`TEN_PAYPAL_CLIENT_SECRET`, `TEN_PAYPAL_API_BASE`, `TEN_PAYPAL_WEBHOOK_ID`
-(Supabase secrets are project-wide; the prefix keeps them apart). The functions refuse to start
+`TEN_PAYPAL_CLIENT_SECRET`, `TEN_PAYPAL_API_BASE`, `TEN_PAYPAL_WEBHOOK_ID`,
+and the non-secret `TEN_PAYPAL_MERCHANT_ID` (§ 17.10) (Supabase secrets are
+project-wide; the prefix keeps them apart). The functions refuse to start
 unless the base is `https://api-m.sandbox.paypal.com` or
 `https://api-m.paypal.com`. The browser gets only the public
 `VITE_PAYPAL_CLIENT_ID`. `ten-paypal` uses `_shared/cors.ts`. Sandbox
-first; for live, switch secrets, Vercel value, webhook and its id together.
+first; for live, switch secrets (merchant id included), Vercel value,
+webhook and its id together.
 
 The older app's webhook gets every Ten payment too; today it fails on
 `ten:<uuid>`, answers 500 and is retried for 3 days. Its patch:
@@ -2239,9 +2241,11 @@ records survive a delete.
 2. PayPal: the account takes USD without manual acceptance (else payments
    sit `PENDING`); unique invoice ids stays on.
 3. Apply the migration; `NOTIFY pgrst, 'reload schema';`.
-4. `supabase secrets set TEN_PAYPAL_CLIENT_ID=… TEN_PAYPAL_CLIENT_SECRET=…
-   TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com --project-ref
-   ivunfotoggdxbjouumdk`.
+4. Copy the account's merchant ID from PayPal's account settings (the
+   sandbox business account's for sandbox), then `supabase secrets set
+   TEN_PAYPAL_CLIENT_ID=… TEN_PAYPAL_CLIENT_SECRET=…
+   TEN_PAYPAL_MERCHANT_ID=… TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com
+   --project-ref ivunfotoggdxbjouumdk`.
 5. `supabase functions deploy ten-delete-account`, then `ten-paypal`, then
    `ten-paypal-webhook --no-verify-jwt` (same project ref).
 6. developer.paypal.com → the app → Webhooks → Add:
@@ -2349,15 +2353,24 @@ credited: rotate when none is pending, or credit those by hand.
   answers 503 `paid_not_credited`, the webhook 200 (a retry can't fix it;
   the owner resolves it by hand).
 
-**Open for the lead (architect's note).** The tag does not bind the
-payee. A member can mint a tag with `create-order`, then create their own
-order in the browser with that `invoice_id`, `custom_id` and amount and
-another account as payee; PayPal's unique-invoice rule is per account.
-Whether Ten's keys can capture or re-fetch such an order is UNVERIFIED
-(PayPal likely refuses it as another merchant's). Closing it: the check
-also requires the payee's `merchant_id` to be Ten's (read on the order;
-the webhook would read the order too), from a non-secret
-`TEN_PAYPAL_MERCHANT_ID`.
+**The payee is Ten's (lead ruling, 2026-09-25).** The tag does not bind
+the payee: a member could mint a tag with `create-order`, then create
+their own order in the browser with that `invoice_id`, `custom_id` and
+amount but another account as payee (PayPal's unique-invoice rule is per
+account). So the check also requires the order's
+`purchase_units[0].payee.merchant_id` to equal `TEN_PAYPAL_MERCHANT_ID`, a
+non-secret setting.
+
+- `capture-order` compares it on the order it reads first; a foreign payee
+  → 403 `not_ten_order`, no capture call.
+- The webhook reads the order behind the re-fetched capture
+  (`supplementary_data.related_ids.order_id`, in PayPal's published
+  Payments v2 capture spec) with `GET /v2/checkout/orders/{id}`: a foreign
+  payee, or a missing order id → 200 "ignored", a log line, no row; the
+  order 404 → the same; another failure → 503.
+- The setting unset → refuse, never skip: `create-order` and
+  `capture-order` answer 503 before calling PayPal; the webhook 503, so
+  PayPal retries until it is set.
 
 **Tests** (added to § 17.8):
 
@@ -2376,6 +2389,12 @@ the webhook would read the order too), from a non-secret
    200 ignored; re-fetch 404 → 200 and a log line; re-fetch 500 → 503.
 6. `tests/sql`: both directions of the two-way check are refused.
 7. Review: the tag compare is a constant-time byte compare.
+8. Payee: a valid tag with a foreign `payee.merchant_id` → capture-order
+   403 `not_ten_order` and no capture call; the webhook 200 ignored and no
+   row. The webhook reads the order named in
+   `supplementary_data.related_ids.order_id`; that id missing or the order
+   404 → 200, no row. `TEN_PAYPAL_MERCHANT_ID` unset → create-order and
+   capture-order 503 with no PayPal call; the webhook 503 and no row.
 
 ---
 
@@ -2486,5 +2505,5 @@ spike replaced (owner, 2026-09-23).
   `paypal:<captureId>`; Ten's own capture webhook as the backup, checked by
   PayPal's signature and then a re-fetch; buying is paying in PayPal's window, never Ten spending
   (rule 7); delete keeps every ledger row. Only Ten's own orders are
-  credited: a signed `invoice_id` checked before any credit (§ 17.10, lead
-  ruling on F1, 09-25).
+  credited: a signed `invoice_id` and Ten's own payee (`TEN_PAYPAL_MERCHANT_ID`)
+  checked before any credit (§ 17.10, lead rulings on F1, 09-25).

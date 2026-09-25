@@ -71,6 +71,23 @@ else:
     else:
         passed += 1
 
+# tests/scripts/*.test.mjs — the INDEPENDENT tester's acceptance suite for
+# the same helper scripts (separate from scripts/test/, the coder's own).
+# Same node --test pattern; skips loudly when node isn't on PATH.
+tester_scripts_tests = sorted(glob.glob(os.path.join(HERE, "scripts", "*.test.mjs")))
+if not node:
+    print("\nSKIPPED tests/scripts/*.test.mjs: no `node` on PATH")
+elif not tester_scripts_tests:
+    print("\nSKIPPED tests/scripts/*.test.mjs: no test files found")
+else:
+    print(f"\n--- node --test tests/scripts/*.test.mjs ({len(tester_scripts_tests)} file(s)) ---")
+    result = subprocess.run([node, "--test", *tester_scripts_tests], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/scripts/*.test.mjs (node --test) — see output above")
+    else:
+        passed += 1
+
 # packages/checkers: the JS ports' own unit tests, plus the parity test
 # against the real Python scripts (docs/design-web-agent.md § 5, step 3).
 # Skips loudly (not silently) when node isn't on PATH, same pattern as

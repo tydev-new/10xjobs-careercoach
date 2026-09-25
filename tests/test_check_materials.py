@@ -180,7 +180,7 @@ def test_language_parsers_deleted_and_contract_exists():
     contract = os.path.join(os.path.dirname(cm.__file__), "..", "..",
                             "profile", "references", "language-check.md")
     text = open(contract, encoding="utf-8").read()
-    for rule in ("struck_form", "never_say", "confirm_qualifier", "watch_form"):
+    for rule in ("struck_form", "never_say", "confirm_qualifier", "watch_form", "search_jargon"):
         assert rule in text, f"contract missing {rule}"
     assert "fix-before-delivery" in text and "defend-or-qualify" in text
     assert "not checkable" in text, "missing-source convention absent"
@@ -232,3 +232,46 @@ def test_reworded_block_cannot_self_issue_its_exemption():
             "  tailored: Led a 60-person organization across three continents.\n")
     f = fails(cm.check_resume(_rw(body), base_text=BASE_RW))
     assert any("not in the base" in m for m in f), f
+
+
+# Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): ASCII
+# arrow chains are the same failure class as the Unicode glyphs above.
+def _letter(body):
+    return ("# Cover letter\n\nDear Hiring Manager,\n\n" + body + "\n\nAlex Chen\n")
+
+
+def test_ascii_arrow_chain_fails_each_form():
+    for form in ("->", "-->", "<-", "<->", "=>", "==>", "<=>"):
+        text = _letter(f"Growth went 80{form}90 this quarter, every week, without exception at all.")
+        f = fails(cm.check_letter(text))
+        assert any("arrow/scaffolding chain" in m for m in f), (form, f)
+
+
+def test_ascii_arrow_exempt_spans_pass():
+    exempt = [
+        _letter("```\na->b\n```\n\nExplained the diagram above to the whole panel, calmly and clearly."),
+        _letter("<!-- a->b -->\n\nReviewed the whole draft twice before sending, carefully and calmly."),
+        _letter("The old macro was `a->b` in the legacy build script, never shipped externally."),
+        _letter("See https://example.com/a->b for the writeup, thanks for reading it all today."),
+    ]
+    for text in exempt:
+        f = fails(cm.check_letter(text))
+        assert not any("arrow/scaffolding chain" in m for m in f), (text, f)
+
+
+def test_ascii_le_ge_do_not_fail():
+    text = _letter("Latency stayed <=5ms and throughput >=99% the whole quarter without incident.")
+    f = fails(cm.check_letter(text))
+    assert not any("arrow" in m for m in f), f
+
+
+def test_bullets_only_summary_passes_case_budget():
+    resume = (
+        "# Alex Chen\n\n## Summary\n\n"
+        "- Platform engineering leader delivering reliability at scale.\n"
+        "- Cut incident response time from 4 hours to 40 minutes.\n"
+        "- Built the on-call rotation from zero to a 6-person bench.\n\n"
+        "## Experience\n\nPlatform Lead — Northwind Labs.\n"
+    )
+    f = fails(cm.check_resume(resume))
+    assert not any("case is" in m for m in f), f

@@ -31,6 +31,9 @@ authority here. The checker's taste is not a rule.
 - `voice.md § Never-say list`
 - for outreach drafts, `pitch.md § Messages rubric` — the ⚠ WATCH forms
 
+One rule, `search_jargon`, takes its list from this file, not from a
+candidate file, so it is always checkable.
+
 ## The rules
 
 1. **`struck_form`** — a never-form from § Claim rules must not appear in
@@ -56,6 +59,19 @@ authority here. The checker's taste is not a rule.
 5. **`watch_form`** — when `pitch.md § Messages rubric` is provided, a
    ⚠ WATCH form must not lead a draft or appear in one, in any wording.
    *Severity: fix-before-delivery.*
+6. **`search_jargon`** — the search's own working words must not
+   appear in a candidate-facing document, in any wording:
+   - evaluate's verdict labels and fit scores ("investable stretch",
+     "long shot", "82/100");
+   - track, lane, stage, source-tier, scout, and lead labels ("Track
+     B", "To Review");
+   - the application file's words: coverage statuses
+     ("shown-but-unnamed"), round counts ("6/7 held"), audit tiers
+     ("ATS-Ready"), lens verdicts ("recruiter Revise"), "band call",
+     "spine role", "mandate sentence", "DECISION".
+
+   The echo exemption applies: the posting's own word, quoted, is not
+   jargon. *Severity: fix-before-delivery.*
 
 ## What is not a violation
 
@@ -85,7 +101,7 @@ a rule, and never guess what the list would have said.
 Return only a JSON object. No fences, no prose before or after.
 
 {"rules": [
-  {"rule": "struck_form|never_say|confirm_qualifier|reworded_scope|watch_form",
+  {"rule": "struck_form|never_say|confirm_qualifier|reworded_scope|watch_form|search_jargon",
    "file": "<document name as given>",
    "verdict": "pass|flag",
    "severity": "fix-before-delivery|defend-or-qualify",

@@ -44,7 +44,7 @@ reaches it fastest, earned over the 2026-08 rounds.
    always drafted — it doubles as outreach material; the form decides
    where it goes, never whether it exists.
 5. **Render and measure** (`render_resume.py`), then the checks and
-   the panel per `eval.md`. The panel's three lenses are below; each
+   the panel per `eval.md § The panel — three lenses`. Each lens
    returns `lens · finding` rows, you add the outcome, every finding
    ends fixed or discarded-with-why.
 6. **Deliver with the decisions beside it**: the `.md` path and the
@@ -70,7 +70,7 @@ unchanged sections come straight from the base.
 |---|---|
 | Experience bullets are the base's own sentences — selection, order, and depth ARE the tailoring | Blended or story-flavored rewrites: out of context without the full story |
 | Let what matches the JD's function and level open each section | Re-authoring content so it can lead |
-| Off-target identity: order the transferable dimension first | Authored bridging claims; deleting the off-target signal |
+| Off-target identity: order the transferable dimension first; when titles or products do not match the posting, one Summary bullet states the true adjacency and the gap — claims-free, the default | Authored bridging claims; a title never held; deleting the off-target signal |
 | The Summary carries an achievement's headline number; the role bullet carries its *how* | The same sentence — or the same number — twice in the Summary |
 | Recency opens every checklist bullet: the first clause answers "can they do it NOW" | Opening on old material |
 | ≤2–3 company names per bullet, newest first | A parade of names — reads as reminiscence |
@@ -79,22 +79,40 @@ unchanged sections come straight from the base.
 
 ### Shape, top to bottom
 
-1. **Header**: Name (`# Name`), followed by single delimiter-spaced contact line (`Location | Email | Phone | LinkedIn | GitHub`), followed by an optional italicized **target subtitle** (e.g., `*Technical Program Manager — Field & Enterprise Deployments*`). Never make the target title an H2 section name (confuses ATS parsers).
+1. **Header**: Name (`# Name`), followed by single delimiter-spaced contact line (`Location | Email | Phone | LinkedIn | GitHub`), followed by an optional italicized **target subtitle** — true positioning only, never a title not held (e.g., `*Field engineering leader — enterprise deployments*`). Never make the target title an H2 section name (confuses ATS parsers).
 2. **Clean Typography (Zero Decorative Scaffolding)**:
    - **No horizontal rules (`---`, `***`, `___`)**: Banned across all candidate-facing documents (résumé, cover letter, outreach messages, pitch). In ATS parsers, plain-text clipboards, and PDF renderers, horizontal rules inject unmanaged vertical margins, break page-budget calculations, or get misinterpreted as document termination / signature markers.
    - **No ASCII box-art or raw HTML tags (`<hr>`, `<br>`, `<div>`)**: Structural hierarchy is expressed exclusively through semantic markdown headings (`#`, `##`, `###`) and clean paragraphs. The destination engine (PDF printer, ATS portal, email client) owns visual decoration.
    - **No decorative emojis** in professional artifacts (résumé, cover letter, executive outreach).
-3. **`## Summary` — the single opening section**:
-   - Inside it: **positioning line** (function + level) → **the case** (one claim, ≤50 words).
-   - **No Dual-Summary Duplication**: Never stack both a narrative summary paragraph AND a bulleted "Core Expertise / Core Strengths" list that re-says the same points. Choose ONE: a crisp 3-line narrative case OR a structured requirement checklist.
-4. **`## Professional Experience` / `## Experience`**: 2–4 roles; 4–6 bullets on the top one or two, 2–3 elsewhere; outcome first.
+3. **`## Summary` — the single opening section, always 4–7 short
+   bullets.** Bullet 1 is the mandate sentence (§ The Summary). Never a
+   paragraph, and never a second list ("Core Expertise", "Highlights")
+   that re-says it.
+4. **`## Professional Experience` / `## Experience`**: 2–4 roles in
+   reverse chronological order, current first — tailoring reorders
+   bullets within a role, never the roles. The spine role (the one
+   whose work best proves this mandate, usually the current one) keeps
+   its 3–4 strongest bullets; 2–3 elsewhere; outcome first.
 5. **`## Earlier Experience` / `## Other Experience`**: Roles older than ~10 years get one line each; older than ~15 fold into a single "Earlier" line with no dates.
 6. **`## Selected Work, Patents & Publications` / `## Patents`**: Exact USPTO numbers and verified titles (without redundant co-inventor listings if not universally listed); open-source repos with direct URLs.
-7. **`## Education`** (no graduation dates), then **`## Skills`** (JD-matched, no soft skills).
+7. **`## Education`** (no graduation dates), then **`## Skills`** — one
+   line of the posting's own nouns that the base supports; no rating
+   bars, no stuffing; never a substitute for the Summary's proof.
 
 Omit a section rather than fabricate to fill it. One page under 5
 years' experience; **2 pages maximum otherwise**, even from a 3-page
 base.
+
+### The top third
+
+- **Top third wins**: header, Summary, and the first role's opening
+  bullets prove this mandate; patents and older roles stay below.
+- **No search jargon**: candidate-facing text never uses the search's
+  own words; the language checker's `search_jargon` rule holds the
+  list.
+- **No arrows**: write it in words ("from six months to one month");
+  `check_materials.py` and `check_messages.py` FAIL arrow glyphs and
+  ASCII arrow chains.
 
 ### The Summary — why it exists, and the least that does the job
 
@@ -104,17 +122,18 @@ only three places the posting's words can enter (with the Skills line
 and bolded openers); it states the function and level the titles do not
 ("Field CTO" applying to Head of Engineering otherwise gets guessed).
 
-Three or four lines, two things: the **positioning line** (function +
-level, plainly) and the **strongest card** — ONE claim, ≤50 words, with
-its numbers: the posting's hardest screen, answered. No thesis line, and
-no redundant "Core Competencies" bullet list underneath.
+**Always 4–7 short bullets** — a recruiter scans bullets; a paragraph
+is a wall. **Bullet 1 is the mandate sentence**: function and level,
+stated as the outcome this seat exists to deliver, never an echo of the
+posting's title. Each later bullet is one proof with its number, the
+posting's hardest screen first. The PDF shows them as a list.
 
-**The requirement checklist is an alternative tool** — used when
-over-qualification or a doubted hard screen is the real risk: 5–7 bullets
-in the posting's phrasing, evidence after the colon. Each bullet's
-evidence proves the opener's EXACT claim. A JD's "N+ years of X" is
-answered with THEIR number ("8+: yes —") proven by recent evidence —
-meet the bar, don't triple it.
+**When over-qualification or a doubted hard screen is the real risk**,
+bullets 2–7 take the requirement-checklist form: the posting's
+phrasing, evidence after the colon, each bullet's evidence proving the
+opener's EXACT claim. A JD's "N+ years of X" is answered with THEIR
+number ("8+: yes —") proven by recent evidence — meet the bar, don't
+triple it.
 
 ### Rewording for the JD's vocabulary
 
@@ -169,18 +188,6 @@ When the band call says above-band, the letter carries the one-line
 scope-over-title answer ("this role owns the function I do best"); the
 résumé never litigates level. When `voice.md` exists, mirror its samples
 and respect its never-say list.
-
-## The persona panel — the three lenses
-
-- **The ATS**: parse order, keyword coverage against THIS JD's nouns,
-  anything a parser garbles.
-- **The recruiter**: the 7–11 second F-pattern scan — the band call,
-  screening answers findable, any age tag that survives a skim.
-- **The hiring manager**: does the letter argue value for THEIR problem;
-  would they take the 20-minute call; what question does the packet fail
-  to answer.
-
-Findings are concrete or discarded; fixes apply once.
 
 ## Application answers — the drafting protocol
 
@@ -270,6 +277,10 @@ over, cut content, not quality).
   are the common silent miss; rich-text fields flatten programmatic
   paragraph breaks — count newlines after filling; unsaved form state is
   volatile (stage → verify → submit in one pass).
+- **LinkedIn congruence**: before the Review Gate, compare titles and
+  dates with the folder's LinkedIn copy (`linkedin-audit.md` or an
+  export in `documents/`); name drift in chat for profile's Consistency
+  sweep; no copy: say "LinkedIn not checked".
 - **Reading an Ashby form the browser can't open** (2026-08-01): the
   job-board GraphQL answers without auth —
   `POST https://jobs.ashbyhq.com/api/non-user-graphql?op=ApiJobPosting`

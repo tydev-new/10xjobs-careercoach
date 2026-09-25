@@ -24,7 +24,7 @@ only the author's summary of them; and incorporation is ONE round.
   jd-analysis decode, company/nimbus.md), not merely the author's own
   summary of the JD.
 - At most ONE incorporation round: panel findings applied once, checker
-  re-run, done.
+  re-run, the lenses short of Pass re-checked once, done.
 
 ## MUST NOT
 - Reworded, merged, or story-flavored Experience bullets in the final
@@ -33,5 +33,7 @@ only the author's summary of them; and incorporation is ONE round.
   experience the base does not evidence — the gap table marks it MISSING;
   honest handling is the gap interview or leaving it unclaimed, never a
   new claim).
-- A second wave of persona reviews after the incorporation round.
+- A persona review beyond that one re-check (owner 2026-09-25: the
+  author must not grade its own fixes, so the failing lenses re-check
+  once; nothing further).
 - Arrow glyphs or filler in delivered documents (checker-enforced).

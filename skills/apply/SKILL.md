@@ -20,7 +20,7 @@ A submitted application the candidate is proud of. **An application ships THREE 
 
 ## Prerequisites
 
-- **Required:** Workspace `CLAUDE.md` (none → profile's Setup); `base-resume.md` (SSOT: body + § Claim rules — hard stop if absent, never fabricate); `jd-analysis/` for the role (suggest `evaluate` first if absent).
+- **Required:** Workspace `CLAUDE.md` (none: route to profile's Setup); `base-resume.md` (SSOT: body + § Claim rules — hard stop if absent, never fabricate); `jd-analysis/` for the role (suggest `evaluate` first if absent).
 - **Optional:** `profile.md` (+ `§ Application defaults`), `storybank.md`, `pitch.md`, `voice.md`.
 
 ## Loops and sequences
@@ -32,13 +32,13 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 **Runs when** the candidate asks to tailor a résumé, letter, or "materials" for a specific role.
 
 - **Standard:** The `## Standard` bullets in the application file (`references/schema.md`).
-- **Budget:** Two self-passes; one review incorporation round. Said up front.
+- **Budget:** Two self-passes; one review incorporation round, which re-checks only the lenses short of Pass, once.
 - **Each round:** Read `## Standard` and earlier `## Rounds` rows first. Reshape-only from `base-resume.md` (selection, order, depth — never invented facts). Run checks and multi-persona review panel (`references/eval.md`). Score round as `N/M held` count and append row to `## Rounds`.
 - **Obligations:**
   1. *Facts need a yes:* Voluntarily surfaced facts go to `storybank.md`, not directly into a résumé without an explicit yes.
   2. *Deliver & Disclose:* Present the deliverable beside the proposal block (`scripts/proposal_block.py` list of cuts and placed words with easy reversal).
   3. *Exact edits:* Apply candidate edits directly in place and re-render.
-- **Exits:** When the round scores M/M held and candidate accepts; at the budget; or at **the ceiling: two `## Rounds` rows with the same count and tiers** → stop and present the tradeoff as a **DECISION**. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
+- **Exits:** When the round scores M/M held with every lens at Pass and the candidate accepts; at the budget; or at the ceiling: two `## Rounds` rows with the same count and lens verdicts. At the budget or the ceiling, stop and present a DECISION showing each lens still at Revise or Fail with its `## Panel` rows; the package is not ready until every lens passes or the candidate waives it in chat. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
 
 ### Answers (the loop)
 
@@ -53,8 +53,8 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 **Runs when** candidate says "apply to this one".
 
 1. **Extract & Draft:** Extract all form fields/pages into the application file before drafting essays. Screening answers pull from `profile.md § Application defaults`.
-2. **Review Gate:** Complete application (fields, essays, chosen résumé) approved in chat before touching the live form.
-3. **Submit Gate (Rule 7):** Form filled in browser $\rightarrow$ show screenshot + plain summary $\rightarrow$ candidate's explicit word fires submit.
+2. **Review Gate:** Complete application (fields, essays, chosen résumé) approved in chat before touching the live form, with any LinkedIn drift named.
+3. **Submit Gate (Rule 7):** Form filled in the browser, then a screenshot and a plain summary, then the candidate's explicit word fires submit.
 4. **Third Artifact:** Capture submission confirmation into `## Submission`, set `jobs.md` row to Applied, and draft the outreach plan in `contacts/<company>.md` (`## Outreach plan`).
 
 **Exits** with all three artifacts delivered or at the gate candidate declined.
@@ -71,7 +71,7 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 
 Owned: `applications/` (shapes in `references/schema.md`).
 
-- **Hands back:** Outreach sends → `outreach`; interview prep → `interview`; confirmed story leads → `storybank`; base updates → `profile`.
+- **Hands back:** Outreach sends go to `outreach`; interview prep goes to `interview`; confirmed story leads go to `storybank`; base updates go to `profile`.
 - **Session close:** Run `python3 scripts/check_materials.py`, `python3 scripts/proposal_block.py`, and `python3 ../profile/scripts/check_files.py --workspace .`. Language checker-subagent runs on every delivered document. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails

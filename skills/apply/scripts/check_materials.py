@@ -71,6 +71,14 @@ INFORMAL_SALUTATION = re.compile(r"^\s*(hello|hi|hey|greetings)\b[^,]*[—,-]?\s
 # patterns.md assembly table: arrows garble in ATS parsers and read as audit
 # scaffolding that leaked into the document (candidate-caught 2026-08-16).
 ARROW_GLYPHS = re.compile(r"[→⇒▸►◄←↔]")
+# Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): the same
+# failure class, extended to ASCII arrow chains — catches "->", "-->", "<-",
+# "<->", "=>", "==>", "<=>"; never matches "<=", ">=", "<", or ">" alone.
+ASCII_ARROWS = re.compile(r"<=+>|<-+>?|-+>|=+>")
+# Exempt spans (replaced with one space before scanning): fenced code
+# blocks, HTML comments, one-line inline code, and URLs — a single
+# alternation so the same source text ports byte-identical to the JS side.
+ARROW_EXEMPT_SPANS = re.compile(r"```.*?```|<!--.*?-->|`[^`\n]*`|https?://\S+", re.S)
 # patterns.md § Shape: banned filler — generic strings, so no second-source issue.
 FILLER = re.compile(r"\b(passionate|motivated|fast-paced environments?|outside the box)\b", re.I)
 # Numeric tokens that carry claims (percents/multipliers) — years excluded by shape.
@@ -169,7 +177,7 @@ def check_resume(text, base_text=None, app_text=None):
                          "qualification", "profile"))]
     if len(opener_like) > 1:
         add(("FAIL", f"two opening sections drawing on the same wins: {opener_like} — "
-                     "patterns.md allows ONE (case + checklist), never Summary + a highlights band"))
+                     "patterns.md allows ONE Summary, never Summary + a highlights band"))
 
     for h, hl in zip(headings, lower):
         if hl not in STANDARD_SECTIONS:
@@ -230,6 +238,10 @@ def _shared(text, add):
     if m:
         add(("FAIL", f'arrow/scaffolding glyph "{m.group(0)}" — write transitions in words '
                      '("from 80% to under 1%"); glyphs garble in ATS parsers'))
+    m = ASCII_ARROWS.search(ARROW_EXEMPT_SPANS.sub(" ", text))
+    if m:
+        add(("FAIL", f'arrow/scaffolding chain "{m.group(0)}" — write transitions in words '
+                     '("from 80% to under 1%"); symbol arrows garble in ATS parsers'))
     m = FILLER.search(text)
     if m:
         add(("FAIL", f'banned filler "{m.group(0)}" — patterns.md § Shape'))

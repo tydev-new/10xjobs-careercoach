@@ -70,8 +70,10 @@ audits against the candidate's target band and skips them.
 
 The tier words — ATS-Ready, Strong, the band call — get used, not
 decorated: they go in the round record's `scored` cell beside the
-`N/M held` count, and `apply` shows them in its audit block before the
-documents. **What belongs here vs in `patterns.md`**: a line here
+`N/M held` count (apply's round record carries its panel verdicts
+instead — `../../apply/references/schema.md`), and `apply` shows them
+in its audit block before the documents. **What belongs here vs in
+`patterns.md`**: a line here
 produces a verdict (a tier, a count, a flag) and names who produces it;
 a line that makes a draft better but produces no verdict is craft and
 lives in patterns.

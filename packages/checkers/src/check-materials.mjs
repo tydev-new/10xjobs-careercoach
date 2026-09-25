@@ -29,6 +29,15 @@ const LETTER_MAX_BLOCKS = 6;
 const YEAR_COUNT = /\b\d{2}\+?\s*(?:\+\s*)?years\b/i;
 const INFORMAL_SALUTATION = new RegExp(`^${PY_S}*(hello|hi|hey|greetings)\\b[^,]*[—,-]?${PY_S}*$`, "i");
 const ARROW_GLYPHS = /[→⇒▸►◄←↔]/;
+// Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): the
+// same failure class, extended to ASCII arrow chains — catches "->",
+// "-->", "<-", "<->", "=>", "==>", "<=>"; never matches "<=", ">=", "<",
+// or ">" alone. Same source text as check_materials.py's ASCII_ARROWS.
+const ASCII_ARROWS = /<=+>|<-+>?|-+>|=+>/;
+// Exempt spans (replaced with one space before scanning): fenced code
+// blocks, HTML comments, one-line inline code, and URLs — a single
+// alternation ([\s\S] stands in for Python's re.S dot).
+const ARROW_EXEMPT_SPANS = /```[\s\S]*?```|<!--[\s\S]*?-->|`[^`\n]*`|https?:\/\/\S+/g;
 const FILLER = /\b(passionate|motivated|fast-paced environments?|outside the box)\b/i;
 const CLAIM_NUMBER = /\d+(?:\.\d+)?\s*%|\b\d+(?:\.\d+)?x\b/g;
 
@@ -111,7 +120,7 @@ export function checkResume(text, baseText = null, appText = null) {
   const openerKeywords = ["summary", "highlight", "why i fit", "selected experience against", "qualification", "profile"];
   const openerLike = lower.filter((h) => openerKeywords.some((k) => h.includes(k)));
   if (openerLike.length > 1) {
-    add("FAIL", `two opening sections drawing on the same wins: ${pyListRepr(openerLike)} — patterns.md allows ONE (case + checklist), never Summary + a highlights band`);
+    add("FAIL", `two opening sections drawing on the same wins: ${pyListRepr(openerLike)} — patterns.md allows ONE Summary, never Summary + a highlights band`);
   }
 
   for (let i = 0; i < headings.length; i++) {
@@ -165,6 +174,10 @@ function shared(text, add) {
   let m = text.match(ARROW_GLYPHS);
   if (m) {
     add("FAIL", `arrow/scaffolding glyph "${m[0]}" — write transitions in words ("from 80% to under 1%"); glyphs garble in ATS parsers`);
+  }
+  m = text.replace(ARROW_EXEMPT_SPANS, " ").match(ASCII_ARROWS);
+  if (m) {
+    add("FAIL", `arrow/scaffolding chain "${m[0]}" — write transitions in words ("from 80% to under 1%"); symbol arrows garble in ATS parsers`);
   }
   m = text.match(FILLER);
   if (m) {

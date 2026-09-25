@@ -111,6 +111,27 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "cm-arg-missing-value", files: {}, args: ["--workspace", ".", "--resume"] });
   add({ s, id: "cm-arg-value-looks-like-flag", files: {}, args: ["--workspace", ".", "--resume", "--letter"] });
   add({ s, id: "cm-arg-positional", files: {}, args: ["stray", "--workspace", "."] });
+
+  // owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): ASCII
+  // arrow chains, the same failure class as the Unicode glyphs above.
+  const letter = (body) => "# Letter\n\nDear Hiring Manager,\n\n" + body + "\n\nAlex Chen\n";
+  add({ s, id: "cm-ascii-arrow-form-arrow", files: { "letter.md": letter("Growth went 80->90 this quarter, every week, without exception at all.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-form-long-arrow", files: { "letter.md": letter("Growth went 80-->90 this quarter, every week, without exception at all.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-form-back-arrow", files: { "letter.md": letter("Growth went 80<-90 this quarter, every week, without exception at all.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-form-double-arrow", files: { "letter.md": letter("Growth went 80<->90 this quarter, every week, without exception at all.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-form-fat-arrow", files: { "letter.md": letter("Growth went 80=>90 this quarter, every week, without exception at all.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-form-long-fat-arrow", files: { "letter.md": letter("Growth went 80==>90 this quarter, every week, without exception at all.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-form-bidi-fat-arrow", files: { "letter.md": letter("Growth went 80<=>90 this quarter, every week, without exception at all.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-exempt-url", files: { "letter.md": letter("See https://example.com/a->b for the writeup, thanks for reading it all today.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-exempt-inline-code", files: { "letter.md": letter("The old macro was `a->b` in the legacy build script, never shipped externally.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-exempt-fence", files: { "letter.md": letter("```\na->b\n```\n\nExplained the diagram above to the whole panel, calmly and clearly.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-arrow-exempt-comment", files: { "letter.md": letter("<!-- a->b -->\n\nReviewed the whole draft twice before sending, carefully and calmly.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-ascii-le-ge-no-finding", files: { "letter.md": letter("Latency stayed <=5ms and throughput >=99% the whole quarter without incident.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-unicode-and-ascii-arrows-unicode-first", files: { "letter.md": letter("We cut cost 80%→<1%, then kept it flat at 80->90 the rest of the year, steadily.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-accented-text-beside-ascii-arrow", files: { "letter.md": letter("Latence baissée café->café à Montréal, chaque trimestre sans faute aucune fois.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-bullets-only-summary-passes-case-budget", files: { "resume.md":
+    "# Alex Chen\n\n## Summary\n\n- Platform engineering leader delivering reliability at scale.\n- Cut incident response time from 4 hours to 40 minutes.\n- Built the on-call rotation from zero to a 6-person bench.\n\n## Experience\n\nPlatform Lead — Northwind Labs.\n" },
+    args: ["--workspace", ".", "--resume", "resume.md"] });
 }
 
 // ---- proposal_block

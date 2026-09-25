@@ -39,10 +39,12 @@ outreach-plan summary.
 - `## Rounds` — the round record, one row per round, a round that
   changed nothing included: `| date | round | driver | scored | what
   changed |`. **`scored` is a count, not a sentence**: `N/M held;
-  unmet: <item>, <item>` over the `## Standard` bullets, plus the reader
-  tiers (`ATS-Ready · Strong · Strong`). Read by the loop before it
-  scores — the ceiling is two rows with the same count and tiers. The
-  checker enforces the header and cells; the cell's form is yours.
+  unmet: <item>, <item>` over the `## Standard` bullets, plus the
+  panel's lens verdicts: `6/7 held; unmet: page target; ats Pass ·
+  recruiter Revise · hiring manager Pass`. Before the panel runs:
+  `panel not run`. Read by the loop before it scores — the ceiling is
+  two rows with the same count and lens verdicts. The checker enforces
+  the header and cells; the cell's form is yours.
 - `## Panel` — the persona panel's findings, one row per finding:
   `| lens | finding | outcome |` — `lens` one of `ats` / `recruiter` /
   `hiring manager`. **The lens returns `lens` and `finding`; you fill
@@ -50,7 +52,10 @@ outreach-plan summary.
   only those two forms). Every finding is one or the other; an
   undischarged finding blocks delivery. A lens that returned prose
   twice gets one row: `| <lens> | VOID — <why> | — |`; an empty table
-  says `VOID` and why.
+  says `VOID` and why. A lens at Revise or Fail with no row naming what
+  to change is VOID. A candidate's waiver is the outcome `discarded —
+  candidate waived in chat <date>` (a form the checker already
+  accepts).
 - `## Fields` — every field the form collects, bucketed Standard /
   Screening / Essays; each with its value, or `NEEDS CANDIDATE`, or
   `predicted` when the field set came from a form you could not open

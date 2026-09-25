@@ -82,6 +82,20 @@ def test_arrow_glyph_matches_the_live_defect():
     assert not cmsg.ARROW_GLYPHS.search("batch failures from 80% to under 1%")
 
 
+def test_ascii_arrow_in_draft_fails_and_in_url_is_exempt():
+    """Owner ruling 6 (2026-09-25): the same failure class as the Unicode
+    glyph, extended to ASCII arrow chains, scoped to the drafts."""
+    text = "> Grew signal 80%->90% this quarter, consistently, across every team we support.\n"
+    ds = cmsg.drafts(text)
+    assert ds
+    assert cmsg.ASCII_ARROWS.search(cmsg.EXEMPT_SPANS.sub(" ", ds[0])), ds
+
+    text_url = "> See https://example.com/a->b for the writeup, thanks for reading it all today.\n"
+    ds_url = cmsg.drafts(text_url)
+    assert ds_url
+    assert not cmsg.ASCII_ARROWS.search(cmsg.EXEMPT_SPANS.sub(" ", ds_url[0])), ds_url
+
+
 if __name__ == "__main__":
     for name in sorted(list(globals())):
         if name.startswith("test_"):

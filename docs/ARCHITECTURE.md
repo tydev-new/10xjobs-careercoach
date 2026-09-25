@@ -1,6 +1,7 @@
 # Architecture — how Ten is put together
 
-Ten is a job-search coach. It ships two ways:
+**Ten** is this project's job-search coach (the repo is
+`10xjobs-careercoach`). It ships two ways:
 
 - **As Claude skills in a folder.** You install the skills (see
   [`INSTALL.md`](../INSTALL.md)) and the coach works on plain files on
@@ -16,69 +17,109 @@ the contract wins; please fix this page. The web contract is
 are in [`design-web-ui.md`](design-web-ui.md). Everything answers to
 [`PRINCIPLES.md`](../PRINCIPLES.md).
 
-**Words used below:**
+## Words used here
 
-- **Skill:** a folder of instructions for the model (`skills/<name>/SKILL.md`
-  plus references and checker scripts).
-- **Workspace:** the candidate's files (profile, jobs list, résumés, plan).
-- **Turn:** one message from the candidate and everything the coach does
-  in reply. A turn has **steps**: one model call each, plus the tools
-  that call asks for.
-- **Proxy:** our server function that stands between the browser and the
-  model provider. It holds the only model key.
+**The product**
+
+- **Candidate:** the person searching for a job. On the web, a
+  **member** is a signed-in candidate with a credit row; only members
+  can use Ten.
+- **Skill:** a folder of instructions for the model
+  (`skills/<name>/SKILL.md`, plus references and checker scripts).
+- **Workspace:** the candidate's files: profile, jobs list, résumés, plan.
+- **Turn:** one candidate message and everything the coach does in reply.
+  A turn has **steps**: one model call each, plus the tools it asks for.
+- **Card:** a box in the chat (a verdict, a plan, a cost) that code builds
+  from a file or a script's output. The model never writes one.
+
+**Gates** (three different things share the word)
+
+- **Spend gate:** the coach stops and asks for the candidate's typed
+  `yes` before a run that costs money. The only gate in the web app.
+- **Candidate-action gate:** the same typed-yes step before anything is
+  sent or submitted as the candidate. It exists in the local skills; the
+  web app has no send or submit tools at all.
+- **Design gate:** the project's own step: a change is designed and
+  approved before it is built ([`PROCESS.md`](PROCESS.md)).
+
+**Money and servers**
+
+- **Proxy:** our server function between the browser and the model
+  provider. It holds the model key.
 - **Ledger:** the one table that records money: credits in, calls out.
-- **Gate:** the moment the coach stops and asks for the candidate's typed
-  `yes` before spending (PRINCIPLES rule 7).
-- **RLS (row-level security):** Postgres rules that decide which rows each
-  signed-in user can see.
-- **Member:** a signed-in user who has a credit row. Only members can use Ten.
+- **Allowance:** how much one turn may spend without asking: $1.00, or
+  the amount of a spend gate the candidate just approved.
+- **RLS (row-level security):** Postgres rules that decide which rows
+  each signed-in user can see.
+- **Service role:** a server-only Supabase key that skips RLS. Only our
+  server functions and the owner use it.
+- **Anon key:** the public Supabase key the site ships with. It grants
+  nothing by itself; RLS does the guarding.
+
+**How we work** (more in [`TEAM.md`](TEAM.md))
+
+- **Slice:** one piece of work, sized for one builder.
+- **Spike:** a small throwaway experiment that answers one question.
+- **Fixture persona:** an invented candidate used in tests and demos.
+- **Conduct harness:** runs a skill against a planted workspace and has a
+  second model judge the result, several times (`tests/always-on/`).
+- **Receipt:** the dated, real incident that earned a rule.
+
+**Principles these docs cite** (full text in
+[`PRINCIPLES.md`](../PRINCIPLES.md)): 5 spend like it's yours · 7 typed
+yes before anything sent, submitted or paid · 8 honest numbers · 9 your
+data is yours · 10 safe at the offer stage · 12 one of everything ·
+16 every loop is bounded · 18 plain language.
 
 ## 1. The system map
 
 ```mermaid
-flowchart LR
+flowchart TD
+  Site["Vercel: static site<br/>and version.json"]
   subgraph Tab["Browser tab"]
     UI["Chat screen<br/>(React, Vite)"]
-    Loop["Coach loop<br/>(packages/agent, Vercel AI SDK)"]
-    Skills["Skills + checkers<br/>(bundled at build time)"]
+    Loop["Coach loop, skills, checkers<br/>(packages/agent, Vercel AI SDK)"]
   end
-  Site["Vercel<br/>(static site)"] -->|serves the app| Tab
   subgraph SB["Supabase"]
-    Auth["Auth (sign-in)"]
-    DB["Postgres tables<br/>(ten_...)"]
-    Bucket["Storage bucket<br/>ten-workspaces"]
-    Proxy["Edge Function<br/>ten-model-proxy"]
-    Del["Edge Function<br/>ten-delete-account"]
+    Auth["Auth"]
+    DB["Tables (ten_...)<br/>and bucket ten-workspaces"]
+    Proxy["ten-model-proxy"]
+    Del["ten-delete-account"]
   end
-  Loop --> Proxy
-  UI --> Auth
-  Loop --> DB
-  Loop --> Bucket
-  UI --> Del
+  Site -->|app, then version checks| UI
+  UI -->|sign-in| Auth
+  UI -->|conversation, balance| DB
+  UI -->|delete my data| Del
+  Loop -->|files, gates| DB
+  Loop -->|every model call| Proxy
+  Loop -->|job links| Boards["Job board APIs"]
   Proxy --> OR["OpenRouter"]
-  OR --> Hosts["Model hosts<br/>Claude Sonnet 5 or DeepSeek V4.1 Flash"]
+  OR --> Hosts["Model host:<br/>Claude Sonnet 5 or<br/>DeepSeek V4.1 Flash"]
   OR --> Exa["Exa web search"]
-  Loop --> Boards["Job board APIs<br/>(Greenhouse, Lever, Ashby, SmartRecruiters)"]
 ```
 
 - **The agent loop runs in the tab, not on a server.** `apps/web` builds
-  the loop from `packages/agent` (`createCoach`, C § 1). The package has
-  no browser-only or Node-only imports, so the same loop can later run on
-  a server. A test fails if that rule breaks.
+  it from `packages/agent` (`createCoach`, C § 1). The package has no
+  browser-only or Node-only imports, so the same loop can later run on a
+  server. A test fails if that rule breaks.
 - **The skills are bundled into the site at build time,** read-only. The
   checker scripts they call run as JavaScript ports (`packages/checkers`)
   behind a fake `python3` command. A parity test keeps the ports matching
   the Python (C § 5).
-- **Vercel only serves static files.** Supabase holds everything with
-  state (C § 8).
+- **Vercel only serves static files,** including `version.json`, which
+  open tabs read to spot a newer build (C § 10). Supabase holds
+  everything with state (C § 8).
 - **Every model call goes through `ten-model-proxy`.** The browser holds
-  only the user's sign-in token; the proxy holds the OpenRouter key.
+  only the user's sign-in token. The OpenRouter key is a Supabase function
+  secret. Those secrets are project-wide, so both functions could read
+  it; only the proxy uses it.
 - **The model is a build setting,** `VITE_COACH_MODEL`. Unset means Claude
   Sonnet 5, the model the skills were measured on. DeepSeek is for cheap
   plumbing tests only (C § 13).
 - **Search and job links:** web search is an OpenRouter plugin pinned to
-  Exa (C § 14). Job links on four boards are read from the board's public
-  API; anything else, the candidate pastes (C § 4).
+  Exa (C § 14). Links on four boards (Greenhouse, Lever, Ashby,
+  SmartRecruiters) are read from the board's public API; anything else,
+  the candidate pastes (C § 4).
 
 ## 2. One coaching turn
 
@@ -88,9 +129,9 @@ sequenceDiagram
   participant T as Browser tab
   participant P as ten-model-proxy
   participant M as OpenRouter and model host
-  participant D as Supabase tables
+  participant D as Supabase (tables, bucket)
   C->>T: types a message
-  T->>T: newer build? other tab moved on? (else not sent)
+  T->>T: newer build, or another tab moved on? Then stop: not sent
   T->>T: gate reply check, then history trimmed to a window
   loop each step, at most 25
     T->>P: model request with sign-in token
@@ -112,8 +153,8 @@ sequenceDiagram
   history to about 4,000 words (C § 7).
 - **At the proxy:** checks run in order: sign-in, a 256 KB size cap,
   membership, balance, the daily limit. Then it builds a fresh request
-  from an allowlist, streams the reply back, and meters a copy into one
-  ledger row per call (C § 8, § 9.6).
+  from an allowlist, streams the reply back, and meters a copy into a
+  ledger row (C § 8, § 9.6).
 - **Tools run in the tab** (C § 4). Cards are built by code from files
   and script output, never by the model (C § 6.2).
 - **At the end,** the conversation is saved as one row (C § 11).
@@ -134,18 +175,18 @@ Three ways a turn can stop early:
 ```mermaid
 flowchart TD
   A["Model plans a big run"] --> B["estimate_cost:<br/>code computes low and high"]
-  B --> C{"High estimate<br/>over 1.00 dollar?"}
-  C -->|"no: allowance 1.00 dollar"| E["Run the steps"]
-  C -->|yes| D["Spend gate card.<br/>Turn ends."]
+  B --> C{"High estimate over<br/>the 1.00 dollar allowance?"}
+  C -->|no| E["Run the steps"]
+  C -->|yes| D["Spend gate card.<br/>The turn ends here."]
   D --> Y{"Candidate types<br/>exactly yes?"}
   Y -->|no| N["Nothing starts"]
-  Y -->|yes| F["Next turn's allowance =<br/>the approved amount"]
+  Y -->|yes| F["New turn. Allowance =<br/>the approved amount"]
   F --> E
   E --> G{"Next step fits<br/>the allowance?"}
   G -->|no| D
-  G -->|yes| H{"Proxy: balance above 0,<br/>beta under 5 dollars today?"}
+  G -->|yes| H{"Proxy, before the call:<br/>balance above 0? beta under<br/>5 dollars today?"}
   H -->|no| R["Refused: 402 or 503"]
-  H -->|yes| L["Call runs. Ledger row.<br/>Balance = credits minus calls"]
+  H -->|yes| L["Call runs.<br/>Ledger row afterwards"]
 ```
 
 - **The estimate comes from code, not the model** (rule 8). It uses this
@@ -153,56 +194,83 @@ flowchart TD
 - **Only a typed, exact `yes` approves.** There is no approve button
   (rule 7; C § 3). If a run would pass its allowance mid-turn, the loop
   stops before that step and opens a "Continue this run" gate.
-- **The proxy enforces the hard limits.** A balance at or below zero gets
-  402. At $5 of beta-wide spend today (UTC), every call gets 503 (C § 8).
-- **Each call's cost is bounded** by the output cap and the size cap. The
-  **per-call ceiling** is that bound, priced for each model: about $0.27
-  for Claude and $0.04 for DeepSeek (C § 13.1). The proxy never refuses
-  a call because of it. It charges the ceiling when a call's real cost
-  is missing, so a lost cost never goes uncharged.
+- **The proxy checks before each call:** a balance at or below zero gets
+  402; at $5 of beta-wide spend today (UTC), every call gets 503 (C § 8).
+- **The limits can be overshot by calls already running.** The checks
+  happen before a call, and the cost is known only after it. Calls that
+  start together all pass the check, so a balance or the $5 day can go
+  over by whatever those calls cost. Each call's cost is bounded by the
+  output cap and the size cap (C § 8, "the honest bound").
+- **The per-call ceiling is not a cap.** It is the worst case the caps
+  allow, priced per model: about $0.27 for Claude, $0.04 for DeepSeek
+  (C § 13.1). A reported cost up to 10 times the ceiling is recorded as
+  reported. The ceiling is charged instead when the cost is missing,
+  unreadable, negative, over 10 times the ceiling, or the meter ran out
+  of time. It is also that 10-times sanity bound.
 - **The balance is derived, never stored:** credits minus calls, from the
   ledger (rule 12).
 
 ## 4. The data model
 
+Who writes what:
+
 ```mermaid
-flowchart LR
-  Browser["Member's browser<br/>(sees own rows only)"]
+flowchart TD
+  Browser["Member's browser"]
+  Delete["ten-delete-account<br/>(service role)"]
   Proxy["ten-model-proxy<br/>(service role)"]
   Owner["Owner"]
+  subgraph Beta["The member's beta data"]
+    Gates[("ten_gate_log")]
+    Files[("ten_ws_files")]
+    Conv[("ten_conversations")]
+    Bucket[("bucket ten-workspaces")]
+  end
   Ledger[("ten_usage_ledger")]
-  Gates[("ten_gate_log")]
-  Files[("ten_ws_files")]
-  Conv[("ten_conversations")]
-  Bucket[("bucket<br/>ten-workspaces")]
-  Browser -->|ten_gate_open, _decide| Gates
-  Browser -->|ten_ws_write| Files
-  Browser -->|ten_conversation_save| Conv
-  Browser -->|create only| Bucket
+  Browser -->|through ten_ functions| Beta
+  Delete -->|removes all of it| Beta
+  Delete -->|credit rows only| Ledger
   Proxy -->|call rows| Ledger
   Owner -->|credit rows| Ledger
 ```
 
-| What | Holds | Who can write |
+| What | Holds | Written by |
 |---|---|---|
-| `ten_usage_ledger` | credits and calls: tokens, dollars, model, `finish_reason` | the proxy (calls); the owner (credits). Users only read their own rows. |
-| `ten_gate_log` | each spend gate and its status | the member's browser, through `ten_gate_open` / `ten_gate_decide` / `ten_gate_expire_other_chats` |
-| `ten_ws_files` | workspace text files (`.md .txt .json .html`) | the member, through `ten_ws_write`, which refuses a stale version |
-| `ten_conversations` | one saved conversation per user | the member, through `ten_conversation_save`, same stale-version rule |
+| `ten_usage_ledger` | credits and calls: tokens, dollars, model, `finish_reason` | the proxy (calls); the owner (credits) |
+| `ten_gate_log` | each spend gate and its status | the member's browser, via `ten_gate_open`, `ten_gate_decide`, `ten_gate_expire_other_chats` |
+| `ten_ws_files` | workspace text files (`.md .txt .json .html`) | the member, via `ten_ws_write`, which refuses a stale version |
+| `ten_conversations` | one saved conversation per user | the member, via `ten_conversation_save`, same stale-version rule |
 | bucket `ten-workspaces` | uploaded `.pdf` and `.docx`, under `users/<uid>/ws/` | the member, create only |
 
-- **RLS is on for every table.** Members read only their own rows. Writes
-  go through functions that act only on the caller's rows (C § 2, § 11.2).
+Who can read what:
+
+```mermaid
+flowchart LR
+  Data[("A member's rows<br/>and files")]
+  Data -->|own rows only, RLS| Member["The member"]
+  Data -->|everything, skips RLS| Admin["Owner and server functions<br/>(service role)"]
+  Data -->|only what a call carries| Model["OpenRouter and the model host<br/>(no-data-kept hosts only)"]
+```
+
+- **The member** reads only their own rows (RLS, with membership checked).
+  The ledger is the exception: any signed-in user can read their own
+  ledger rows, because membership itself lives there.
+- **The owner and the server functions** use the service role, which
+  skips RLS. The proxy reads balances and today's spend.
+- **OpenRouter and the model host** see what a call carries: the turn's
+  messages, the text of any file the coach reads, and tool results. The
+  proxy forces the filter that sends calls only to hosts that keep no
+  data and don't train on it. The candidate-facing list of hosts is the
+  [privacy page](../apps/web/public/privacy.html) (C § 13.6).
 - **The gate log is a record, not proof;** the candidate's browser writes
   it. Spending is stopped by the proxy (C § 3).
-- **Delete** removes the user's files, gates, conversation and credit
+- **Delete** removes the member's files, gates, conversation and credit
   rows. It keeps the shared sign-in and the call rows, which hold amounts
   only, no content (C § 8).
 - **The bucket has restrictive "pin" policies,** so a policy added later
   by anyone cannot open it to other users (C § 8).
-- **Schema:** [`supabase/migrations/`](../supabase/migrations/), in
-  date order. An applied migration is never edited; a change is a new
-  file.
+- **Schema:** [`supabase/migrations/`](../supabase/migrations/), in date
+  order. An applied migration is never edited; a change is a new file.
 
 ## 5. Deploying
 
@@ -215,16 +283,17 @@ flowchart LR
   V --> L["6. Live check"]
 ```
 
-**Only the owner deploys.** No agent runs any of these steps.
+**Every production change needs the owner's explicit approval.** The
+function and site READMEs say the owner runs the deploy steps.
 
 **Why this order:** each layer must exist before the layer that uses it.
 A proxy that writes a new column before the column exists would fail
 every ledger insert, so calls would go unbilled (C § 9.6). The delete
 function must cover new data before the site writes any (C § 11.8). A
 Vercel setting is baked in at build time, so it needs a fresh site
-deploy. Each change's contract states its own order, and it can differ.
-For example, § 13 shipped site first, then proxy, so no live build was
-ever refused (C § 13.2).
+deploy. Each change's contract states its own order, and it can differ:
+§ 13 went out site first, then proxy, then the setting (2026-09-25),
+because the new proxy refuses requests the old site sends (C § 13.2).
 
 **The site deploy is a script,**
 [`apps/web/scripts/deploy-prod.sh`](../apps/web/scripts/deploy-prod.sh).
@@ -250,22 +319,25 @@ settings: [`apps/web/README.md`](../apps/web/README.md).
 | The proxy's rules, models, ceilings | `supabase/functions/ten-model-proxy/core.ts`, `handler.ts` | C § 8, § 13, § 14 |
 | Tables and access rules | a **new** file in `supabase/migrations/`, plus the teardown and `tests/sql/` | C § 2, § 8 |
 | Screens and cards | `apps/web/src/components/`, `apps/web/src/real/` | [`design-web-ui.md`](design-web-ui.md) |
-| Tests | your package's own tests; `tests/` holds the skill tests and the independent tester's suites | [`TEAM.md`](TEAM.md) |
+| Tests | your package's own tests; `tests/` holds the skill tests and the independent tester's suites | [`CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | Deploy | `apps/web/scripts/deploy-prod.sh`, `supabase/functions/README.md` | C § 10.1, § 11.8, § 13.2 |
 
 ## Invariants you must not break
 
-- **Money.** No model key ever reaches the browser. Every call is metered
-  with exactly one ledger row. The balance is derived from the ledger,
-  never stored. The proxy's limits (balance, $5/day, output cap, size
-  cap, model allowlist) are the real spending stops.
+- **Money.** No model key ever reaches the browser. Every call is
+  metered into one ledger row; if that insert fails twice, the row is
+  lost and the proxy logs an alert (`handler.ts`). The balance is derived
+  from the ledger, never stored. The proxy's checks (balance, $5/day,
+  output cap, size cap, model allowlist) are the real spending stops, and
+  calls already running can overshoot them by their own cost.
   Source: [C § 8](design-web-agent.md#8-model-proxy-balance-and-the-production-project), rule 5.
 - **Privacy: no data kept.** The proxy forces the provider filter
   (`data_collection: "deny"`, `zdr: true`), so only hosts that keep no
   data serve a call. Logs never hold conversation content (C § 11.7).
   Delete removes all career data. No candidate data ever enters this
-  repo. Source: [rule 9](../PRINCIPLES.md), C § 8, and the PII guard in
-  [`tests/test_invariants.py`](../tests/test_invariants.py).
+  repo. Source: [rule 9](../PRINCIPLES.md), C § 8, and the PII guards in
+  [`tests/test_invariants.py`](../tests/test_invariants.py) and
+  [`tests/test_docs_guard.py`](../tests/test_docs_guard.py).
 - **Honesty (rule 8).** Cards, costs and the model name are built by code
   from files and measurements, never from the model's prose. Error
   messages say what happened and what the candidate can do, never a

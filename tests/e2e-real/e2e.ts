@@ -36,7 +36,7 @@
 // Exit code 0 = all PASS; one PASS/FAIL line per assertion.
 // Also here: upload-errors.test.ts (node --test), the upload messages over PGlite.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -48,6 +48,7 @@ import { chromium, firefox, webkit } from "../../apps/web/node_modules/playwrigh
 import { unzipSync } from "../../apps/web/node_modules/fflate/esm/index.mjs";
 import { ANON_KEY, JWT_SECRET, SERVICE_KEY, startStandIn, verifyJwt, type StandIn } from "./stand-in.ts";
 import { startStubOpenRouter, textOfContent, type Scenario, type StubOpenRouter } from "./stub-openrouter.ts";
+import { CUT_OFF_MESSAGE, NEXT_TURN_NOTE as CUT_OFF_NOTE } from "../agent/_spec9.ts";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "../..");
@@ -704,8 +705,14 @@ await section("journey", async () => {
     const rel = o.name.replace(`users/${uid}/ws/`, "");
     return entries[rel] && Buffer.from(entries[rel]).equals(Buffer.from(standIn.backend.objectBytes.get(o.name)!));
   });
-  const expectedCount = dbFiles.length + (await db.objects(uid)).length;
-  rec(textOk && binOk && Object.keys(entries).filter((k) => !k.endsWith("/")).length === expectedCount, "export: zip == every text row + every object, byte for byte, same folder shape", `${Object.keys(entries).length} entries`);
+  // § 11.7 (amended 2026-09-24): plus .ten/conversation.json, the saved array, when a row exists.
+  const savedConv = (await standIn.sql<any>("select messages from public.ten_conversations where user_id = $1", [uid]))[0];
+  const expectedCount = dbFiles.length + (await db.objects(uid)).length + (savedConv ? 1 : 0);
+  rec(textOk && binOk && Object.keys(entries).filter((k) => !k.endsWith("/")).length === expectedCount, "export: zip == every text row + every object (+ .ten/conversation.json), byte for byte, same folder shape", `${Object.keys(entries).length} entries`);
+  const convEntry = entries[".ten/conversation.json"];
+  let convParsed: unknown = undefined;
+  try { convParsed = convEntry ? JSON.parse(Buffer.from(convEntry).toString("utf8")) : undefined; } catch { convParsed = "UNPARSEABLE"; }
+  rec(!!savedConv && JSON.stringify(convParsed) === JSON.stringify(savedConv.messages), "export (§ 11.9 x): .ten/conversation.json parses and equals the saved array", convEntry ? `${convEntry.length} bytes` : "missing");
   const shots = process.env.SHOTS;
   if (shots) await page.screenshot({ path: path.join(shots, "e2e-real-journey.png"), fullPage: true });
 
@@ -732,6 +739,8 @@ await section("import", async () => {
   const ao = (await db.objects(journeyUid)).map((o) => o.name.replace(`users/${journeyUid}/ws/`, ""));
   const bo = (await db.objects(uid)).map((o) => o.name.replace(`users/${uid}/ws/`, ""));
   eq(bo, ao, "import: binaries identical paths to the source workspace");
+  rec(!b.some((f) => f.path.startsWith(".ten/")), "import (§ 11.9 x): .ten/ entries are skipped, never written as files");
+  rec((await standIn.sql("select 1 from public.ten_conversations where user_id = $1", [uid])).length === 0, "import (§ 11.9 x): an import starts a new conversation (no row carried over)");
   // import into a now non-empty workspace is refused with a visible message
   await page.locator('input[accept=".zip"]').setInputFiles(zipPath);
   const refused = await until(async () => ((await page.locator(".import-error").count()) ? (await page.locator(".import-error").textContent()) : false), 10000);
@@ -779,15 +788,24 @@ await section("gate", async () => {
   rec(after?.status === "approved" && after?.typed_text === "yes", "gate: typed 'yes' -> approved, the typed text logged", JSON.stringify(after));
   rec(stub.hits.length - hY === 1 && ((await lastAssistant(page).textContent()) ?? "").includes("Starting the search now."), "gate: the run continues after approval");
   rec(((await page.locator(".card--gate").last().textContent()) ?? "").includes("approved"), "gate: card status approved");
-  // leave a pending gate, reload (new chat) -> the old pending row expires
+  // leave a pending gate, reload: § 11.6 (amended 2026-09-24) — the chat id is
+  // stable, so the pending gate survives and a typed yes still approves it.
   await say(page, "find me roles at ten more companies");
   const pend = (await db.gates(uid)).slice(-1)[0];
   rec(pend?.status === "pending", "gate: a second gate opened (pending) before reload");
+  await until(async () => ((await standIn.sql<any>("select messages from public.ten_conversations where user_id = $1", [uid]))[0]?.messages ?? []).some((m: any) => JSON.stringify(m).includes(pend.id)), 10000);
   await page.reload();
   await page.locator(".composer-input").waitFor({ timeout: 20000 });
-  await say(page, "hello again");
-  const expired = (await db.gates(uid)).find((g) => g.id === pend?.id);
-  rec(expired?.status === "expired", "gate: a reload starts a new chat; its first turn expires the older chat's pending gate (§ 3)", JSON.stringify(expired?.status));
+  await page.waitForTimeout(500);
+  const cardAfter = (await page.locator(`.card--gate[data-gate-id="${pend?.id}"]`).textContent().catch(() => "")) ?? "";
+  rec(cardAfter.includes("pending"), "gate (§ 11.9 vi): after a reload the pending gate card is back, still pending", cardAfter.slice(0, 120));
+  rec(((await page.locator(".avatar").getAttribute("class")) ?? "").includes("needs-you"), "gate (§ 11.9 vi): …and the avatar shows needs-you");
+  rec((await db.gates(uid)).find((g) => g.id === pend?.id)?.status === "pending", "gate (§ 11.6): the reload expired nothing");
+  const hR = stub.hits.length;
+  await say(page, "yes");
+  const approvedAfterReload = (await db.gates(uid)).find((g) => g.id === pend?.id);
+  rec(approvedAfterReload?.status === "approved" && approvedAfterReload?.typed_text === "yes", "gate (§ 11.9 vi): a typed yes after the reload approves it", JSON.stringify(approvedAfterReload?.status));
+  rec(stub.hits.length - hR === 1 && ((await lastAssistant(page).textContent()) ?? "").includes("Starting the search now."), "gate (§ 11.9 vi): …and the run continues");
   // decline is final
   await say(page, "find me roles at ten more companies");
   const dg = (await db.gates(uid)).slice(-1)[0];
@@ -926,11 +944,12 @@ await section("delete", async () => {
   await say(page, "find me roles at five more companies"); // a gate row + call rows
   const before = { files: (await db.files(uid)).length, objs: (await db.objects(uid)).length, gates: (await db.gates(uid)).length, ledger: await db.ledger(uid) };
   rec(before.files >= 1 && before.objs === 2 && before.gates === 1 && before.ledger.some((r) => r.kind === "call"), "delete: seeded workspace, object, gate row, call rows", JSON.stringify({ ...before, ledger: before.ledger.length }));
+  rec((await until(async () => ((await standIn.sql("select 1 from public.ten_conversations where user_id = $1", [uid])).length === 1 ? true : false), 10000)) === true, "delete: a saved conversation row exists before the delete");
   await page.locator(".menu-trigger").click();
   await page.getByRole("menuitem", { name: "Delete my beta data" }).click();
   const dlg = page.locator(".delete-confirm-card");
   const dText = (await dlg.textContent()) ?? "";
-  rec(dText.includes("your workspace files, your gate log, and your credit"), "delete: names the complete thing (§ 1.7.1)");
+  rec(dText.includes("your workspace files, your conversation, your gate log, and your credit"), "delete: names the complete thing, incl. your conversation (§ 1.7.1, amended for C § 11.7)");
   rec(
     dText.includes("This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. Your usage records, which show only amounts spent and no content, are kept."),
     "delete: C § 8's sentence word for word, incl. the kept-usage sentence (§ 1.7.2)",
@@ -959,6 +978,7 @@ await section("delete", async () => {
   rec(fnCalls() === 1 && verifyJwt(/^Bearer (.+)$/.exec(call?.auth ?? "")?.[1] ?? "")?.sub === uid && call?.status === 200, "delete: ten-delete-account called once, with the user's JWT, 200", JSON.stringify({ n: fnCalls(), status: call?.status }));
   const afterL = await db.ledger(uid);
   rec((await db.files(uid)).length === 0 && (await db.objects(uid)).length === 0 && (await db.gates(uid)).length === 0, "delete: no text rows, no objects, no gate rows left");
+  rec((await standIn.sql("select 1 from public.ten_conversations where user_id = $1", [uid])).length === 0, "delete (§ 11.7): the saved conversation is gone too");
   rec(!afterL.some((r) => r.kind === "credit") && afterL.filter((r) => r.kind === "call").length === before.ledger.filter((r) => r.kind === "call").length, "delete: credit rows gone, call rows kept (§ 8)");
   rec((await standIn.sql("select 1 from auth.users where id = $1", [uid])).length === 1, "delete: the shared sign-in (auth user) is kept");
   if (await page.locator(".delete-confirm-card button", { hasText: "OK" }).count()) await page.locator(".delete-confirm-card button", { hasText: "OK" }).click();
@@ -981,6 +1001,271 @@ await section("delete", async () => {
   rec(((await p2.locator(".delete-confirm-card").textContent()) ?? "").includes("Declined — nothing was deleted.") && (await db.files(uid2)).length === 1, "delete: 'no' declines; nothing deleted");
   await page.context().close();
   await p2.context().close();
+});
+
+// ================================================================ SAVED CONVERSATION (C § 11)
+// Tester-owned, from docs/design-web-agent.md § 11.9 (iv)–(viii), (x)–(xii)
+// and design-web-ui.md § 1.8–1.9 (6641e1a). The real RealApp over the
+// stand-in (PGlite running all three applied migrations).
+await section("conversation", async () => {
+  const UI = readFileSync(path.join(REPO, "docs/design-web-ui.md"), "utf8").replace(/\s+/g, " ");
+  const q = (re: RegExp) => UI.match(re)?.[1] ?? `(copy not found: ${re})`;
+  const OLDER = q(/\*\*Older turns not kept\*\* \(C § 11\.4\), at the top of the restored transcript: "([^"]+)"/);
+  const SAVE_FAILED = q(/\*\*A save failed\*\* \(C § 11\.4\): "([^"]+)"/);
+  const STALE = q(/\*\*Stale tab, before a send\*\* \(C § 11\.5; the message is not sent and its text stays in the composer\): "([^"]+)"/);
+  const CONFLICT = q(/\*\*Save conflict\*\* \(C § 11\.5\): "([^"]+)"/);
+  const LOAD_FAILED = q(/"(Couldn't load your conversation\. Try again in a moment\.)"/);
+  const FAILED_SUFFIX = q(/both lines end instead with: "([^"]+)"/);
+  const SAVED_SUFFIX = q(/Notice, with a `Reload` button: "Ten has been updated\. Reload to use the new version\. ([^"]+)"/);
+  const SENTINEL = "SENTINEL-CONV-7f3a91";
+  const consoleLines: string[] = [];
+  const watch = (p: any) => p.on("console", (m: any) => consoleLines.push(`${m.type()}: ${m.text()}`));
+  const conv = async (uid: string) => (await standIn.sql<any>("select chat_id, messages, older_dropped, version from public.ten_conversations where user_id = $1", [uid]))[0];
+  const bubbles = async (p: any) => (await p.locator(".bubble").allTextContents()).map((s: string) => s.trim());
+  const textOf = async (p: any, sel: string) => ((await p.locator(sel).first().textContent().catch(() => "")) ?? "").trim();
+  const subOf = (l: any) => verifyJwt(/^Bearer (.+)$/.exec(l.auth ?? "")?.[1] ?? "")?.sub;
+  const proxyFor = (uid: string) => proxyCalls().filter((l) => subOf(l) === uid).length;
+  const plant = (uid: string, chatId: string, messages: unknown[], olderDropped = false) =>
+    standIn.sql(
+      "insert into public.ten_conversations (user_id, chat_id, messages, older_dropped, version) values ($1, $2, $3::jsonb, $4, left(encode(sha256(convert_to($3::jsonb::text, 'UTF8')), 'hex'), 16))",
+      [uid, chatId, JSON.stringify(messages), olderDropped],
+    );
+  const newerVersion = async (p: any) => {
+    await p.route("**/version.json", (r: any) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: "zzzzzzz-20990101T000000Z" }) }));
+    await p.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await p.locator(".version-notice").waitFor({ timeout: 8000 });
+  };
+  rec(!/copy not found/.test([OLDER, SAVE_FAILED, STALE, CONFLICT, LOAD_FAILED, FAILED_SUFFIX, SAVED_SUFFIX].join("|")), "conversation: every § 1.8/§ 1.9 line was read from the doc", SAVED_SUFFIX);
+
+  // ---- (iv) restore after reload: same messages, same chat id, avatar done, the next request carries them
+  {
+    const uid = await standIn.createUser({ email: em("conv.user") });
+    const { page } = await newPage();
+    watch(page);
+    await signIn(page, em("conv.user"));
+    await page.locator(".empty-state").waitFor({ timeout: 20000 });
+    await say(page, "hello there");
+    await say(page, "hello again");
+    const row = await until(async () => { const r = await conv(uid); return r && r.messages.length === 4 ? r : false; }, 10000);
+    rec(!!row, "conversation (iv): two ended turns are saved as one row, 4 messages", JSON.stringify(row ? { chat: row.chat_id, n: row.messages.length } : null));
+    rec(true, "conversation (iv): bytes per turn (info, § 11.4 UNVERIFIED 5–20 KB)", `${Math.round(Buffer.byteLength(JSON.stringify(row?.messages ?? [])) / 2)} B/turn for a short text turn`);
+    const shown = await bubbles(page);
+    const hits0 = stub.hits.length;
+    await page.reload();
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    await page.waitForTimeout(600);
+    eq(await bubbles(page), shown, "conversation (iv): after a reload the same transcript is restored");
+    rec(stub.hits.length === hits0, "conversation (iv): restoring makes no model call");
+    const av = (await page.locator(".avatar").getAttribute("class")) ?? "";
+    rec(av.includes("avatar--done"), "conversation (iv): avatar shows done after a restore", av);
+    await say(page, "hello after reload");
+    const texts = (stub.hits.slice(-1)[0]?.body?.messages ?? []).map((m: any) => textOfContent(m.content));
+    rec(["hello there", "hello again", "Hi — I'm here."].every((s) => texts.some((t: string) => t.includes(s))), "conversation (iv): the next request carries the restored turns");
+    const row2 = await until(async () => { const r = await conv(uid); return r && r.messages.length === 6 ? r : false; }, 10000);
+    rec(!!row2 && row2.chat_id === row?.chat_id, "conversation (iv): the same chat id after reload (the row was updated, never replaced)", `${row?.chat_id} -> ${row2?.chat_id}`);
+    await page.context().close();
+  }
+
+  // ---- (v) a cut_off turn, reload: the next turn has its note
+  {
+    const uid = await standIn.createUser({ email: em("conv.cutoff") });
+    await plant(uid, "chat-planted-cutoff", [
+      { id: "p-u1", role: "user", metadata: { origin: "typed" }, parts: [{ type: "text", text: "Evaluate all four roles" }] },
+      { id: "p-a1", role: "assistant", parts: [{ type: "step-start" }, { type: "text", text: "Writing the verdicts." }, { type: "data-error", data: { code: "cut_off", message: CUT_OFF_MESSAGE, retryable: true } }] },
+    ]);
+    const { page } = await newPage();
+    watch(page);
+    await signIn(page, em("conv.cutoff"));
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    rec(((await page.locator(".card--error").textContent().catch(() => "")) ?? "").includes(CUT_OFF_MESSAGE), "conversation (v): the restored cut_off card shows");
+    await say(page, "hello, carry on");
+    const sys = textOfContent(stub.hits.slice(-1)[0]?.body?.messages?.[0]?.content);
+    rec(sys.trimEnd().endsWith(CUT_OFF_NOTE), "conversation (v): after a restore the next turn's system prompt ends with the § 9.4 cut_off note");
+    await page.context().close();
+  }
+
+  // ---- (vi) the row owns gate status: approved elsewhere shows approved; a card the cap dropped is expired
+  {
+    const uid = await standIn.createUser({ email: em("conv.gate") });
+    const { page } = await newPage();
+    watch(page);
+    await signIn(page, em("conv.gate"));
+    await page.locator(".empty-state").waitFor({ timeout: 20000 });
+    await say(page, "hello there");
+    await say(page, "find me roles at five more companies");
+    const g = (await db.gates(uid)).slice(-1)[0];
+    await until(async () => ((await conv(uid))?.messages ?? []).some((m: any) => JSON.stringify(m).includes(g.id)), 10000);
+    await standIn.sql("update public.ten_gate_log set status = 'approved', typed_text = 'yes', decided_at = now() where id = $1", [g.id]);
+    await page.reload();
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    await page.waitForTimeout(500);
+    const card = (await page.locator(`.card--gate[data-gate-id="${g.id}"]`).textContent().catch(() => "")) ?? "";
+    rec(card.includes("approved") && !card.includes("pending"), "conversation (vi): a row approved in a turn that was never saved shows approved after reload", card.slice(0, 120));
+    rec(!((await page.locator(".avatar").getAttribute("class")) ?? "").includes("needs-you"), "conversation (vi): …and the avatar no longer asks for a yes");
+    await page.context().close();
+
+    const uid2 = await standIn.createUser({ email: em("conv.gate.dropped") });
+    const gid = randomUUID();
+    await standIn.sql(
+      "insert into public.ten_gate_log (id, user_id, chat_id, kind, label, text_hash, gate_line, amount_usd) values ($1, $2, 'chat-planted-dropped', 'spend', 'Search more companies', $3, 'This costs up to $2.50 — nothing starts until you say yes.', 2.5)",
+      [gid, uid2, "sha256:" + "0".repeat(64)],
+    );
+    await plant(uid2, "chat-planted-dropped", [
+      { id: "d-u9", role: "user", metadata: { origin: "typed" }, parts: [{ type: "text", text: "hello later" }] },
+      { id: "d-a9", role: "assistant", parts: [{ type: "text", text: "Hi — I'm here." }] },
+    ], true);
+    const { page: p2 } = await newPage();
+    watch(p2);
+    await signIn(p2, em("conv.gate.dropped"));
+    await p2.locator(".composer-input").waitFor({ timeout: 20000 });
+    const st = (await db.gates(uid2)).find((x) => x.id === gid)?.status;
+    rec(st === "expired", "conversation (vi): a pending gate whose card the cap dropped is expired on load (rule 7)", st);
+    rec((await textOf(p2, ".conversation-notice--older-dropped")) === OLDER, "conversation (xii): older_dropped shows its § 1.9 line, word for word");
+    const first = await p2.evaluate(() => {
+      const n = document.querySelector(".conversation-notice--older-dropped");
+      const b = document.querySelector(".bubble");
+      return !!n && !!b && !!(n.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+    rec(first, "conversation (xii): …at the top of the restored transcript");
+    await say(p2, "yes");
+    rec((await db.gates(uid2)).find((x) => x.id === gid)?.status === "expired", "conversation (vi): a typed yes can't approve the gate whose card was never on screen");
+    await p2.context().close();
+  }
+
+  // ---- (viii) two tabs: a stale tab's send is not sent; a failed check sends; simultaneous saves -> one wins, the other shows its line
+  {
+    const uid = await standIn.createUser({ email: em("conv.tabs") });
+    const { page: A } = await newPage();
+    watch(A);
+    await signIn(A, em("conv.tabs"));
+    await A.locator(".empty-state").waitFor({ timeout: 20000 });
+    await say(A, "hello first");
+    await until(async () => ((await conv(uid))?.messages?.length === 2 ? true : false), 10000);
+    const { page: B } = await newPage();
+    watch(B);
+    await signIn(B, em("conv.tabs"));
+    await B.locator(".composer-input").waitFor({ timeout: 20000 });
+    const { page: C } = await newPage();
+    watch(C);
+    await signIn(C, em("conv.tabs"));
+    await C.locator(".composer-input").waitFor({ timeout: 20000 });
+    await say(A, "hello from A");
+    await until(async () => ((await conv(uid))?.messages?.length === 4 ? true : false), 10000);
+    const n0 = proxyFor(uid);
+    await B.locator(".composer-input").fill("hello from B");
+    await B.locator(".composer-input").press("Enter");
+    await B.waitForTimeout(1500);
+    rec(proxyFor(uid) === n0, "conversation (viii): a stale tab's send is not sent (no proxy request)", `${proxyFor(uid) - n0} call(s)`);
+    rec((await B.locator(".composer-input").inputValue()) === "hello from B", "conversation (viii): its text stays in the composer, word for word");
+    rec((await textOf(B, ".conversation-notice--stale-blocked")) === STALE, "conversation (xii): the stale-tab line, word for word", await textOf(B, ".conversation-notice"));
+
+    await C.route(/\/rest\/v1\/ten_conversations\?select=version/, (r: any) => r.abort());
+    await say(C, "hello from C");
+    rec(proxyFor(uid) === n0 + 1, "conversation (viii): a failed stale check never blocks — the send goes through");
+    await C.waitForTimeout(1200);
+    const row = await conv(uid);
+    rec(JSON.stringify(row.messages).includes("hello from A") && !JSON.stringify(row.messages).includes("hello from C"), "conversation (viii): the row keeps the winner's history; the stale tab never overwrites or merges");
+    rec((await textOf(C, ".conversation-notice--save-conflict")) === CONFLICT, "conversation (xii): the save-conflict line, word for word", await textOf(C, ".conversation-notice"));
+    await newerVersion(C);
+    const vn = await textOf(C, ".version-notice-text");
+    rec(vn.endsWith(FAILED_SUFFIX), "conversation (xii)/ui § 1.8: after a save CONFLICT (this tab's latest reply wasn't saved) the notice ends with the failed-save ending", vn);
+    for (const p of [A, B, C]) await p.context().close();
+  }
+
+  // ---- a failed save: its line; the notice's failed ending; the next save carries the whole array
+  {
+    const uid = await standIn.createUser({ email: em("conv.savefail") });
+    const { page } = await newPage();
+    watch(page);
+    await signIn(page, em("conv.savefail"));
+    await page.locator(".empty-state").waitFor({ timeout: 20000 });
+    await page.route("**/rest/v1/rpc/ten_conversation_save", (r: any) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "XX000", message: "injected" }) }));
+    await say(page, `hello ${SENTINEL}`);
+    await page.waitForTimeout(800);
+    rec((await textOf(page, ".conversation-notice--save-failed")) === SAVE_FAILED, "conversation (xii): the save-failed line, word for word", await textOf(page, ".conversation-notice"));
+    await newerVersion(page);
+    rec((await textOf(page, ".version-notice-text")).endsWith(FAILED_SUFFIX), "conversation (xii)/ui § 1.8: after a failed save the notice ends with the failed-save ending");
+    await page.unroute("**/version.json");
+    await page.unroute("**/rest/v1/rpc/ten_conversation_save");
+    await page.close();
+    await page.context().close();
+    const { page: p2 } = await newPage();
+    watch(p2);
+    await signIn(p2, em("conv.savefail"));
+    await p2.locator(".empty-state").waitFor({ timeout: 20000 });
+    rec(!(await conv(uid)), "conversation: nothing was saved while saves failed");
+    await p2.context().close();
+  }
+
+  // ---- (xi) logs: the sentinel reaches no console call — failed load, 413, turn error (failed save above)
+  {
+    const uid = await standIn.createUser({ email: em("conv.logs") });
+    await plant(uid, "chat-planted-logs", [
+      { id: "l-u1", role: "user", metadata: { origin: "typed" }, parts: [{ type: "text", text: `hello ${SENTINEL}` }] },
+      { id: "l-a1", role: "assistant", parts: [{ type: "text", text: `Hi — ${SENTINEL}.` }] },
+    ]);
+    const { page } = await newPage();
+    watch(page);
+    await page.route(/\/rest\/v1\/ten_conversations\?select=chat_id/, (r: any) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "XX000", message: "injected load failure" }) }));
+    await signIn(page, em("conv.logs"));
+    await page.locator(".app-shell--config-error").waitFor({ timeout: 20000 });
+    const errTxt = ((await page.locator(".app-shell--config-error").textContent()) ?? "").trim();
+    rec(errTxt.includes(LOAD_FAILED), "conversation (xii): a failed load goes to the setup error screen with its § 1.9 line", errTxt.slice(0, 120));
+    rec((await page.locator(".app-shell--config-error button", { hasText: "Retry" }).count()) === 1 && (await page.locator(".app-shell--config-error button", { hasText: "Sign out" }).count()) === 1, "conversation: …with Retry and Sign out");
+    rec((await page.locator(".composer-input").count()) === 0, "conversation: never mounts empty over a saved conversation");
+    await page.unroute(/\/rest\/v1\/ten_conversations\?select=chat_id/);
+    await page.locator(".app-shell--config-error button", { hasText: "Retry" }).click();
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    rec((await bubbles(page)).some((b: string) => b.includes(SENTINEL)), "conversation: Retry loads it");
+    // a 413 (a message over the proxy's 256 KB) and an upstream turn error
+    await page.locator(".composer-input").fill(`hello ${SENTINEL} ` + "x ".repeat(140_000));
+    await page.locator(".composer-input").press("Enter");
+    await waitSettled(page);
+    rec(((await page.locator(".card--error").last().textContent()) ?? "").includes("This turn got too big to send"), "conversation: a 413 shows too_large (§ 12.2)");
+    await page.route("**/functions/v1/ten-model-proxy/**", (r: any) => r.fulfill({ status: 503, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ error: { code: "model_error", message: "The model is temporarily unavailable. Try again." } }) }));
+    await say(page, `hello ${SENTINEL} again`);
+    await page.context().close();
+    const leaked = consoleLines.filter((l) => l.includes(SENTINEL));
+    rec(leaked.length === 0, "conversation (xi): the sentinel reached no console call (failed save, failed load, 413, turn error)", leaked.slice(0, 3).join(" | ").slice(0, 400));
+    rec(!denoLog.join("").includes(SENTINEL), "conversation (xi): …nor the functions' logs");
+  }
+
+  // ---- this tab's own save still in flight is not "another tab" (§ 11.5)
+  {
+    const uid = await standIn.createUser({ email: em("conv.race") });
+    const { page } = await newPage();
+    watch(page);
+    await signIn(page, em("conv.race"));
+    await page.locator(".empty-state").waitFor({ timeout: 20000 });
+    await say(page, "hello first");
+    await until(async () => ((await conv(uid))?.messages?.length === 2 ? true : false), 10000);
+    // the save commits on the server at once; its answer reaches the tab 2.5 s later (a slow network)
+    await page.route("**/rest/v1/rpc/ten_conversation_save", async (r: any) => {
+      const resp = await r.fetch();
+      await sleep(2500);
+      await r.fulfill({ response: resp });
+    });
+    await say(page, "hello second");
+    const n0 = proxyFor(uid);
+    await page.locator(".composer-input").fill("hello third");
+    await page.locator(".composer-input").press("Enter");
+    await page.waitForTimeout(3500);
+    await waitSettled(page);
+    rec(proxyFor(uid) === n0 + 1, "conversation (viii): a send while THIS tab's own save is still in flight is sent (it is not another tab)", `${proxyFor(uid) - n0} call(s); line: ${await textOf(page, ".conversation-notice")}`);
+    // § 11.5: the pre-send check runs "under § 10.3's rules (2 s; a failed
+    // check never blocks)". An own save that never answers must not hold the
+    // candidate's send (or the composer) hostage.
+    await page.unroute("**/rest/v1/rpc/ten_conversation_save");
+    await page.route("**/rest/v1/rpc/ten_conversation_save", () => new Promise(() => {})); // never answers
+    await say(page, "hello fourth");
+    const n1 = proxyFor(uid);
+    const t0 = Date.now();
+    await page.locator(".composer-input").fill("hello fifth");
+    await page.locator(".composer-input").press("Enter");
+    const sent = await until(async () => (proxyFor(uid) > n1 ? Date.now() - t0 : false), 12000, 100);
+    rec(sent !== undefined && sent <= 4000, "conversation (viii): a send while this tab's own save HANGS still goes within the 2 s rule (a failed check never blocks)", sent === undefined ? "not sent within 12 s; composer disabled: " + (await page.locator(".composer-input").isDisabled()) : `${sent} ms`);
+    await page.context().close();
+  }
 });
 
 // ================================================================ JWT REFRESH

@@ -13,7 +13,8 @@ export function GateCard({
 }): ReactElement {
   return (
     <div className={`card card--gate card--gate-${status}`} data-gate-id={gate.gateId}>
-      <div className="card-title">Gate — {gate.label}</div>
+      <div className="card-kicker">Needs your word</div>
+      <div className="card-title">{gate.label}</div>
       <pre className="gate-text">{gate.text}</pre>
       <p className="gate-line">{gate.gateLine}</p>
       <p className="card-meta">

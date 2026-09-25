@@ -3,14 +3,19 @@
 // separate route or spinner screen for the membership check — it happens
 // once, on this same shell, before the chat ever mounts.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { validateUIMessages } from "ai";
 import { createCoach, type Coach } from "../../../../packages/agent/src/index.ts";
+import type { AppMessage } from "../../../../packages/agent/src/types.ts";
 import { accessTokenFrom, checkMembership, createTenAuthClient, siteRedirectUrl, signOut } from "../backend/auth.ts";
 import { toAuthClientLike } from "../backend/auth-client-adapter.ts";
 import type { TenEnv } from "../backend/env.ts";
 import { createRootClaudeMd } from "../backend/supabase-workspace-store.ts";
 import { buildSkillBundle } from "../backend/skills-bundle.ts";
 import { TIER0_PATH } from "../../../../packages/agent/src/skills/system-prompt.ts";
+import { createConversationStore, type ConversationStore } from "../backend/conversation-store.ts";
+import { readGateStatus } from "../backend/gate.ts";
 import { buildRealDeps } from "./deps.ts";
+import { reconcileGateStatuses } from "./reconcile-gates.ts";
 import { SignIn } from "./SignIn";
 import { NotAMember } from "./NotAMember";
 import { RealChatShell } from "./RealChatShell";
@@ -60,9 +65,18 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   // `.auth.onAuthStateChange()`, which isn't part of AuthClientLike.
   const authClient = useMemo(() => toAuthClientLike(client), [client]);
   const [screen, setScreen] = useState<Screen>({ kind: "loading" });
-  // A reload starts a new chat (design-web-agent.md § 3, § 7) — a fresh id
-  // per mount of the member screen is exactly that.
-  const [chatId] = useState(() => `chat-${crypto.randomUUID()}`);
+  // § 11 (amended 2026-09-24): the conversation is restored under the SAME
+  // chat id it was saved under (§ 11.6) — a reload no longer starts a new
+  // chat (that replaces § 7's old rule; see design-web-agent.md § 11's own
+  // header note). `chatId` is resolved once checkAndAdvance's conversation-
+  // load step finishes: the restored row's own chat_id, or a fresh
+  // `chat-<uuid>` when no row exists yet (a brand-new member, or one who
+  // has never sent a turn).
+  const [chatId, setChatId] = useState<string | undefined>(undefined);
+  const [initialMessages, setInitialMessages] = useState<AppMessage[] | undefined>(undefined);
+  const [initialVersion, setInitialVersion] = useState<string | null>(null);
+  const [initialOlderDropped, setInitialOlderDropped] = useState(false);
+  const [conversationStore, setConversationStore] = useState<ConversationStore | undefined>(undefined);
   const [coach, setCoach] = useState<Coach | undefined>(undefined);
   const [workspace, setWorkspace] = useState<ReturnType<typeof buildRealDeps>["workspace"] | undefined>(undefined);
   const [balanceFn, setBalanceFn] = useState<(() => Promise<number>) | undefined>(undefined);
@@ -124,9 +138,48 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         return;
       }
 
+      // § 11.6 — "before mounting", restore the saved conversation (if
+      // any) under its OWN chat id, checked with validateUIMessages, then
+      // reconcile any gate whose latest restored status is pending against
+      // its ten_gate_log row's real truth (a turn that decided it may
+      // never have been saved). A failed read/check/reconcile is a setup
+      // failure like every other step here — never a silent empty mount
+      // over a saved conversation (§ 11.6's own rule).
+      const conversation = createConversationStore({ url: env.supabaseUrl, anonKey: env.supabaseAnonKey, accessToken });
+      let resolvedChatId: string;
+      let resolvedMessages: AppMessage[] = [];
+      let resolvedVersion: string | null = null;
+      let resolvedOlderDropped = false;
+      try {
+        const loaded = await conversation.load();
+        if (loaded) {
+          const validated = await validateUIMessages<AppMessage>({ messages: loaded.messages });
+          resolvedMessages = await reconcileGateStatuses(validated, loaded.chatId, {
+            pending: (cid) => deps.gate.pending(cid),
+            decide: (gid, status) => deps.gate.decide(gid, status),
+            readStatus: (gid) => readGateStatus({ url: env.supabaseUrl, anonKey: env.supabaseAnonKey, accessToken }, gid),
+          });
+          resolvedChatId = loaded.chatId;
+          resolvedVersion = loaded.version;
+          resolvedOlderDropped = loaded.olderDropped;
+        } else {
+          resolvedChatId = `chat-${crypto.randomUUID()}`;
+        }
+      } catch (err) {
+        logSetupError("loading your conversation", err);
+        checkedUserIdRef.current = undefined;
+        setScreen({ kind: "error", message: "Couldn't load your conversation. Try again in a moment." });
+        return;
+      }
+
       setWorkspace(deps.workspace);
       setBalanceFn(() => deps.balance);
       setCoach(createCoach(deps));
+      setConversationStore(conversation);
+      setChatId(resolvedChatId);
+      setInitialMessages(resolvedMessages);
+      setInitialVersion(resolvedVersion);
+      setInitialOlderDropped(resolvedOlderDropped);
       setScreen({ kind: "member", userId });
     },
     [authClient, env, accessToken],
@@ -187,11 +240,24 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   if (screen.kind === "loading" || screen.kind === "checking-membership") {
     return <div className="app-shell app-shell--loading" />;
   }
+  // Every screen — pre-auth included — lives under the same theme root:
+  // [data-theme="dark"]'s variable overrides only apply to their own
+  // descendants (styles.css), so sign-in/not-a-member must sit inside
+  // .app-root too, or they'd always render in light-mode tokens
+  // regardless of the host's own dark-mode setting.
   if (screen.kind === "signed-out") {
-    return <SignIn client={authClient} redirectTo={siteRedirectUrl()} />;
+    return (
+      <div className="app-root" data-theme={theme}>
+        <SignIn client={authClient} redirectTo={siteRedirectUrl()} />
+      </div>
+    );
   }
   if (screen.kind === "not-a-member") {
-    return <NotAMember onSignOut={handleSignOut} />;
+    return (
+      <div className="app-root" data-theme={theme}>
+        <NotAMember onSignOut={handleSignOut} />
+      </div>
+    );
   }
   if (screen.kind === "deleted") {
     // The sign-in screen underneath (sign-out already happened — § 1.7
@@ -199,7 +265,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
     // fix round 2 item 3), with the report-back on top; OK just closes
     // the overlay onto the now-ordinary sign-in screen.
     return (
-      <>
+      <div className="app-root" data-theme={theme}>
         <SignIn client={authClient} redirectTo={siteRedirectUrl()} />
         <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
           <div className="delete-confirm-card">
@@ -209,39 +275,45 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
             </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
   if (screen.kind === "error") {
     return (
-      <div className="app-shell app-shell--config-error">
-        <div>
-          <p>{screen.message}</p>
-          <button
-            type="button"
-            onClick={() => {
-              void client.auth.getSession().then(({ data }) => {
-                const uid = data.session?.user.id;
-                if (uid) {
-                  checkedUserIdRef.current = uid;
-                  void checkAndAdvance(uid);
-                } else {
-                  setScreen({ kind: "signed-out" });
-                }
-              });
-            }}
-          >
-            Retry
-          </button>
-          <button type="button" onClick={handleSignOut}>
-            Sign out
-          </button>
+      <div className="app-root" data-theme={theme}>
+        <div className="app-shell app-shell--config-error">
+          <div>
+            <p>{screen.message}</p>
+            <button
+              type="button"
+              onClick={() => {
+                void client.auth.getSession().then(({ data }) => {
+                  const uid = data.session?.user.id;
+                  if (uid) {
+                    checkedUserIdRef.current = uid;
+                    void checkAndAdvance(uid);
+                  } else {
+                    setScreen({ kind: "signed-out" });
+                  }
+                });
+              }}
+            >
+              Retry
+            </button>
+            <button type="button" onClick={handleSignOut}>
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     );
   }
-  if (!coach || !workspace || !balanceFn) {
-    return <div className="app-shell app-shell--loading" />;
+  if (!coach || !workspace || !balanceFn || !chatId || !initialMessages || !conversationStore) {
+    return (
+      <div className="app-root" data-theme={theme}>
+        <div className="app-shell app-shell--loading" />
+      </div>
+    );
   }
   return (
     <div className="app-root" data-theme={theme}>
@@ -250,6 +322,10 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         workspace={workspace}
         balance={balanceFn}
         chatId={chatId}
+        initialMessages={initialMessages}
+        initialVersion={initialVersion}
+        initialOlderDropped={initialOlderDropped}
+        conversationStore={conversationStore}
         supabaseUrl={env.supabaseUrl}
         accessToken={accessToken}
         onSignOut={handleSignOut}

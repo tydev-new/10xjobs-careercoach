@@ -26,7 +26,10 @@ export interface DeleteBetaDataConfirmProps {
   onDeleted: () => Promise<void>;
 }
 
-const COMPLETE_THING = "your workspace files, your gate log, and your credit";
+// Amended 2026-09-24 (C § 11.7 / ui § 1.7 point 1): "your conversation"
+// added, named — not folded into "workspace files" (ten_conversations is
+// its own table, C § 11.7).
+const COMPLETE_THING = "your workspace files, your conversation, your gate log, and your credit";
 // C § 8's own wording, word for word (design-web-ui.md § 1.7, point 2).
 const ONE_SENTENCE =
   "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. " +

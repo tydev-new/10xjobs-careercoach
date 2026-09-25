@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createSupabaseGate } from "./gate.ts";
+import { createSupabaseGate, readGateStatus } from "./gate.ts";
 import type { GateRequest } from "../../../../packages/agent/src/types.ts";
 
 interface Call {
@@ -114,6 +114,31 @@ test("expireOtherChats() calls ten_gate_expire_other_chats with p_chat", async (
   await gate.expireOtherChats("chat-2");
   assert.equal(calls[0].url, "https://proj.supabase.co/rest/v1/rpc/ten_gate_expire_other_chats");
   assert.deepEqual(calls[0].body, { p_chat: "chat-2" });
+});
+
+// § 11.6 — readGateStatus: reads ONE gate's row regardless of its status
+// (unlike pending(), which only ever finds a "pending" row).
+test("readGateStatus() reads the row's status by id, whatever it is (RLS: own rows readable)", async () => {
+  const { fetchImpl, calls } = makeFetch((call) => {
+    assert.match(call.url, /\/rest\/v1\/ten_gate_log\?/);
+    assert.match(call.url, /id=eq\.g1/);
+    assert.match(call.url, /select=status/);
+    return { status: 200, body: [{ status: "approved" }] };
+  });
+  const status = await readGateStatus({ url: "https://proj.supabase.co", anonKey: "anon", accessToken: async () => "jwt", fetchImpl }, "g1");
+  assert.equal(status, "approved");
+  assert.equal(calls[0].headers.authorization, "Bearer jwt");
+});
+
+test("readGateStatus() returns null when the row doesn't exist (or isn't the caller's)", async () => {
+  const { fetchImpl } = makeFetch(() => ({ status: 200, body: [] }));
+  const status = await readGateStatus({ url: "https://proj.supabase.co", anonKey: "anon", accessToken: async () => "jwt", fetchImpl }, "missing");
+  assert.equal(status, null);
+});
+
+test("readGateStatus() throws on a non-2xx", async () => {
+  const { fetchImpl } = makeFetch(() => ({ status: 500, body: { message: "boom" } }));
+  await assert.rejects(() => readGateStatus({ url: "https://proj.supabase.co", anonKey: "anon", accessToken: async () => "jwt", fetchImpl }, "g1"), /readGateStatus.*failed: HTTP 500/);
 });
 
 test("accessToken() is called fresh per RPC call (a refreshed JWT is used)", async () => {

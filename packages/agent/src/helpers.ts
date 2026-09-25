@@ -79,6 +79,24 @@ export function latestGateStatuses(
   return byGate;
 }
 
+/** § 11.6's gate reconciliation on restore: every gateId that has a
+ *  `data-gate` CARD part somewhere in `messages` — i.e. whose card is
+ *  actually visible on screen, as opposed to one whose opening turn the
+ *  § 11.4 size cap dropped. Used by the app (apps/web) to find a pending
+ *  row whose card fell out of the restored window (rule 7: no `yes`
+ *  without the complete thing on screen) so it can be expired. */
+export function gateIdsWithCards(messages: AppMessage[]): Set<string> {
+  const ids = new Set<string>();
+  for (const message of messages) {
+    for (const part of message.parts as Array<{ type: string; data?: unknown }>) {
+      if (part.type === "data-gate") {
+        ids.add((part.data as { gateId: string }).gateId);
+      }
+    }
+  }
+  return ids;
+}
+
 export function statusOf(messages: AppMessage[], chat: ChatStatus): Status {
   const hasTurn = messages.some((m) => m.role === "assistant");
   const lastMessage = messages[messages.length - 1];

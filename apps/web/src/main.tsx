@@ -4,6 +4,16 @@ import { App } from "./App";
 import { SHOW_MOCK_CONTROLS } from "./components/Header";
 import { MissingEnvError, readEnv } from "./backend/env.ts";
 import { RealApp } from "./real/RealApp";
+import { DevScreenPreview, devPreviewKind } from "./dev-preview";
+// Four openly licensed (SIL OFL) families, bundled via @fontsource —
+// never an external font CDN (design-web-ui-refresh.md's token table).
+// v2: Fraunces is the characterful heading/display face; Inter stays the
+// body/UI face (the brief excludes Inter only as the DISPLAY choice).
+import "@fontsource-variable/fraunces";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/source-serif-4";
+import "@fontsource/jetbrains-mono/400.css";
+import "@fontsource/jetbrains-mono/500.css";
 import "./styles.css";
 
 // Follow the host's explicit choice (data-theme on <html>), else the OS
@@ -49,6 +59,20 @@ function RealRoot(): ReactElement {
 const root = document.getElementById("root");
 if (!root) throw new Error("missing #root");
 
+// Preview-only, screenshot harness (design-web-ui-refresh.md's render
+// step): ?preview=sign-in|not-a-member renders that static real-mode
+// screen with a stub auth client — no Supabase URL, no network call,
+// never reachable when SHOW_MOCK_CONTROLS is false (the deployed build).
+const previewKind = SHOW_MOCK_CONTROLS ? devPreviewKind(window.location.search) : null;
+
 createRoot(root).render(
-  <StrictMode>{SHOW_MOCK_CONTROLS ? <App /> : <RealRoot />}</StrictMode>
+  <StrictMode>
+    {previewKind ? (
+      <DevScreenPreview kind={previewKind} />
+    ) : SHOW_MOCK_CONTROLS ? (
+      <App />
+    ) : (
+      <RealRoot />
+    )}
+  </StrictMode>
 );

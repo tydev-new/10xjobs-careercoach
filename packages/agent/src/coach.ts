@@ -16,6 +16,7 @@ import { matchGateReply } from "./helpers.ts";
 import { buildAlwaysOnSystemPrompt } from "./skills/system-prompt.ts";
 import { createTools, type ToolContext, type TurnState } from "./tools/index.ts";
 import { VersionTracker } from "./tools/version-tracker.ts";
+import { trimTurnStepsForBudget } from "./turn-trim.ts";
 import { trimHistoryToWindow } from "./window.ts";
 import type {
   AppMessage,
@@ -43,6 +44,14 @@ export const ERROR_MESSAGES: Record<ErrorCode, { message: string; retryable: boo
   // message is fixed, word for word.
   cut_off: {
     message: "My reply got too long and was cut off, so its last step didn't save. Say continue to redo it in smaller pieces.",
+    retryable: true,
+  },
+  // § 12.2 (amended 2026-09-24): a proxy 413 (the request itself grew too
+  // large to send) — fixed message, word for word, never the proxy's own
+  // "Request too large." sentence (unlike over_balance/model_error, which
+  // DO pass the server's literal message through, § 6.1).
+  too_large: {
+    message: "This turn got too big to send, so it stopped partway.",
     retryable: true,
   },
 };
@@ -78,13 +87,21 @@ const CUT_OFF_NEXT_TURN_NOTE =
 const STEP_CAP_NEXT_TURN_NOTE =
   "\n\n---\nYour previous turn in this chat stopped at its step limit before it finished. The actions it finished did run; nothing after the stop ran. Check the files for what was actually saved before redoing anything, tell the candidate plainly where it stopped, then carry on from there, unless they asked for something else. If the files don't show what that turn was working on, ask the candidate in one line.";
 
-// § 9.4 (generalized 2026-09-24, round 2): "For each code below that
-// appears on a data-error part of that message, the coach appends that
-// code's note... each code's note at most once; in the order below,
-// after the gate-pending note when that applies." cut_off comes first.
-const NEXT_TURN_NOTES: ReadonlyArray<{ code: "cut_off" | "step_cap"; note: string }> = [
+// § 12.2's too_large next-turn note (amended 2026-09-24): "§ 9.4 gains a
+// third note, after step_cap, word for word" — unwrapped from the doc's
+// blockquote.
+const TOO_LARGE_NEXT_TURN_NOTE =
+  "\n\n---\nYour previous turn in this chat stopped because its request grew too large to send. The actions it finished did run; nothing after the stop ran. Check the files for what was actually saved before redoing anything, tell the candidate plainly where it stopped, then carry on in smaller pieces, reading only what the next step needs, unless they asked for something else. If the files don't show what that turn was working on, ask the candidate in one line.";
+
+// § 9.4 (generalized 2026-09-24, round 2; § 12.2 amended 2026-09-24): "For
+// each code below that appears on a data-error part of that message, the
+// coach appends that code's note... each code's note at most once; in the
+// order below, after the gate-pending note when that applies." Order:
+// cut_off, step_cap, too_large.
+const NEXT_TURN_NOTES: ReadonlyArray<{ code: "cut_off" | "step_cap" | "too_large"; note: string }> = [
   { code: "cut_off", note: CUT_OFF_NEXT_TURN_NOTE },
   { code: "step_cap", note: STEP_CAP_NEXT_TURN_NOTE },
+  { code: "too_large", note: TOO_LARGE_NEXT_TURN_NOTE },
 ];
 
 /** § 3.2's note, added to the system prompt (not a canned USER-FACING
@@ -124,13 +141,29 @@ function originOf(m: AppMessage): "typed" | "ui" {
   return (m.metadata as AppMessageMetadata | undefined)?.origin ?? "ui";
 }
 
-// § 9.4 (generalized 2026-09-24, round 2): "One stateless check runs at
-// the start of each turn. It looks at the assistant message just before
-// the latest user message, in the history as sent, before the window
-// trims it." No stored flag (rule 12) — this reads straight off the
-// history the client resent. Returns every data-error `code` on that one
-// message (a hand-built history could carry more than one; § 9.8 (xi)).
-function dataErrorCodesOnMessageBeforeLatestUser(messages: AppMessage[]): Set<string> {
+// § 9.4 (generalized 2026-09-24, round 2; lead ruling, fix round 2 of the
+// § 11/§ 12 release): "One stateless check runs at the start of each turn.
+// It looks at the [most recent assistant message before the latest user
+// message that has at least one part other than data-gate-status —
+// assistant messages consisting only of data-gate-status parts are
+// skipped], in the history as sent, before the window trims it." No
+// stored flag (rule 12) — this reads straight off the history the client
+// resent. Returns every data-error `code` on that one message (a
+// hand-built history could carry more than one; § 9.8 (xi)).
+//
+// The skip exists because § 11.6's gate reconciliation-on-restore
+// (apps/web's reconcile-gates.ts) appends its OWN synthetic assistant
+// message, carrying only `data-gate-status` parts, after the restored
+// history — so, once the candidate's next turn lands, that synthetic
+// message (not the real turn that actually ended early) would otherwise
+// be "the assistant message just before the latest user message", hiding
+// a genuine cut_off/step_cap/too_large note.
+// Exported for its own direct unit test (packages/agent/test/next-turn-
+// notes.test.ts) — not part of the package's public API (index.ts curates
+// that separately); this stays a plain named export purely so the test
+// doesn't have to drive the whole streamText loop to exercise one pure,
+// data-only function.
+export function dataErrorCodesOnMessageBeforeLatestUser(messages: AppMessage[]): Set<string> {
   let lastUserIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") {
@@ -139,14 +172,19 @@ function dataErrorCodesOnMessageBeforeLatestUser(messages: AppMessage[]): Set<st
     }
   }
   if (lastUserIndex <= 0) return new Set();
-  const prev = messages[lastUserIndex - 1];
-  if (prev.role !== "assistant") return new Set();
-  const parts = prev.parts as unknown as Array<{ type: string; data?: { code?: string } }>;
-  const codes = new Set<string>();
-  for (const p of parts) {
-    if (p.type === "data-error" && p.data?.code) codes.add(p.data.code);
+  for (let i = lastUserIndex - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "assistant") return new Set();
+    const parts = m.parts as unknown as Array<{ type: string; data?: { code?: string } }>;
+    const hasOtherThanGateStatus = parts.some((p) => p.type !== "data-gate-status");
+    if (!hasOtherThanGateStatus) continue; // a reconciliation-only message — keep looking backward
+    const codes = new Set<string>();
+    for (const p of parts) {
+      if (p.type === "data-error" && p.data?.code) codes.add(p.data.code);
+    }
+    return codes;
   }
-  return codes;
+  return new Set();
 }
 
 // § 9.2: "drop a trailing assistant message with no content" — an
@@ -229,16 +267,37 @@ function serverMessageFrom(error: unknown): string | undefined {
   }
 }
 
+// § 12.2: "for a proxy 413 (the status, or the body's too_large code)" —
+// the proxy's own shape (handler.ts's jsonError) is `{ error: { code,
+// message } }`; this checks the body's code independent of status, in
+// case a wrapper surfaces a different statusCode for the same refusal.
+function bodyErrorCode(error: unknown): string | undefined {
+  const responseBody = (error as any)?.responseBody;
+  if (typeof responseBody !== "string") return undefined;
+  try {
+    const parsed = JSON.parse(responseBody);
+    const code = parsed?.error?.code;
+    return typeof code === "string" ? code : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function classifyError(error: unknown): { code: ErrorCode; serverMessage?: string } {
   const status =
     (error as any)?.status ?? (error as any)?.statusCode ?? (error as any)?.response?.status;
+  // § 12.2: too_large is its own code with a FIXED message (never the
+  // proxy's own "Request too large." sentence — unlike over_balance/
+  // model_error, § 6.1) — checked first, before serverMessageFrom's
+  // pass-through applies to anything else.
+  if (status === 413 || bodyErrorCode(error) === "too_large") return { code: "too_large" };
   const serverMessage = serverMessageFrom(error);
   if (status === 402) return { code: "over_balance", serverMessage };
   const message = String((error as any)?.message ?? error ?? "");
   if (/\b402\b/.test(message)) return { code: "over_balance", serverMessage };
   if (/network|fetch failed|ECONNREFUSED|offline/i.test(message)) return { code: "offline", serverMessage };
-  // Every other proxy-originated HTTP failure (401/403/413/503, § 8) is
-  // shown as model_error, distinguished only by ITS OWN message text
+  // Every other proxy-originated HTTP failure (401/403/503, § 8) is shown
+  // as model_error, distinguished only by ITS OWN message text
   // (design-web-ui.md § 2.7) — there's no dedicated ErrorCode for each.
   return { code: "model_error", serverMessage };
 }
@@ -642,17 +701,33 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
   // § 9.2's "one assistant message on screen": every call's stream is
   // merged with `sendFinish: false`, and the coach itself writes the ONE
   // `{ type: "finish" }` once both calls (or just the first) are done.
-  async function runOneCall(callMessages: unknown, baseStepCount: number, sendStart: boolean): Promise<CallOutcome> {
+  // `turnStartIndex` (§ 12.1) is `modelMessages.length` on BOTH calls: the
+  // continuation's own `callMessages` are built by PREFIXING that exact
+  // array (`buildContinuationMessages`), so it marks the same boundary —
+  // "this turn's steps" begin there — on either call.
+  async function runOneCall(callMessages: unknown, baseStepCount: number, sendStart: boolean, turnStartIndex: number): Promise<CallOutcome> {
     const { stop, recordedCount } = makeStop(baseStepCount);
     const result = streamText({
       model: deps.model,
       // § 9.2: "The system prompt stays the same, so the continuation can
       // reuse the prompt cache." Byte-identical on both calls: computed
       // once, above, never touched again after the first call starts.
+      // § 12.1: the system prompt is never part of `prepareStep`'s
+      // `messages` (it's this separate `system` option) and is never
+      // touched by the trim below.
       system: systemPrompt + systemNote,
       messages: callMessages as any,
       tools,
       stopWhen: stop,
+      // § 12.1: "Every streamText call ... gets a prepareStep." Under the
+      // 160,000-byte trigger: no override (the prompt cache stays warm).
+      // Over it: stubs this turn's own steps, oldest first, down to
+      // 120,000 (never the last 2, never a user-role message, never text
+      // the model wrote, never anything before `turnStartIndex`).
+      prepareStep: ({ messages: stepMessages }) => {
+        const { messages: trimmedMessages, trimmed } = trimTurnStepsForBudget(stepMessages as unknown[], turnStartIndex);
+        return trimmed ? { messages: trimmedMessages as any } : {};
+      },
       abortSignal,
       // Fix round 1, item 5 (flagged, outside this slice's own directory):
       // ONE proxy call per step. The AI SDK's default `maxRetries: 2`
@@ -745,7 +820,11 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     return { steps: allSteps, cutOff, hadError, responseMessages };
   }
 
-  const call1 = await runOneCall(modelMessages, 0, true);
+  // § 12.1: "this turn's steps" begin here on EITHER call — the
+  // continuation's own messages are built by prefixing this exact array.
+  const turnStartIndex = (modelMessages as unknown[]).length;
+
+  const call1 = await runOneCall(modelMessages, 0, true, turnStartIndex);
   let finalCutOff = call1.cutOff;
 
   if (call1.cutOff) {
@@ -774,7 +853,7 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
       const continuationMessages = buildContinuationMessages(modelMessages as any[], call1.responseMessages);
       // "There is never a third call" — this is the ONLY continuation
       // attempt this function ever makes, whatever call 2 itself ends on.
-      const call2 = await runOneCall(continuationMessages, call1.steps.length, false);
+      const call2 = await runOneCall(continuationMessages, call1.steps.length, false, turnStartIndex);
       finalCutOff = call2.cutOff;
     }
     // preconditions failing (or a second cut-off) both fall through to

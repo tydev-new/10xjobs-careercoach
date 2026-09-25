@@ -60,6 +60,7 @@ t("delete: only the caller's beta data goes; call rows kept; the other user's ro
   assertEquals(
     [...new Set(touched.filter((x) => x.startsWith("DELETE")))].sort(),
     [
+      "DELETE /rest/v1/ten_conversations", // § 11.7 (amended 2026-09-24): the saved conversation goes too
       "DELETE /rest/v1/ten_gate_log",
       "DELETE /rest/v1/ten_usage_ledger",
       "DELETE /rest/v1/ten_ws_files",

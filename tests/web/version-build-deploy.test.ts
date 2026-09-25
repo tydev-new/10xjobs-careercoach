@@ -167,10 +167,8 @@ const CASES: Array<{ name: string; dist: () => string; ok: boolean; why?: RegExp
   { name: "an id in no asset is refused", dist: () => variant("foreignid", (d) => writeFileSync(path.join(d, "version.json"), JSON.stringify({ id: "deadbee-20990101T000000Z" }))), ok: false, why: /not found in any built JS asset/ },
   { name: "an empty id is refused", dist: () => variant("emptyid", (d) => writeFileSync(path.join(d, "version.json"), JSON.stringify({ id: "" }))), ok: false },
   { name: "a version.json without an id is refused", dist: () => variant("noid", (d) => writeFileSync(path.join(d, "version.json"), JSON.stringify({ version: idA }))), ok: false },
-  // The spec asks exit 1 and no deploy call. The script's own REFUSED line is
-  // not printed here (a raw node stack instead) — reported as a NIT, so the
-  // plain-line check is off for this one case.
-  { name: "an unparseable version.json is refused", dist: () => variant("badjson", (d) => writeFileSync(path.join(d, "version.json"), '{"id": ')), ok: false, plain: false },
+  // Fixed in release round 2 (7713737): a plain REFUSED line, never a raw node stack.
+  { name: "an unparseable version.json is refused, with a plain REFUSED line", dist: () => variant("badjson", (d) => writeFileSync(path.join(d, "version.json"), '{"id": ')), ok: false, why: /REFUSED: version\.json could not be parsed\. Nothing was deployed\./ },
   {
     name: "an id found only in index.html (not an asset) is refused",
     dist: () =>

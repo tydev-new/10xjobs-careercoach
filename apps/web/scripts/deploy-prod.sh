@@ -33,7 +33,18 @@ if [ ! -f "$static/version.json" ]; then
   echo "REFUSED: no version.json in the static output. Nothing was deployed." >&2
   exit 1
 fi
-version_id=$(node -e "console.log(JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).id ?? '')" "$static/version.json")
+# Fix round 2, item 8 (tester finding): a malformed version.json makes the
+# node one-liner below THROW (JSON.parse) — under `set -e` that would abort
+# the whole script (still exit 1, still no deploy call, correct on both
+# counts already), but with node's raw stack trace on stderr instead of
+# this script's own plain "REFUSED: ... Nothing was deployed." line every
+# other refusal prints. `if ! version_id=$(...)` is exempt from `errexit`
+# (a command tested directly in an `if` condition), so the failure is
+# caught here instead and reported the same way as every other refusal.
+if ! version_id=$(node -e "console.log(JSON.parse(require('node:fs').readFileSync(process.argv[1], 'utf8')).id ?? '')" "$static/version.json" 2>/dev/null); then
+  echo "REFUSED: version.json could not be parsed. Nothing was deployed." >&2
+  exit 1
+fi
 if [ -z "$version_id" ] || ! grep -rqF --include='*.js' -- "$version_id" "$static"; then
   echo "REFUSED: version.json's id is not found in any built JS asset. Nothing was deployed." >&2
   exit 1

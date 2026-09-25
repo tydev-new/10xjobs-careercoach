@@ -87,6 +87,45 @@ test("importWorkspace() skips a root CLAUDE.md entry (the app owns creating it s
   await assert.rejects(store.read("CLAUDE.md"), (e: any) => e.code === "resource_missing");
 });
 
+// § 11.7 (amended 2026-09-24): "Export adds .ten/conversation.json (the
+// saved array) when a row exists ... Import skips .ten/ entries instead of
+// refusing; an import starts a new conversation."
+test("exportWorkspace() adds .ten/conversation.json when given one", async () => {
+  const store = createInMemoryWorkspaceStore({ "plan.md": "# Plan\n" });
+  const json = JSON.stringify([{ id: "u1", role: "user", parts: [{ type: "text", text: "hi" }] }]);
+  const zip = await exportWorkspace(store, json);
+  const entries = unzipSync(zip);
+  assert.ok(entries[".ten/conversation.json"], "the entry exists");
+  assert.equal(new TextDecoder().decode(entries[".ten/conversation.json"]), json);
+  assert.deepEqual(Object.keys(entries).sort(), [".ten/conversation.json", "plan.md"]);
+});
+
+test("exportWorkspace() with no conversation JSON given: unchanged, no .ten/ entry (round trip stays byte-identical)", async () => {
+  const store = createInMemoryWorkspaceStore({ "plan.md": "# Plan\n" });
+  const zip = await exportWorkspace(store);
+  const entries = unzipSync(zip);
+  assert.deepEqual(Object.keys(entries), ["plan.md"]);
+});
+
+test("importWorkspace() skips .ten/conversation.json (and any other .ten/ entry), writing nothing for it, refusing nothing", async () => {
+  const store = createInMemoryWorkspaceStore();
+  const zip = zipSync({
+    "plan.md": new TextEncoder().encode("good"),
+    ".ten/conversation.json": new TextEncoder().encode('[{"id":"u1"}]'),
+    ".ten/nested/other.json": new TextEncoder().encode("{}"),
+  });
+  const { written } = await importWorkspace(store, zip);
+  assert.deepEqual(written.map((f) => f.path), ["plan.md"]);
+  await assert.rejects(store.read(".ten/conversation.json"), (e: any) => e.code === "outside_workspace");
+});
+
+test("importWorkspace() with ONLY .ten/ entries (no workspace files): succeeds, writing nothing (an import still starts a new conversation)", async () => {
+  const store = createInMemoryWorkspaceStore();
+  const zip = zipSync({ ".ten/conversation.json": new TextEncoder().encode("[]") });
+  const { written } = await importWorkspace(store, zip);
+  assert.deepEqual(written, []);
+});
+
 test("import -> export round trip is byte-identical for a small synthetic workspace", async () => {
   const original: Record<string, Uint8Array> = {
     "plan.md": new TextEncoder().encode("# Plan\n\n## To do\n- write the résumé\n"),

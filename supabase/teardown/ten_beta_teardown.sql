@@ -1,11 +1,14 @@
 -- Ten web beta teardown: drops exactly what
--- supabase/migrations/20260923000000_ten_beta_init.sql and
--- supabase/migrations/20260924000000_ten_ledger_finish_reason.sql created,
--- and nothing else. The second file adds no object of its own to drop —
+-- supabase/migrations/20260923000000_ten_beta_init.sql,
+-- supabase/migrations/20260924000000_ten_ledger_finish_reason.sql, and
+-- supabase/migrations/20260924100000_ten_conversations.sql created, and
+-- nothing else. The second file adds no object of its own to drop —
 -- ten_usage_ledger.finish_reason is one column on a table this file already
--- drops, so it goes with the table; no new statement here. Applied by the
--- OWNER, never by an agent. DESTROYS all beta data (workspace files, ledger,
--- gate log). The shared auth users are NOT touched.
+-- drops, so it goes with the table; no new statement here. The third file
+-- DOES add its own statements below (a new table and function it owns).
+-- Applied by the OWNER, never by an agent. DESTROYS all beta data (workspace
+-- files, ledger, gate log, saved conversation). The shared auth users are
+-- NOT touched.
 --
 -- STEP 1 — THROUGH THE STORAGE API, FIRST (service role key, never in a browser).
 -- Supabase refuses direct SQL deletes from storage.objects/buckets
@@ -41,13 +44,16 @@ drop policy if exists ten_ws_objects_insert_own on storage.objects;
 drop policy if exists ten_ws_objects_pin on storage.objects;
 drop policy if exists ten_bucket_pin_update on storage.buckets;
 drop policy if exists ten_bucket_pin_delete on storage.buckets;
+drop policy if exists ten_conversations_select_own on public.ten_conversations;
 
 -- Tables (their policies, constraints and indexes go with them).
 drop table if exists public.ten_ws_files;
 drop table if exists public.ten_gate_log;
+drop table if exists public.ten_conversations;
 drop table if exists public.ten_usage_ledger;
 
 -- Functions last: the tables' policies call ten_is_member().
+drop function if exists public.ten_conversation_save(text, jsonb, boolean, text);
 drop function if exists public.ten_gate_expire_other_chats(text);
 drop function if exists public.ten_gate_decide(uuid, text, text);
 drop function if exists public.ten_gate_open(uuid, text, text, text, text, numeric);

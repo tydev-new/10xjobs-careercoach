@@ -101,7 +101,11 @@ export type ErrorCode =
   // A reply cut off at the output limit (design-web-agent.md § 9.3,
   // amended 2026-09-24; design-web-ui.md § 2.7): its own code, a fixed
   // message that already says what to do, so no `nextStep` entry below.
-  | "cut_off";
+  | "cut_off"
+  // A proxy 413 — the turn's own request grew too large to send
+  // (design-web-agent.md § 12.2, design-web-ui.md § 2.7, both amended
+  // 2026-09-24). Has a `nextStep` line, same as `step_cap`'s.
+  | "too_large";
 
 export interface DataErrorData {
   code: ErrorCode;

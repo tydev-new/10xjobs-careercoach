@@ -93,6 +93,8 @@ export interface SbState {
   ledger: LedgerRow[];
   wsFiles: Array<{ user_id: string; path: string }>;
   gateLog: Array<{ user_id: string; id: string }>;
+  /** § 11.2 (amended 2026-09-24): ten_conversations, one row per user. */
+  conversations: Array<{ user_id: string; chat_id: string; messages: unknown[] }>;
   objects: Set<string>; // `${bucket}/${name}`
   now: () => Date;
   /** path-substring -> status: inject a PostgREST/Storage failure */
@@ -130,6 +132,7 @@ export function newState(): SbState {
     ledger: [],
     wsFiles: [],
     gateLog: [],
+    conversations: [],
     objects: new Set(),
     now: () => new Date(),
     fail: {},
@@ -138,6 +141,12 @@ export function newState(): SbState {
     anonKey: "",
     serviceKey: "",
   };
+}
+
+/** Plants the user's one saved conversation (§ 11.2). */
+export function conversation(st: SbState, uid: string, chatId = `chat-${uid.slice(0, 8)}`) {
+  st.conversations = st.conversations.filter((c) => c.user_id !== uid);
+  st.conversations.push({ user_id: uid, chat_id: chatId, messages: [{ role: "user", parts: [{ type: "text", text: "CONVERSATION-CANARY" }] }] });
 }
 
 export function credit(st: SbState, uid: string, usd = 5) {
@@ -267,7 +276,7 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
       if (step === "commit-then-fail") return pgErr(503, "XX000", "injected: committed, response lost");
       return new Response(null, { status: 201 });
     }
-    const del = url.pathname.match(/^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger)$/);
+    const del = url.pathname.match(/^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger|ten_conversations)$/);
     if (del && req.method === "DELETE") {
       if (!svc) return pgErr(403, "42501", "permission denied");
       // PostgREST semantics: every `col=op.value` query param is a filter and
@@ -278,6 +287,8 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
         ten_usage_ledger: ["id", "user_id", "kind", "request_id", "model"],
         ten_ws_files: ["user_id", "path"],
         ten_gate_log: ["id", "user_id"],
+        // § 11.7: ten-delete-account deletes the caller's row by user_id.
+        ten_conversations: ["user_id"],
       };
       const filters: Array<[string, string]> = [];
       for (const [col, expr] of url.searchParams) {
@@ -297,6 +308,10 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
         const before = st.wsFiles.length;
         st.wsFiles = st.wsFiles.filter((x) => !match(x));
         n = before - st.wsFiles.length;
+      } else if (del[1] === "ten_conversations") {
+        const before = st.conversations.length;
+        st.conversations = st.conversations.filter((x) => !match(x));
+        n = before - st.conversations.length;
       } else {
         const before = st.gateLog.length;
         st.gateLog = st.gateLog.filter((x) => !match(x));

@@ -205,7 +205,7 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
     // role only. Unlike the bulk tester harness this mock DOES honor an
     // additional `kind=eq.` filter on ten_usage_ledger, so a delete-account
     // test here can assert 'credit' rows are removed and 'call' rows kept.
-    const deleteMatch = url.pathname.match(/^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger)$/);
+    const deleteMatch = url.pathname.match(/^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger|ten_conversations)$/);
     if (deleteMatch && req.method === "DELETE") {
       if (token !== state.serviceRoleKey) return new Response("forbidden", { status: 403 });
       const table = deleteMatch[1];

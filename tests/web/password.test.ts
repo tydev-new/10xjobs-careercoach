@@ -266,6 +266,17 @@ test("P1b the check before any call still holds in the code step: a mismatch typ
     await settle(o.page);
     assert.equal((await callsOf(o.page, "updateUser")).length, before, "updateUser was called with two passwords that don't match");
     assert.ok((await bodyText(o.page)).includes(COPY.mismatch), "mismatch line in the code step");
+    // a 7-character password typed in the code step: no call either
+    await fill(o.page, "Abcdefg");
+    await save(o.page);
+    await settle(o.page);
+    assert.equal((await callsOf(o.page, "updateUser")).length, before, "updateUser was called with a 7-character password");
+    assert.ok((await bodyText(o.page)).includes(COPY.tooShort), "too-short line in the code step");
+    // and a valid pair with the right code still saves, with the nonce
+    await fill(o.page, "Correct-Horse-9");
+    await save(o.page);
+    await o.page.getByText(COPY.success).waitFor();
+    assert.deepEqual((await callsOf(o.page, "updateUser")).at(-1)!.args[0], { password: "Correct-Horse-9", nonce: "246810" });
   } finally {
     await o.close();
   }
@@ -544,13 +555,28 @@ for (const c of ORDERS) {
 test("P6b a PASSWORD_RECOVERY event that follows INITIAL_SESSION (no URL) still leaves 'Choose a new password' on screen", async () => {
   // Edge: a check already in flight when the event arrives must not replace
   // the recovery screen ("in place of every other screen", C § 16.1).
-  const o = await open({ signedIn: true, member: false, rpcDelay: 300, events: [{ event: "INITIAL_SESSION" }, { event: "PASSWORD_RECOVERY", delay: 50 }] });
-  try {
-    await settle(o.page, 900);
-    const t = await bodyText(o.page);
-    assert.ok(t.includes(COPY.recoveryTitle), `final screen: ${t.slice(0, 200)}`);
-  } finally {
-    await o.close();
+  for (const member of [false, true]) {
+    // member=false: the late answer is not-a-member. member=true: the check
+    // goes on to the workspace setup, which fails here (no REST behind the
+    // fake), so the late screen would be the setup error screen.
+    const o = await open({ signedIn: true, member, rpcDelay: 300, updateUser: "ok", events: [{ event: "INITIAL_SESSION" }, { event: "PASSWORD_RECOVERY", delay: 50 }] });
+    try {
+      await settle(o.page, 1200);
+      const t = await bodyText(o.page);
+      assert.ok(t.includes(COPY.recoveryTitle) && t.includes(COPY.recoveryLine), `member=${member}: final screen: ${t.slice(0, 200)}`);
+      assert.equal(await o.page.locator(".composer-input").count(), 0, "no chat");
+      // the flow still completes: save, Continue, one more check, its screen
+      await fill(o.page, "Correct-Horse-9");
+      await save(o.page);
+      await o.page.getByRole("button", { name: "Continue" }).click();
+      await settle(o.page, 900);
+      assert.equal(await memberChecks(o.page), 2, "the in-flight check, then exactly one after Continue");
+      const after = await bodyText(o.page);
+      assert.ok(!after.includes(COPY.recoveryTitle), `Continue leaves recovery: ${after.slice(0, 200)}`);
+      if (!member) assert.ok(after.includes("invite-only"), after.slice(0, 200));
+    } finally {
+      await o.close();
+    }
   }
 });
 
@@ -753,10 +779,14 @@ async function phoneCheck(page: Page, scope: string, label: string) {
   const r = await page.evaluate((sel) => {
     const root = document.querySelector(sel) as HTMLElement | null;
     const small: string[] = [];
+    let minH = Infinity;
+    let targets = 0;
     if (root)
       for (const e of root.querySelectorAll("button, input, a, [role=menuitem]")) {
         const b = (e as HTMLElement).getBoundingClientRect();
         if (b.width === 0 && b.height === 0) continue;
+        targets++;
+        minH = Math.min(minH, b.height);
         if (b.height < 44 || b.width < 44) small.push(`${e.tagName.toLowerCase()} "${(e.textContent || (e as HTMLInputElement).getAttribute("aria-label") || e.getAttribute("type") || "").trim().slice(0, 40)}" ${Math.round(b.width)}x${Math.round(b.height)}`);
       }
     const overflow: string[] = [];
@@ -766,13 +796,13 @@ async function phoneCheck(page: Page, scope: string, label: string) {
         if (b.width > 0 && (b.right > window.innerWidth + 0.5 || b.left < -0.5)) overflow.push(`${e.tagName.toLowerCase()}.${(e as HTMLElement).className} [${Math.round(b.left)}, ${Math.round(b.right)}]`);
       }
     const themed = root?.closest("[data-theme]")?.getAttribute("data-theme") ?? null;
-    return { found: !!root, scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth, small, overflow: overflow.slice(0, 8), themed };
+    return { found: !!root, scrollW: document.documentElement.scrollWidth, clientW: document.documentElement.clientWidth, small, overflow: overflow.slice(0, 8), themed, targets, minH: Math.round(minH * 10) / 10 };
   }, scope);
   assert.ok(r.found, `${label}: ${scope} not found`);
   return { label, ...r };
 }
 
-test("P8 375px: the dialog, the reset card and the recovery screen (form and code steps) have no horizontal scroll, tap targets of at least 44px, and data-theme=\"light\"", async () => {
+test("P8 375px: the dialog, the reset card and the recovery screen (form and code steps) have no horizontal scroll, tap targets of at least 44px, and data-theme=\"light\"", async (t) => {
   const reports: any[] = [];
   const d = await openDialog({ updateUser: "reauth" }, PHONE);
   try {
@@ -812,31 +842,34 @@ test("P8 375px: the dialog, the reset card and the recovery screen (form and cod
     await r.close();
   }
   const problems: string[] = [];
+  for (const rep of reports) t.diagnostic(`${rep.label}: ${rep.targets} targets, smallest ${rep.minH}px tall; scrollWidth ${rep.scrollW}/${rep.clientW}; theme ${rep.themed}`);
   for (const rep of reports) {
     if (rep.scrollW > rep.clientW) problems.push(`${rep.label}: horizontal scroll ${rep.scrollW} > ${rep.clientW}`);
     if (rep.overflow.length) problems.push(`${rep.label}: past the viewport: ${rep.overflow.join("; ")}`);
-    // "New here? Create an account" predates § 1.10 (not this slice's control)
-    const small = rep.small.filter((s: string) => !s.includes("New here?"));
-    if (small.length) problems.push(`${rep.label}: under 44px: ${small.join("; ")}`);
+    if (rep.small.length) problems.push(`${rep.label}: under 44px: ${rep.small.join("; ")}`);
     if (rep.themed !== "light") problems.push(`${rep.label}: data-theme ${rep.themed}`);
   }
   assert.deepEqual(problems, []);
 });
 
-test("P8b the new § 1.10 CSS uses only styles.css custom properties (colors, sizes, spacing)", () => {
+test("P8b the new § 1.10 CSS uses only styles.css custom properties for color, spacing, type and radius", () => {
   const css = readFileSync(path.join(REPO, "apps/web/src/styles.css"), "utf8");
   const defined = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+  const TOKENED = /^(color|background|background-color|border|border-color|border-radius|padding|margin|gap|font-size|font-weight|font-family|line-height)$/;
   const offenders: string[] = [];
-  for (const cls of ["sign-in-link-error"]) {
-    const m = new RegExp(`\\.${cls}\\s*\\{([^}]*)\\}`).exec(css);
-    assert.ok(m, `.${cls} not in styles.css`);
-    for (const decl of m[1].split(";").map((x) => x.trim()).filter(Boolean)) {
-      const [prop, ...rest] = decl.split(":");
-      const val = rest.join(":").trim();
-      for (const v of val.matchAll(/var\((--[a-z0-9-]+)\)/g)) if (!defined.has(v[1])) offenders.push(`${decl} (undefined ${v[1]})`);
-      const literal = val.replace(/var\(--[a-z0-9-]+\)/g, "").replace(/\b(solid|none|auto|0)\b/g, "").replace(/(^|\s)1px(\s|$)/g, " ").trim();
-      if (literal) offenders.push(`${prop.trim()}: ${val}`);
-    }
+  // every class the § 1.10 screens added (round 1: the expired line; round 2: the secondary button)
+  for (const cls of ["sign-in-link-error", "sign-in-secondary-button"]) {
+    const blocks = [...css.matchAll(new RegExp(`\\.${cls}(?::[a-z-]+)?\\s*\\{([^}]*)\\}`, "g"))];
+    assert.ok(blocks.length, `.${cls} not in styles.css`);
+    for (const m of blocks)
+      for (const decl of m[1].replace(/\/\*[\s\S]*?\*\//g, "").split(";").map((x) => x.trim()).filter(Boolean)) {
+        const [prop, ...rest] = decl.split(":");
+        const val = rest.join(":").trim();
+        for (const v of val.matchAll(/var\((--[a-z0-9-]+)\)/g)) if (!defined.has(v[1])) offenders.push(`${decl} (undefined ${v[1]})`);
+        if (!TOKENED.test(prop.trim())) continue;
+        const literal = val.replace(/var\(--[a-z0-9-]+\)/g, "").replace(/\b(solid|none|auto|0)\b/g, "").replace(/(^|\s)1px(\s|$)/g, " ").trim();
+        if (literal) offenders.push(`.${cls} ${prop.trim()}: ${val}`);
+      }
   }
   assert.deepEqual(offenders, []);
 });

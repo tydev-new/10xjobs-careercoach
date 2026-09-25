@@ -669,7 +669,11 @@ await section("journey", async () => {
   rec(pc.every((l) => l.path === "/functions/v1/ten-model-proxy/chat/completions"), "env: VITE_MODEL_PROXY_URL unset -> <SUPABASE_URL>/functions/v1/ten-model-proxy (the default)");
   rec(stub.hits.slice(hitsAtStart).every((h) => h.auth === `Bearer ${OPENROUTER_CANARY}`), "auth: upstream calls carry the host-side OpenRouter key only (never the JWT)");
   rec(stub.hits.every((h) => !JSON.stringify(h.body).includes("eyJ")), "auth: no JWT in any upstream body");
-  rec(stub.hits.filter((h) => h.kind === "chat").every((h) => h.body.model === "anthropic/claude-sonnet-5" && h.body.stream === true && h.body.provider?.zdr === true), "proxy: upstream body forced (model, stream, provider zdr)");
+  // Only this section's hits: a later browser's run would otherwise also see
+  // the DeepSeek calls an earlier browser's "model" section made on purpose
+  // (it failed in firefox/webkit for that reason alone, 2026-09-25).
+  const journeyChats = stub.hits.slice(hitsAtStart).filter((h) => h.kind === "chat");
+  rec(journeyChats.length > 0 && journeyChats.every((h) => h.body.model === "anthropic/claude-sonnet-5" && h.body.stream === true && h.body.provider?.zdr === true), "proxy: upstream body forced (model, stream, provider zdr)", `${journeyChats.length} chat call(s) this section`);
 
   // ---- CORS: every preflight's requested headers are all allowed (fix round 1, item 2)
   const pre = standIn.log.filter((l) => l.method === "OPTIONS" && l.path.startsWith("/functions/v1/ten-model-proxy") && l.at >= (pc[0]?.at ?? 0) - 60000);

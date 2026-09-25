@@ -1,4 +1,5 @@
-// Auth — sign-in and membership detection (docs/design-web-agent.md § 8).
+// Auth — sign-in and membership detection (docs/design-web-agent.md § 8),
+// plus setting and resetting a password (§ 16).
 //
 // Uses @supabase/supabase-js (pinned 2.58.0) for session management: it
 // handles the magic-link / password flows, token refresh, and storing the
@@ -51,6 +52,19 @@ export function siteRedirectUrl(_ignoredOrigin?: string): string {
   throw new Error("siteRedirectUrl: VITE_SITE_URL is not set — refusing to guess redirectTo (§ 8).");
 }
 
+// § 16.1: the shape of a real Supabase AuthError as it reaches this file —
+// `.code` (e.g. "reauthentication_needed", "weak_password", "same_password")
+// and `.status` (e.g. 429) come straight off `@supabase/auth-js`'s own
+// `AuthError`; `.reasons` only ever appears on a `weak_password` error
+// (`AuthWeakPasswordError`). Never read `.message` on these screens (§
+// 16.2 — "Shown errors come from § 1.10's table, never error.message").
+export interface AuthErrorLike {
+  message: string;
+  code?: string;
+  status?: number;
+  reasons?: string[];
+}
+
 // A minimal structural subset of SupabaseClient's auth surface — lets the
 // sign-in/membership functions below be unit-tested against a small fake,
 // with no real network and no localStorage, while the real SupabaseClient
@@ -66,6 +80,11 @@ export interface AuthClientLike {
     }): Promise<{ error: { message: string } | null }>;
     signOut(): Promise<{ error: { message: string } | null }>;
     getSession(): Promise<{ data: { session: Session | null }; error: { message: string } | null }>;
+    // § 16.1's three additions — the real client already has them; only
+    // the (structural) shape used here is declared.
+    resetPasswordForEmail(email: string, options: { redirectTo: string }): Promise<{ error: AuthErrorLike | null }>;
+    updateUser(attributes: { password: string; nonce?: string }): Promise<{ error: AuthErrorLike | null }>;
+    reauthenticate(): Promise<{ error: AuthErrorLike | null }>;
   };
   rpc(fn: string, args?: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }>;
 }
@@ -130,4 +149,122 @@ export async function checkMembership(client: AuthClientLike): Promise<boolean> 
   const { data, error } = await client.rpc("ten_is_member");
   if (error) throw new Error(`ten_is_member() failed: ${error.message}`);
   return data === true;
+}
+
+// ---------------------------------------------------------------------
+// § 16 — setting and resetting a password. Every call below goes only to
+// Supabase Auth (§ 16: "No new table, Edge Function, secret or server
+// code"). Nothing here touches window/document/localStorage — this file
+// stays importable under plain Node (see the header note above).
+// ---------------------------------------------------------------------
+
+/** design-web-ui § 1.10's "at least 8 characters" — one number in code,
+ *  used both by SignIn.tsx's sign-up field (`minLength`) and by every
+ *  password-save call below (§ 16.1). */
+export const MIN_PASSWORD_LENGTH = 8;
+
+/** What `authRedirectFromUrl` found on the page's own URL. */
+export type AuthUrlRedirect = "recovery" | "link-error" | "none";
+
+/**
+ * Pure (no window/document read — the CALLER passes `href`, e.g.
+ * `window.location.href`): § 16.1 — "`recovery` when the hash or query has
+ * `type=recovery`, `link-error` when it has `error_code`, else `none`."
+ * A link error is checked first: an expired/used link can carry both an
+ * `error_code` and other recovery-shaped params, and it's the error that
+ * must win (§ 1.10's expired-link line applies to a recovery link too).
+ */
+export function authRedirectFromUrl(href: string): AuthUrlRedirect {
+  let hash = "";
+  let search = "";
+  try {
+    const url = new URL(href);
+    hash = url.hash.startsWith("#") ? url.hash.slice(1) : url.hash;
+    search = url.search.startsWith("?") ? url.search.slice(1) : url.search;
+  } catch {
+    return "none";
+  }
+  const hashParams = new URLSearchParams(hash);
+  const searchParams = new URLSearchParams(search);
+  const get = (key: string): string | null => hashParams.get(key) ?? searchParams.get(key);
+  if (get("error_code")) return "link-error";
+  if (get("type") === "recovery") return "recovery";
+  return "none";
+}
+
+/** The result of a password-save attempt (`updateUser`) or a
+ *  reauthentication-code send/resend (`reauthenticate`) — never the raw
+ *  `AuthError`, so every caller is forced through `passwordErrorMessage`
+ *  rather than ever touching `.message` (§ 16.2). */
+export interface PasswordCallResult {
+  ok: boolean;
+  code?: string;
+  status?: number;
+  reasons?: string[];
+}
+
+/** § 16.1 "Set a new password": `updateUser({ password })`, or, once
+ *  `reauthenticate()` has emailed a code, `updateUser({ password, nonce })`.
+ *  Supabase's User object has no "has a password" field (hence the one
+ *  menu label design-web-ui § 1.10 describes) — this function doesn't try
+ *  to detect one either. */
+export async function setNewPassword(client: AuthClientLike, password: string, nonce?: string): Promise<PasswordCallResult> {
+  const { error } = await client.auth.updateUser(nonce === undefined ? { password } : { password, nonce });
+  if (!error) return { ok: true };
+  return { ok: false, code: error.code, status: error.status, reasons: error.reasons };
+}
+
+/** § 16.1 "Secure password change": emails a 6-digit reauthentication code.
+ *  Used both for the first send (after `updateUser` answers
+ *  `reauthentication_needed`) and for "Send a new code" (design-web-ui §
+ *  1.10's code step). */
+export async function sendReauthenticationCode(client: AuthClientLike): Promise<PasswordCallResult> {
+  const { error } = await client.auth.reauthenticate();
+  if (!error) return { ok: true };
+  return { ok: false, code: error.code, status: error.status };
+}
+
+/** § 16.1 "Forgot": `resetPasswordForEmail(email, { redirectTo })`. Supabase
+ *  answers no differently whether or not an account exists (its own
+ *  password guide) — the enumeration-safe copy lives in the UI (design-web-
+ *  ui § 1.10), keyed off `ok` and `status === 429` both rendering the same
+ *  line. */
+export async function requestPasswordReset(client: AuthClientLike, email: string, redirectTo: string): Promise<PasswordCallResult> {
+  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+  if (!error) return { ok: true };
+  return { ok: false, code: error.code, status: error.status };
+}
+
+/** design-web-ui § 1.10, word for word: "After a success OR a 429, the
+ *  same text, character for character... No other line may depend on
+ *  whether the account exists." The caller decides WHEN to show this
+ *  (`result.ok || result.status === 429`); this only owns the sentence. */
+export function resetPasswordEnumerationSafeLine(email: string): string {
+  return (
+    `If an account exists for ${email}, a link to choose a new password ` +
+    "should arrive within a few minutes. Check spam too. Only a few emails " +
+    "can be sent each hour, so if nothing comes, try again later."
+  );
+}
+
+/** design-web-ui § 1.10's error table, word for word — the ONLY place any
+ *  of these six lines are spelled out, and the only thing any password
+ *  screen may render for a failed call. Never reads `.message` (§ 16.2). */
+export function passwordErrorMessage(result: Pick<PasswordCallResult, "code" | "status" | "reasons">): string {
+  if (result.code === "reauthentication_not_valid") {
+    return "That code didn't work. It may be mistyped or expired: check the newest email, or send a new code.";
+  }
+  if (result.code === "weak_password") {
+    const reasons = result.reasons ?? [];
+    if (reasons.includes("length")) return "That password is too short for the sign-in rules. Try a longer one.";
+    if (reasons.includes("characters")) return "That password needs more kinds of characters, such as capitals, digits or symbols.";
+    if (reasons.includes("pwned")) return "That password has appeared in a known data leak. Choose a different one.";
+  }
+  if (result.code === "same_password") {
+    return "That's already your password. Choose a different one.";
+  }
+  if (result.status === 429) {
+    return "Too many tries. Wait a minute, then try again.";
+  }
+  return "Couldn't save your password. Try again in a moment.";
 }

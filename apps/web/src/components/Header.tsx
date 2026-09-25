@@ -30,6 +30,10 @@ export interface HeaderProps {
   /** design-web-ui.md § 1.7 — opens the same four-step typed-yes
    *  confirmation as a spend gate, never a click-to-confirm. */
   onDeleteBetaData?: () => void;
+  /** design-web-ui.md § 1.10 — member-only, above Sign out. The app can't
+   *  tell whether an account already has a password, hence one label for
+   *  both cases. */
+  onSetPassword?: () => void;
   onSignOut?: () => void;
   /** § 13.3: the ⋯ menu's last line, real mode only — plain text, never a
    *  button, built from `coachModel` so it can never disagree with what's
@@ -81,6 +85,7 @@ export function Header(props: HeaderProps): ReactElement {
     onExportWorkspace,
     onImportWorkspace,
     onDeleteBetaData,
+    onSetPassword,
     onSignOut,
     coachModel,
   } = props;
@@ -187,6 +192,20 @@ export function Header(props: HeaderProps): ReactElement {
                 }}
               >
                 Delete my beta data
+              </button>
+              {/* design-web-ui.md § 1.10 — "Set a new password" or "Change
+                  password" would each be false for someone; this label is
+                  true either way. */}
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!onSetPassword}
+                onClick={() => {
+                  onSetPassword?.();
+                  setMenuOpen(false);
+                }}
+              >
+                Set a new password
               </button>
               <button
                 type="button"

@@ -40,6 +40,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import http from "node:http";
 import os from "node:os";
+import { inflateSync } from "node:zlib";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 // @ts-ignore - resolved from apps/web's own install, like tests/web/e2e.mjs
@@ -340,12 +341,12 @@ const external: string[] = [];
 const atsHits: string[] = [];
 const pageErrors: string[] = [];
 
-async function newPage(opts: { browser?: string; viewport?: { width: number; height: number }; noRoute?: boolean } = {}) {
+async function newPage(opts: { browser?: string; viewport?: { width: number; height: number }; noRoute?: boolean; colorScheme?: "light" | "dark"; noGoto?: boolean } = {}) {
   const bname = opts.browser ?? BROWSER;
   // noRoute: no Playwright request interception at all. Chromium answers
   // CORS preflights itself while interception is on (none reach the
   // server), so a real preflight check needs a context without routes.
-  const ctx = await (opts.noRoute ? noRouteBrowsers[bname] : browsers[bname]).newContext({ viewport: opts.viewport ?? { width: 1280, height: 860 }, acceptDownloads: true });
+  const ctx = await (opts.noRoute ? noRouteBrowsers[bname] : browsers[bname]).newContext({ viewport: opts.viewport ?? { width: 1280, height: 860 }, acceptDownloads: true, ...(opts.colorScheme ? { colorScheme: opts.colorScheme } : {}) });
   if (!opts.noRoute) await ctx.route("**/*", async (route: any) => {
     const u = new URL(route.request().url());
     if (u.hostname === "127.0.0.1" || u.protocol === "data:" || u.protocol === "blob:") return route.continue();
@@ -403,7 +404,7 @@ async function newPage(opts: { browser?: string; viewport?: { width: number; hei
       if (a) for (const c of a.classList) if (c.startsWith("avatar--")) (window as any).__states.add(c.slice(8));
     }, 10);
   });
-  await page.goto(ORIGIN + "/");
+  if (!opts.noGoto) await page.goto(ORIGIN + "/");
   return { ctx, page };
 }
 
@@ -1264,6 +1265,140 @@ await section("conversation", async () => {
     await page.locator(".composer-input").press("Enter");
     const sent = await until(async () => (proxyFor(uid) > n1 ? Date.now() - t0 : false), 12000, 100);
     rec(sent !== undefined && sent <= 4000, "conversation (viii): a send while this tab's own save HANGS still goes within the 2 s rule (a failed check never blocks)", sent === undefined ? "not sent within 12 s; composer disabled: " + (await page.locator(".composer-input").isDisabled()) : `${sent} ms`);
+    await page.context().close();
+  }
+});
+
+// ================================================================ LIGHT THEME ALWAYS (owner ruling, 2026-09-24)
+// Tester-owned, from design-web-ui.md's dated amendment (e750910): the real
+// app renders the v2 LIGHT palette on every screen whatever the OS says,
+// color-scheme light from the first paint, and no theme item in its menu
+// (rule 8). Every page here emulates prefers-color-scheme: dark.
+/** Mean luminance (0–255) of a PNG screenshot region, decoded with zlib. */
+function meanLuma(png: Buffer): number {
+  let p = 8;
+  let w = 0, h = 0, ct = 0;
+  const idat: Buffer[] = [];
+  while (p < png.length) {
+    const len = png.readUInt32BE(p);
+    const type = png.toString("ascii", p + 4, p + 8);
+    const data = png.subarray(p + 8, p + 8 + len);
+    if (type === "IHDR") { w = data.readUInt32BE(0); h = data.readUInt32BE(4); ct = data[9]; }
+    if (type === "IDAT") idat.push(data);
+    p += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const bpp = ct === 6 ? 4 : 3;
+  const stride = w * bpp;
+  const out = Buffer.alloc(h * stride);
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const a = x >= bpp ? out[y * stride + x - bpp] : 0;
+      const b = y > 0 ? out[(y - 1) * stride + x] : 0;
+      const c = x >= bpp && y > 0 ? out[(y - 1) * stride + x - bpp] : 0;
+      const v = raw[y * (stride + 1) + 1 + x];
+      const pa = Math.abs(b - c), pb = Math.abs(a - c), pc = Math.abs(a + b - 2 * c);
+      const pred = f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+      out[y * stride + x] = (v + pred) & 0xff;
+    }
+  }
+  let sum = 0;
+  for (let i = 0; i < out.length; i += bpp) sum += 0.2126 * out[i] + 0.7152 * out[i + 1] + 0.0722 * out[i + 2];
+  return sum / (w * h);
+}
+await section("theme", async () => {
+  const LIGHT_BG = "rgb(247, 242, 234)"; // v2 light --bg, design-web-ui-refresh.md's v2 token table
+  const probe = async (p: any, label: string, opts: { root?: boolean; clip?: string } = {}) => {
+    const s = await p.evaluate(() => {
+      const r = document.querySelector(".app-root") as HTMLElement | null;
+      return {
+        theme: r?.getAttribute("data-theme") ?? null,
+        bg: r ? getComputedStyle(r).getPropertyValue("--bg").trim() : getComputedStyle(document.documentElement).getPropertyValue("--bg").trim(),
+        scheme: getComputedStyle(document.documentElement).colorScheme,
+        matchesDark: matchMedia("(prefers-color-scheme: dark)").matches,
+      };
+    });
+    // a dialog sits over a dimming backdrop by design: measure the dialog itself
+    const box = opts.clip ? await p.locator(opts.clip).boundingBox() : null;
+    const luma = meanLuma(await p.screenshot({ clip: box ? { x: box.x, y: box.y, width: box.width, height: box.height } : { x: 0, y: 0, width: 1280, height: 860 } }));
+    rec(s.matchesDark, `theme: ${label} — the page really is under prefers-color-scheme: dark`);
+    if (opts.root !== false) rec(s.theme === "light", `theme: ${label} renders data-theme="light"`, String(s.theme));
+    rec(s.bg.toLowerCase() === "#f7f2ea", `theme: ${label} uses the light tokens (--bg #f7f2ea)`, s.bg);
+    rec(/\blight\b/.test(s.scheme) && !/\bdark\b/.test(s.scheme), `theme: ${label} has native color-scheme light`, s.scheme);
+    rec(luma > 200, `theme: ${label} paints light (mean screen luminance ${luma.toFixed(0)}/255)`, luma.toFixed(1));
+  };
+
+  // first paint, before React mounts: hold the JS bundle back
+  {
+    const { page } = await newPage({ colorScheme: "dark", noGoto: true });
+    await page.route(/\/assets\/.*\.js$/, async (r: any) => { await sleep(2500); await r.continue(); });
+    await page.goto(ORIGIN + "/", { waitUntil: "commit" });
+    await page.waitForTimeout(900);
+    const mounted = await page.evaluate(() => (document.getElementById("root")?.children.length ?? 0) > 0);
+    rec(!mounted, "theme: precondition — the probe runs before React mounts");
+    await probe(page, "the first paint (before mount)", { root: false });
+    rec((await page.locator('meta[name="color-scheme"]').getAttribute("content")) === "light", "theme: index.html declares <meta name=color-scheme content=light>");
+    await page.context().close();
+  }
+  // loading (the membership check held for 3 s)
+  {
+    await standIn.createUser({ email: em("theme.loading") });
+    const { page } = await newPage({ colorScheme: "dark" });
+    await page.route("**/rest/v1/rpc/ten_is_member", async (r: any) => { await sleep(3000); await r.continue(); });
+    await signIn(page, em("theme.loading"));
+    await page.locator(".app-shell--loading").waitFor({ timeout: 10000 });
+    const hasRoot = (await page.locator(".app-root").count()) > 0;
+    rec(true, "theme: loading screen has a data-theme root (info; its colours come from :root either way)", String(hasRoot));
+    await probe(page, "the loading screen", { root: hasRoot });
+    await page.context().close();
+  }
+  // sign-in, member chat + menu, delete confirm
+  {
+    await standIn.createUser({ email: em("theme.member") });
+    const { page } = await newPage({ colorScheme: "dark" });
+    await page.locator(".sign-in-screen").waitFor({ timeout: 20000 });
+    await probe(page, "the sign-in screen");
+    await signIn(page, em("theme.member"));
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    await probe(page, "the member chat");
+    await page.locator(".menu-trigger").click();
+    const items = (await page.getByRole("menuitem").allTextContents()).map((s: string) => s.trim());
+    rec(!items.some((t: string) => /switch to (dark|light)/i.test(t)) && items.length > 0, "theme: the real app's menu has no theme item (rule 8)", items.join(" | "));
+    await page.getByRole("menuitem", { name: "Delete my beta data" }).click();
+    await page.locator(".delete-confirm-card").waitFor();
+    await probe(page, "the delete confirmation", { clip: ".delete-confirm-card" });
+    await page.context().close();
+  }
+  // not-a-member
+  {
+    await standIn.createUser({ email: em("theme.nonmember"), member: false });
+    const { page } = await newPage({ colorScheme: "dark" });
+    await signIn(page, em("theme.nonmember"));
+    await page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+    await probe(page, "the not-a-member screen");
+    await page.context().close();
+  }
+  // setup error (the conversation load fails)
+  {
+    await standIn.createUser({ email: em("theme.error") });
+    const { page } = await newPage({ colorScheme: "dark" });
+    await page.route(/\/rest\/v1\/ten_conversations\?select=chat_id/, (r: any) => r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "XX000", message: "injected" }) }));
+    await signIn(page, em("theme.error"));
+    await page.locator(".app-shell--config-error").waitFor({ timeout: 20000 });
+    await probe(page, "the setup error screen");
+    await page.context().close();
+  }
+  // a host data-theme="dark" on <html> is ignored too
+  {
+    await standIn.createUser({ email: em("theme.host") });
+    const { page } = await newPage({ colorScheme: "dark", noGoto: true });
+    await page.addInitScript(() => document.documentElement.setAttribute("data-theme", "dark"));
+    await page.goto(ORIGIN + "/");
+    await signIn(page, em("theme.host"));
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    const t = await page.evaluate(() => document.querySelector(".app-root")?.getAttribute("data-theme"));
+    rec(t === "light", "theme: a host data-theme=\"dark\" on <html> does not change the real app", String(t));
     await page.context().close();
   }
 });

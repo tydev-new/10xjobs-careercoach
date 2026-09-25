@@ -48,10 +48,8 @@ Never include anyone's real data in a report.
 ## Production
 
 Production changes only through the owner-approved deploy path:
-migrations, server functions, the site
-(`apps/web/scripts/deploy-prod.sh`) and settings. Each one needs the
-owner's explicit approval for that action, and the owner, or the lead
-agent acting on that approval, runs it. No other agent role ever deploys
-or touches production. Contributors never hold production keys or touch
+migrations, server functions and the site
+(`apps/web/scripts/deploy-prod.sh`), each with the owner's approval.
+Contributors and agents never hold production keys and never touch
 production data. For local work, use your own accounts
 ([`CONTRIBUTING.md`](CONTRIBUTING.md)).

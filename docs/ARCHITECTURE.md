@@ -283,11 +283,8 @@ flowchart LR
   V --> L["6. Live check"]
 ```
 
-**Every production change needs the owner's explicit approval for that
-action:** a migration, a function deploy, a site deploy, a setting. The
-owner, or the lead agent acting on that approval, runs the step. No
-other agent role (architect, designer, coder, tester) ever deploys or
-touches production.
+**Every production change needs the owner's explicit approval.** The
+function and site READMEs say the owner runs the deploy steps.
 
 **Why this order:** each layer must exist before the layer that uses it.
 A proxy that writes a new column before the column exists would fail

@@ -24,8 +24,8 @@ and the lead have none (their jobs are described here and in
 
 | Role | Does | Never does | Hands back |
 |---|---|---|---|
-| **Owner** (a human; no role file) | Decides what gets built. Approves contracts, designs, spending and every production change. Holds every key. Runs Ten on real data, in their own account. | Gives an agent a secret or real user data. Lets any agent touch production without approval for that exact action. | Decisions, recorded in the issue or the contract with a date ("owner, 2026-09-24"). |
-| **Lead** (the main agent session; no role file) | Holds the issue and runs the loop. Starts every other agent. Checks each hand-back by reading the files and re-running the commands. Commits and merges. Brings every approval to the owner. Deploys only on the owner's explicit approval, per action (migration, function, site, setting). | Approves on the owner's behalf. Reuses one approval for a second action. Believes a hand-back it hasn't checked. There is no other coordinator. | To the owner: a checked summary and the questions that need a decision. |
+| **Owner** (a human; no role file) | Decides what gets built. Approves contracts, designs, spending and every production change. Holds every key. Applies migrations. Runs Ten on real data, in their own account. | Gives an agent a secret, a production write, or real user data. | Decisions, recorded in the issue or the contract with a date ("owner, 2026-09-24"). |
+| **Lead** (the main agent session; no role file) | Holds the issue and runs the loop. Starts every other agent. Checks each hand-back by reading the files and re-running the commands. Commits and merges. Brings every approval to the owner. | Approves on the owner's behalf. Believes a hand-back it hasn't checked. There is no other coordinator. | To the owner: a checked summary and the questions that need a decision. |
 | **Architect** ([`architect.md`](../agents/architect.md)) | Contracts, design gates, spike notes, closing reviews against [`PRINCIPLES.md`](../PRINCIPLES.md). Docs only. | Writes feature code. Reviews its own contract. | Files written, decisions with reasons, open questions, anything UNVERIFIED. |
 | **Designer** ([`designer.md`](../agents/designer.md)) | Screens, cards, fixture conversations, the gate and balance, the phone layout. Exact values, rendered and looked at. | Wires live data. Uses real candidate data. | Files, the token table, screenshot paths (checked to exist), notes for the coder. |
 | **Coder** ([`coder.md`](../agents/coder.md)) | Builds one slice against an agreed contract, with unit tests, in its own worktree. | Grades its own work. Commits (the lead commits coder work after checking it). Edits outside its slice without saying so. Hardcodes a key. | Files changed, commands run with real output, what is not done, blockers. |
@@ -170,9 +170,7 @@ Numbers only; no personal data. Each one changed a rule.
 - **Never hand an agent:**
   - **secrets:** API keys, the Supabase service-role key, any `.env` file;
   - **production writes:** migrations, deploys, setting secrets, credit
-    rows, anything on the live project. Here only the owner, or the lead
-    agent acting on the owner's explicit approval for that one action,
-    runs these; no other agent role ever does;
+    rows, anything on the live project;
   - **real user data:** a real candidate workspace, production rows,
     chat transcripts.
 

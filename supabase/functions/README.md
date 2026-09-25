@@ -5,11 +5,9 @@ model is a setting" — the proxy now allows exactly two models, Claude
 Sonnet 5 and DeepSeek V4.1 Flash, each with its own per-call ceiling) and
 § 14 (web search's own per-request price). Built and tested **locally
 only** (Deno, mocked OpenRouter and mocked Supabase — see "Tests" below).
-**Not deployed by this change.** Every deploy below needs the owner's
-explicit approval for that action; the owner, or the lead agent acting
-on that approval, runs it. No other agent role (architect, designer,
-coder, tester) ever deploys or touches production. Nothing here calls
-the live OpenRouter key or a production Supabase project.
+**Not deployed by this change.** The owner runs the commands below when
+ready; nothing here calls the live OpenRouter key or a production
+Supabase project.
 
 ```
 supabase/functions/
@@ -74,7 +72,7 @@ change explicitly does not touch — see the Step-1 spike-4 note in
 the key's credit change, a turn-2 prompt-cache read, and streaming from an
 actual Vercel build. Those are the owner's live re-run once this is deployed.
 
-## Deploy (owner-approved per action; run by the owner or the lead agent on that approval)
+## Deploy (the owner runs these; an agent never does)
 
 Both functions read Supabase's own auto-injected `SUPABASE_URL`,
 `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — those are reserved names
@@ -104,9 +102,8 @@ site build would 400 every call from whatever OLD site build is still
 live, since it never sent a `model` field at all and this version of the
 proxy no longer fills one in.
 
-Preconditions, in this order (per § 8 and the migration's own header; the
-same rule — the owner's explicit approval per action, run by the owner or
-the lead agent on that approval, never by another agent role):
+Preconditions, in this order (per § 8 and the migration's own header — an
+agent never runs these either):
 
 1. `supabase/migrations/20260923000000_ten_beta_init.sql` applied (creates
    `ten_ws_files`, `ten_gate_log`, `ten_usage_ledger`, the `ten-workspaces`

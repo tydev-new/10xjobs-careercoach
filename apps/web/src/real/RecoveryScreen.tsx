@@ -58,7 +58,7 @@ export function RecoveryScreen({ client, email, onSignOut, onContinue }: Recover
             which shares your sign-in.
           </p>
         )}
-        <form onSubmit={submit} className="sign-in-form">
+        <form onSubmit={submit} method="post" className="sign-in-form">
           <PasswordFields form={form} />
           {form.phase === "code" ? (
             <label>
@@ -79,7 +79,12 @@ export function RecoveryScreen({ client, email, onSignOut, onContinue }: Recover
             {form.saving ? "Saving…" : "Save password"}
           </button>
           {form.phase === "code" ? (
-            <button type="button" disabled={form.resending} onClick={() => void form.resend()}>
+            <button
+              type="button"
+              className="sign-in-secondary-button"
+              disabled={form.resending}
+              onClick={() => void form.resend()}
+            >
               Send a new code
             </button>
           ) : null}

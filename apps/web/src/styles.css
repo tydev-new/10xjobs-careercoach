@@ -1343,6 +1343,31 @@ button {
   padding: 0;
   text-align: left;
   font-size: var(--text-sm);
+  /* Fix round 2, item 1 (tester finding, P8): a text-styled link button is
+     still a tap target — 44px tall without changing its look (no border,
+     no fill), same posture as the mode-toggle/submit buttons' own
+     min-height. */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* design-web-ui.md § 1.10 — RecoveryScreen's "Send a new code" (the
+   dialog's own copy sits inside .delete-confirm-actions, already 44px;
+   this is the recovery screen's equivalent, a bordered secondary button
+   matching .sign-in-mode-toggle button's own shape). */
+.sign-in-secondary-button {
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  min-height: 44px;
+}
+
+.sign-in-secondary-button:disabled {
+  opacity: 0.6;
 }
 
 .sign-in-local {

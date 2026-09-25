@@ -28,10 +28,12 @@ export async function savePassword(
   args: { password: string; confirm: string; phase: "form" | "code"; code: string },
 ): Promise<PasswordSaveOutcome> {
   const { password, confirm, phase, code } = args;
-  if (phase === "form") {
-    if (password.length < MIN_PASSWORD_LENGTH) return { kind: "invalid", error: "Use at least 8 characters." };
-    if (password !== confirm) return { kind: "invalid", error: "The two passwords don't match." };
-  }
+  // Fix round 2, item 2 (tester finding, P1b): "checked before any call"
+  // means every call, not only the form phase's first one — the code step
+  // leaves both password fields editable (the shared form, § 1.10), so a
+  // mismatch typed there must still make no call.
+  if (password.length < MIN_PASSWORD_LENGTH) return { kind: "invalid", error: "Use at least 8 characters." };
+  if (password !== confirm) return { kind: "invalid", error: "The two passwords don't match." };
   const result = await setNewPassword(client, password, phase === "code" ? code : undefined);
   if (result.ok) return { kind: "saved" };
   if (result.code === "reauthentication_needed" && phase === "form") {

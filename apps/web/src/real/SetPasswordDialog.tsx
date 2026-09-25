@@ -55,7 +55,7 @@ export function SetPasswordDialog({ client, email, onClose }: SetPasswordDialogP
         ) : (
           <p>This password also works for the older app, which shares your sign-in.</p>
         )}
-        <form onSubmit={submit} className="sign-in-form">
+        <form onSubmit={submit} method="post" className="sign-in-form">
           <PasswordFields form={form} />
           {form.phase === "code" ? (
             <label>

@@ -95,7 +95,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   // 2026-09-25 approval extends this same line to an expired magic link,
   // not only an expired recovery link — `authRedirectFromUrl` doesn't
   // distinguish the two, by design (any `error_code` on the URL).
-  const [expiredLink] = useState(() => initialRedirect === "link-error");
+  const [expiredLink, setExpiredLink] = useState(() => initialRedirect === "link-error");
   useEffect(() => {
     if (expiredLink) window.history.replaceState(null, "", window.location.pathname);
     // Runs once, at mount, regardless of `client` — stripping the URL
@@ -111,8 +111,13 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   const isRecoveryRef = useRef(initialRedirect === "recovery");
   // The signed-in member's own email (§ 1.10's "{email}" in the code-step
   // and resend lines) — captured off whatever session the listener last
-  // saw, real or recovery.
-  const userEmailRef = useRef<string | undefined>(undefined);
+  // saw, real or recovery. Fix round 2, item 4 (tester finding, P3b): this
+  // MUST be state, not a ref — an "ignore" action (e.g. INITIAL_SESSION
+  // arriving while already on the recovery screen, with no further
+  // PASSWORD_RECOVERY event) never calls setScreen, so a ref's new value
+  // would sit unread until some UNRELATED re-render happened to occur.
+  // RecoveryScreen needs the email the very first time it has one.
+  const [userEmail, setUserEmail] = useState<string | undefined>(undefined);
   // § 11 (amended 2026-09-24): the conversation is restored under the SAME
   // chat id it was saved under (§ 11.6) — a reload no longer starts a new
   // chat (that replaces § 7's old rule; see design-web-agent.md § 11's own
@@ -140,9 +145,24 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   // Cleared on sign-out and on a setup FAILURE (so Retry can re-run it).
   const checkedUserIdRef = useRef<string | undefined>(undefined);
 
+  // Fix round 2, item 6 (tester finding, P6b): "in place of every other
+  // screen" (§ 16.1) has to hold even against a check that was ALREADY
+  // running when the recovery screen appeared — checkAndAdvance has no
+  // way to cancel `checkMembership`'s in-flight request, so every one of
+  // its own setScreen calls goes through this guard instead, and a
+  // recovery that starts mid-check simply wins the race for the screen
+  // (checkedUserIdRef is still updated normally either way — Continue,
+  // from the recovery screen, re-reads the session and re-runs this
+  // whole function itself, so nothing is lost by discarding this run's
+  // own screen update).
+  const setScreenUnlessRecovering = useCallback((next: Screen) => {
+    if (isRecoveryRef.current) return;
+    setScreen(next);
+  }, []);
+
   const checkAndAdvance = useCallback(
     async (userId: string, email: string) => {
-      setScreen({ kind: "checking-membership" });
+      setScreenUnlessRecovering({ kind: "checking-membership" });
 
       let isMember: boolean;
       try {
@@ -150,11 +170,11 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
       } catch (err) {
         logSetupError("checking membership", err);
         checkedUserIdRef.current = undefined;
-        setScreen({ kind: "error", message: "Couldn't check your membership. Try again in a moment." });
+        setScreenUnlessRecovering({ kind: "error", message: "Couldn't check your membership. Try again in a moment." });
         return;
       }
       if (!isMember) {
-        setScreen({ kind: "not-a-member" });
+        setScreenUnlessRecovering({ kind: "not-a-member" });
         return;
       }
 
@@ -169,7 +189,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
       } catch (err) {
         logSetupError("setting up your workspace", err);
         checkedUserIdRef.current = undefined;
-        setScreen({ kind: "error", message: "Couldn't set up your workspace. Try again in a moment." });
+        setScreenUnlessRecovering({ kind: "error", message: "Couldn't set up your workspace. Try again in a moment." });
         return;
       }
 
@@ -182,7 +202,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
       } catch (err) {
         logSetupError("checking your balance", err);
         checkedUserIdRef.current = undefined;
-        setScreen({ kind: "error", message: "Couldn't check your balance. Try again in a moment." });
+        setScreenUnlessRecovering({ kind: "error", message: "Couldn't check your balance. Try again in a moment." });
         return;
       }
 
@@ -216,7 +236,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
       } catch (err) {
         logSetupError("loading your conversation", err);
         checkedUserIdRef.current = undefined;
-        setScreen({ kind: "error", message: "Couldn't load your conversation. Try again in a moment." });
+        setScreenUnlessRecovering({ kind: "error", message: "Couldn't load your conversation. Try again in a moment." });
         return;
       }
 
@@ -228,9 +248,9 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
       setInitialMessages(resolvedMessages);
       setInitialVersion(resolvedVersion);
       setInitialOlderDropped(resolvedOlderDropped);
-      setScreen({ kind: "member", userId, email });
+      setScreenUnlessRecovering({ kind: "member", userId, email });
     },
-    [authClient, env, accessToken],
+    [authClient, env, accessToken, setScreenUnlessRecovering],
   );
 
   useEffect(() => {
@@ -242,7 +262,12 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
     // redundant race, not a second real check).
     const { data: sub } = client.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
-      if (session?.user.email) userEmailRef.current = session.user.email;
+      if (session?.user.email) setUserEmail(session.user.email);
+      // Fix round 2, item 5 (tester finding, P6e): the expired line
+      // belongs to the LINK that came back, not to this tab forever — the
+      // moment any session starts (member or not), it's stale and must
+      // not reappear after a later sign-out in the same tab.
+      if (session) setExpiredLink(false);
       // § 16.1: either order (INITIAL_SESSION then PASSWORD_RECOVERY, or
       // the reverse) must end up showing the recovery screen with
       // ten_is_member never called. `nextAuthScreen` is the order-
@@ -300,7 +325,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         setScreen({ kind: "signed-out" });
         return;
       }
-      if (session.user.email) userEmailRef.current = session.user.email;
+      if (session.user.email) setUserEmail(session.user.email);
       checkedUserIdRef.current = session.user.id;
       void checkAndAdvance(session.user.id, session.user.email ?? "");
     });
@@ -335,7 +360,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
       <div className="app-root" data-theme={theme}>
         <RecoveryScreen
           client={authClient}
-          email={userEmailRef.current ?? ""}
+          email={userEmail ?? ""}
           onSignOut={handleSignOut}
           onContinue={handleRecoveryContinue}
         />

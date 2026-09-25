@@ -98,7 +98,7 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
           {forgotResult ? (
             <p className={forgotStatus === "error" ? "sign-in-error" : "sign-in-sent"}>{forgotResult}</p>
           ) : (
-            <form onSubmit={(e) => void submitForgot(e)} className="sign-in-form">
+            <form onSubmit={(e) => void submitForgot(e)} method="post" className="sign-in-form">
               <label>
                 Email
                 <input

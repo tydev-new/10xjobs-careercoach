@@ -13,18 +13,26 @@
 // localStorage/node:*.
 import type { WebSearchInput, WebSearchOutput, WebSearchResult } from "../../../../packages/agent/src/types.ts";
 import { boundFetch } from "./bound-fetch.ts";
+import { CLAUDE_COACH_MODEL } from "./coach-model.ts";
 
 export interface WebSearchOptions {
   /** The `ten-model-proxy` base URL (same as model.ts's `proxyUrl`). */
   proxyUrl: string;
+  /** § 13.2: "web search passes the model too" — the active model's id
+   *  (`coach-model.ts`). The proxy's allowlist refuses a missing/wrong
+   *  model (§ 13.1) the same way it does for the main chat call. Optional,
+   *  defaulting to Claude's id (same "unset -> Claude" rule as
+   *  VITE_COACH_MODEL); `real/deps.ts` always passes it explicitly. */
+  modelId?: string;
   /** Returns the current session's access token; called per request. */
   getAccessToken: () => Promise<string>;
   /** Injectable for tests; defaults to the global `fetch`. */
   fetchImpl?: typeof fetch;
-  /** § 14's last-resort dated fallback (estimate-cost.ts's own
-   *  DEFAULT_WEB_SEARCH_COST_MAX_USD) — used only when a response carries no
-   *  `usage.cost` at all. Passed in rather than imported so this module
-   *  doesn't have to agree with estimate-cost.ts's own constant twice. */
+  /** § 14/§ 13.3's last-resort dated fallback (estimate-cost.ts's
+   *  per-model `searchMaxUsd`, picked by the caller for the ACTIVE model)
+   *  — used only when a response carries no `usage.cost` at all. Passed
+   *  in rather than imported so this module doesn't have to agree with
+   *  estimate-cost.ts's own constants twice. */
   defaultUsd: number;
 }
 
@@ -90,6 +98,7 @@ export function createWebSearch(opts: WebSearchOptions): (input: WebSearchInput)
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
+        model: opts.modelId ?? CLAUDE_COACH_MODEL.id,
         messages: [{ role: "user", content: input.query }],
         plugins: [{ id: "web", max_results: maxResults }],
       }),

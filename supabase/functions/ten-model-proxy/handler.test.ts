@@ -6,7 +6,7 @@
 // checkable without a live upstream.
 
 import { assert, assertAlmostEquals, assertEquals, assertFalse } from "jsr:@std/assert@1";
-import { CEILING_USD, MODEL } from "./core.ts";
+import { CEILING_USD, CEILING_USD_BY_MODEL, CLAUDE_MODEL_ID, DEEPSEEK_MODEL_ID, MODEL } from "./core.ts";
 import { handleRequest, type ProxyDeps } from "./handler.ts";
 import {
   balanceFor,
@@ -37,18 +37,29 @@ function dt(name: string, fn: () => Promise<void>) {
 const PROD_ORIGIN = "https://ten.example.com";
 const BASE_ENV = { TEN_APP_ORIGIN: PROD_ORIGIN } satisfies Record<string, string>;
 
+// § 13.1: "The proxy no longer fills in a model: the site always names
+// it." Every test below that isn't specifically exercising the allowlist
+// itself now needs a `model` field to get past it — injected here, once,
+// so the ~40 call sites that predate § 13 don't all need editing by hand.
+// Pass `omitModel: true` (or set `body.model` yourself) for the tests that
+// ARE the allowlist's own coverage.
 function req(
   body: unknown,
-  opts: { token?: string; origin?: string; method?: string; rawBody?: string; path?: string } = {},
+  opts: { token?: string; origin?: string; method?: string; rawBody?: string; path?: string; omitModel?: boolean } = {},
 ): Request {
   const headers = new Headers({ "Content-Type": "application/json" });
   if (opts.token !== undefined) headers.set("authorization", `Bearer ${opts.token}`);
   if (opts.origin !== undefined) headers.set("origin", opts.origin);
   const path = opts.path ?? "/chat/completions";
+  let effectiveBody = body;
+  if (!opts.omitModel && opts.rawBody === undefined && body !== undefined && typeof body === "object" && body !== null && !Array.isArray(body)) {
+    const b = body as Record<string, unknown>;
+    if (!("model" in b)) effectiveBody = { ...b, model: MODEL };
+  }
   return new Request(`http://localhost${path}`, {
     method: opts.method ?? "POST",
     headers,
-    body: opts.rawBody ?? (body === undefined ? undefined : JSON.stringify(body)),
+    body: opts.rawBody ?? (effectiveBody === undefined ? undefined : JSON.stringify(effectiveBody)),
   });
 }
 
@@ -493,11 +504,20 @@ dt("N1: a down ten_balance_for fails closed with 503 model_error, never throws",
   }
 });
 
-dt("N3/§ 9.5 (amended 2026-09-24): the ceiling is computed from the formula (64k in + 8,192 out + one search)", async () => {
+dt("N3/§ 9.5/§ 13.1 (amended 2026-09-24): Claude's ceiling is computed from the formula (64k in at the regional cache-write price + 8,192 out + one search)", async () => {
   await Promise.resolve(); // pure check; dt() expects an async fn
-  const formula = (64_000 * 2) / 1e6 + (8_192 * 10) / 1e6 + 0.007; // § 14: one search, per request
+  // § 13.1's raised Claude ceiling (§ 13.6 (1)): the regional cache-write
+  // price ($2.75/M), not the plain global input price § 9.5 used ($2/M).
+  const formula = (64_000 * 2.75) / 1e6 + (8_192 * 11.0) / 1e6 + 0.007;
   assertAlmostEquals(CEILING_USD, formula, 1e-9);
-  assert(CEILING_USD >= 0.21 && CEILING_USD < 0.23, `CEILING_USD ${CEILING_USD} should read "about $0.22"`);
+  assertAlmostEquals(CEILING_USD, 0.273112, 1e-9);
+});
+
+dt("§ 13.1: DeepSeek's ceiling is $0.043288 (64k × $0.375/M + 8,192 × $1.50/M + one search)", async () => {
+  await Promise.resolve();
+  const formula = (64_000 * 0.375) / 1e6 + (8_192 * 1.5) / 1e6 + 0.007;
+  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], formula, 1e-9);
+  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 0.043288, 1e-9);
 });
 
 dt("§ 9.6 (amended 2026-09-24): the ledger row carries finish_reason off the metered stream's own last chunk", async () => {
@@ -595,6 +615,174 @@ dt("the exact allowed model string in the body is accepted", async () => {
     await h.drain();
   } finally {
     await h.stop();
+  }
+});
+
+dt("§ 13.1: a missing model is refused (400 model_not_allowed) — the proxy no longer fills one in", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    const res = await handleRequest(req({ messages: [] }, { token: "tok-1", omitModel: true }), h.deps, BASE_ENV);
+    assertEquals(res.status, 400);
+    const body = await res.json();
+    assertEquals(body.error.code, "model_not_allowed");
+    assertEquals(h.lastUpstreamBody, undefined, "a missing model must never reach upstream");
+    await h.drain();
+    assertEquals(h.state.ledgerInserts.length, 0, "no ledger row for a refused call");
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("§ 13.1: DeepSeek's outgoing body has no cache_control and provider.require_parameters is true", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ cost: 0.005 });
+    const res = await handleRequest(
+      req({ messages: [{ role: "user", content: "hi" }], model: DEEPSEEK_MODEL_ID }, { token: "tok-1" }),
+      h.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+    const sent = h.lastUpstreamBody as Record<string, unknown>;
+    assertEquals(sent.model, DEEPSEEK_MODEL_ID);
+    assertFalse("cache_control" in sent, "DeepSeek must never get cache_control");
+    assertEquals(sent.provider, { data_collection: "deny", zdr: true, require_parameters: true });
+    assertEquals(sent.max_tokens, 8192);
+    assertEquals(sent.stream, true);
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("§ 13.1: Claude's outgoing body still has cache_control and no require_parameters", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ cost: 0.01 });
+    const res = await handleRequest(
+      req({ messages: [{ role: "user", content: "hi" }], model: CLAUDE_MODEL_ID }, { token: "tok-1" }),
+      h.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+    const sent = h.lastUpstreamBody as Record<string, unknown>;
+    assertEquals(sent.cache_control, { type: "ephemeral" });
+    assertEquals(sent.provider, { data_collection: "deny", zdr: true });
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("§ 13.1/§ 13.5 (v): the ledger's model column is the id the proxy SENT, for each model", async () => {
+  for (const model of [CLAUDE_MODEL_ID, DEEPSEEK_MODEL_ID]) {
+    const h = await harness();
+    try {
+      h.state.users["tok-1"] = { id: "u1" };
+      h.state.members.add("u1");
+      h.state.balances["u1"] = 5;
+      // The upstream's OWN `model` string can carry a dated suffix
+      // (§ 13.1: "the upstream may add a dated suffix ... no `models`
+      // fallback list is ever forwarded, so the id sent is the model that
+      // ran") — the ledger row must still record what THIS proxy sent,
+      // not whatever comes back in the stream.
+      h.orOptions.chunks = [
+        `data: ${JSON.stringify({ id: "gen-model-col", model: `${model}-20260910`, choices: [{ delta: { content: "hi" } }] })}`,
+        `data: ${JSON.stringify({ id: "gen-model-col", choices: [], usage: { cost: 0.001, prompt_tokens: 1, completion_tokens: 1 } })}`,
+        "data: [DONE]",
+      ];
+      const res = await handleRequest(
+        req({ messages: [{ role: "user", content: "hi" }], model }, { token: "tok-1" }),
+        h.deps,
+        BASE_ENV,
+      );
+      assertEquals(res.status, 200, model);
+      await res.body?.cancel();
+      await h.drain();
+      assertEquals(h.state.ledgerInserts.length, 1, model);
+      assertEquals(h.state.ledgerInserts[0].model, model, model);
+    } finally {
+      await h.stop();
+    }
+  }
+});
+
+dt("§ 13.5 (iv): a DeepSeek call records DeepSeek's own ceiling ($0.043288) when the cost can't be read", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = [`data: ${JSON.stringify({ id: "gen-ds-nocost", choices: [{ delta: { content: "hi" } }] })}`];
+    const res = await handleRequest(
+      req({ messages: [], model: DEEPSEEK_MODEL_ID }, { token: "tok-1" }),
+      h.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+    assertEquals(h.state.ledgerInserts.length, 1);
+    assertAlmostEquals(h.state.ledgerInserts[0].usd as number, CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 1e-9);
+    assertEquals(h.state.ledgerInserts[0].model, DEEPSEEK_MODEL_ID);
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("§ 13.5 (iv): a DeepSeek reported cost of $0.60 is recorded as DeepSeek's ceiling (beyond its own 10x bound); the same $0.60 on Claude is recorded as reported, with the anomaly log", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 5;
+    h.orOptions.chunks = sseChunks({ id: "gen-ds-060", cost: 0.6 });
+    const res = await handleRequest(
+      req({ messages: [], model: DEEPSEEK_MODEL_ID }, { token: "tok-1" }),
+      h.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+    assertEquals(h.state.ledgerInserts.length, 1);
+    assertAlmostEquals(h.state.ledgerInserts[0].usd as number, CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 1e-9);
+  } finally {
+    await h.stop();
+  }
+
+  const h2 = await harness();
+  try {
+    h2.state.users["tok-1"] = { id: "u1" };
+    h2.state.members.add("u1");
+    h2.state.balances["u1"] = 5;
+    h2.orOptions.chunks = sseChunks({ id: "gen-claude-060", cost: 0.6 });
+    const warnings: unknown[] = [];
+    h2.deps.log = { warn: (e) => warnings.push(e) };
+    const res = await handleRequest(
+      req({ messages: [], model: CLAUDE_MODEL_ID }, { token: "tok-1" }),
+      h2.deps,
+      BASE_ENV,
+    );
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h2.drain();
+    assertEquals(h2.state.ledgerInserts.length, 1);
+    assertAlmostEquals(h2.state.ledgerInserts[0].usd as number, 0.6, 1e-9);
+    assert(warnings.some((w) => JSON.stringify(w).includes("anomaly")));
+  } finally {
+    await h2.stop();
   }
 });
 

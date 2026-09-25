@@ -1,9 +1,13 @@
 # supabase/functions — Ten's two Edge Functions
 
-Contract: `docs/design-web-agent.md` § 8. Built and tested **locally only**
-(Deno, mocked OpenRouter and mocked Supabase — see "Tests" below). **Not
-deployed by this change.** The owner runs the commands below when ready;
-nothing here calls the live OpenRouter key or a production Supabase project.
+Contract: `docs/design-web-agent.md` § 8, amended by § 13 ("the site's
+model is a setting" — the proxy now allows exactly two models, Claude
+Sonnet 5 and DeepSeek V4.1 Flash, each with its own per-call ceiling) and
+§ 14 (web search's own per-request price). Built and tested **locally
+only** (Deno, mocked OpenRouter and mocked Supabase — see "Tests" below).
+**Not deployed by this change.** The owner runs the commands below when
+ready; nothing here calls the live OpenRouter key or a production
+Supabase project.
 
 ```
 supabase/functions/
@@ -32,18 +36,26 @@ logic is testable with `deno test` and no network to a real project. Only
 deno test --allow-net supabase/functions/
 ```
 
-Current result (this change, run 2026-09-23):
+Current result (§ 13 "the site's model is a setting", run 2026-09-25):
 
 ```
-running 8 tests from ./supabase/functions/ten-delete-account/handler.test.ts
-... (8 passed)
-running 18 tests from ./supabase/functions/ten-model-proxy/core.test.ts
-... (18 passed)
-running 29 tests from ./supabase/functions/ten-model-proxy/handler.test.ts
-... (29 passed)
+running 12 tests from ./supabase/functions/ten-delete-account/handler.test.ts
+... (12 passed)
+running 49 tests from ./supabase/functions/ten-model-proxy/core.test.ts
+... (49 passed)
+running 50 tests from ./supabase/functions/ten-model-proxy/handler.test.ts
+... (50 passed)
 
-ok | 55 passed | 0 failed
+ok | 111 passed | 0 failed
 ```
+
+The new coverage (§ 13.1/§ 13.5): the allowlist accepts each id and
+refuses a missing/other one (400, no upstream call, no ledger row); a
+golden-body test pins Claude's outgoing body byte-identical to before
+§ 13; `cache_control` only for Claude, `provider.require_parameters` only
+for DeepSeek; each model's own ceiling ($0.273112 / $0.043288, to 1e-9)
+drives the meter's fallback and 10× bound; the ledger's `model` column is
+the id THIS proxy sent, for either model.
 
 `deno check supabase/functions/**/*.ts` and `deno lint supabase/functions/`
 are also clean.
@@ -82,6 +94,13 @@ supabase secrets set TEN_APP_ORIGIN=<the production Vercel origin, e.g. https://
 `ten-delete-account` needs no extra secret beyond the auto-injected three —
 it never calls OpenRouter and never needs the app origin beyond CORS, which
 also reads `TEN_APP_ORIGIN` (set it once; both functions share it).
+
+**Deploy order for § 13 — the site deploys BEFORE this function** (see
+`apps/web/README.md`'s own "Deploy order for § 13" for the full three-step
+sequence: site → proxy → setting). Deploying the proxy before the § 13
+site build would 400 every call from whatever OLD site build is still
+live, since it never sent a `model` field at all and this version of the
+proxy no longer fills one in.
 
 Preconditions, in this order (per § 8 and the migration's own header — an
 agent never runs these either):
@@ -123,20 +142,33 @@ Supabase session (401 otherwise, including the anon/publishable key alone);
 checks the 256 KB body cap and beta membership (403); checks the caller's
 balance (402 `over_balance`) and the $5/day beta-wide ceiling
 (`ten_beta_spend_today()`, 503, shown as `model_error`); rebuilds the
-upstream body from an explicit allowlist (forces the model, cost cap,
-`stream: true`, the provider privacy filter, `cache_control`, and rewrites
-`plugins: [{ id: "web" }]` to the fixed engine and result cap — everything
-else is dropped); calls the one hard-coded OpenRouter URL with
+upstream body from an explicit allowlist. **§ 13:** the request's `model`
+must be exactly `anthropic/claude-sonnet-5` or `deepseek/deepseek-v4.1-flash`
+— anything else, including a missing `model` (the proxy no longer fills
+one in), gets 400 `model_not_allowed`, no upstream call, no ledger row.
+The allowlist forces `stream: true`, the provider privacy filter
+(`require_parameters: true` ADDED for DeepSeek only — Claude's every host
+supports tools, DeepSeek's cheapest doesn't), `cache_control` (Claude
+only — never sent for DeepSeek, whose hosts cache automatically if at
+all), the cost cap (`max_tokens`, 8,192 for both), and rewrites
+`plugins: [{ id: "web" }]` to the fixed engine and result cap for either
+model — everything else is dropped, and Claude's outgoing body is
+byte-identical to the pre-§ 13 single-model proxy (a golden-body test
+pins this). Calls the one hard-coded OpenRouter URL with
 `TEN_OPENROUTER_API_KEY` (never logged); streams the response back to the
 client while metering a `tee()`'d copy in the background (`waitUntil`, a
 360 s deadline timed from the request's start), inserting exactly one
-`ten_usage_ledger` `'call'` row keyed by the response id: a finite reported
-cost from $0 to 10× the ~$0.22 ceiling is recorded **as reported** (a cost
-above the ceiling also logs an anomaly line — no key or content in it); a
-missing, non-finite, negative, or >10×-the-ceiling cost, or the meter
-deadline, records the ceiling instead. An upstream 402/5xx maps to 503
-`model_error` (the shared key's own limit, not this user's balance). CORS is
-restricted to the production Vercel origin (`TEN_APP_ORIGIN`) and
+`ten_usage_ledger` `'call'` row keyed by the response id, with `model` =
+the id THIS proxy sent (never the stream's own, possibly dated-suffixed,
+`model` string): a finite reported cost from $0 to 10× that request's
+OWN model's ceiling ($0.273112 Claude, $0.043288 DeepSeek — § 13.1's price
+table, the dearest no-data-kept tool-capable host per model) is recorded
+**as reported** (a cost above the ceiling also logs an anomaly line — no
+key or content in it); a missing, non-finite, negative, or
+>10×-the-ceiling cost, or the meter deadline, records that model's own
+ceiling instead. An upstream 402/5xx maps to 503 `model_error` (the
+shared key's own limit, not this user's balance). CORS is restricted to
+the production Vercel origin (`TEN_APP_ORIGIN`) and
 `http://localhost:5173`.
 
 **`ten-delete-account`** — `POST` only (`OPTIONS` for preflight). Verifies

@@ -5,7 +5,9 @@ human owner. This page explains who does what, the loop every change
 goes through, and where you fit in as a contributor. You can join with
 your own agents or with none; the rules are the same.
 
-The role files are [`agents/`](../agents/). The loop is
+The four agent roles have files in [`agents/`](../agents/); the owner
+and the lead have none (their jobs are described here and in
+[`agents/README.md`](../agents/README.md)). The loop is
 [`PROCESS.md`](PROCESS.md). The plan that set up the team is
 [`plan-portable-skills-and-web-agent.md` § The team](plan-portable-skills-and-web-agent.md#the-team).
 
@@ -22,39 +24,43 @@ The role files are [`agents/`](../agents/). The loop is
 
 | Role | Does | Never does | Hands back |
 |---|---|---|---|
-| **Owner** (a human) | Decides what gets built. Approves contracts, designs, spending and deploys. Holds every key. Applies migrations and deploys. Runs Ten on real data, in their own account. | Gives an agent a secret, a production write, or real user data. | Decisions, recorded in the issue or the contract with a date ("owner, 2026-09-24"). |
-| **Lead** (the main agent session) | Holds the issue and runs the loop. Starts every other agent. Checks each hand-back by reading the files and re-running the commands. Commits and merges. Brings every approval to the owner. | Approves on the owner's behalf. Believes a hand-back it hasn't checked. There is no other coordinator. | To the owner: a checked summary and the questions that need a decision. |
+| **Owner** (a human; no role file) | Decides what gets built. Approves contracts, designs, spending and every production change. Holds every key. Applies migrations. Runs Ten on real data, in their own account. | Gives an agent a secret, a production write, or real user data. | Decisions, recorded in the issue or the contract with a date ("owner, 2026-09-24"). |
+| **Lead** (the main agent session; no role file) | Holds the issue and runs the loop. Starts every other agent. Checks each hand-back by reading the files and re-running the commands. Commits and merges. Brings every approval to the owner. | Approves on the owner's behalf. Believes a hand-back it hasn't checked. There is no other coordinator. | To the owner: a checked summary and the questions that need a decision. |
 | **Architect** ([`architect.md`](../agents/architect.md)) | Contracts, design gates, spike notes, closing reviews against [`PRINCIPLES.md`](../PRINCIPLES.md). Docs only. | Writes feature code. Reviews its own contract. | Files written, decisions with reasons, open questions, anything UNVERIFIED. |
 | **Designer** ([`designer.md`](../agents/designer.md)) | Screens, cards, fixture conversations, the gate and balance, the phone layout. Exact values, rendered and looked at. | Wires live data. Uses real candidate data. | Files, the token table, screenshot paths (checked to exist), notes for the coder. |
-| **Coder** ([`coder.md`](../agents/coder.md)) | Builds one slice against an agreed contract, with unit tests, in its own worktree. | Grades its own work. Commits. Edits outside its slice without saying so. Hardcodes a key. | Files changed, commands run with real output, what is not done, blockers. |
-| **Tester** ([`tester.md`](../agents/tester.md)) | Writes tests from the spec, not from the code. Runs them. Re-checks every fix itself. | Fixes product code. Takes the fixer's word. | PASS, FAIL or BLOCKED per exit criterion, with the command and its output. Findings by severity. |
+| **Coder** ([`coder.md`](../agents/coder.md)) | Builds one slice against an agreed contract, with unit tests, in its own worktree. | Grades its own work. Commits (the lead commits coder work after checking it). Edits outside its slice without saying so. Hardcodes a key. | Files changed, commands run with real output, what is not done, blockers. |
+| **Tester** ([`tester.md`](../agents/tester.md)) | Writes tests from the spec, not from the code. Runs them. Re-checks every fix itself. Commits its own tests when the lead says to. | Fixes product code. Takes the fixer's word. | PASS, FAIL or BLOCKED per exit criterion, with the command and its output. Findings by severity. |
 
 **Who talks to whom.** Agents never hand work to each other directly.
 Everything goes through the lead, and only the owner approves.
 
 ```mermaid
-flowchart TD
-  O["Owner"] -->|decisions and approvals| L["Lead"]
-  L -->|checked summary and questions| O
-  L -->|one task with exit criteria| A["Architect"] & D["Designer"] & C["Coder"] & T["Tester"]
-  A & D & C & T -->|hand-back| L
+flowchart LR
+  O["Owner"] <-->|"approvals, questions"| L["Lead"]
+  L <-->|"tasks out, hand-backs in"| Agents["Architect · Designer<br/>Coder · Tester"]
 ```
 
 ## The loop
 
+The steps are [`PROCESS.md`](PROCESS.md)'s, numbered the same. A skill
+change goes down the left path. A web slice (app, proxy, database) takes
+the right path: its live check happens after an owner-approved deploy.
+
 ```mermaid
 flowchart TD
-  G["Design gate:<br/>contract drafted, owner approves"] --> I["GitHub issue<br/>with exit criteria"]
-  I --> B["Coder builds<br/>in its own worktree"]
-  I --> T["Tester writes tests<br/>from the spec"]
-  B --> V{"Tester's verdict"}
-  T --> V
+  G["1 Design gate:<br/>owner approves"] --> I["2 GitHub issue<br/>with exit criteria"]
+  I --> P["3 Prior-art check"]
+  P --> B["4 Build in a worktree,<br/>tests written from the spec"]
+  B --> V{"5 Independent review:<br/>tester's verdict"}
   V -->|fail| F["Fix round<br/>(bounded)"]
   F --> V
-  V -->|pass| R["Architect's<br/>closing review"]
-  R --> O{"Owner approves<br/>the deploy?"}
-  O -->|yes| D["Owner deploys"]
-  D --> L["Live check,<br/>issue closed with receipts"]
+  V -->|"pass: skill change"| L["6 Live run<br/>(fixture persona;<br/>owner's real-data run)"]
+  L --> H["7 Conduct harness,<br/>several trials"]
+  H --> C["8 Closing review"]
+  V -->|"pass: web slice"| C
+  C -->|skill change| Done["Issue closed<br/>with receipts"]
+  C -->|web slice| D["Owner-approved deploy,<br/>then live check"]
+  D --> Done
 ```
 
 - **The design gate comes first.** Goal, assumptions, tradeoffs and a
@@ -64,11 +70,14 @@ flowchart TD
 - **Build and tests run in parallel,** and neither sees the other's
   work until the verdict. That is what makes the tests independent.
 - **Fix rounds are bounded** (rule 16: 2 to 3 passes). Most slices
-  closed in two ("round 2/2" in the log); the checker port took three.
+  closed in two ("round 2/2" in the log). The checker port took three,
+  and the § 10–12 release needed a third fix after its second round
+  (`df6a5cb`).
   If a round doesn't move, change the approach or take the choice to
   the owner.
-- **The live check** uses a fixture persona in a fresh account or
-  workspace. Only the owner runs on real data.
+- **Live runs** by contributors use a fixture persona in a fresh
+  account or workspace. Closing a skill change also needs the owner's
+  real-data run, or a waiver recorded in the issue (PROCESS step 6).
 
 ## How work moves between branches
 
@@ -78,23 +87,25 @@ flowchart LR
   W --> T["Tester worktree<br/>branch worktree-agent-id"]
   C -->|hand-back| L["Lead checks files,<br/>re-runs tests, commits"]
   L -->|merge coder branch| T
-  T -->|verdict, lead commits tests| M["Merge into<br/>working branch"]
+  T -->|"verdict; tester commits<br/>its tests on the lead's say"| M["Merge into<br/>working branch"]
   M --> W
   W -->|owner approves| Main["main"]
 ```
 
 Real example: the switchable-model build (C § 13). The coder's commit
 `4078319` was merged into the tester's branch (`70c72b9`). The tester's
-acceptance commit `62b0e58` then went back into the working branch
-(`650cfc1`). Agent worktrees live under `.claude/worktrees/`, which git
+acceptance commit `62b0e58`, made on the lead's instruction, then went
+back into the working branch (`650cfc1`). Agent worktrees live under `.claude/worktrees/`, which git
 ignores.
 
 ## The tools
 
-- **`python3 tests/run.py`**: one command for every suite: the skill
-  tests, the repo rules, the JavaScript and Deno suites, and the SQL
-  harness. Missing tools make a suite say `SKIPPED` out loud, never pass
-  in silence.
+- **`python3 tests/run.py`**: one command for almost every suite: the
+  skill tests, the repo rules and doc guards, the JavaScript and Deno
+  suites, and the SQL harness. It does **not** run `apps/web`'s own
+  `npm test` or the browser end-to-end suite in `tests/e2e-real/`; run
+  those separately ([`CONTRIBUTING.md`](../CONTRIBUTING.md)). A missing
+  tool makes a suite say `SKIPPED` out loud, never pass in silence.
 - **[`scripts/check-handback-paths.mjs`](../scripts/check-handback-paths.mjs)**:
   reads a hand-back and checks that every file path it names exists.
   Exit 1 if one is missing. It turns "verify the file, not the
@@ -109,7 +120,8 @@ ignores.
   accident. A local file never reaches the network.
 - **[`tests/always-on/`](../tests/always-on/README.md)**: the conduct
   harness. It runs a skill against a planted workspace and has a second
-  model judge the result. It spends money, so state the cost first.
+  model judge the result. It spends money, so state the size first and
+  get the owner's approval.
 
 ## Four short stories
 

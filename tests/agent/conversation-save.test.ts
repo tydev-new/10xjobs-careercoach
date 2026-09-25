@@ -22,6 +22,15 @@ test("§ 11.3/§ 12.1: both stub builders produce the spec's stub word for word,
   assert.ok(STUB_TEMPLATE.includes("N characters"));
 });
 
+test("§ 11.3 (lead ruling 6276698): the stub, the 2,000 threshold and the walker are ONE shared implementation", async () => {
+  const { readFileSync } = await import("node:fs");
+  assert.equal(trimStub, convStub, "turn-trim's stubFor IS conversation's stubFor (same function)");
+  const trimSrc = readFileSync(new URL("../../packages/agent/src/turn-trim.ts", import.meta.url), "utf8").replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, "");
+  assert.ok(!/Removed to save space/.test(trimSrc), "no second copy of the stub text in turn-trim.ts");
+  assert.ok(!/\b2_?000\b/.test(trimSrc), "no second copy of the threshold in turn-trim.ts");
+  assert.ok(/import\s*\{[^}]*\bstubLongStrings\b[^}]*\}\s*from\s*"\.\/conversation\.ts"/.test(trimSrc), "turn-trim.ts uses conversation.ts's walker");
+});
+
 // ------------------------------------------------------------------ (iii) the sanitize table
 
 const LONG = "a".repeat(10_000);

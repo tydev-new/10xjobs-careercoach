@@ -1252,6 +1252,18 @@ await section("conversation", async () => {
     await page.waitForTimeout(3500);
     await waitSettled(page);
     rec(proxyFor(uid) === n0 + 1, "conversation (viii): a send while THIS tab's own save is still in flight is sent (it is not another tab)", `${proxyFor(uid) - n0} call(s); line: ${await textOf(page, ".conversation-notice")}`);
+    // § 11.5: the pre-send check runs "under § 10.3's rules (2 s; a failed
+    // check never blocks)". An own save that never answers must not hold the
+    // candidate's send (or the composer) hostage.
+    await page.unroute("**/rest/v1/rpc/ten_conversation_save");
+    await page.route("**/rest/v1/rpc/ten_conversation_save", () => new Promise(() => {})); // never answers
+    await say(page, "hello fourth");
+    const n1 = proxyFor(uid);
+    const t0 = Date.now();
+    await page.locator(".composer-input").fill("hello fifth");
+    await page.locator(".composer-input").press("Enter");
+    const sent = await until(async () => (proxyFor(uid) > n1 ? Date.now() - t0 : false), 12000, 100);
+    rec(sent !== undefined && sent <= 4000, "conversation (viii): a send while this tab's own save HANGS still goes within the 2 s rule (a failed check never blocks)", sent === undefined ? "not sent within 12 s; composer disabled: " + (await page.locator(".composer-input").isDisabled()) : `${sent} ms`);
     await page.context().close();
   }
 });

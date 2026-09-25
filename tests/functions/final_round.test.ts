@@ -7,7 +7,7 @@
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
 import { baseBody, callRows, FN, harness, member, OPENROUTER_KEY, observe, preq, sse, t } from "./_harness.ts";
 
-const CEILING = 64_000 * 2e-6 + 8_192 * 1e-5 + 5 * 0.004; // § 9.5 (amended 2026-09-24): MAX_TOKENS_CAP 8,192
+const CEILING = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007; // § 14.2 (amended 2026-09-24): one search = one $0.007 request, = 0.21692
 const MODEL_TEXT = "MODEL-OUTPUT-CANARY-cover-letter-for-Acme";
 const CLIENT_TEXT = "CLIENT-CV-CANARY-jane-doe-salary-history";
 

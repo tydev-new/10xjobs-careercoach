@@ -127,13 +127,13 @@ t("meter: usage missing entirely -> the ceiling cost is recorded", async () => {
   await run(tok);
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
-  assertAlmostEquals(rows[0].usd, CEILING, 1e-6, `usd ${rows[0].usd}`); // § 9.5: $0.22992 (was a loose >= 0.18)
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6, `usd ${rows[0].usd}`); // § 14.2: $0.21692
   assertEquals(rows[0].request_id, "gen-nousage");
 });
 
 t("meter: the ceiling constant vs § 9.5's own formula (64k×$2/M + 8,192×$10/M + one search)", async () => {
   // 64,000 × 2e-6 = 0.128; 8,192 × 1e-5 = 0.08192; one Exa search at 5 results ($4/1000 results) = 0.02
-  const formula = 64_000 * 2e-6 + 8_192 * 1e-5 + 5 * 0.004;
+  const formula = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007; // § 14.2: the search term is one request, not 5 results
   const h = await harness();
   h.reset();
   const [, tok] = await member(h);
@@ -143,7 +143,7 @@ t("meter: the ceiling constant vs § 9.5's own formula (64k×$2/M + 8,192×$10/M
   assertAlmostEquals(callRows(h.st)[0].usd, formula, 1e-6);
 });
 
-const CEILING = 64_000 * 2e-6 + 8_192 * 1e-5 + 5 * 0.004; // § 9.5's formula (amended 2026-09-24), = 0.22992
+const CEILING = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007; // § 14.2's formula (amended 2026-09-24), = 0.21692
 
 // § 8 (amended, main eb523bf): a finite cost from 0 to 10× the ceiling is recorded
 // AS REPORTED (never undercounted); above the ceiling it is also logged as an

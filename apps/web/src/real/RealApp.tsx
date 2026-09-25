@@ -333,6 +333,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         conversationStore={conversationStore}
         supabaseUrl={env.supabaseUrl}
         accessToken={accessToken}
+        paypalClientId={env.paypalClientId}
         onSignOut={handleSignOut}
         onDeleted={handleDeleted}
         theme={theme}

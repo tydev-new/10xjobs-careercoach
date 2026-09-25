@@ -61,7 +61,7 @@
         { "type": "text", "text": "Solterra Robotics – Group PM: recorded as Weak Fit. Moving to the next one." },
         { "type": "data-error", "data": {
           "code": "over_balance",
-          "message": "Your beta credit is used up. Ask the person who invited you for more.",
+          "message": "Your credit is used up. You can buy more from your balance at the top.",
           "retryable": false
         } }
       ]

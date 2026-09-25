@@ -1415,6 +1415,88 @@ button {
   display: none;
 }
 
+/* ---- BEGIN Buy-credit dialog (design-web-agent.md § 17, ui § 1.11) ----
+   Same overlay/card shape as .delete-confirm-* — a members-only dialog,
+   Close or Esc shuts it, no card/chat/model-output path ever opens it. */
+.balance-chip--button {
+  cursor: pointer;
+}
+
+.buy-credit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 22, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: var(--space-4);
+}
+
+.buy-credit-card {
+  position: relative;
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  max-width: 420px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.buy-credit-close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--text-lg);
+  width: 44px;
+  height: 44px;
+}
+
+.buy-credit-packs {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.buy-credit-pack {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  min-height: 44px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.buy-credit-pack--selected {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.buy-credit-buttons {
+  min-height: 44px;
+}
+
+.buy-credit-result {
+  color: var(--fg);
+  line-height: var(--leading-normal);
+}
+
+.buy-credit-footer {
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+/* ---- END Buy-credit dialog ---- */
+
 /* ---- BEGIN new-version notice (design-web-agent.md § 10, ui § 1.8) ----
    The mechanism lives in src/real/version-check.ts + VersionNotice.tsx
    (.version-notice-*); dev-preview.tsx's style-only scene uses the

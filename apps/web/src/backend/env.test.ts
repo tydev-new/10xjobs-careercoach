@@ -78,6 +78,18 @@ test("readEnv: an unrecognized VITE_COACH_MODEL fails the same way a missing req
   }
 });
 
+// -------------------------------------------------- § 17.1: VITE_PAYPAL_CLIENT_ID ----
+
+test("readEnv: VITE_PAYPAL_CLIENT_ID unset -> paypalClientId is '', never MissingEnvError (buying credit isn't load-bearing for the chat)", () => {
+  const env = readEnv(BASE);
+  assert.equal(env.paypalClientId, "");
+});
+
+test("readEnv: VITE_PAYPAL_CLIENT_ID set is trimmed and passed through", () => {
+  const env = readEnv({ ...BASE, VITE_PAYPAL_CLIENT_ID: "  test-client-id  " });
+  assert.equal(env.paypalClientId, "test-client-id");
+});
+
 test("readEnv: an unrecognized VITE_COACH_MODEL is reported ALONGSIDE other missing vars, not instead of them", () => {
   try {
     readEnv({ VITE_COACH_MODEL: "not-a-model" });

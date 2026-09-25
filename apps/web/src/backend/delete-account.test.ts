@@ -12,8 +12,10 @@ test("posts to /functions/v1/ten-delete-account with the live JWT and returns th
     seenAuth = new Headers(init?.headers).get("authorization") ?? "";
     return new Response(
       JSON.stringify({
-        message: "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. Your usage records, which show only amounts spent and no content, are kept.",
-        deleted: { storageObjects: 2, textFiles: 5, gateLogRows: 1, creditRows: 1 },
+        // § 17.4 / design-web-ui.md § 1.11's replaced copy, word for word.
+        message:
+          "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Your credit stays, and so do your payment and usage records, which show only amounts and no content.",
+        deleted: { storageObjects: 2, textFiles: 5, gateLogRows: 1, conversationRows: 1 },
       }),
       { status: 200 },
     );
@@ -24,7 +26,7 @@ test("posts to /functions/v1/ten-delete-account with the live JWT and returns th
   assert.equal(seenMethod, "POST");
   assert.equal(seenAuth, "Bearer jwt-1");
   assert.equal(summary.deleted.textFiles, 5);
-  assert.match(summary.message, /Unused credit is forfeited/);
+  assert.match(summary.message, /Your credit stays/);
 });
 
 test("a non-2xx response throws with the server's own error message", async () => {

@@ -29,11 +29,16 @@ export interface DeleteBetaDataConfirmProps {
 // Amended 2026-09-24 (C § 11.7 / ui § 1.7 point 1): "your conversation"
 // added, named — not folded into "workspace files" (ten_conversations is
 // its own table, C § 11.7).
-const COMPLETE_THING = "your workspace files, your conversation, your gate log, and your credit";
-// C § 8's own wording, word for word (design-web-ui.md § 1.7, point 2).
+// Amended again 2026-09-25 (C § 17.4 / design-web-ui.md § 1.11's "Replaced,
+// after the function change" copy): credit is no longer part of "the
+// complete thing" — it survives a delete now, so it's no longer named among
+// what's erased. § 1.7's own list becomes "your workspace files, your
+// conversation, and your gate log."
+const COMPLETE_THING = "your workspace files, your conversation, and your gate log";
+// C § 8's own wording, word for word — replaced 2026-09-25 by
+// design-web-ui.md § 1.11's own replacement sentence (§ 17.4).
 const ONE_SENTENCE =
-  "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. " +
-  "Your usage records, which show only amounts spent and no content, are kept.";
+  "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Your credit stays, and so do your payment and usage records, which show only amounts and no content.";
 
 type Phase = "confirming" | "declined" | "deleting" | "error";
 

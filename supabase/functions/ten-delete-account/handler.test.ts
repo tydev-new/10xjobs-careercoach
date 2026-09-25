@@ -131,8 +131,10 @@ Deno.test("deletes only this user's storage objects, DB rows, and keeps the auth
     assertEquals(body.deleted.textFiles, 3);
     assertEquals(body.deleted.gateLogRows, 2);
     assert(body.message.includes("Your sign-in stays"));
-    // Round 2, item 4: names what's kept, not just what's deleted.
-    assert(body.message.includes("Your usage records, which show only amounts spent and no content, are kept."));
+    // § 17.4 (amended 2026-09-25): names what's kept, not just what's
+    // deleted — credit now survives too, so it's named alongside the
+    // usage/payment records.
+    assert(body.message.includes("Your credit stays, and so do your payment and usage records, which show only amounts and no content."));
 
     // user-a's objects are gone; user-b's are untouched.
     assertFalse(h.state.storageObjects.has("users/user-a/ws/resume.pdf"));
@@ -178,7 +180,7 @@ Deno.test("a workspace with no files/objects still returns a zeroed summary, not
     const res = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(res.status, 200);
     const body = await res.json();
-    assertEquals(body.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, conversationRows: 0, creditRows: 0 });
+    assertEquals(body.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, conversationRows: 0 });
   } finally {
     await h.stop();
   }
@@ -190,23 +192,29 @@ Deno.test("idempotent: a second call finds nothing left and still returns 200 wi
     h.state.users["tok-1"] = { id: "u1" };
     h.state.storageObjects.add("users/u1/ws/cv.pdf");
     h.state.rowCounts["ten_ws_files:u1"] = 3;
+    // § 17.4: seeded credit stays seeded — this delete never touches it.
     h.state.ledgerRowsByKind["credit"] = { u1: 1 };
 
     const first = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(first.status, 200);
     const firstBody = await first.json();
-    assertEquals(firstBody.deleted, { storageObjects: 1, textFiles: 3, gateLogRows: 0, conversationRows: 0, creditRows: 1 });
+    assertEquals(firstBody.deleted, { storageObjects: 1, textFiles: 3, gateLogRows: 0, conversationRows: 0 });
+    assertEquals(h.state.ledgerRowsByKind["credit"]["u1"], 1, "the credit row is untouched by the first call");
 
     const second = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(second.status, 200);
     const secondBody = await second.json();
-    assertEquals(secondBody.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, conversationRows: 0, creditRows: 0 });
+    assertEquals(secondBody.deleted, { storageObjects: 0, textFiles: 0, gateLogRows: 0, conversationRows: 0 });
   } finally {
     await h.stop();
   }
 });
 
-Deno.test("keeps 'call' ledger rows, deletes only 'credit' rows (lead ruling, fix round 1)", async () => {
+// § 17.4 (amended 2026-09-25): supersedes the earlier fix-round-1 rule
+// ("keeps 'call', deletes 'credit'") — NO ledger row of any kind is ever
+// deleted here any more, the $5 starter included, so a self-delete can
+// never take paid credit with it.
+Deno.test("keeps every ledger row, 'call' and 'credit' alike (§ 17.4) — no deleteOwnRows call on ten_usage_ledger at all", async () => {
   const h = await harness();
   try {
     h.state.users["tok-1"] = { id: "u1" };
@@ -220,12 +228,14 @@ Deno.test("keeps 'call' ledger rows, deletes only 'credit' rows (lead ruling, fi
     const res = await handleRequest(req({ token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(res.status, 200);
     const body = await res.json();
-    assertEquals(body.deleted.creditRows, 1);
+    assertFalse("creditRows" in body.deleted, "the response no longer carries a creditRows field at all");
 
     const remaining = h.state.ledgerInserts.filter((r) => r.user_id === "u1");
-    assertEquals(remaining.length, 2, "the two 'call' rows must survive");
+    assertEquals(remaining.length, 2, "both 'call' rows must survive");
     assert(remaining.every((r) => r.kind === "call"));
     assertEquals(h.state.ledgerInserts.some((r) => r.user_id === "other"), true, "another user's row untouched");
+    assertEquals(h.state.ledgerRowsByKind["credit"]["u1"], 1, "the seeded credit row is untouched");
+    assertFalse(h.state.deletedRows["ten_usage_ledger"]?.includes("u1"), "ten_usage_ledger is never targeted by a delete for this user");
   } finally {
     await h.stop();
   }

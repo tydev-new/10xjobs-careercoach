@@ -201,7 +201,8 @@ dt("402 over_balance at a zero balance", async () => {
     assertEquals(res.status, 402);
     const body = await res.json();
     assertEquals(body.error.code, "over_balance");
-    assertEquals(body.error.message, "Your beta credit is used up. Ask the person who invited you for more.");
+    // design-web-ui.md § 1.11's replaced copy (§ 17.4).
+    assertEquals(body.error.message, "Your credit is used up. You can buy more from your balance at the top.");
   } finally {
     await h.stop();
   }

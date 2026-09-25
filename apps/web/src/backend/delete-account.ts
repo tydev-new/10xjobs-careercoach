@@ -15,7 +15,9 @@ export interface DeleteAccountSummary {
     // § 11.7 (amended 2026-09-24): ten-delete-account also deletes the
     // caller's ten_conversations row.
     conversationRows: number;
-    creditRows: number;
+    // § 17.4 (amended 2026-09-25): no ledger row of any kind is ever
+    // deleted here any more, so there is no creditRows field to read —
+    // paid credit (and the $5 starter) survives a delete.
   };
 }
 

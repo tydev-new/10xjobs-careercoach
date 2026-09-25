@@ -30,6 +30,13 @@ export interface HeaderProps {
   /** design-web-ui.md § 1.7 — opens the same four-step typed-yes
    *  confirmation as a spend gate, never a click-to-confirm. */
   onDeleteBetaData?: () => void;
+  /** design-web-ui.md § 1.11 — opens the Buy-credit dialog. Wired from BOTH
+   *  the balance chip and the ⋯ menu's "Buy credit" line (§ 17.2: "no tool,
+   *  card or model output opens the dialog"); omitted (undefined) for a
+   *  non-member or the mock preview, where neither ever renders as a
+   *  button — the chip stays plain text and the menu item is absent
+   *  outright (not merely disabled), since § 1.11 is members-only. */
+  onBuyCredit?: () => void;
   onSignOut?: () => void;
   /** § 13.3: the ⋯ menu's last line, real mode only — plain text, never a
    *  button, built from `coachModel` so it can never disagree with what's
@@ -81,6 +88,7 @@ export function Header(props: HeaderProps): ReactElement {
     onExportWorkspace,
     onImportWorkspace,
     onDeleteBetaData,
+    onBuyCredit,
     onSignOut,
     coachModel,
   } = props;
@@ -122,10 +130,21 @@ export function Header(props: HeaderProps): ReactElement {
         ) : null}
         {/* deps.balance() (design-web-agent.md § 8) rounds DOWN to the
             cent and never shows below $0.00 — formatBalanceUsd, not
-            formatUsd (S2/N3, docs/reviews/proxy-change-review.md). */}
-        <span className="balance-chip">
-          {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
-        </span>
+            formatUsd (S2/N3, docs/reviews/proxy-change-review.md).
+            design-web-ui.md § 1.11: "Opened from the balance chip or 'Buy
+            credit' in the ⋯ menu" — a real <button> only when onBuyCredit
+            is given (a member in the real app); plain text otherwise (mock
+            preview, or before onBuyCredit is wired), never a dead click
+            target (rule 8, no untrue UI). */}
+        {onBuyCredit ? (
+          <button type="button" className="balance-chip balance-chip--button" onClick={onBuyCredit}>
+            {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
+          </button>
+        ) : (
+          <span className="balance-chip">
+            {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
+          </span>
+        )}
         <div className="menu">
           <button
             type="button"
@@ -162,6 +181,22 @@ export function Header(props: HeaderProps): ReactElement {
               {/* No per-candidate key to manage: one shared app key sits
                   behind the model proxy (design-web-agent.md § 8), so
                   "Manage your usage key" is gone (design-web-ui.md § 1.1). */}
+              {/* design-web-ui.md § 1.11 — the menu's OTHER entry point into
+                  the same Buy-credit dialog the chip opens; absent
+                  outright (not merely disabled) when onBuyCredit isn't
+                  given, same posture as the chip above. */}
+              {onBuyCredit ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onBuyCredit();
+                    setMenuOpen(false);
+                  }}
+                >
+                  Buy credit
+                </button>
+              ) : null}
               {onThemeToggle ? (
                 <button
                   type="button"

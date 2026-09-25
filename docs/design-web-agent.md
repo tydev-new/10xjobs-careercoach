@@ -7,6 +7,7 @@
 disagree, § 9 wins. Again 2026-09-24: § 11 (the conversation is kept;
 owner requirement) and § 12 (a turn that grows too large), both approved
 by the owner as written (2026-09-24). Each wins over earlier text it names.
+Again 2026-09-24: § 13 (the site's model is a setting; PENDING OWNER).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -16,7 +17,9 @@ owns the wrapper and where each prop comes from (§ 6.2).
 `PENDING OWNER` = not yet confirmed by O. Reasons: Decision log.
 
 **Default model:** `anthropic/claude-sonnet-5` on OpenRouter (on its live
-model list, 2026-09-22), for the web app and the B1 runner.
+model list, 2026-09-22), for the web app and the B1 runner. Since § 13 the
+site's model is a build setting, `VITE_COACH_MODEL`, with this model as the
+fallback; the proxy allows exactly two models.
 
 ---
 
@@ -561,11 +564,11 @@ person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
    exists only as the fixed plugin below), `tool_choice` and `temperature`.
    It **sets**:
    - `model` = `anthropic/claude-sonnet-5`, an exact match with no suffix
-     (anything else gets 400 `model_not_allowed`);
+     (anything else gets 400 `model_not_allowed`; two models, § 13);
    - `max_tokens` = min(client, 8,192) (was 4,096; amended 2026-09-24, § 9.5);
    - `stream: true`;
    - `provider: { data_collection: "deny", zdr: true }`;
-   - `cache_control: { type: "ephemeral" }`;
+   - `cache_control: { type: "ephemeral" }` (Claude only, § 13);
    - if the client asked for `plugins: [{ id: "web" }]`, exactly
      `[{ id: "web", engine: "exa", max_results: min(n, 5) }]`.
 
@@ -582,7 +585,8 @@ person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
    non-finite, negative or beyond 10×, or the meter passes its ~360 s
    deadline (timed from the request's start), the row records the
    **ceiling**, computed from the formula (64k input tokens ×
-   input price + 8,192 × output price + one search; about $0.23 today, § 9.5).
+   input price + 8,192 × output price + one search; about $0.23 today, § 9.5;
+   per model, § 13).
    One metering path only; the same pass records `finish_reason` (§ 9.6).
 6. **Failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx,
    a Supabase error, or anything unexpected becomes a 503 with the CORS
@@ -869,7 +873,8 @@ the turn's system prompt:
 ### 9.5 The cap and its time bound (proxy)
 
 `max_tokens` = min(client, **8,192**) (was 4,096). The ceiling comes from
-§ 8's formula with `core.ts`'s constants:
+§ 8's formula with `core.ts`'s constants (per model since § 13, which also
+proposes Claude's prices at the dearest allowed host):
 
 64,000 × $2/M + 8,192 × $10/M + one search (5 × $0.004)
 = $0.128 + $0.08192 + $0.02 = **$0.22992, about $0.23** (was $0.18896).
@@ -1464,6 +1469,275 @@ shortened ((i) through the real `@openrouter/ai-sdk-provider`, then
 
 ---
 
+## 13. The site's model is a setting (amendment, 2026-09-24)
+
+**PENDING OWNER.** Owner request (2026-09-24): "change the LLM to deepseek
+to save testing cost". Where this section and an earlier one disagree,
+this one wins; § 8 and § 9.5 point here. It ships after § 10–12.
+
+**What changes.** The proxy allows exactly two models. One build setting
+on Vercel picks which one the site uses. Switching back to Claude is a
+setting change and a redeploy, never a code change.
+
+| model id (exact, no suffix) | name shown | role |
+|---|---|---|
+| `anthropic/claude-sonnet-5` | Claude Sonnet 5 | the measured model; the fallback |
+| `deepseek/deepseek-v4.1-flash` | DeepSeek V4.1 Flash | testing plumbing and cost |
+
+**Prevents:** paying Claude prices to test plumbing; a missing or mistyped
+setting silently changing which model coaches (and what it costs); a
+per-call ceiling or cost estimate priced for the wrong model; a cost record
+that doesn't say which model ran; a tool request sent to a host that
+ignores tools.
+
+**Prices (read 2026-09-24 from OpenRouter's public API: `GET
+/api/v1/models`, `/api/v1/models/{id}/endpoints`, `/api/v1/endpoints/zdr`).**
+The provider filter (`zdr: true`, `data_collection: "deny"`) means only
+the no-data-kept hosts can serve a call, so those hosts' prices are the
+ones that matter, not the model's headline price.
+
+- **Claude Sonnet 5:** 6 no-data-kept hosts (Bedrock and Vertex, global
+  and regional). Global: $2.00 in, $10.00 out, $2.50 per 1M for a cache
+  write. Regional: $2.20 in, $11.00 out, $2.75 cache write. Every host
+  supports tools; max output 128,000.
+- **DeepSeek V4.1 Flash:** 22 no-data-kept hosts. 21 list tool support
+  (DekaLLM does not). Input $0.04 to $0.375, output $0.30 to $1.50 (Venice
+  is the dearest). None lists a cache-write price. The smallest max output
+  among tool hosts is 32,768 (BaseTen), so 8,192 fits every host. DeepSeek's
+  own API ($0.15 in, $0.60 out, with weekday price doubling at some hours)
+  is **not** a no-data-kept host, so the filter never uses it. Candidate
+  data never goes to DeepSeek's own API.
+
+### 13.1 Proxy (`ten-model-proxy`)
+
+One table in `core.ts`, keyed by model id, replaces `MODEL` and the
+ceiling constants. Everything else in § 8 is unchanged.
+
+- **Allowlist.** The request's `model` must be exactly one of the two ids.
+  Anything else, including a missing `model`, a suffix (`:online`,
+  `:free`, `:nitro`), another case, or `deepseek/deepseek-v4-pro`, gets
+  400 `model_not_allowed`, "This model is not allowed.", with no upstream
+  call and no ledger row. The proxy no longer fills in a model: the site
+  always names it (§ 13.2).
+- **Claude's request is unchanged.** For `anthropic/claude-sonnet-5`, the
+  outgoing body is byte-identical to today's, `cache_control` included.
+- **DeepSeek's request differs in two fields only:**
+  - no `cache_control`. OpenRouter's docs (prompt caching page, read
+    2026-09-24) list top-level `cache_control` for Anthropic, Vertex,
+    Azure and Bedrock only, and say DeepSeek caching is automatic with no
+    configuration.
+  - `provider: { data_collection: "deny", zdr: true, require_parameters:
+    true }`. OpenRouter routes a request with `tools` to tool hosts only
+    as "best effort" (provider routing docs, 2026-09-24), and picks hosts
+    weighted toward the cheapest. The cheapest no-data-kept host
+    (DekaLLM, $0.04 in) lists no tool support, so without this a turn
+    could silently run with no tools. `require_parameters` makes every
+    host used support everything the request sends. Claude does not get it,
+    because every Claude host supports tools and its body stays as it is.
+- **`max_tokens`** = min(client, 8,192) for both. The time bound of § 9.5
+  applies to both.
+- **Web plugin** unchanged for both (`exa`, at most 5 results).
+- **Per-call ceiling**, per model, by § 8's formula: 64,000 input tokens ×
+  the highest input price + 8,192 × the highest output price + one search
+  (5 × $0.004). "Highest" means the dearest no-data-kept, tool-capable
+  host above, and for Claude the cache-write price, because the proxy
+  forces caching and the first call of a turn writes the cache at that
+  price.
+
+  | model | input $/M | output $/M | ceiling |
+  |---|---|---|---|
+  | Claude Sonnet 5 | 2.75 (regional cache write) | 11.00 | 0.176 + 0.090112 + 0.02 = **$0.286112, about $0.29** |
+  | DeepSeek V4.1 Flash | 0.375 | 1.50 | 0.024 + 0.012288 + 0.02 = **$0.056288, about $0.06** |
+
+  **This raises Claude's ceiling** from § 9.5's $0.22992, which used the
+  global $2/$10 and no cache write. A regional host plus a cache write can
+  cost up to $0.286 per call today, so § 8's "each ≤ the ceiling" was not
+  true. **PENDING OWNER** as its own decision: if the owner declines, the
+  Claude row stays $0.22992 and § 8's bound carries that caveat.
+- **Ceiling uses:** the meter's fallback charge (missing cost, deadline)
+  and the 10× sanity bound both use the **request's** model's ceiling.
+  A DeepSeek cost above $0.56288 is recorded as that model's ceiling.
+  Prices drift. The table is dated, and a cost above the ceiling is
+  still recorded as reported, up to 10×, so drift never undercounts.
+- **The $5/day beta ceiling** is unchanged. It sums all models.
+- **Ledger `model`** records the id the proxy sent: the validated request
+  id, not the stream's `model` string. The upstream may add a dated suffix
+  (the listing names `deepseek/deepseek-v4.1-flash-20260910`). No
+  `models` fallback list is ever forwarded (§ 8), so the id sent is the
+  model that ran. No migration: the column exists (`20260923000000`).
+- **Not taken:** `provider.max_price` to enforce the ceiling prices (one
+  more forced field, and a price rise would fail calls instead of costing
+  a little more); a host column in the ledger (a migration; OpenRouter's
+  `GET /api/v1/generation?id=` names the host per request id when needed).
+
+### 13.2 Site (`apps/web`)
+
+- **Setting:** `VITE_COACH_MODEL`, a Vercel Production environment
+  variable, read at build time like `VITE_SUPABASE_URL` (the same `vercel
+  pull` path in `deploy-prod.sh`).
+  - unset or blank → `anthropic/claude-sonnet-5`. A missing setting never
+    changes the model: Claude is the one the skills were measured on.
+  - exactly one of the two ids (trimmed) → that id.
+  - anything else → `readEnv` fails the same way a missing required variable
+    does. The existing config screen names `VITE_COACH_MODEL`, and no model
+    call is made. A typo never falls back silently, because the owner
+    would think DeepSeek was running.
+- **One list, one reader.** A new `apps/web/src/backend/coach-model.ts`,
+  with no imports, holds the two ids and their names from the table
+  above. `readEnv` returns `coachModel`. `real/deps.ts` passes it to
+  `createCoachModel` (it replaces `COACH_MODEL_ID`) and to
+  `createWebSearch`, whose request now carries `model`. `check_language`
+  uses `deps.model`, so it follows by itself.
+- **The client stops setting `cache_control`** (`backend/model.ts`). The
+  proxy drops the client's copy and sets its own, so the client's copy was
+  a second place for one fact (rule 12), and wrong for DeepSeek.
+- **`packages/agent` gets no new field.** The active id is `deps.model`'s
+  id: the string itself, or `.modelId` (`@openrouter/ai-sdk-provider`
+  3.1.0 declares `readonly modelId`; `ai` 7.0.111's `LanguageModel` may be
+  a string).
+- **Proxy and site must agree.** The proxy's table is the gate, and the
+  site's list is the choice. A repo test fails if their ids differ.
+
+**Switching.** Set or remove `VITE_COACH_MODEL` on Vercel (Production),
+then run `deploy-prod.sh`. § 10's notice stops open tabs from sending on
+the old build, so the next send uses the new model.
+
+**Deploy order (first time):** site → proxy → setting. The new site sends
+`model` on every call, including web search, which the old proxy accepts
+for Claude. The new proxy refuses a missing `model`, which only the old
+site's web search omits, and § 10 blocks sends from old tabs.
+
+### 13.3 Honesty
+
+- **Estimates use the active model.** Only the constants used before a chat
+  has measured steps depend on the model. They become one per-model table in
+  `estimate-cost.ts`, used by all three places that read them today:
+  `computeCostEstimate` (turn 1), `projectedNextStepUsd` and the fallback
+  in `recordStepCost`.
+  - Claude: median $0.0019, highest $0.0025 per step (measured
+    2026-09-23, unchanged).
+  - DeepSeek: median $0.0004, highest $0.0005. These are **derived, not
+    measured**: Claude's values × 0.1875 (the larger of 0.375/2.00 and
+    1.50/10.00), rounded up. `method` says "derived from listed prices
+    (2026-09-24), not measured".
+  - An unknown id (a stub or test model) uses Claude's values, the higher
+    ones, which err toward opening a gate (rule 5).
+  - Once a chat has measured steps, those are used whatever the model.
+  - After the first DeepSeek day, the median and highest per-call `usd`
+    from the ledger replace the derived values, with the date.
+  - Unchanged: the web search price ($0.004) doesn't depend on the model.
+    The `check_language` fallback ($0.0175) is used only when a call reports
+    no cost, and on DeepSeek it overstates the cost, the safe direction.
+- **The candidate is never told a wrong model.** Code shows the model:
+  the `⋯` menu (UI § 1.1) gets a last line that is text, not a button. In
+  real mode only, word for word:
+  - `Model: Claude Sonnet 5`
+  - `Model: DeepSeek V4.1 Flash (testing)`
+
+  It is built from `coachModel`, so it cannot disagree with what is sent.
+  Nothing is added to the system prompt. If asked, the model may name
+  itself wrongly (the skills mention Claude and `CLAUDE.md`), and the
+  menu line is the source of truth. `design-web-ui.md` § 1.1 gets a
+  pointer here when this ships (not now, because the v2 UI branch edits it).
+
+### 13.4 Quality caveat (travels with every DeepSeek result, rule 17)
+
+The skills were measured on Claude: the conduct harnesses, B1's
+simplification bar ("no pass-rate drop on the default model"), and every
+live dogfood receipt. DeepSeek is for testing plumbing and cost. A DeepSeek
+run is evidence about the pipes, never about coaching quality, and no B1
+deletion may be justified by a DeepSeek run. The plan's B2 still holds: a
+model offered to beta members must pass the conduct subset first, or it
+is dropped (see open question 2).
+
+What to watch in DeepSeek runs (ledger and chat, numbers only):
+
+- **Tool calls over long runs:** malformed arguments, tool calls written
+  as prose, a turn ending with no tool call where Claude made one, and
+  loops that hit the step cap (`step_cap`).
+- **The spend gate:** gate text word for word
+  (`skills/coach/references/gate-grammar.md`). A gate must never be
+  treated as approved without a typed yes.
+- **Word-for-word rules:** fixed lines quoted exactly (§ 9.7's hint,
+  checker output, the plan card), claims never stated stronger than the
+  facts (rule 8).
+- **Reasoning:** the model supports reasoning, and the proxy drops the
+  client's `reasoning` field, so the default applies (**UNVERIFIED**
+  whether it reasons by default). OpenRouter bills reasoning as output,
+  and on most hosts it counts against `max_tokens`. So watch the rate of
+  `finish_reason = length` and `tokens_out` by model. Also watch for host
+  errors after tool calls: OpenRouter asks for reasoning blocks to be passed
+  back unchanged, and § 11's saved conversation and § 12's trim were
+  tested only on Claude.
+- **Size:** § 12's byte budget assumed Claude's tokenizer. Check that
+  DeepSeek's `tokens_in` stays ≤ 64,000.
+
+### 13.5 Test plan
+
+- **(i) Allowlist:** each id → 200, and the outgoing `model` equals it.
+  Missing, `null`, a number, `anthropic/claude-sonnet-5:online`,
+  `deepseek/deepseek-v4.1-flash:free`, `DeepSeek/deepseek-v4.1-flash`,
+  and `deepseek/deepseek-v4-pro` → 400 `model_not_allowed`, no upstream
+  fetch, no ledger row.
+- **(ii) Claude body unchanged:** a golden body captured from today's
+  proxy for a fixed input equals the new proxy's body byte for byte.
+- **(iii) DeepSeek body:** no `cache_control`; `provider` exactly
+  `{ data_collection: "deny", zdr: true, require_parameters: true }`;
+  `max_tokens` 8,192 for a client 20,000 and 100 for 100; `stream: true`;
+  the web plugin rewrite is the same as Claude's.
+- **(iv) Ceiling per model:** the table's values are 0.286112 (or
+  0.22992 if declined) and 0.056288 (1e-9). A DeepSeek call with no
+  `usage.cost` and one that passes the deadline both record $0.056288; a
+  Claude call records Claude's ceiling. A DeepSeek cost of $0.60 is
+  recorded as $0.056288; the same $0.60 on Claude is recorded as $0.60
+  with the anomaly log.
+- **(v) Ledger model:** the row's `model` is the request's id, even when
+  the stream's `model` is `deepseek/deepseek-v4.1-flash-20260910`.
+- **(vi) Daily ceiling:** $4.99 of Claude rows plus $0.02 of DeepSeek
+  rows → 503, the same message.
+- **(vii) Setting:** `readEnv` with the setting unset, `""` or `"  "` gives
+  Claude; each id (with spaces around it) gives that id;
+  `deepseek/deepseek-v4.1-flsh` and `anthropic/claude-sonnet-5:online`
+  give the config error naming `VITE_COACH_MODEL`. With DeepSeek set, the
+  chat request and the web-search request both carry the DeepSeek id, and
+  neither body has `cache_control`.
+- **(viii) Estimates:** with no measured steps, DeepSeek's turn-1 estimate
+  uses 0.0004/0.0005, Claude's uses 0.0019/0.0025, and a stub model id
+  uses Claude's. `projectedNextStepUsd` and the `recordStepCost` fallback
+  use the same per-model values. With measured steps, both models use the
+  measured ones.
+- **(ix) Menu line:** word for word for each model, last in the `⋯`
+  menu, not focusable as an action; absent in mock mode.
+- **(x) Agreement:** a test fails if the proxy table's ids and
+  `coach-model.ts`'s ids differ.
+- **(xi) Live, once per model** (the owner approves the spend, a fixture
+  persona, a fresh workspace): one turn that writes a file with a tool,
+  and one web search.
+  - Each ledger row names its model.
+  - DeepSeek: the file is really in the workspace (rule 11). Record
+    `tokens_cached` on turn 2, which settles whether its hosts cache, and
+    the host per call from `GET /api/v1/generation?id=`.
+  - Claude: turn 2 still shows a cache read.
+
+**UNVERIFIED:** whether no-data-kept DeepSeek hosts cache at all (they
+list cache-read prices, but the ZDR listing says `supports_implicit_caching:
+false`; (xi) settles it, and the ceiling assumes no caching either way);
+DeepSeek's default reasoning and its throughput against § 9.5's 30 tokens/s
+worst case (the meter's deadline fallback covers a slow host); whether
+`require_parameters` interacts with the web plugin ((xi)); that § 12's
+160,000-byte budget stays under 64k DeepSeek tokens ((xi)'s `tokens_in`).
+
+**Open for the owner:** (1) Claude's ceiling to $0.286112, or keep
+$0.22992. (2) While the site runs DeepSeek, will outside beta members use
+it? B2 says a model offered to them passes the conduct subset first. The
+recommendation: DeepSeek only while the owner and informed testers are
+the active users, with the menu line in place. (3) The processors change:
+about 20 hosting companies (Together, Fireworks, DeepInfra, …), all
+no-data-kept. The plan's Risks section says to name them in the privacy
+terms. (4) The menu wording "(testing)".
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -1541,3 +1815,7 @@ spike replaced (owner, 2026-09-23).
 - A long turn trims itself (§ 12; approved as written, owner, 09-24): older tool data in the current turn
   becomes a stub before a step would pass 160 KB; the proxy's 256 KB cap
   and the cost ceiling stay. A refusal is its own code, `too_large`.
+- The site's model is a setting (§ 13, PENDING OWNER, 09-24): the proxy
+  allows Claude Sonnet 5 and DeepSeek V4.1 Flash; `VITE_COACH_MODEL` picks
+  one, unset means Claude, a bad value refuses to start. The ceiling and
+  the turn-1 estimate are per model; Claude's request body is unchanged.

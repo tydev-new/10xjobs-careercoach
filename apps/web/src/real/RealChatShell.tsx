@@ -25,7 +25,7 @@ import { uploadWithClashRenumber } from "../backend/upload-errors.ts";
 import { ConversationError, type ConversationStore } from "../backend/conversation-store.ts";
 import type { AppMessage, DataCardData, FileRead } from "../types.ts";
 import { DeleteBetaDataConfirm } from "./DeleteBetaDataConfirm";
-import { checkConversationStale } from "./conversation-stale-check.ts";
+import { checkConversationStale, CONVERSATION_CHECK_TIMEOUT_MS } from "./conversation-stale-check.ts";
 import { useVersionMonitor } from "./version-check.ts";
 import { VersionNotice } from "./VersionNotice";
 import { ConversationNotice } from "./ConversationNotice";
@@ -332,17 +332,31 @@ export function RealChatShell({
       // that races an in-flight save of THIS tab's own turn would read the
       // row mid-write and see a version conversationVersionRef.current
       // hasn't caught up to yet, misreading itself as "another tab moved
-      // on". Bounded by the same save chain onFinish already uses, so this
-      // is never more than that one save's own latency.
-      await saveChainRef.current;
-      const stale = await checkConversationStale({
-        readVersion: (opts) => store.readVersion(opts),
-        currentVersion: () => conversationVersionRef.current,
-      });
-      if (stale) {
-        setComposerValue(text);
-        setStaleBlockedOnce(true);
-        return;
+      // on". Fix round 3: § 11.5 puts this pre-send check under § 10.3's
+      // OWN rules — 2 s, and a failed check never blocks — so waiting on
+      // the save chain must itself be bounded the same way. An own save
+      // that never answers (a genuinely stuck request, not just "slow")
+      // must not hold the send, or the composer, hostage forever. On
+      // timeout this is treated exactly like a failed check: send WITHOUT
+      // the stale comparison (comparing against a version we never caught
+      // up to would be meaningless anyway — the row's own compare-and-
+      // swap on save is still the real backstop, § 11.5). `saveChainRef`
+      // itself is never replaced or reset here — a later save still
+      // chains onto whatever's still in flight, same as before.
+      const chainSettledInTime = await Promise.race([
+        saveChainRef.current.then(() => true),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), CONVERSATION_CHECK_TIMEOUT_MS)),
+      ]);
+      if (chainSettledInTime) {
+        const stale = await checkConversationStale({
+          readVersion: (opts) => store.readVersion(opts),
+          currentVersion: () => conversationVersionRef.current,
+        });
+        if (stale) {
+          setComposerValue(text);
+          setStaleBlockedOnce(true);
+          return;
+        }
       }
       setStaleBlockedOnce(false);
       doSendMessage(text);

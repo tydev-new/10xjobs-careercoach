@@ -7,7 +7,10 @@ Sonnet 5 and DeepSeek V4.1 Flash, each with its own per-call ceiling) and
 only** (Deno, mocked OpenRouter and mocked Supabase — see "Tests" below).
 **Not deployed by this change.** The owner runs the commands below when
 ready; nothing here calls the live OpenRouter key or a production
-Supabase project.
+Supabase project. (Note, 2026-09-25: during the 2026-09-23 to 25 beta
+setup the lead agent ran some of these steps on the owner's per-action
+approval; that exception is closed. Production is owner-only:
+`docs/design-web-agent.md` § 15.)
 
 ```
 supabase/functions/

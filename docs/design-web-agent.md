@@ -10,6 +10,7 @@ by the owner as written (2026-09-24). Each wins over earlier text it names.
 Again 2026-09-24: § 13 (the site's model is a setting; approved by the owner,
 2026-09-24, with the answers in § 13.6).
 Again 2026-09-24: § 14 (web search is billed per request; owner request).
+Again 2026-09-25: § 15 (production is owner-only; owner decision).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -1922,6 +1923,28 @@ about five times.
 
 ---
 
+## 15. Production is owner-only (amendment, 2026-09-25)
+
+Owner decision (2026-09-25). Every production step is run by the
+**owner**: a migration or teardown, an Edge Function deploy or secret, a
+site deploy, a Vercel or Auth setting, a credit row. Agents prepare the
+exact commands and the checks to run after them; they never run them and
+never hold secrets. This restates the rule the earlier sections already
+give ("the owner applies …, never an agent").
+
+**A closed exception, recorded (rule 11).** During the 2026-09-23 to
+2026-09-25 beta setup, the lead agent ran several production steps:
+migrations, function deploys, secrets read from the owner's env file, a
+credit row, site deploys, and a Vercel setting. Each ran on the owner's
+explicit approval for that action. That exception is now closed.
+
+**Prevents:** a secret or a production write reaching an agent session;
+records that say one thing while production was changed another way.
+**Proved by:** a review, not a test: each production change in an issue
+or commit names the owner as the one who ran it.
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -2011,6 +2034,9 @@ spike replaced (owner, 2026-09-23).
   outside members are invited (B2 stands); the privacy terms start as
   `/privacy.html`, naming OpenRouter, Exa and each model's hosts, and ship
   with § 13; the menu keeps "(testing)".
+- Production is owner-only (§ 15; owner, 09-25): agents prepare
+  commands and checks, never run them or hold secrets; the 09-23..25
+  setup exception (the lead ran steps on per-action approval) is closed.
 - Fix round 2 of § 10–12 (lead rulings, 09-24): § 9.4 skips an assistant
   message made only of `data-gate-status` parts, so § 11.6's
   reconciliation message can't hide a stop; each reconciliation message

@@ -11,6 +11,8 @@ Again 2026-09-24: § 13 (the site's model is a setting; approved by the owner,
 2026-09-24, with the answers in § 13.6).
 Again 2026-09-24: § 14 (web search is billed per request; owner request).
 Again 2026-09-25: § 15 (production is owner-only; owner decision).
+Again 2026-09-25: § 16 (setting and resetting a password; owner-reported
+gap; draft for owner approval).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -1945,6 +1947,152 @@ or commit names the owner as the one who ran it.
 
 ---
 
+## 16. Setting and resetting a password (amendment, 2026-09-25)
+
+Owner-reported gap (2026-09-25); **draft for owner approval.** Screens and
+exact copy: `design-web-ui.md` § 1.10. No new table, Edge Function, secret
+or server code: every call goes from the browser to Supabase Auth.
+
+**Prevents:** an email-link account with no way to get a password; a
+forgotten password with no way back; the reset form telling a stranger
+whether an email has an account; a password reaching anything but
+Supabase Auth; a recovery link that opens the chat without asking for the
+new password.
+
+### 16.1 The calls
+
+Read in the installed package (`supabase-js` 2.58.0, `auth-js` 2.72.0,
+`apps/web/node_modules/@supabase/auth-js/src/GoTrueClient.ts`).
+
+- **`auth.ts` gains** three methods the real client already has, added to
+  `AuthClientLike`: `resetPasswordForEmail(email, { redirectTo })`,
+  `updateUser({ password, nonce? })`, `reauthenticate()`. Also
+  `MIN_PASSWORD_LENGTH = 8`, which `SignIn.tsx`'s sign-up `minLength={8}`
+  then uses (one number in code), and the pure
+  `authRedirectFromUrl(href)`: `recovery` when the hash or query has
+  `type=recovery`, `link-error` when it has `error_code`, else `none`.
+- **Set a new password:** `updateUser({ password })`. Supabase's User
+  object has no "has a password" field, hence one menu label.
+- **Secure password change**, designed for both settings. The app never
+  reads the setting; it reacts to the answer. Off, or on with a session
+  under 24 hours old: the call saves. On with an older session: error
+  code `reauthentication_needed`. The app then calls `reauthenticate()`,
+  which emails a 6-digit code, and retries with
+  `updateUser({ password, nonce: code })`. A wrong or expired code is
+  `reauthentication_not_valid`. The setting is the owner's and can change
+  without a deploy, so the app must not assume either.
+- **Forgot:** `resetPasswordForEmail(email, { redirectTo: siteRedirectUrl() })`,
+  which is `VITE_SITE_URL` (§ 8: every auth link passes `redirectTo`).
+  Supabase returns no error when no account exists (its password guide).
+- **The link back.** The flow stays **implicit**, the client's default
+  (nothing sets `flowType`), so the link works in any browser, not only the
+  one that asked. It lands as `#access_token=…&type=recovery`.
+  `detectSessionInUrl` saves the session, then fires `PASSWORD_RECOVERY`
+  a tick later (`setTimeout`, line 424). Each listener also gets
+  `INITIAL_SESSION` with that session once setup finishes (line 2075), and
+  the two have no guaranteed order. Today `RealApp.tsx`'s listener would
+  run the membership check and open the chat on `INITIAL_SESSION`.
+  So `RealApp` reads `authRedirectFromUrl(window.location.href)` **once,
+  before creating the client** (the client clears the hash). `recovery`, or
+  a `PASSWORD_RECOVERY` event, shows "Choose a new password" in place of
+  every other screen; while it shows, the listener acts only on sign-out.
+  After a save, `Continue` runs the normal membership check once.
+  Nothing is stored: a reload during recovery goes on to the app signed
+  in (the link was a valid sign-in), and the menu still offers the
+  password.
+- **A link error** (`error_code`, for example `otp_expired`): the sign-in
+  screen shows the expired line, then `history.replaceState` removes the
+  parameters so a reload doesn't repeat it.
+
+### 16.2 Security
+
+- The password and the code live only in the form's React state, cleared
+  on success, `Cancel`, sign-out and unmount. They leave the tab only in
+  the body of Supabase Auth's own calls (HTTPS).
+- Never: the console or `logSetupError`, `localStorage` or
+  `sessionStorage`, the conversation (§ 11), workspace files, the gate log,
+  the agent, any URL. Shown errors come from § 1.10's table, never
+  `error.message`. Forms are `method="post"` and the fields have no `name`,
+  so no fallback submit can put a password in a URL. Fields are
+  `type="password"` until Show; `autocomplete="new-password"`, and the
+  code is `autocomplete="one-time-code"`.
+- Supabase enforces the password rules; the app's 8 is only a first
+  check. If the dashboard asks for more, the `weak_password` line says so.
+- **The sign-in is shared** (§ 8): the new password, and every setting
+  below, also applies to the older app. The copy says so.
+- Enumeration: the screen shows success and a 429 identically. What the
+  Auth API itself reveals to a script calling it directly is Supabase's
+  behaviour, not this screen's (UNVERIFIED: whether its 429 can differ
+  by account).
+
+### 16.3 Owner checklist (production is owner-only, § 15)
+
+Dashboard of `career-coach-nextgen`. Agents never change these; the owner
+checks each and tells the lead the values. The provider page URL and Rate
+Limits come from Supabase's docs; the menu paths in items 1, 2, 3 and 5
+are UNVERIFIED against today's dashboard (menus move).
+
+1. **Authentication → URL Configuration.** Redirect URLs has
+   `https://ten-coach.vercel.app/**`, and Vercel's `VITE_SITE_URL` falls
+   inside it. Site URL stays the old app's. A `redirectTo` not on the list
+   falls back to the Site URL, so the reset link would open the old app.
+2. **Authentication → Email Templates → Reset Password.** The link is
+   `{{ .ConfirmationURL }}` (it carries `redirect_to`), not a fixed
+   `{{ .SiteURL }}` path. The wording suits both apps: it is shared.
+3. **Authentication → Email Templates → Reauthentication.** It contains
+   `{{ .Token }}`.
+4. **Authentication → Providers → Email**
+   (`/dashboard/project/_/auth/providers?provider=Email`):
+   - *Minimum password length:* 8, or tell the lead the number (the app's
+     first check must not be below it).
+   - *Password requirements* and *leaked password protection* (Pro plan):
+     either value works; report them.
+   - *Secure password change:* either works; report which.
+   - *Require the current password*, if shown: must be **off**.
+     `current_password` needs `supabase-js` 2.102 or later (vendor docs),
+     and email-link accounts have no current password.
+5. **Authentication → Emails → SMTP Settings** and **Authentication → Rate
+   Limits.** Custom SMTP is set: the built-in sender allows 2 emails an
+   hour for the whole project, old app included. Note the per-user 60 s
+   interval and the email OTP expiry (the link's and the code's lifetime).
+6. **After the site deploy**, the owner's live run on a fresh test account
+   (PROCESS step 6): forgot → email → "Choose a new password" → sign out →
+   sign in with it; then "Set a new password" from the menu.
+
+### 16.4 Test plan (independent tester)
+
+A fake `AuthClientLike` for units. For e2e, the GoTrue stand-in in
+`tests/e2e-real/stand-in.ts` gains `POST /recover`, `PUT /user` and
+`GET /reauthenticate`.
+
+1. **Form:** a mismatch and a 7-character password make no call.
+2. **Secure change off**, or on with a fresh session: `updateUser` is
+   called once with exactly `{ password }`; the success line shows.
+3. **Secure change on, older session:** `reauthentication_needed`, then
+   `reauthenticate` once, then the code step. A wrong code gives its
+   line and keeps the password; `Send a new code` calls `reauthenticate`
+   again; the right code sends `{ password, nonce }`.
+4. **Every error code** gives its § 1.10 line, and the shown text never
+   contains the fake's `error.message`.
+5. **Forgot:** called with `(email, { redirectTo: VITE_SITE_URL })`. The
+   has-account, no-account and 429 fakes render byte-identical text;
+   another error gives the failure line.
+6. **Recovery:** `authRedirectFromUrl` cases (recovery hash, error in the
+   hash, error in the query, none). `RealApp` with a fake that emits
+   `INITIAL_SESSION` then `PASSWORD_RECOVERY`, the reverse, and the URL
+   alone: the recovery screen shows, `ten_is_member` is not called and no
+   chat mounts; after save and `Continue` it is called once. An
+   `otp_expired` hash shows the expired line.
+7. **No leak:** a sentinel password and code. Spies on `console.*`,
+   storage `setItem`, `fetch` URLs and bodies, `location` and `history`,
+   the conversation save and workspace writes: the sentinel appears only
+   in a Supabase Auth request body.
+8. **375px:** the dialog, the reset card and the recovery screen have no
+   horizontal scroll, tap targets of at least 44px, `data-theme="light"`,
+   and new CSS uses only `styles.css` custom properties.
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -2042,3 +2190,8 @@ spike replaced (owner, 2026-09-23).
   reconciliation message can't hide a stop; each reconciliation message
   gets a unique id; § 12.3 (i) uses 22 reads so the trim really fires;
   the § 11.3/§ 12.1 stub is one shared implementation.
+- Password reset stays on the implicit flow (§ 16; draft, 09-25): the
+  link works in any browser; the recovery screen is chosen from the URL,
+  read before the client exists, because the two auth events have no
+  guaranteed order. The app reacts to `reauthentication_needed` rather
+  than reading the secure-change setting.

@@ -66,7 +66,7 @@ job, post-MVP only if dogfooding shows chat + cards isn't enough).
   (reads `deps.balance()` — C § 8, not the envelope; rounded **down**
   to the cent, and a balance at or below zero still reads `$0.00`,
   never a negative number), a `⋯` menu (export workspace, delete my
-  beta data — § 1.7, sign out). There is no per-candidate key to
+  beta data — § 1.7, set a new password — § 1.10, sign out). There is no per-candidate key to
   manage — one shared app key sits behind the model proxy (C § 8) — so
   "manage your usage key" is gone from the product, menu included.
 - **Transcript:** prose interleaved with collapsed "ran …" lines
@@ -111,7 +111,9 @@ is, not that they're in the beta. **After sign-in, one membership
 check** (a credit row, C § 8) decides what comes next, before the chat
 ever mounts: a member goes straight to § 1.5, anyone else sees § 1.6.
 No separate route or spinner screen — the check happens once, on the
-same shell.
+same shell. A recovery link shows § 1.10's "Choose a new password"
+before this check; forgot password and the expired-link line are
+§ 1.10 too.
 
 ### 1.5 Empty / first-run state
 
@@ -234,6 +236,71 @@ above the composer unless noted, and blocks nothing unless noted.
   the latest."
 - **Load failed** (C § 11.6): the setup error screen with Retry and Sign
   out, "Couldn't load your conversation. Try again in a moment."
+
+### 1.10 Passwords (amendment, 2026-09-25; draft for owner approval)
+
+Owner-reported gap: an account made from an email link has no password,
+and nobody can reset a forgotten one. Mechanism, security and the owner's
+checklist: C § 16. All three screens below render in the v2 light palette
+(the 2026-09-24 amendment above), use only `styles.css` custom properties,
+and work at 375px (§ 1.2). They use ordinary buttons: rule 7 covers what
+is sent as the candidate, submitted for them or paid for, and here the
+candidate types their own password twice.
+
+**One menu item, "Set a new password"** (member `⋯` menu, above Sign out).
+The app can't tell whether an account already has a password (C § 16.1),
+so "Set a password" or "Change password" would each be false for someone.
+"Set a new password" is true either way. § 1.6's menu is unchanged.
+
+**The form** (the menu dialog and the recovery screen share it): "New
+password" and "Type it again", both hidden, one `Show`/`Hide` button for
+both. Checked before any call: "Use at least 8 characters." · "The two
+passwords don't match."
+
+- **Dialog.** Title "Set a new password". Line: "This password also works
+  for the older app, which shares your sign-in." Buttons: `Save password`,
+  `Cancel`. Success: "Password saved. Use it next time you sign in, here
+  or in the older app." and `Done`.
+- **Code step** (only when Supabase asks, C § 16.1): "For your security,
+  we emailed a 6-digit code to {email}. Enter it to save your new
+  password." A `Code` field; `Save password`, `Send a new code`, `Cancel`.
+  After a resend: "A new code is on its way to {email}. Use the newest
+  one."
+- **Errors**, one line each, never Supabase's own text (§ 2.7's rule):
+
+| Supabase says | The line |
+|---|---|
+| `reauthentication_not_valid` | "That code didn't work. It may be mistyped or expired: check the newest email, or send a new code." |
+| `weak_password`, reason `length` | "That password is too short for the sign-in rules. Try a longer one." |
+| `weak_password`, reason `characters` | "That password needs more kinds of characters, such as capitals, digits or symbols." |
+| `weak_password`, reason `pwned` | "That password has appeared in a known data leak. Choose a different one." |
+| `same_password` | "That's already your password. Choose a different one." |
+| HTTP 429 | "Too many tries. Wait a minute, then try again." |
+| anything else | "Couldn't save your password. Try again in a moment." |
+
+**Sign-in screen additions** (§ 1.4). In "Email + password" mode, under
+the password field, a link button: "Forgot or never set a password?" It
+opens, on the same card:
+
+- Title "Reset your password". Line: "Enter the email you sign in with to
+  get a link for choosing a new password." Button `Send reset link`; link
+  `Back to sign in`.
+- After a success **or** a 429, the same text, character for character:
+  "If an account exists for {email}, a link to choose a new password
+  should arrive within a few minutes. Check spam too. Only a few emails
+  can be sent each hour, so if nothing comes, try again later." No other
+  line may depend on whether the account exists.
+- Any other failure: "Couldn't send the request. Try again in a moment."
+- A link that came back with an error (C § 16.1), above the form: "That
+  email link has expired or was already used. Ask for a new one below."
+
+**"Choose a new password"** — the first screen after a recovery link,
+before the membership check and before the chat (C § 16.1). Line:
+"You're signed in from your reset link. This password also works for the
+older app, which shares your sign-in." The form; buttons `Save password`
+and `Sign out`. Success: "Password saved. Use it next time you sign in,
+here or in the older app." and `Continue`, which runs the normal
+membership check (§ 1.4). Errors: the table above.
 
 ## 2. The card catalog
 

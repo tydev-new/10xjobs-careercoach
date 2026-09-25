@@ -16,6 +16,16 @@ contents (rule 12 — a copy drifts). Where C doesn't fully specify
 something rule 7/8/11 needs, that's named as **open for the
 architect** in place, not guessed at.
 
+**Amendment, 2026-09-24 (owner decision):** the real (deployed) app
+always renders the v2 LIGHT palette — every screen, including sign-in,
+not-a-member, and the setup/error screens — regardless of the OS's
+`prefers-color-scheme` or any host `data-theme`. `design-web-ui-refresh.md`'s
+v2 § "dark is the primary/richer identity" is superseded for the real
+app by this ruling; the v2 dark tokens stay in `styles.css`
+(`[data-theme="dark"]`), dormant, for a possible future light/dark
+switch, and the dev/build:preview mock still renders both for design
+review.
+
 ## 1. The one screen
 
 Two panes: transcript (left) + pinned side panel (right), composer

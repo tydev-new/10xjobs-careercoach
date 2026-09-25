@@ -1,10 +1,11 @@
-import { StrictMode, useState, type ReactElement } from "react";
+import { StrictMode, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { SHOW_MOCK_CONTROLS } from "./components/Header";
 import { MissingEnvError, readEnv } from "./backend/env.ts";
 import { RealApp } from "./real/RealApp";
 import { DevScreenPreview, devPreviewKind } from "./dev-preview";
+import { realTheme } from "./theme.ts";
 // Four openly licensed (SIL OFL) families, bundled via @fontsource —
 // never an external font CDN (design-web-ui-refresh.md's token table).
 // v2: Fraunces is the characterful heading/display face; Inter stays the
@@ -16,25 +17,19 @@ import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "./styles.css";
 
-// Follow the host's explicit choice (data-theme on <html>), else the OS
-// setting — the SAME logic as App.tsx's own initialTheme (kept there
-// unchanged; duplicated here in the few lines it takes rather than
-// refactoring the mock's own file for this slice).
-function initialTheme(): "light" | "dark" {
-  try {
-    const stamped = document.documentElement.dataset.theme;
-    if (stamped === "light" || stamped === "dark") return stamped;
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  } catch {
-    return "light";
-  }
-}
-
+// Owner ruling (2026-09-24): the real app always renders light — never
+// the host's data-theme on <html>, never prefers-color-scheme. See
+// theme.ts's realTheme() (the one place this decision lives) and
+// docs/design-web-ui.md's dated amendment. No onThemeToggle is passed:
+// a menu item that does nothing is untrue UI (PRINCIPLES rule 8), so
+// Header's "Switch to dark"/"Switch to light" item (RealChatShell.tsx /
+// components/Header.tsx — both take onThemeToggle as optional now)
+// simply doesn't render in the real app; the mock/preview build
+// (App.tsx) still passes its own handler and keeps the toggle.
 function RealRoot(): ReactElement {
-  const [theme, setTheme] = useState<"light" | "dark">(initialTheme());
   try {
     const env = readEnv(import.meta.env as unknown as Record<string, string | undefined>);
-    return <RealApp env={env} theme={theme} onThemeToggle={() => setTheme((t) => (t === "light" ? "dark" : "light"))} />;
+    return <RealApp env={env} theme={realTheme()} />;
   } catch (err) {
     if (err instanceof MissingEnvError) {
       // A plain, obviously-a-deploy-problem message — never a blank

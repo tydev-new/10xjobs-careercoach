@@ -15,7 +15,11 @@ export interface HeaderProps {
   autoplay: boolean;
   onAutoplayToggle: () => void;
   theme: "light" | "dark";
-  onThemeToggle: () => void;
+  /** Owner ruling (2026-09-24, PRINCIPLES rule 8 — no untrue UI): the
+   *  real app passes none, so "Switch to dark"/"Switch to light" never
+   *  renders there (a menu item that does nothing is untrue UI). The
+   *  mock/preview keeps passing its handler. */
+  onThemeToggle?: () => void;
   /** Real-mode-only menu actions (design-web-ui.md § 1.1's ⋯ menu). Each
    *  item stays `disabled` (the mock preview's existing behavior,
    *  UNCHANGED) when its handler is omitted — App.tsx (the mock) never
@@ -151,16 +155,18 @@ export function Header(props: HeaderProps): ReactElement {
               {/* No per-candidate key to manage: one shared app key sits
                   behind the model proxy (design-web-agent.md § 8), so
                   "Manage your usage key" is gone (design-web-ui.md § 1.1). */}
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  onThemeToggle();
-                  setMenuOpen(false);
-                }}
-              >
-                {theme === "light" ? "Switch to dark" : "Switch to light"}
-              </button>
+              {onThemeToggle ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    onThemeToggle();
+                    setMenuOpen(false);
+                  }}
+                >
+                  {theme === "light" ? "Switch to dark" : "Switch to light"}
+                </button>
+              ) : null}
               {/* design-web-ui.md § 1.7: opens its own typed-yes
                   confirmation flow — never fires anything itself. */}
               <button

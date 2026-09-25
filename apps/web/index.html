@@ -3,6 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Owner ruling (2026-09-24): the real app is light-only. This meta
+         tag (belt-and-suspenders alongside styles.css's `:root {
+         color-scheme: light }`) tells the browser's own UA chrome
+         (autofill, form validation popups, initial paint before the
+         stylesheet's own color-scheme rule applies) to render light
+         from the very first frame, so there is no dark flash even for
+         a candidate whose OS is set to dark. -->
+    <meta name="color-scheme" content="light" />
     <title>Ten</title>
   </head>
   <body>

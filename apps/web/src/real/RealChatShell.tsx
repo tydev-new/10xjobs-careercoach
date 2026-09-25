@@ -88,7 +88,10 @@ export interface RealChatShellProps {
    *  sign-in (design-web-ui.md § 1.7 point 4). */
   onDeleted: () => Promise<void>;
   theme: "light" | "dark";
-  onThemeToggle: () => void;
+  /** Owner ruling (2026-09-24): the real app never passes this (see
+   *  RealApp.tsx/main.tsx) — Header only renders "Switch to
+   *  dark"/"Switch to light" when a handler is given. */
+  onThemeToggle?: () => void;
 }
 
 export function RealChatShell({

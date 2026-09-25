@@ -93,9 +93,20 @@
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-linear: linear;
+
+  /* Owner ruling (2026-09-24): the real app is light-only, so native
+     controls/scrollbars should match light too, and — since nothing
+     paints a data-theme wrapper until React mounts — this root default
+     is also what prevents a dark-first flash before that happens
+     (index.html itself sets no background). [data-theme="dark"] below
+     overrides this back to dark for its own descendants — reachable
+     only by the dev/preview mock (App.tsx, dev-preview.tsx), never by
+     the real, deployed app. */
+  color-scheme: light;
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   /* A deep ink-navy, not neutral gray-black — the hue plus a full
      supporting palette (not one neon note on flat black) is what keeps
      this out of the banned "near-black + one neon" combo. */

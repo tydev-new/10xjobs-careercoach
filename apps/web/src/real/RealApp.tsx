@@ -23,7 +23,10 @@ import { RealChatShell } from "./RealChatShell";
 export interface RealAppProps {
   env: TenEnv;
   theme: "light" | "dark";
-  onThemeToggle: () => void;
+  /** Owner ruling (2026-09-24): main.tsx's RealRoot never passes this —
+   *  threaded through unchanged to RealChatShell/Header, which only
+   *  render "Switch to dark"/"Switch to light" when it's given. */
+  onThemeToggle?: () => void;
 }
 
 type Screen =
@@ -240,11 +243,13 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   if (screen.kind === "loading" || screen.kind === "checking-membership") {
     return <div className="app-shell app-shell--loading" />;
   }
-  // Every screen — pre-auth included — lives under the same theme root:
-  // [data-theme="dark"]'s variable overrides only apply to their own
-  // descendants (styles.css), so sign-in/not-a-member must sit inside
-  // .app-root too, or they'd always render in light-mode tokens
-  // regardless of the host's own dark-mode setting.
+  // Every screen — pre-auth included — lives under the same theme root
+  // (.app-root[data-theme]), so styling stays consistent whatever
+  // `theme` is. Owner ruling (2026-09-24): in the real app `theme` is
+  // ALWAYS "light" (main.tsx's RealRoot passes theme.ts's realTheme()),
+  // so every branch below always renders the light palette — the
+  // `[data-theme="dark"]` overrides in styles.css stay dormant here,
+  // never reached in production.
   if (screen.kind === "signed-out") {
     return (
       <div className="app-root" data-theme={theme}>

@@ -136,29 +136,49 @@ export function RealChatShell({
   const [saveConflict, setSaveConflict] = useState(false);
   const [staleBlockedOnce, setStaleBlockedOnce] = useState(false);
 
+  // Fix round 2, item 2: every save CHAINS off the one before it — never
+  // two `store.save()` calls in flight at once for this tab. Without this,
+  // two overlapping saves both read `conversationVersionRef.current`
+  // before EITHER wrote its result back, so the second would CAS-conflict
+  // against the first's own (successful) write — a false "another tab"
+  // conflict against itself. `saveChainRef` also lets the pre-send check
+  // (below) wait for an in-flight save to actually land before comparing
+  // versions, for the same reason.
+  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
+
   const saveConversation = useCallback(
-    async (msgs: AppMessage[]) => {
-      const { messages: prepared, droppedAnyTurn } = prepareConversationForSave(msgs, CONVERSATION_BYTE_CAP);
-      const nextOlderDropped = olderDroppedRef.current || droppedAnyTurn;
-      try {
-        const saved = await store.save(chatId, prepared, nextOlderDropped, conversationVersionRef.current);
-        conversationVersionRef.current = saved.version;
-        olderDroppedRef.current = saved.olderDropped;
-        if (saved.olderDropped) setOlderDropped(true);
-        setSaveFailed(false);
-        setSaveConflict(false);
-      } catch (err) {
-        if (err instanceof ConversationError && err.code === "version_conflict") {
-          // § 11.5's backstop: another tab/device saved first. This tab
-          // never overwrites or merges — it just reports the conflict;
-          // the pre-send check (below) already blocks its NEXT send.
-          console.error("[Ten] conversation save conflict:", err.code);
-          setSaveConflict(true);
-        } else {
-          console.error("[Ten] conversation save failed:", err);
-          setSaveFailed(true);
+    (msgs: AppMessage[]): Promise<void> => {
+      const run = async () => {
+        const { messages: prepared, droppedAnyTurn } = prepareConversationForSave(msgs, CONVERSATION_BYTE_CAP);
+        const nextOlderDropped = olderDroppedRef.current || droppedAnyTurn;
+        try {
+          const saved = await store.save(chatId, prepared, nextOlderDropped, conversationVersionRef.current);
+          conversationVersionRef.current = saved.version;
+          olderDroppedRef.current = saved.olderDropped;
+          if (saved.olderDropped) setOlderDropped(true);
+          setSaveFailed(false);
+          setSaveConflict(false);
+        } catch (err) {
+          if (err instanceof ConversationError && err.code === "version_conflict") {
+            // § 11.5's backstop: another tab/device saved first. This tab
+            // never overwrites or merges — it just reports the conflict;
+            // the pre-send check (below) already blocks its NEXT send.
+            console.error("[Ten] conversation save conflict:", err.code);
+            setSaveConflict(true);
+          } else {
+            console.error("[Ten] conversation save failed:", err);
+            setSaveFailed(true);
+          }
         }
-      }
+      };
+      // Chained, never raced: the next save (whatever msgs it was called
+      // with) starts only once the previous one is fully settled — so it
+      // reads conversationVersionRef.current as THAT save's own resulting
+      // version, not a stale pre-save value. `run` never itself rejects
+      // (every failure is caught above), so a plain `.then` is enough.
+      const chained = saveChainRef.current.then(run);
+      saveChainRef.current = chained;
+      return chained;
     },
     [chatId, store],
   );
@@ -307,6 +327,14 @@ export function RealChatShell({
         setSendBlockedOnce(true);
         return;
       }
+      // Fix round 2, item 2: wait for THIS tab's own in-flight save (if
+      // any) to land before reading the row's version — otherwise a send
+      // that races an in-flight save of THIS tab's own turn would read the
+      // row mid-write and see a version conversationVersionRef.current
+      // hasn't caught up to yet, misreading itself as "another tab moved
+      // on". Bounded by the same save chain onFinish already uses, so this
+      // is never more than that one save's own latency.
+      await saveChainRef.current;
       const stale = await checkConversationStale({
         readVersion: (opts) => store.readVersion(opts),
         currentVersion: () => conversationVersionRef.current,
@@ -429,18 +457,22 @@ export function RealChatShell({
         {/* ui § 1.8: one line above the composer, hidden while a turn is
             running (the agent runs in THIS tab, so reload mid-turn would
             stop the run), not dismissible, no error styling. The ending
-            swaps (§ 1.8 amended) when THIS tab's own latest save failed. */}
+            swaps (§ 1.8 amended) when THIS tab's own latest save didn't
+            land — either a plain failure OR a version conflict (fix round
+            2, item 1: a conflict is still "wasn't saved", never "saved"). */}
         {newerVersionKnown && !turnRunning ? (
-          <VersionNotice mode={sendBlockedOnce ? "blocked" : "newer"} saveFailed={saveFailed} />
+          <VersionNotice mode={sendBlockedOnce ? "blocked" : "newer"} saveFailed={saveFailed || saveConflict} />
         ) : null}
         {/* ui § 1.9 — the conversation-specific lines, one at a time
             (freshest first): a just-blocked stale send, else a save
-            conflict from this turn's onFinish, else a plain save failure. */}
+            conflict from this turn's onFinish, else a plain save failure —
+            each suppressed only while the § 1.8 notice above is ALREADY
+            showing the same "wasn't saved" fact, so the two never stack. */}
         {staleBlockedOnce ? (
           <ConversationNotice kind="stale-blocked" />
-        ) : saveConflict ? (
+        ) : saveConflict && !(newerVersionKnown && !turnRunning) ? (
           <ConversationNotice kind="save-conflict" />
-        ) : saveFailed && !(newerVersionKnown && !turnRunning) ? (
+        ) : saveFailed && !saveConflict && !(newerVersionKnown && !turnRunning) ? (
           <ConversationNotice kind="save-failed" />
         ) : null}
         <Composer

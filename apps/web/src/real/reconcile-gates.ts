@@ -68,8 +68,12 @@ export async function reconcileGateStatuses(messages: AppMessage[], chatId: stri
   }
   if (additions.length === 0) return messages;
 
+  // Fix round 2, item 5 / architect ruling (§ 11.6, 2026-09-24): a unique
+  // id per reconciliation, `gate-reconcile-${chatId}-${uuid}` — a FIXED id
+  // repeated across loads would collide in useChat's own message-id space
+  // (two reloads producing two reconciliation messages with the SAME id).
   const reconciled: AppMessage = {
-    id: `gate-reconcile-${chatId}`,
+    id: `gate-reconcile-${chatId}-${crypto.randomUUID()}`,
     role: "assistant",
     parts: additions.map((a) => ({ type: "data-gate-status" as const, data: { gateId: a.gateId, status: a.status } })),
   } as AppMessage;

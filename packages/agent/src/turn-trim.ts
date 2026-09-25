@@ -15,14 +15,17 @@
 // coach.ts's `buildContinuationMessages`), so everything before it is
 // off-limits by construction, with no need to inspect message content to
 // find the boundary.
-
-/** § 11.3's stub, shared with § 12.1 — word for word, N the removed
- *  length. */
-export function stubFor(removedLength: number): string {
-  return `[Removed to save space: ${removedLength} characters. The workspace files hold what was saved; read a file again if you need it.]`;
-}
-
-const STUB_STRING_THRESHOLD = 2_000;
+//
+// Fix round 2 (lead ruling, NIT 7): the stub, its 2,000-character
+// threshold, and the recursive walker are § 11.3's — owned by
+// conversation.ts — and shared with § 12.1 here, not re-implemented. No
+// import cycle: conversation.ts imports only from types.ts.
+import { stubFor, stubLongStrings } from "./conversation.ts";
+// Re-exported: existing callers (this package's own turn-trim tests, and
+// the independent tester's tests/agent/conversation-save.test.ts) import
+// `stubFor` from THIS file's path — kept working unchanged, even though
+// the implementation now lives in conversation.ts alone.
+export { stubFor };
 
 export const TRIM_TRIGGER_BYTES = 160_000;
 export const TRIM_TARGET_BYTES = 120_000;
@@ -31,45 +34,6 @@ export const TRIM_TARGET_BYTES = 120_000;
  *  proxy's own 256 KB check tracks (§ 12.1). */
 export function messagesByteLength(value: unknown): number {
   return new TextEncoder().encode(JSON.stringify(value)).length;
-}
-
-interface StubResult {
-  value: unknown;
-  changed: boolean;
-}
-
-/** Recursively replaces every string over 2,000 characters found anywhere
- *  inside `value` with the stub — "every string ... in a tool call's input
- *  or a tool result's output becomes the stub" (§ 12.1), which in the AI
- *  SDK's `ModelMessage` shape may nest a long string under `input`/
- *  `output.value`/`output.value[].text`/etc. Never mutates its input. */
-function stubLongStrings(value: unknown): StubResult {
-  if (typeof value === "string") {
-    if (value.length > STUB_STRING_THRESHOLD) {
-      return { value: stubFor(value.length), changed: true };
-    }
-    return { value, changed: false };
-  }
-  if (Array.isArray(value)) {
-    let changed = false;
-    const out = value.map((v) => {
-      const r = stubLongStrings(v);
-      if (r.changed) changed = true;
-      return r.value;
-    });
-    return { value: changed ? out : value, changed };
-  }
-  if (value !== null && typeof value === "object") {
-    let changed = false;
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      const r = stubLongStrings(v);
-      if (r.changed) changed = true;
-      out[k] = r.value;
-    }
-    return { value: changed ? out : value, changed };
-  }
-  return { value, changed: false };
 }
 
 interface StepGroup {

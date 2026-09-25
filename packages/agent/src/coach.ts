@@ -141,13 +141,29 @@ function originOf(m: AppMessage): "typed" | "ui" {
   return (m.metadata as AppMessageMetadata | undefined)?.origin ?? "ui";
 }
 
-// § 9.4 (generalized 2026-09-24, round 2): "One stateless check runs at
-// the start of each turn. It looks at the assistant message just before
-// the latest user message, in the history as sent, before the window
-// trims it." No stored flag (rule 12) — this reads straight off the
-// history the client resent. Returns every data-error `code` on that one
-// message (a hand-built history could carry more than one; § 9.8 (xi)).
-function dataErrorCodesOnMessageBeforeLatestUser(messages: AppMessage[]): Set<string> {
+// § 9.4 (generalized 2026-09-24, round 2; lead ruling, fix round 2 of the
+// § 11/§ 12 release): "One stateless check runs at the start of each turn.
+// It looks at the [most recent assistant message before the latest user
+// message that has at least one part other than data-gate-status —
+// assistant messages consisting only of data-gate-status parts are
+// skipped], in the history as sent, before the window trims it." No
+// stored flag (rule 12) — this reads straight off the history the client
+// resent. Returns every data-error `code` on that one message (a
+// hand-built history could carry more than one; § 9.8 (xi)).
+//
+// The skip exists because § 11.6's gate reconciliation-on-restore
+// (apps/web's reconcile-gates.ts) appends its OWN synthetic assistant
+// message, carrying only `data-gate-status` parts, after the restored
+// history — so, once the candidate's next turn lands, that synthetic
+// message (not the real turn that actually ended early) would otherwise
+// be "the assistant message just before the latest user message", hiding
+// a genuine cut_off/step_cap/too_large note.
+// Exported for its own direct unit test (packages/agent/test/next-turn-
+// notes.test.ts) — not part of the package's public API (index.ts curates
+// that separately); this stays a plain named export purely so the test
+// doesn't have to drive the whole streamText loop to exercise one pure,
+// data-only function.
+export function dataErrorCodesOnMessageBeforeLatestUser(messages: AppMessage[]): Set<string> {
   let lastUserIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].role === "user") {
@@ -156,14 +172,19 @@ function dataErrorCodesOnMessageBeforeLatestUser(messages: AppMessage[]): Set<st
     }
   }
   if (lastUserIndex <= 0) return new Set();
-  const prev = messages[lastUserIndex - 1];
-  if (prev.role !== "assistant") return new Set();
-  const parts = prev.parts as unknown as Array<{ type: string; data?: { code?: string } }>;
-  const codes = new Set<string>();
-  for (const p of parts) {
-    if (p.type === "data-error" && p.data?.code) codes.add(p.data.code);
+  for (let i = lastUserIndex - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (m.role !== "assistant") return new Set();
+    const parts = m.parts as unknown as Array<{ type: string; data?: { code?: string } }>;
+    const hasOtherThanGateStatus = parts.some((p) => p.type !== "data-gate-status");
+    if (!hasOtherThanGateStatus) continue; // a reconciliation-only message — keep looking backward
+    const codes = new Set<string>();
+    for (const p of parts) {
+      if (p.type === "data-error" && p.data?.code) codes.add(p.data.code);
+    }
+    return codes;
   }
-  return codes;
+  return new Set();
 }
 
 // § 9.2: "drop a trailing assistant message with no content" — an

@@ -24,11 +24,12 @@ export {
   capConversationSize,
   prepareConversationForSave,
   stubFor,
+  stubLongStrings,
   STUB_THRESHOLD_CHARS,
   STOPPED_BEFORE_RESULT_TEXT,
   CONVERSATION_BYTE_CAP,
 } from "./conversation.ts";
-export type { CapResult } from "./conversation.ts";
+export type { CapResult, StubWalkResult } from "./conversation.ts";
 export {
   buildAlwaysOnSystemPrompt,
   buildTier1,

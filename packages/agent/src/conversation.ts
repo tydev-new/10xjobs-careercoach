@@ -30,24 +30,45 @@ export function stubFor(removedLength: number): string {
  *  any test) can match it without re-typing the sentence. */
 export const STOPPED_BEFORE_RESULT_TEXT = "Stopped before a result came back. Check the files for what was saved.";
 
+/** The walker's own result: `changed` lets a caller (§ 12.1's turn trimmer)
+ *  keep the SAME reference when nothing needed stubbing, instead of always
+ *  rebuilding arrays/objects it didn't touch. */
+export interface StubWalkResult {
+  value: unknown;
+  changed: boolean;
+}
+
 /** Replaces every string LEAF over STUB_THRESHOLD_CHARS with the stub,
  *  walking arrays/objects (mirrors window.ts's `leaves()` walk, which
  *  counts the same shape) — never touching a shorter string, a number, a
  *  boolean, or the surrounding structure/keys. Nullish input passes
- *  through unchanged (a tool part with no input, e.g.). */
-function stubLongStrings(value: unknown): unknown {
+ *  through unchanged (a tool part with no input, e.g.). Never mutates its
+ *  input. Shared with § 12.1's in-turn trimmer (turn-trim.ts) — the ONE
+ *  copy, so the two stub sites can never quietly drift apart. */
+export function stubLongStrings(value: unknown): StubWalkResult {
   if (typeof value === "string") {
-    return value.length > STUB_THRESHOLD_CHARS ? stubFor(value.length) : value;
+    return value.length > STUB_THRESHOLD_CHARS ? { value: stubFor(value.length), changed: true } : { value, changed: false };
   }
   if (Array.isArray(value)) {
-    return value.map(stubLongStrings);
+    let changed = false;
+    const out = value.map((v) => {
+      const r = stubLongStrings(v);
+      if (r.changed) changed = true;
+      return r.value;
+    });
+    return { value: changed ? out : value, changed };
   }
   if (value && typeof value === "object") {
+    let changed = false;
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = stubLongStrings(v);
-    return out;
+    for (const [k, v] of Object.entries(value)) {
+      const r = stubLongStrings(v);
+      if (r.changed) changed = true;
+      out[k] = r.value;
+    }
+    return { value: changed ? out : value, changed };
   }
-  return value;
+  return { value, changed: false };
 }
 
 function isToolPart(part: { type: string }): boolean {
@@ -81,11 +102,11 @@ function sanitizePart(part: Record<string, unknown> & { type: string }): Record<
       // toolCallId/type/input (whatever exists) travel unchanged; output
       // is dropped (output-error carries no output), errorText is fixed.
       const { output: _output, errorText: _errorText, ...rest } = part;
-      return { ...rest, state: "output-error", input: stubLongStrings(part.input), errorText: STOPPED_BEFORE_RESULT_TEXT };
+      return { ...rest, state: "output-error", input: stubLongStrings(part.input).value, errorText: STOPPED_BEFORE_RESULT_TEXT };
     }
     const sanitized: Record<string, unknown> = { ...part };
-    if ("input" in sanitized) sanitized.input = stubLongStrings(sanitized.input);
-    if ("output" in sanitized) sanitized.output = stubLongStrings(sanitized.output);
+    if ("input" in sanitized) sanitized.input = stubLongStrings(sanitized.input).value;
+    if ("output" in sanitized) sanitized.output = stubLongStrings(sanitized.output).value;
     if (typeof sanitized.errorText === "string" && sanitized.errorText.length > STUB_THRESHOLD_CHARS) {
       sanitized.errorText = stubFor(sanitized.errorText.length);
     }

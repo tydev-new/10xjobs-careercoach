@@ -528,8 +528,14 @@ button {
   margin: var(--space-1) 0;
   /* v2: tool rows stay quieter than content (owner direction) — a
      smaller, lower-contrast register than the reply text around it, so
-     the eye lands on what Ten SAYS, not on what it ran. */
-  opacity: 0.82;
+     the eye lands on what Ten SAYS, not on what it ran. Fix round 2, item
+     3 (tester finding): `opacity: 0.82` blended every descendant's color
+     toward the background, dropping rendered text/background contrast to
+     3.75-4.28:1 in places (below WCAG AA's 4.5:1) — a `--fg-muted` COLOR
+     does the same "quieter" job (children that don't set their own color
+     inherit it) while staying >= 4.5:1 on every background this block
+     sits on (measured: ~5.2-6.6:1, both themes). */
+  color: var(--fg-muted);
 }
 
 .tool-run-toggle {
@@ -742,8 +748,13 @@ button {
 .card-open-link--inline {
   margin-left: var(--space-2);
   font-size: var(--text-xs);
-  min-height: auto;
-  min-width: auto;
+  /* Fix round 2, item 4 (tester finding): `min-height/width: auto` shrank
+     the tap target below 44px at 375 px. The base `.card-open-link`
+     already reserves a full 44x44 box (padding-driven, content stays
+     small/centered) without needing its own layout row — inheriting that
+     here keeps the "open" link sitting inline right after the plan item's
+     text (still `inline-flex`, still `margin-left` only, no line break
+     forced), just with a real tap target instead of a smaller one. */
 }
 
 .badge {

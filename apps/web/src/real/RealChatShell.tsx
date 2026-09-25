@@ -12,6 +12,7 @@
 //     (plan step 5b item 3)
 import { useChat } from "@ai-sdk/react";
 import type { Coach, WorkspaceStore } from "../../../../packages/agent/src/types.ts";
+import type { CoachModel } from "../backend/coach-model.ts";
 import { prepareConversationForSave, CONVERSATION_BYTE_CAP } from "../../../../packages/agent/src/index.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { statusOf } from "../agent-helpers.ts";
@@ -92,6 +93,9 @@ export interface RealChatShellProps {
    *  RealApp.tsx/main.tsx) — Header only renders "Switch to
    *  dark"/"Switch to light" when a handler is given. */
   onThemeToggle?: () => void;
+  /** § 13.2/§ 13.3: the active model (env.coachModel) — passed straight
+   *  to Header's ⋯ menu line, real mode only. */
+  coachModel: CoachModel;
 }
 
 export function RealChatShell({
@@ -109,6 +113,7 @@ export function RealChatShell({
   onDeleted,
   theme,
   onThemeToggle,
+  coachModel,
 }: RealChatShellProps): ReactElement {
   const store = useMemo(() => conversationStore ?? createNoopConversationStore(), [conversationStore]);
   const transport = useMemo(() => new AgentChatTransport(coach, chatId), [coach, chatId]);
@@ -451,6 +456,7 @@ export function RealChatShell({
           onImportWorkspace={() => importInputRef.current?.click()}
           onDeleteBetaData={() => setShowDeleteConfirm(true)}
           onSignOut={onSignOut}
+          coachModel={coachModel}
         />
         <input ref={importInputRef} type="file" accept=".zip" hidden onChange={(e) => void handleImportFile(e)} />
         {importError ? <p className="import-error">{importError}</p> : null}

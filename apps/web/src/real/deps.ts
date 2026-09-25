@@ -11,7 +11,8 @@
 // used only for fetch_job's board API calls (§ 4).
 import { createCoach } from "../../../../packages/agent/src/index.ts";
 import type { Deps } from "../../../../packages/agent/src/types.ts";
-import { DEFAULT_WEB_SEARCH_COST_MAX_USD } from "../../../../packages/agent/src/estimate-cost.ts";
+import { DEFAULT_WEB_SEARCH_COST_MAX_USD, MODEL_COST_TABLE } from "../../../../packages/agent/src/estimate-cost.ts";
+import { CLAUDE_COACH_MODEL } from "../backend/coach-model.ts";
 import { createBalanceFn } from "../backend/balance.ts";
 import { createSupabaseGate } from "../backend/gate.ts";
 import { createCoachModel } from "../backend/model.ts";
@@ -49,14 +50,27 @@ export function buildRealDeps(opts: RealDepsOptions): Deps {
     anonKey: opts.env.supabaseAnonKey,
     accessToken: opts.accessToken,
   });
+  // § 13.2: the active model — env.coachModel, resolved once by
+  // readEnv() from VITE_COACH_MODEL (Claude if unset/blank; readEnv
+  // itself already refused an unrecognized value, so this is always one
+  // of the two ids by the time it gets here). The `?? CLAUDE_COACH_MODEL`
+  // is only for a caller that builds a TenEnv by hand without it (a test
+  // fixture predating § 13, `as any`-cast) — readEnv() itself never
+  // omits the field, so production always takes the left side.
+  const modelId = (opts.env.coachModel ?? CLAUDE_COACH_MODEL).id;
   const model = createCoachModel({
+    modelId,
     proxyUrl: opts.env.modelProxyUrl,
     getAccessToken: opts.accessToken,
   });
+  // § 13.1's per-model search-cost fallback (§ 13.3): the ACTIVE model's
+  // own highest measured/derived search cost, not always Claude's.
+  const searchDefaultUsd = MODEL_COST_TABLE[modelId]?.searchMaxUsd ?? DEFAULT_WEB_SEARCH_COST_MAX_USD;
   const webSearch = createWebSearch({
+    modelId,
     proxyUrl: opts.env.modelProxyUrl,
     getAccessToken: opts.accessToken,
-    defaultUsd: DEFAULT_WEB_SEARCH_COST_MAX_USD,
+    defaultUsd: searchDefaultUsd,
   });
   const scripts = createRealScriptRunner();
 

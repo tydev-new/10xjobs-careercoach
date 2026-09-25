@@ -1,6 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { Avatar } from "./Avatar";
 import { formatBalanceUsd } from "../format.ts";
+import type { CoachModel } from "../backend/coach-model.ts";
 import type { FixtureEntry } from "../fixtures";
 import type { Status } from "../types";
 
@@ -30,6 +31,11 @@ export interface HeaderProps {
    *  confirmation as a spend gate, never a click-to-confirm. */
   onDeleteBetaData?: () => void;
   onSignOut?: () => void;
+  /** § 13.3: the ⋯ menu's last line, real mode only — plain text, never a
+   *  button, built from `coachModel` so it can never disagree with what's
+   *  actually sent. Omitted (undefined) in mock mode, where the line
+   *  never renders (§ 13.5 (ix)). */
+  coachModel?: CoachModel;
 }
 
 const STATE_LABEL: Record<Status["state"], string> = {
@@ -76,6 +82,7 @@ export function Header(props: HeaderProps): ReactElement {
     onImportWorkspace,
     onDeleteBetaData,
     onSignOut,
+    coachModel,
   } = props;
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -192,6 +199,16 @@ export function Header(props: HeaderProps): ReactElement {
               >
                 Sign out
               </button>
+              {/* § 13.6 (3): the Privacy link, just above the model line,
+                  in real AND mock mode — plain, honest copy in the house
+                  voice lives at the page itself, never restated here. */}
+              <a className="menu-item-link" role="menuitem" href="/privacy.html" target="_blank" rel="noreferrer">
+                Privacy
+              </a>
+              {/* § 13.3: plain text, not a button — never focusable as an
+                  action, absent in mock mode (coachModel undefined). Built
+                  from `coachModel` so it can't disagree with what's sent. */}
+              {coachModel ? <div className="menu-item-model">Model: {coachModel.name}</div> : null}
             </div>
           ) : null}
         </div>

@@ -8,8 +8,8 @@ import { allowedOrigins, corsHeaders } from "../_shared/cors.ts";
 import {
   BETA_CEILING_USD,
   MAX_BODY_BYTES,
-  MODEL,
   buildUpstreamBody,
+  ceilingUsdFor,
   parseUsageFromSSE,
   pathTail,
   sanitizeUsageForLedger,
@@ -123,18 +123,21 @@ async function meterUsage(
   stream: ReadableStream<Uint8Array>,
   deps: ProxyDeps,
   uid: string,
+  model: string,
   deadlineAt: number,
 ): Promise<void> {
   const text = await readStreamWithDeadline(stream, deps, deadlineAt);
 
   const parsed = parseUsageFromSSE(text);
-  // S1 (fix round 1) + round 2's contract amendment: a garbled upstream
-  // usage object must never fail the insert silently — cost and each token
-  // count are validated and, if invalid, replaced (cost -> the ceiling; a
-  // bad token count -> 0) rather than sent on faith or dropped. A valid,
-  // in-range cost above the ceiling is now recorded AS REPORTED (never
-  // undercounted) and gets its own anomaly log line — no key, no content.
-  const amounts = sanitizeUsageForLedger(parsed);
+  // S1 (fix round 1) + round 2's contract amendment + § 13.1 "Ceiling
+  // uses: ... the request's model's ceiling": a garbled upstream usage
+  // object must never fail the insert silently — cost and each token
+  // count are validated and, if invalid, replaced (cost -> THIS request's
+  // model's ceiling; a bad token count -> 0) rather than sent on faith or
+  // dropped. A valid, in-range cost above the ceiling is now recorded AS
+  // REPORTED (never undercounted) and gets its own anomaly log line — no
+  // key, no content.
+  const amounts = sanitizeUsageForLedger(parsed, ceilingUsdFor(model));
   const requestId = parsed?.id ?? deps.randomId();
   if (amounts.costAboveCeiling) {
     deps.log?.warn({
@@ -147,7 +150,11 @@ async function meterUsage(
     user_id: uid,
     kind: "call" as const,
     request_id: requestId,
-    model: MODEL,
+    // § 13.1: "Ledger model records the id the proxy SENT: the validated
+    // request id, not the stream's own `model` string" (an upstream may
+    // add a dated suffix) — `model` here is exactly `built.body.model`
+    // from handleRequest below, already validated by buildUpstreamBody.
+    model,
     tokens_in: amounts.tokensIn,
     tokens_out: amounts.tokensOut,
     tokens_cached: amounts.tokensCached,
@@ -319,7 +326,8 @@ export async function handleRequest(
     // cancels only the client-facing branch still lets the meter branch run
     // to completion.
     const [clientStream, meterStream] = upstream.body.tee();
-    deps.waitUntil(meterUsage(meterStream, deps, user.id, meterDeadlineAt));
+    const sentModel = typeof built.body.model === "string" ? built.body.model : "";
+    deps.waitUntil(meterUsage(meterStream, deps, user.id, sentModel, meterDeadlineAt));
 
     return new Response(clientStream, {
       status: 200,

@@ -353,6 +353,32 @@ button {
   background: var(--accent-soft);
 }
 
+/* § 13.6 (3): the Privacy link — same shape as a menu button (it's an
+   action, opening the page), but it's an <a>, not a <button>. */
+.menu-item-link {
+  display: block;
+  text-align: left;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  color: var(--fg);
+  font-size: var(--text-sm);
+  min-height: 44px;
+  line-height: 44px;
+  text-decoration: none;
+}
+
+.menu-item-link:hover {
+  background: var(--accent-soft);
+}
+
+/* § 13.3: the ⋯ menu's LAST line, real mode only — plain text, never a
+   button (no hover state, not focusable, no role=menuitem action). */
+.menu-item-model {
+  padding: var(--space-2) var(--space-3);
+  color: var(--fg-muted);
+  font-size: var(--text-sm);
+}
+
 /* ---- Avatar (design-web-ui.md § 1.3: one status signal, not scattered
    spinners) ---- */
 

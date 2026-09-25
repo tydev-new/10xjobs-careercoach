@@ -128,13 +128,13 @@ t("meter: usage missing entirely -> the ceiling cost is recorded", async () => {
   await run(tok);
   const rows = callRows(h.st);
   assertEquals(rows.length, 1);
-  assertAlmostEquals(rows[0].usd, CEILING, 1e-6, `usd ${rows[0].usd}`); // § 9.5/§ 14: $0.21692 (was a loose >= 0.18)
+  assertAlmostEquals(rows[0].usd, CEILING, 1e-6, `usd ${rows[0].usd}`); // § 13.1 Claude: $0.273112
   assertEquals(rows[0].request_id, "gen-nousage");
 });
 
 t("meter: the ceiling constant vs § 9.5's own formula (64k×$2/M + 8,192×$10/M + one search)", async () => {
-  // 64,000 × 2e-6 = 0.128; 8,192 × 1e-5 = 0.08192; one Exa search, billed per request = 0.007 (§ 14)
-  const formula = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007;
+  // § 13.1 Claude: 64,000 × 2.75e-6 = 0.176; 8,192 × 11e-6 = 0.090112; one Exa search = 0.007 (§ 14)
+  const formula = 64_000 * 2.75e-6 + 8_192 * 11e-6 + 0.007;
   const h = await harness();
   h.reset();
   const [, tok] = await member(h);
@@ -144,7 +144,7 @@ t("meter: the ceiling constant vs § 9.5's own formula (64k×$2/M + 8,192×$10/M
   assertAlmostEquals(callRows(h.st)[0].usd, formula, 1e-6);
 });
 
-const CEILING = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007; // § 9.5's formula, search term per § 14, = 0.21692
+const CEILING = 64_000 * 2.75e-6 + 8_192 * 11e-6 + 0.007; // § 13.1's formula for Claude (the default model), = 0.273112
 
 // § 8 (amended, main eb523bf): a finite cost from 0 to 10× the ceiling is recorded
 // AS REPORTED (never undercounted); above the ceiling it is also logged as an
@@ -159,8 +159,8 @@ const GARBLED: Array<[string, Record<string, unknown> | string, number, boolean]
   ["cost above the ceiling (1.5)", { prompt_tokens: 10, completion_tokens: 5, cost: 1.5 }, 1.5, true],
   ["cost exactly 10x the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: CEILING * 10 }, CEILING * 10, true],
   ["cost just beyond 10x the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: CEILING * 10 + 0.0001 }, CEILING, false],
-  // § 14 moved the bound: 10× is now 2.1692, so the pre-§ 14 10× (2.2992) is beyond it.
-  ["cost at the pre-§ 14 10x (2.2992), now beyond 10x", { prompt_tokens: 10, completion_tokens: 5, cost: 2.2992 }, CEILING, false],
+  // § 13.1 moved the bound up: 10× is now 2.73112, so § 14's old 10× (2.1692) is within it, reported as-is (above the ceiling).
+  ["cost at the pre-§ 13 10x (2.1692), now within 10x", { prompt_tokens: 10, completion_tokens: 5, cost: 2.1692 }, 2.1692, true],
   ["cost beyond 10x the ceiling (25)", { prompt_tokens: 10, completion_tokens: 5, cost: 25 }, CEILING, false],
   ["cost exactly 0", { prompt_tokens: 10, completion_tokens: 5, cost: 0 }, 0, false],
   ["cost exactly the ceiling", { prompt_tokens: 10, completion_tokens: 5, cost: CEILING }, CEILING, false],

@@ -131,7 +131,7 @@ export interface StubbedModel {
 
 /** The real provider, same construction as apps/web/src/backend/model.ts
  *  (baseURL = the proxy, placeholder apiKey, custom fetch). */
-export function stubbedOpenRouter(script: Array<SseScript | HttpReply>): StubbedModel {
+export function stubbedOpenRouter(script: Array<SseScript | HttpReply>, opts: { modelId?: string } = {}): StubbedModel {
   const requests: any[] = [];
   const prompts: any[] = [];
   let i = 0;
@@ -146,7 +146,7 @@ export function stubbedOpenRouter(script: Array<SseScript | HttpReply>): Stubbed
     return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
   };
   const openrouter = createOpenRouter({ apiKey: "unused-stub", baseURL: "http://127.0.0.1:9/ten-model-proxy", fetch: fetchStub as any });
-  const real = openrouter.chat("anthropic/claude-sonnet-5", { provider: { data_collection: "deny", zdr: true }, cache_control: { type: "ephemeral" } } as any);
+  const real = openrouter.chat(opts.modelId ?? "anthropic/claude-sonnet-5", { provider: { data_collection: "deny", zdr: true }, cache_control: { type: "ephemeral" } } as any);
   const model = new Proxy(real, {
     get(target, prop, recv) {
       if (prop === "doStream") {

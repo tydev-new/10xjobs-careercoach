@@ -24,10 +24,12 @@ import { CEILING_USD } from "../../supabase/functions/ten-model-proxy/core.ts";
 import { baseBody, callRows, harness, member, preq, sse, t } from "./_harness.ts";
 
 // § 14.2's arithmetic, term by term.
-const INPUT_TERM = 64_000 * 2e-6; // 0.128
-const OUTPUT_TERM = 8_192 * 1e-5; // 0.08192
+// § 13.1 (approved; § 13.6 (1)) moved Claude to the dearest no-data-kept host
+// with the cache-write price; § 14's search term is unchanged.
+const INPUT_TERM = 64_000 * 2.75e-6; // 0.176
+const OUTPUT_TERM = 8_192 * 11e-6; // 0.090112
 const SEARCH_TERM = 0.007; // one Exa Auto request, ≤ 10 results
-const SPEC_CEILING = 0.21692;
+const SPEC_CEILING = 0.273112;
 const EXA_INCLUDED_RESULTS = 10;
 
 async function meterWithUsage(usage: unknown, label: string) {
@@ -52,27 +54,27 @@ async function meterWithUsage(usage: unknown, label: string) {
 
 // ------------------------------------------------------------ (v) the constant
 
-t("§ 14.4 (v): CEILING_USD = 64,000 × 2e-6 + 8,192 × 1e-5 + 0.007 = 0.21692 (1e-9)", async () => {
+t("§ 14.4 (v) as amended by § 13.1: Claude's CEILING_USD = 64,000 × 2.75e-6 + 8,192 × 11e-6 + 0.007 = 0.273112 (1e-9)", async () => {
   await Promise.resolve();
   assertAlmostEquals(INPUT_TERM + OUTPUT_TERM + SEARCH_TERM, SPEC_CEILING, 1e-12, "the spec's own arithmetic");
   assertAlmostEquals(CEILING_USD, SPEC_CEILING, 1e-9);
 });
 
-t("§ 14.2: the ceiling dropped by exactly $0.013 from § 9.5's $0.22992 (one request, not 5 × $0.004)", async () => {
+t("§ 13.1: Claude's ceiling rose from § 14's $0.21692 by exactly the price change (64,000 × $0.75/M + 8,192 × $1/M = $0.056192)", async () => {
   await Promise.resolve();
-  assertAlmostEquals(0.22992 - CEILING_USD, 0.013, 1e-9);
+  assertAlmostEquals(CEILING_USD - 0.21692, 64_000 * 0.75e-6 + 8_192 * 1e-6, 1e-9);
 });
 
 // ------------------------------------------------------------ (v) the meter
 
-t("§ 14.4 (v): a meter with no usage chunk at all records 0.21692", async () => {
+t("§ 14.4 (v): a meter with no usage chunk at all records Claude's ceiling, 0.273112", async () => {
   const { res, rows } = await meterWithUsage(undefined, "nousage");
   assertEquals(res.status, 200);
   assertEquals(rows.length, 1);
   assertAlmostEquals(rows[0].usd, SPEC_CEILING, 1e-6);
 });
 
-t("§ 14.4 (v): a meter whose cost is unreadable (string / null / missing) records 0.21692", async () => {
+t("§ 14.4 (v): a meter whose cost is unreadable (string / null / missing) records 0.273112", async () => {
   const cases: Array<[string, Record<string, unknown>]> = [
     ["string", { prompt_tokens: 10, completion_tokens: 5, cost: "0.035" }],
     ["null", { prompt_tokens: 10, completion_tokens: 5, cost: null }],
@@ -87,30 +89,30 @@ t("§ 14.4 (v): a meter whose cost is unreadable (string / null / missing) recor
   assertEquals(got, { string: SPEC_CEILING, null: SPEC_CEILING, missing: SPEC_CEILING });
 });
 
-// ------------------------------------------------------------ the 10× bound, re-derived from 0.21692
+// ------------------------------------------------------------ the 10× bound, re-derived from 0.273112
 
-t("§ 14.2 + § 8: the 10× bound is 10 × 0.21692 = 2.1692 — a cost just under it (2.1691) is recorded as reported, with the anomaly log", async () => {
-  const cost = 2.1691;
+t("§ 8: the 10× bound is 10 × 0.273112 = 2.73112 — a cost just under it (2.7311) is recorded as reported, with the anomaly log", async () => {
+  const cost = 2.7311;
   const { rows, anomalies } = await meterWithUsage({ prompt_tokens: 10, completion_tokens: 5, cost }, "under-10x");
   assertEquals(rows.length, 1);
   assertAlmostEquals(rows[0].usd, cost, 1e-6);
   assert(anomalies.length >= 1, "a cost above the ceiling logs an anomaly line");
 });
 
-t("§ 14.2 + § 8: a cost just over 10 × 0.21692 (2.1693) records the ceiling, not the reported cost", async () => {
-  const { rows, anomalies } = await meterWithUsage({ prompt_tokens: 10, completion_tokens: 5, cost: 2.1693 }, "over-10x");
+t("§ 8: a cost just over 10 × 0.273112 (2.7312) records the ceiling, not the reported cost", async () => {
+  const { rows, anomalies } = await meterWithUsage({ prompt_tokens: 10, completion_tokens: 5, cost: 2.7312 }, "over-10x");
   assertEquals(rows.length, 1);
   assertAlmostEquals(rows[0].usd, SPEC_CEILING, 1e-6);
   assertEquals(anomalies, [], "a replaced cost is not an anomaly");
 });
 
-t("§ 14.2: a cost between the new ceiling and § 9.5's old one (0.225) is above the ceiling: recorded as reported, with the anomaly log", async () => {
-  // 0.21692 < 0.225 < 0.22992: under the pre-§ 14 ceiling this was in range
-  // with no anomaly; under § 14 it is above the ceiling.
-  const { rows, anomalies } = await meterWithUsage({ prompt_tokens: 10, completion_tokens: 5, cost: 0.225 }, "between-ceilings");
+t("§ 13.1: a cost between § 14's ceiling and § 13's (0.25) is now within Claude's ceiling: recorded as reported, no anomaly", async () => {
+  // 0.21692 < 0.25 < 0.273112: a regional host plus a cache write can cost this,
+  // which is why § 13.6 (1) raised the ceiling.
+  const { rows, anomalies } = await meterWithUsage({ prompt_tokens: 10, completion_tokens: 5, cost: 0.25 }, "between-ceilings");
   assertEquals(rows.length, 1);
-  assertAlmostEquals(rows[0].usd, 0.225, 1e-6);
-  assert(anomalies.length >= 1, "0.225 > 0.21692 is above the ceiling");
+  assertAlmostEquals(rows[0].usd, 0.25, 1e-6);
+  assertEquals(anomalies, [], "0.25 < 0.273112 is within the ceiling");
 });
 
 t("§ 14 in the ledger: a Claude search call's cost (tokens + the $0.007 fee) is recorded as reported, no anomaly", async () => {

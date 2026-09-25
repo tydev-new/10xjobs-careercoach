@@ -7,7 +7,7 @@
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
 import { baseBody, callRows, FN, harness, member, OPENROUTER_KEY, observe, preq, sse, t } from "./_harness.ts";
 
-const CEILING = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007; // § 9.5 (MAX_TOKENS_CAP 8,192) + § 14 (one search, $0.007 per request) = 0.21692
+const CEILING = 64_000 * 2.75e-6 + 8_192 * 11e-6 + 0.007; // § 13.1 Claude: regional cache write $2.75/M in, $11/M out; § 14's $0.007 search = 0.273112
 const MODEL_TEXT = "MODEL-OUTPUT-CANARY-cover-letter-for-Acme";
 const CLIENT_TEXT = "CLIENT-CV-CANARY-jane-doe-salary-history";
 
@@ -74,7 +74,8 @@ t("deadline: no client input (header, query, body field) lengthens the meter dea
       ["header", preq(baseBody(), { token: tok, headers: { "x-meter-deadline-ms": "999999999", "x-deadline": "999999999", "meterDeadlineMs": "999999999" } })],
       ["query", preq(baseBody(), { token: tok, url: `${FN}/chat/completions?meterDeadlineMs=999999999&deadline=999999999` })],
       ["body", preq({ ...baseBody(), meterDeadlineMs: 999999999, deadline: 999999999, timeout: 999999999, meter: { deadlineMs: 999999999 } }, { token: tok })],
-      ["prototype", preq(undefined, { token: tok, raw: `{"messages":[],"__proto__":{"meterDeadlineMs":999999999}}` })],
+      // § 13.1: a request must name its model, so the prototype probe names Claude
+      ["prototype", preq(undefined, { token: tok, raw: `{"model":"anthropic/claude-sonnet-5","messages":[],"__proto__":{"meterDeadlineMs":999999999}}` })],
     ];
     for (const [label, r] of attempts) {
       long.length = 0;

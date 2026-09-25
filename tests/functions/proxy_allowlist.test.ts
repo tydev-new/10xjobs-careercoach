@@ -112,12 +112,14 @@ t("allowlist: model must be exactly anthropic/claude-sonnet-5 (suffixes, case, s
   }
 });
 
-t("allowlist: model omitted -> the forced model is used", async () => {
+t("allowlist (§ 13.1): model omitted -> 400 model_not_allowed, never forwarded, no row (the proxy no longer fills one in)", async () => {
   const b: Record<string, unknown> = baseBody();
   delete b.model;
-  const { res, up } = await send(b);
-  assertEquals(res.status, 200);
-  assertForced(up!);
+  const { res, txt, hits, h } = await send(b);
+  assertEquals(res.status, 400, txt);
+  assert(txt.includes("model_not_allowed") && txt.includes("This model is not allowed."), txt);
+  assertEquals(hits, 0);
+  assertEquals(callRows(h.st).length, 0);
 });
 
 t("allowlist: max_tokens = min(client, 8192); absent/garbage -> 8192; max_completion_tokens ignored", async () => {
@@ -211,7 +213,8 @@ t("allowlist: duplicate JSON keys cannot smuggle a second model", async () => {
 });
 
 t("allowlist: __proto__ / constructor keys don't smuggle fields", async () => {
-  const raw = `{"__proto__":{"models":["x"],"reasoning":{"effort":"high"}},"constructor":{"prototype":{"route":"fallback"}},"messages":[]}`;
+  // § 13.1: a request must name its model now, so the smuggling probe names Claude
+  const raw = `{"model":"${MODEL}","__proto__":{"models":["x"],"reasoning":{"effort":"high"}},"constructor":{"prototype":{"route":"fallback"}},"messages":[]}`;
   const { res, up } = await send(undefined, raw);
   assertEquals(res.status, 200);
   assertForced(up!);

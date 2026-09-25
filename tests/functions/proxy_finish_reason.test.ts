@@ -18,7 +18,7 @@ import { handleRequest, type ProxyDeps } from "../../supabase/functions/ten-mode
 import { balanceFor, betaSpendToday, envFromDeno, insertLedgerCall, isMember, verifyUser } from "../../supabase/functions/_shared/supabase.ts";
 import { baseBody, callRows, harness, member, preq, PROD_ORIGIN, sse, t, type Harness } from "./_harness.ts";
 
-const FORMULA = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007; // § 9.5 + § 14 (one search, $0.007 per request), = 0.21692
+const FORMULA = 64_000 * 2.75e-6 + 8_192 * 11e-6 + 0.007; // § 13.1 Claude (§ 9.5 cap, § 14 search, regional cache-write prices), = 0.273112
 
 const line = (o: unknown) => `data: ${JSON.stringify(o)}`;
 const content = (id: string, text: string, finish: unknown = null, extra: Record<string, unknown> = {}) =>
@@ -56,9 +56,9 @@ function assertRowWithKey(rows: any[], inserts: any[], want: string | null, labe
 
 // ------------------------------------------------------------------ (v)
 
-t("(v) MAX_TOKENS_CAP is 8,192 and CEILING_USD = 64,000×2e-6 + 8,192×1e-5 + 0.007 = 0.21692 (§ 9.8 (v) as amended by § 14)", async () => {
+t("(v) MAX_TOKENS_CAP is 8,192 and Claude's CEILING_USD = 64,000×2.75e-6 + 8,192×11e-6 + 0.007 = 0.273112 (§ 13.1)", async () => {
   assertEquals(MAX_TOKENS_CAP, 8192);
-  assertAlmostEquals(CEILING_USD, 0.21692, 1e-12);
+  assertAlmostEquals(CEILING_USD, 0.273112, 1e-9);
   assertAlmostEquals(CEILING_USD, FORMULA, 1e-12);
 });
 
@@ -80,10 +80,10 @@ t("(v) clamp through the deployed proxy: 8,192 stays; 8,193, absent and garbage 
   assertEquals(out, { "8192": 8192, "8193": 8192, absent: 8192, "garbage-string": 8192, "garbage-object": 8192, "NaN-as-null": 8192 });
 });
 
-t("(v) a meter with no readable cost records the § 9.5/§ 14 ceiling, $0.21692", async () => {
+t("(v) a meter with no readable cost records Claude's § 13.1 ceiling, $0.273112", async () => {
   const { rows } = await meter([content("gen-nocost", "hi", "stop"), "data: [DONE]"]);
   assertEquals(rows.length, 1);
-  assertAlmostEquals(rows[0].usd, 0.21692, 1e-6);
+  assertAlmostEquals(rows[0].usd, 0.273112, 1e-6);
 });
 
 // ------------------------------------------------------------------ (vi) parse

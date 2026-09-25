@@ -828,7 +828,13 @@ covers `step_cap`.*
 
 One stateless check runs at the start of each turn. It looks at the
 assistant message just before the latest user message, in the history as
-sent, **before** the window trims it. For each code below that appears on a
+sent, **before** the window trims it. *(Lead ruling, 2026-09-24, fix round
+2 of § 10–12: "just before" means the most recent assistant message
+before the latest user message that has at least one part other than
+`data-gate-status`. An assistant message made only of `data-gate-status`
+parts, such as § 11.6's reconciliation message, is skipped; otherwise it
+hides a `cut_off`, `step_cap` or `too_large` from this check. Measured by
+the tester: the `cut_off` note was lost.)* For each code below that appears on a
 `data-error` part of that message, the coach appends that code's note to
 the turn's system prompt:
 
@@ -1255,6 +1261,10 @@ A **new** migration, `supabase/migrations/20260924100000_ten_conversations.sql`
    > [Removed to save space: N characters. The workspace files hold what
    > was saved; read a file again if you need it.]
 
+   The stub text, the 2,000-character threshold and the walker that
+   replaces strings are **one shared implementation**, used by this
+   section and § 12.1 (rule 12; tester finding 7, fix round 2).
+
    A tool part in any state but `output-available`/`output-error` is saved
    as `output-error`, `errorText` "Stopped before a result came back.
    Check the files for what was saved."
@@ -1305,7 +1315,10 @@ was removed.
   being saved (a closed tab). So before mounting, for each gate whose
   latest restored status is `pending`, the app reads its own
   `ten_gate_log` row and appends the row's status as a `data-gate-status`
-  part. A pending gate whose card is not in the restored messages (the cap
+  part. *(Lead ruling, 2026-09-24, fix round 2:)* these parts go in one
+  data-only assistant message, placed last, whose id is unique per load,
+  `gate-reconcile-${chatId}-${uuid}` (a fixed id repeated across loads).
+  § 9.4's check skips such a message. A pending gate whose card is not in the restored messages (the cap
   dropped it) is expired first: no yes without the complete thing on
   screen (rule 7).
 - The coach's per-chat memory starts empty after a load; each part
@@ -1359,6 +1372,11 @@ Written from this section; fixture personas and fresh workspaces only.
 - **(vi) Pending gate:** reload: card and `needs-you`; typed `yes`
   approves (allowance = amount), `ui` yes doesn't. Row approved, saved
   status pending: shows approved. Card dropped by the cap: row expired.
+- **(vi-b) Reconciliation × § 9.4** (fix round 2): a restored history
+  whose last real assistant message carries `cut_off` (then `step_cap`,
+  then `too_large`), followed by a reconciliation message: the next turn
+  has that code's note. Two loads produce two different reconciliation
+  ids, and no id repeats in the messages.
 - **(vii) Cap:** over 900,000 bytes drops oldest turns only, sets
   `older_dropped`, shows the line.
 - **(viii) Two tabs:** a stale tab's send: not sent, no proxy request,
@@ -1444,8 +1462,10 @@ turn starts small (the window drops the long turn).
 
 ### 12.3 Test plan
 
-- **(i) Trim:** a stubbed model, 12 steps each reading a 10,000-character
-  file. Every request's messages ≤ 160,000 bytes; stubs land oldest step
+- **(i) Trim:** a stubbed model, 22 steps each reading a 10,000-character
+  file (12 peak at ~131 KB, under the trigger, so they never trim; with 22
+  the first trim comes at request 16; fix round 2). Trimming must happen
+  at least once. Every request's messages ≤ 160,000 bytes; stubs land oldest step
   first; the last 2 steps, user messages and model text are byte-identical;
   the system prompt is identical on every request; the stub word for word.
 - **(ii)** Under budget: no override. **(iii)** Between two trims, each
@@ -1819,3 +1839,8 @@ spike replaced (owner, 2026-09-23).
   allows Claude Sonnet 5 and DeepSeek V4.1 Flash; `VITE_COACH_MODEL` picks
   one, unset means Claude, a bad value refuses to start. The ceiling and
   the turn-1 estimate are per model; Claude's request body is unchanged.
+- Fix round 2 of § 10–12 (lead rulings, 09-24): § 9.4 skips an assistant
+  message made only of `data-gate-status` parts, so § 11.6's
+  reconciliation message can't hide a stop; each reconciliation message
+  gets a unique id; § 12.3 (i) uses 22 reads so the trim really fires;
+  the § 11.3/§ 12.1 stub is one shared implementation.

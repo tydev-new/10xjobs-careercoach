@@ -362,8 +362,10 @@ separately (`supabase/functions/README.md`); `TEN_APP_ORIGIN` must equal the
 production origin above or the browser's calls are refused by CORS.
 
 **Deploy order for § 13 (the site's model is a setting), first time —
-site → proxy → setting, per `docs/design-web-agent.md` § 13.2 (an agent
-never runs any of this; the owner does, in this order):**
+site → proxy → setting, per `docs/design-web-agent.md` § 13.2 (each step
+needs the owner's explicit approval for that action; the owner, or the
+lead agent acting on that approval, runs it, in this order; no other
+agent role ever deploys):**
 
 1. **Site first.** Deploy `apps/web` with the § 13 code (this change) but
    `VITE_COACH_MODEL` still unset — the site keeps sending Claude, and

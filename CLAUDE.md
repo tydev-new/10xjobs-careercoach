@@ -2,7 +2,7 @@
 
 **Read `docs/PROCESS.md` before building or changing any skill** — the
 ritual (design gate → issue → prior-art check → build → independent
-review → live dogfood → harness → closing review) is not optional and
+review → live run → harness → closing review) is not optional and
 each step carries its receipt.
 
 Precedence for every design judgment: `PRINCIPLES.md` →

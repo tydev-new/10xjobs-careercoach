@@ -37,6 +37,9 @@ const stubClient: AuthClientLike = {
     signUp: () => Promise.reject(new Error(NEVER_CALLED)),
     signOut: () => Promise.reject(new Error(NEVER_CALLED)),
     getSession: () => Promise.reject(new Error(NEVER_CALLED)),
+    resetPasswordForEmail: () => Promise.reject(new Error(NEVER_CALLED)),
+    updateUser: () => Promise.reject(new Error(NEVER_CALLED)),
+    reauthenticate: () => Promise.reject(new Error(NEVER_CALLED)),
   },
   rpc: () => Promise.reject(new Error(NEVER_CALLED)),
 };

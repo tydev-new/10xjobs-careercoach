@@ -1315,6 +1315,20 @@ button {
   margin: 0;
 }
 
+/* design-web-ui.md § 1.10 — the expired/used-link line: neutral, not an
+   error state (rule 8's "never alarm-red for something the candidate
+   didn't do wrong" posture, same as .delete-confirm-scope/.sentence). */
+.sign-in-link-error {
+  color: var(--fg-muted);
+  background: var(--bg-sunken);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  margin: 0 0 var(--space-2);
+}
+
 .sign-in-sent {
   color: var(--fg-muted);
   font-size: var(--text-md);

@@ -1,0 +1,305 @@
+{
+  "$schema_notes": "One entry per font. `fontsource` is the npm package id to bundle (variable packages are named @fontsource-variable/<id>; static packages are @fontsource/<id>). `category` is one of ui-sans | display | document-serif | monospace — the four spreads the brief asked for. `license` was read from api.fontsource.org/v1/fonts/<id> on 2026-09-24 (fontsource mirrors the font's own OFL.txt from the Google Fonts repo); every entry here came back OFL-1.1 — none needed the Apache-2.0 fallback. `weights` is the full weight list the family ships (not every weight need be loaded by a consumer). `description` and `avoid_for` are this designer's own words, written after reading each font's own specimen page and (for the 15 in pairings.json) after rendering it.",
+  "fonts": [
+    {
+      "name": "Inter",
+      "fontsource": "@fontsource-variable/inter",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A neutral, high-x-height grotesque built for screens; tight spacing and even strokes keep 13-16px UI text crisp on light and dark backgrounds alike. Already our own body face app-wide — steady rather than characterful.",
+      "avoid_for": "Display headlines or a wordmark — excluded from this library as a display choice by the brief itself, since at large size it reads as the generic 'AI product' default."
+    },
+    {
+      "name": "IBM Plex Sans",
+      "fontsource": "@fontsource-variable/ibm-plex-sans",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700],
+      "variable": true,
+      "description": "A humanist sans with slightly squared curves and an engineered, technical feel (IBM's corporate face); clear at small UI sizes with a little more personality than Inter, though its numerals run wider.",
+      "avoid_for": "Dense tabular numbers — the wider figures cost horizontal space in a tight column."
+    },
+    {
+      "name": "Work Sans",
+      "fontsource": "@fontsource-variable/work-sans",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "An open, screen-optimized grotesque with a generous x-height; friendly and slightly rounded without being cute, holds up well as 13px body copy.",
+      "avoid_for": "Very tight, dense data grids — its open spacing wants room to breathe."
+    },
+    {
+      "name": "Public Sans",
+      "fontsource": "@fontsource-variable/public-sans",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "USWDS's civic-service sans — plain, sturdy, unpretentious, built for forms and long-form reading; institutional in a reassuring way, not a corporate-brand way.",
+      "avoid_for": "Any moment the product wants to feel playful or expressive — it reads deliberately plain by design."
+    },
+    {
+      "name": "Manrope",
+      "fontsource": "@fontsource-variable/manrope",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800],
+      "variable": true,
+      "description": "A geometric-leaning sans with softly trimmed corners; modern and a little warm, a good body face under an expressive display heading.",
+      "avoid_for": "Anywhere italic emphasis is needed — no italic style ships; use weight for emphasis instead."
+    },
+    {
+      "name": "Karla",
+      "fontsource": "@fontsource-variable/karla",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800],
+      "variable": true,
+      "description": "A grotesque with a few quiet quirks (a two-story 'a', slightly springy curves); calm at UI sizes, a notch friendlier than a pure neutral grotesque without tipping into 'rounded app' territory.",
+      "avoid_for": "Numerals-heavy dashboards — figures are proportional by default and can misalign in a table unless tabular-nums is forced."
+    },
+    {
+      "name": "Figtree",
+      "fontsource": "@fontsource-variable/figtree",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A rounded-corner grotesque, friendly and a little soft, common in consumer product UI; reads warm at UI sizes without reading like a children's app.",
+      "avoid_for": "A face that must feel serious or institutional (finance-adjacent, legal-adjacent copy) — its warmth works against gravity there."
+    },
+    {
+      "name": "Plus Jakarta Sans",
+      "fontsource": "@fontsource-variable/plus-jakarta-sans",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800],
+      "variable": true,
+      "description": "A geometric sans with slightly condensed proportions and confident, even strokes; reads more 'designed' than Inter at small sizes, good for product-marketing UI.",
+      "avoid_for": "Long paragraphs of body text — the condensed rhythm gets tiring past a few sentences."
+    },
+    {
+      "name": "Atkinson Hyperlegible",
+      "fontsource": "@fontsource/atkinson-hyperlegible",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [400, 700],
+      "variable": false,
+      "description": "Designed by the Braille Institute to disambiguate easily-confused letterforms (1/l/I, O/0); unusual proportions at display size but unmatched clarity at small UI sizes for low-vision readers.",
+      "avoid_for": "Headings or marketing — its distinguishing shapes (open counters, an unusual 'l') read as unpolished at large sizes, and only two weights ship."
+    },
+    {
+      "name": "Fraunces",
+      "fontsource": "@fontsource-variable/fraunces",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A warm, old-style display serif with soft, ink-trap-like curves; already our own heading face for the wordmark and verdict tiers — characterful without going decorative, and it holds a large size well.",
+      "avoid_for": "Body copy or small UI labels — its low-contrast strokes were drawn for headline sizes, not 13px."
+    },
+    {
+      "name": "Newsreader",
+      "fontsource": "@fontsource-variable/newsreader",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800],
+      "variable": true,
+      "description": "An editorial, book-like serif in the Georgia/Times lineage but drawn softer; reads calm and 'written by a person' at headline size, and stays legible enough to carry a short article body too.",
+      "avoid_for": "A punchy, high-energy brand moment — it reads measured, not loud."
+    },
+    {
+      "name": "Playfair Display",
+      "fontsource": "@fontsource-variable/playfair-display",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A high-contrast Didone serif — thin hairlines against heavy stems — dramatic and editorial-magazine at large size.",
+      "avoid_for": "Small sizes or busy backgrounds — the hairlines can thin out or vibrate below about 24px, and it's an overused 'elegant AI brand' default if not paired deliberately."
+    },
+    {
+      "name": "DM Serif Display",
+      "fontsource": "@fontsource/dm-serif-display",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [400],
+      "variable": false,
+      "description": "A calm, moderate-contrast serif display face, closer to a transitional book serif than Playfair's drama; reads warm and confident at headline size with just the one weight to lean on.",
+      "avoid_for": "Any UI needing a bold or black display weight, or body text — ships regular only, drawn for short headlines."
+    },
+    {
+      "name": "Instrument Serif",
+      "fontsource": "@fontsource/instrument-serif",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [400],
+      "variable": false,
+      "description": "A quiet, slightly compressed serif with a distinctive italic; closer to a typewriter-adjacent book face than a grand display serif — understated rather than dramatic.",
+      "avoid_for": "Long headlines — its compressed rhythm was drawn for a short, quiet phrase, not multi-line hero copy."
+    },
+    {
+      "name": "Young Serif",
+      "fontsource": "@fontsource/young-serif",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [400],
+      "variable": false,
+      "description": "A quirky, slightly rounded slab-leaning serif with warm, hand-set character; playful without being a script face.",
+      "avoid_for": "Anything that needs to read serious or authoritative (a verdict card, money) — its playfulness undercuts gravity there."
+    },
+    {
+      "name": "Bricolage Grotesque",
+      "fontsource": "@fontsource-variable/bricolage-grotesque",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800],
+      "variable": true,
+      "description": "A contemporary grotesque with a built-in optical-size axis — tightens and gets quirkier at display sizes, settles down for text; distinctive without being a novelty face.",
+      "avoid_for": "Body copy set at its most expressive optical setting — dial the axis back or it reads noisy below headline size."
+    },
+    {
+      "name": "Archivo",
+      "fontsource": "@fontsource-variable/archivo",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A grotesque built for posters and headlines — even, confident, a little industrial; the heavy weights carry real authority for a verdict tier or a marketing headline.",
+      "avoid_for": "Light weights as long-form body text — 400 reads flat in a paragraph; save it for the heavier headline weights it was designed for."
+    },
+    {
+      "name": "Unbounded",
+      "fontsource": "@fontsource-variable/unbounded",
+      "category": "display",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A wide, geometric display face with a distinct rounded-square rhythm; reads bold and 'product launch' at headline size, closer to a wordmark face than a workhorse heading.",
+      "avoid_for": "Anything longer than a very short headline or logotype — its width and quirks make it hard to read in more than a few words; use sparingly, one of the more novelty-leaning faces in this set."
+    },
+    {
+      "name": "Source Serif 4",
+      "fontsource": "@fontsource-variable/source-serif-4",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "Adobe's companion serif to Source Sans — even, restrained, built for long-form reading; already our own résumé/cover-letter face, quiet rather than decorative.",
+      "avoid_for": "Display headlines — it was drawn for paragraphs, not a large wordmark."
+    },
+    {
+      "name": "Lora",
+      "fontsource": "@fontsource-variable/lora",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [400, 500, 600, 700],
+      "variable": true,
+      "description": "A moderately-contrasted serif with slightly brushed, calligraphic curves; warm and readable in long paragraphs, a common article/blog-body choice.",
+      "avoid_for": "Dense tabular résumé data (dates, figures) — its proportional numerals aren't built for column alignment."
+    },
+    {
+      "name": "PT Serif",
+      "fontsource": "@fontsource/pt-serif",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [400, 700],
+      "variable": false,
+      "description": "A sturdy transitional serif originally designed for Cyrillic/Latin coexistence; plain, a touch heavier than Lora, reads dependable rather than literary.",
+      "avoid_for": "A headline or hero moment — only regular and bold ship, no light or expressive weight to lean into."
+    },
+    {
+      "name": "Noto Serif",
+      "fontsource": "@fontsource-variable/noto-serif",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "Google's pan-Unicode serif — deliberately neutral, drawn to look consistent across every script it covers; safe and legible but the least 'designed' of the serifs in this set.",
+      "avoid_for": "A moment that wants personality (marketing, a wordmark) — it was drawn for universal coverage, not character."
+    },
+    {
+      "name": "Crimson Pro",
+      "fontsource": "@fontsource-variable/crimson-pro",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A book-typography serif in the Garamond/Caslon old-style tradition; classic and literary at body-text sizes, comfortable for a long résumé or cover letter read.",
+      "avoid_for": "UI chrome or small labels — its delicate serifs blur at very small sizes on lower-density screens."
+    },
+    {
+      "name": "Spectral",
+      "fontsource": "@fontsource/spectral",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800],
+      "variable": false,
+      "description": "A serif drawn specifically for on-screen reading comfort (originally for WordPress); slightly heavier and more even than Crimson Pro, reads well on a laptop the way a résumé actually gets read.",
+      "avoid_for": "Print-first documents wanting a higher-contrast, traditional-press serif — Spectral was tuned for the screen, not the page."
+    },
+    {
+      "name": "Literata",
+      "fontsource": "@fontsource-variable/literata",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "Google's ebook-reading serif (built for Play Books); a wide optical-size range, comfortable and warm at long-form reading sizes with real weight range for emphasis.",
+      "avoid_for": "A short marketing headline — its personality is calm and bookish, not a punchy display moment."
+    },
+    {
+      "name": "Bitter",
+      "fontsource": "@fontsource-variable/bitter",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800, 900],
+      "variable": true,
+      "description": "A slab serif with squared, confident serifs; sturdier and more structured-looking than the other document serifs here, gives a résumé a more assertive, organized feel.",
+      "avoid_for": "A delicate or literary tone — the slab reads structured and technical, not warm."
+    },
+    {
+      "name": "JetBrains Mono",
+      "fontsource": "@fontsource-variable/jetbrains-mono",
+      "category": "monospace",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700, 800],
+      "variable": true,
+      "description": "A mono drawn for code, with a tall x-height and easily distinguished 0/O and 1/l/I; already our tool-output and file-path face, calm and legible at small sizes.",
+      "avoid_for": "Nothing in this library specifically — note the app today pins the static @fontsource/jetbrains-mono package at 400/500 rather than the variable one; switch packages deliberately, not by accident, if a smoother weight range is ever needed."
+    },
+    {
+      "name": "IBM Plex Mono",
+      "fontsource": "@fontsource/ibm-plex-mono",
+      "category": "monospace",
+      "license": "OFL-1.1",
+      "weights": [100, 200, 300, 400, 500, 600, 700],
+      "variable": false,
+      "description": "IBM Plex's mono companion — slightly narrower and more geometric than JetBrains Mono, pairs naturally with IBM Plex Sans for a cohesive technical UI.",
+      "avoid_for": "Mixing with a very different body sans — its proportions were drawn as part of the Plex family and look most at home there."
+    },
+    {
+      "name": "Space Mono",
+      "fontsource": "@fontsource/space-mono",
+      "category": "monospace",
+      "license": "OFL-1.1",
+      "weights": [400, 700],
+      "variable": false,
+      "description": "A quirky, slightly retro monospace with distinctive rounded terminals; more a designed object than a neutral code font — good for a single stat or number callout, less good for a wall of text.",
+      "avoid_for": "Long tool-output blocks — the personality gets tiring at volume; better as a small accent than a body mono."
+    },
+    {
+      "name": "Fira Code",
+      "fontsource": "@fontsource-variable/fira-code",
+      "category": "monospace",
+      "license": "OFL-1.1",
+      "weights": [300, 400, 500, 600, 700],
+      "variable": true,
+      "description": "A code-editor mono with optional ligatures (rendered only where the ligature feature is explicitly enabled); otherwise a clean, even mono close to Fira Sans's own proportions.",
+      "avoid_for": "Anywhere ligatures would misrepresent literal tool output or JSON-like text — set font-variant-ligatures: none for anything that must show exact characters."
+    }
+  ]
+}

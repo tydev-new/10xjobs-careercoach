@@ -126,7 +126,7 @@ PII = re.compile(
     r"|\(?\b\d{3}\)?[-. ]\d{3}[-. ]\d{4}\b"                   # a phone number
     r"|linkedin\.com/in/[A-Za-z0-9-]+"                        # a profile URL
 )
-SHIPPED = ("skills", "plugins", "kit", ".claude-plugin", "apps")
+SHIPPED = ("skills", "plugins", "kit", ".claude-plugin", "apps", "scripts", "design")
 # Build output is skipped here like dist/. The upload itself is scanned by
 # apps/web/scripts/deploy-prod.sh, which refuses to ship a home path.
 SKIP_DIRS = {"node_modules", "dist", "__pycache__", ".vercel"}

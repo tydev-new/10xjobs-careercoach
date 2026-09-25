@@ -1,0 +1,160 @@
+{
+  "$schema_notes": "One entry per pairing. `heading_font`/`body_font`/`mono_font` (mono optional, null if unused) name entries in fonts.json by their `name` field — resolve weights/fontsource there. `use` is one of chat-ui | document-resume | marketing-sign-in, matching the three UI use cases the brief named. Each pairing was rendered as a specimen (a chat snippet, a verdict card, a résumé paragraph) at 1440 and 375px, light and dark, before being kept here — see design/library/README.md for the specimen paths (private, outside this repo) and the render notes below each dropped/fixed pairing.",
+  "pairings": [
+    {
+      "id": "chat-bricolage-inter",
+      "use": "chat-ui",
+      "heading_font": "Bricolage Grotesque",
+      "heading_weight": 600,
+      "body_font": "Inter",
+      "body_weight": 400,
+      "mono_font": "JetBrains Mono",
+      "mono_weight": 400,
+      "rationale": "Bricolage's built-in expressive axis gives Ten's card kickers and verdict headline a bit of edge without shouting, while Inter keeps every other line of chat completely neutral. Both are grotesques at heart, so nothing clashes at the x-height — the contrast is weight and a little personality, not two unrelated letterform families."
+    },
+    {
+      "id": "chat-archivo-public",
+      "use": "chat-ui",
+      "heading_font": "Archivo",
+      "heading_weight": 800,
+      "body_font": "Public Sans",
+      "body_weight": 400,
+      "mono_font": "IBM Plex Mono",
+      "mono_weight": 400,
+      "rationale": "A heavy Archivo tier word ('Strong Fit') carries real authority the way Fraunces does in the shipped v2, but as a grotesque instead of a serif — industrial-confident rather than warm. Public Sans's plain civic tone keeps everything else quiet, so the one bold moment per screen (Patterns across the set) stays the verdict, nothing else."
+    },
+    {
+      "id": "chat-newsreader-manrope",
+      "use": "chat-ui",
+      "heading_font": "Newsreader",
+      "heading_weight": 600,
+      "body_font": "Manrope",
+      "body_weight": 400,
+      "mono_font": "Fira Code",
+      "mono_weight": 400,
+      "rationale": "An editorial serif verdict headline over a soft geometric sans body is the same 'written by a person' pattern the reference set names in Claude and Granola, but with a different serif than Fraunces so it reads as its own option rather than a reskin of what already ships."
+    },
+    {
+      "id": "chat-figtree-karla",
+      "use": "chat-ui",
+      "heading_font": "Figtree",
+      "heading_weight": 700,
+      "body_font": "Karla",
+      "body_weight": 400,
+      "mono_font": "JetBrains Mono",
+      "mono_weight": 400,
+      "rationale": "Two related, slightly softened grotesques keep the whole surface in one quiet family — a warmer, rounder alternative to the serif-headline pairings above, for a friendlier tone that still avoids the rounded-bubble 'AI assistant' cliché (no color, no gradient, just softer letterforms)."
+    },
+    {
+      "id": "chat-fraunces-inter",
+      "use": "chat-ui",
+      "heading_font": "Fraunces",
+      "heading_weight": 600,
+      "body_font": "Inter",
+      "body_weight": 400,
+      "mono_font": "JetBrains Mono",
+      "mono_weight": 400,
+      "rationale": "The library's own baseline: this is the pairing already contrast-checked and shipped in design-web-ui-refresh.md's v2. Kept here so a future sampling run can render a candidate pairing next to what's actually live and judge the delta, not just the candidate in isolation."
+    },
+    {
+      "id": "doc-sourceserif-inter",
+      "use": "document-resume",
+      "heading_font": "Source Serif 4",
+      "heading_weight": 600,
+      "body_font": "Source Serif 4",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "The other shipped baseline: Source Serif 4 for the résumé/cover-letter content itself, Inter for the surrounding side-panel chrome (path, tabs). Restrained rather than decorative, which is the point of a document of record."
+    },
+    {
+      "id": "doc-lora-public",
+      "use": "document-resume",
+      "heading_font": "Lora",
+      "heading_weight": 500,
+      "body_font": "Lora",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "Lora's brushed, slightly calligraphic curves read warmer and more personal than Source Serif 4, paired with Public Sans's plain tone for the chrome around it so the résumé still reads as a distinct object from the app shell, per Granola's document-plus-AI pattern."
+    },
+    {
+      "id": "doc-literata-plexsans",
+      "use": "document-resume",
+      "heading_font": "Literata",
+      "heading_weight": 500,
+      "body_font": "Literata",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "Literata was drawn for comfortable long-form reading (Google Play Books) — apt, since a candidate actually reads their full résumé in-app. IBM Plex Sans's engineered chrome stays clearly separate from the reading face."
+    },
+    {
+      "id": "doc-spectral-work",
+      "use": "document-resume",
+      "heading_font": "Spectral",
+      "heading_weight": 600,
+      "body_font": "Spectral",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "Spectral was tuned specifically for on-screen reading rather than print, which matches how a résumé is actually consumed here; Work Sans's open apertures keep small chrome labels legible beside it."
+    },
+    {
+      "id": "doc-bitter-manrope",
+      "use": "document-resume",
+      "heading_font": "Bitter",
+      "heading_weight": 600,
+      "body_font": "Bitter",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "A more structured, assertive alternative to a book serif — Bitter's slab gives a metrics-heavy résumé (titles, dates, numbers) a more organized feel. Manrope's soft geometry keeps the UI chrome from competing with the slab's weight."
+    },
+    {
+      "id": "marketing-playfair-jakarta",
+      "use": "marketing-sign-in",
+      "heading_font": "Playfair Display",
+      "heading_weight": 700,
+      "body_font": "Plus Jakarta Sans",
+      "body_weight": 500,
+      "mono_font": null,
+      "rationale": "Playfair's dramatic, high-contrast hairlines make a strong hero headline at sign-in size; Plus Jakarta Sans's confident geometric body keeps the rest of the page from reading like a fashion editorial. Reserve Playfair for the one headline only — its hairlines thin out below about 24px."
+    },
+    {
+      "id": "marketing-dmserif-work",
+      "use": "marketing-sign-in",
+      "heading_font": "DM Serif Display",
+      "heading_weight": 400,
+      "body_font": "Work Sans",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "DM Serif Display is calmer than Playfair — confident but not theatrical — paired with Work Sans for an approachable sign-in flow. A plainer, single-weight alternative to Fraunces for a wordmark treatment."
+    },
+    {
+      "id": "marketing-instrument-manrope",
+      "use": "marketing-sign-in",
+      "heading_font": "Instrument Serif",
+      "heading_weight": 400,
+      "body_font": "Manrope",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "Instrument Serif's understated italic reads as quiet confidence rather than AI hype for a short sign-in phrase, with Manrope keeping the surrounding form plain. Works only because the headline stays to a handful of words — this face was drawn for that length, not more."
+    },
+    {
+      "id": "marketing-youngserif-figtree",
+      "use": "marketing-sign-in",
+      "heading_font": "Young Serif",
+      "heading_weight": 400,
+      "body_font": "Figtree",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "A warmer, more playful sign-in moment. Flagged as the riskiest pairing in this set: Young Serif's hand-set quirkiness can undercut the product's plain, no-hype tone (rule 18) if it strays anywhere near a verdict or the gate — keep it to sign-in/marketing only, never a card."
+    },
+    {
+      "id": "marketing-unbounded-plexsans",
+      "use": "marketing-sign-in",
+      "heading_font": "Unbounded",
+      "heading_weight": 700,
+      "body_font": "IBM Plex Sans",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "Unbounded is legible only as a very short wordmark or one-line headline at large size, so it is paired here strictly for that — a logotype moment next to a plain, engineered body sans, not a general heading face for running copy."
+    }
+  ]
+}

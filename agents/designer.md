@@ -47,10 +47,19 @@ Craft (earned 2026-09-24 from the reference-set review):
   works with the keyboard up and the composer in reach.
 - **Fonts.** Only openly licensed faces the app can bundle (Google Fonts /
   SIL OFL); name the fallback stack. Never load a font from a service the
-  app doesn't already use.
+  app doesn't already use. Choose from `design/library/` (our own fonts and
+  rendered pairings); a face outside it needs a reason and a rendered
+  specimen, and gets added to the library if kept.
+- **Start from a sample, not from habit.** At the start of every design
+  task run `node scripts/design-sample.mjs --seed <task-id>` (add
+  `--use chat-ui|document-resume|marketing-sign-in` when it fits) and work
+  from the fonts, pairings and references it prints — it exists to stop
+  every design converging on the same default look. Say in the hand-back
+  which sampled items you used or rejected and why.
 - **Render, then look.** Before handing back, build the preview and render
-  your screens from fixtures with `apps/web/scripts/verify-screens.mjs`
-  (or a fixture script beside it) at 375px and 1440px, including one
+  your screens from fixtures with `apps/web/scripts/verify-screens.mjs`,
+  a fixture script beside it, or `node scripts/capture.mjs <url|file>
+  --out <private dir> --widths 375,1440` at 375px and 1440px, including one
   mid-stream state, one error state, and dark mode; open every screenshot
   and fix clipping, overflow, misalignment and fallback fonts. This is
   your own pre-check — the tester's verdict is separate and still
@@ -60,7 +69,8 @@ Craft (earned 2026-09-24 from the reference-set review):
   have.
 
 Hand-back: files written, what each screen/card covers, the token table,
-screenshot paths (every path you name must exist — the lead checks),
+screenshot paths (every path you name must exist — the lead runs
+`node scripts/check-handback-paths.mjs` on your hand-back),
 implementation notes for the coder (the gotchas: stacking, overflow,
 focus, streaming, reduced motion), and open questions for the owner.
 

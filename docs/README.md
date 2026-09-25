@@ -15,6 +15,7 @@ Read in this order.
 | [`plan-portable-skills-and-web-agent.md`](plan-portable-skills-and-web-agent.md) | portable skills, measured simplification, and the web agent MVP steps |
 | [`design-web-agent.md`](design-web-agent.md) | the web MVP's contracts: agent package, store, gate, tools, checker ports, transport, loading, model proxy and balance |
 | [`design-web-ui.md`](design-web-ui.md) | the web MVP's screen, cards, and fixture conversations |
+| [`old-app-paypal-ten-prefix.md`](old-app-paypal-ten-prefix.md) | a patch for the older app, owner-applied before Ten's first PayPal payment (web agent § 17.6) |
 | [`skill-shape.md`](skill-shape.md) | the five-file shape every skill follows, and how to convert one |
 | [`PROCESS.md`](PROCESS.md) | the ritual for changing anything |
 | [`loading-map.md`](loading-map.md) | what loads when, and where a new rule goes |

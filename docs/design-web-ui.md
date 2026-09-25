@@ -302,6 +302,39 @@ and `Sign out`. Success: "Password saved. Use it next time you sign in,
 here or in the older app." and `Continue`, which runs the normal
 membership check (§ 1.4). Errors: the table above.
 
+### 1.11 Buy credit (amendment, 2026-09-25; draft for owner approval)
+
+Mechanism: C § 17. Members only (§ 1.6 has none). Opened from the balance
+chip or "Buy credit" in the `⋯` menu, never from a card or the chat. A
+dialog; Close or Esc shuts it. `<contact>` is PENDING OWNER. Copy, word for
+word:
+
+- "Buy credit". "Credit pays for Ten's work. You pay in PayPal's window;
+  Ten adds what arrives after PayPal's fee, a few percent plus a fixed
+  amount. This is a one-time payment: nothing renews, and Ten never
+  charges you on its own." Then `$10`, `$20`, `$40` and PayPal's buttons.
+- Under them: "Paid credit stays if you delete your beta data. The beta
+  has a shared daily limit, so on a busy day Ten can pause until tomorrow
+  even with credit. For a refund, email <contact>."
+- Credited (numbers from the reply): "Added $9.16 of credit. PayPal
+  charged $10.00; its fee was $0.84." The chip refreshes.
+- Pending: "PayPal is still clearing this payment. The credit is added
+  when it clears."
+- Declined: "PayPal declined this payment. No money moved."
+- Window closed: "No payment was made."
+- Create-order failed: "Couldn't start a payment. No money moved."
+- Not credited, or no answer from capture: "Ten couldn't confirm the credit
+  yet. If PayPal took your payment, it's added automatically, usually
+  within minutes. If not by tomorrow, email <contact> with PayPal's
+  receipt."
+
+Replaced, after the function change (C § 17.4): `over_balance` reads "Your
+credit is used up. You can buy more from your balance at the top." § 1.7's
+list is "your workspace files, your conversation, and your gate log", and
+its sentence: "This deletes your Ten beta data. Your sign-in stays because
+it's shared with the older app. Your credit stays, and so do your payment
+and usage records, which show only amounts and no content."
+
 ## 2. The card catalog
 
 Every card is a `data-card` part — `{ card: CardType, props, ref? }`

@@ -837,7 +837,7 @@ await section("balance", async () => {
   rec(proxyCalls().length - p0 === 1, "over_balance: exactly one proxy call (402 is not retried)", `${proxyCalls().length - p0}`);
   const err = page.locator(".card--error").last();
   const errText = (await err.textContent().catch(() => "")) ?? "";
-  rec(errText.includes("over_balance") && errText.includes("Your beta credit is used up. Ask the person who invited you for more."), "over_balance: the proxy's 402 sentence is shown (§ 8, § 2.7)", errText);
+  rec(errText.includes("over_balance") && errText.includes("Your credit is used up. You can buy more from your balance at the top."), "over_balance: the proxy's 402 sentence is shown (§ 8, § 2.7)", errText);
   rec(stub.hits.length === h0, "over_balance: nothing reached the model");
   rec((await lastAssistant(page).locator("p:not(.card-body):not(.card-meta)").count()) === 0, "over_balance: no model reply after the refusal");
   // (b) mid-run: the balance runs out between steps -> the finished tool stays, error, no reply after
@@ -863,7 +863,7 @@ await section("balance", async () => {
   const lastBubble = lastAssistant(p2);
   rec((await lastBubble.locator(".tool-run").count()) === 1, "over_balance mid-run: the finished tool run stays on screen");
   const e2 = (await lastBubble.locator(".card--error").textContent().catch(() => "")) ?? "";
-  rec(e2.includes("Your beta credit is used up."), "over_balance mid-run: the 402 copy", e2);
+  rec(e2.includes("Your credit is used up."), "over_balance mid-run: the 402 copy", e2);
   const bubbleHtml = await lastBubble.innerHTML();
   rec(!bubbleHtml.includes("SHOULD NOT BE REACHED"), "over_balance mid-run: no model text after the refusal");
   await focusRefresh(p2);
@@ -950,10 +950,10 @@ await section("delete", async () => {
   await page.getByRole("menuitem", { name: "Delete my beta data" }).click();
   const dlg = page.locator(".delete-confirm-card");
   const dText = (await dlg.textContent()) ?? "";
-  rec(dText.includes("your workspace files, your conversation, your gate log, and your credit"), "delete: names the complete thing, incl. your conversation (§ 1.7.1, amended for C § 11.7)");
+  rec(dText.includes("your workspace files, your conversation, and your gate log") && !dText.includes("and your credit"), "delete: names the complete thing, credit no longer in it (§ 1.7.1, as replaced by § 1.11 / C § 17.4)");
   rec(
-    dText.includes("This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. Your usage records, which show only amounts spent and no content, are kept."),
-    "delete: C § 8's sentence word for word, incl. the kept-usage sentence (§ 1.7.2)",
+    dText.includes("This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Your credit stays, and so do your payment and usage records, which show only amounts and no content."),
+    "delete: § 1.11's replacement sentence word for word (C § 17.4)",
   );
   const fnBase = standIn.log.filter((l) => l.path === "/functions/v1/ten-delete-account" && l.method === "POST").length;
   const fnCalls = () => standIn.log.filter((l) => l.path === "/functions/v1/ten-delete-account" && l.method === "POST").length - fnBase;
@@ -980,15 +980,15 @@ await section("delete", async () => {
   const afterL = await db.ledger(uid);
   rec((await db.files(uid)).length === 0 && (await db.objects(uid)).length === 0 && (await db.gates(uid)).length === 0, "delete: no text rows, no objects, no gate rows left");
   rec((await standIn.sql("select 1 from public.ten_conversations where user_id = $1", [uid])).length === 0, "delete (§ 11.7): the saved conversation is gone too");
-  rec(!afterL.some((r) => r.kind === "credit") && afterL.filter((r) => r.kind === "call").length === before.ledger.filter((r) => r.kind === "call").length, "delete: credit rows gone, call rows kept (§ 8)");
+  rec(afterL.length === before.ledger.length && afterL.some((r) => r.kind === "credit"), "delete: every ledger row kept, the $5 starter included (C § 17.4)", `${before.ledger.length} -> ${afterL.length}`);
   rec((await standIn.sql("select 1 from auth.users where id = $1", [uid])).length === 1, "delete: the shared sign-in (auth user) is kept");
   if (await page.locator(".delete-confirm-card button", { hasText: "OK" }).count()) await page.locator(".delete-confirm-card button", { hasText: "OK" }).click();
   await page.locator(".sign-in-screen").waitFor({ timeout: 10000 });
   rec(!(await page.evaluate(() => Object.keys(localStorage).some((k) => k.includes("auth-token") && localStorage.getItem(k)))), "delete: session cleared after sign-out");
   rec(true, "delete: OK -> signed out to the sign-in screen");
   await signIn(page, em("delete.user"));
-  await page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
-  rec(true, "delete: signing back in -> not a member (the credit is gone)");
+  await page.locator(".composer-input").waitFor({ timeout: 20000 });
+  rec((await page.locator(".not-a-member-screen").count()) === 0, "delete: signing back in -> still a member, empty workspace (C § 17.4)");
   // decline path, fresh user
   const uid2 = await standIn.createUser({ email: em("delete.decline") });
   const { page: p2 } = await newPage();

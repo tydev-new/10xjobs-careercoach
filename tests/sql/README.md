@@ -17,6 +17,7 @@ node r3-own.mjs      # the round-2 review's own cases: guard bypasses, lookalike
 node r4-own.mjs      # the round-3 review's own cases
 node r5-finish-reason.mjs  # § 9.6: 20260924000000_ten_ledger_finish_reason.sql applied AFTER the init file
 node r6-conversations.mjs  # § 11: 20260924100000_ten_conversations.sql applied AFTER the first two migrations
+node r8-paypal.mjs         # § 17.3/17.8(7): 20260925000000_ten_paypal_credit.sql after the three applied ones; checks, refunds, teardown (tester)
 ```
 
 Each prints `[PASS]` / `[FAIL]` / `[OBSERVED]` lines and a failure count.

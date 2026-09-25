@@ -1,11 +1,13 @@
-// § 8 ten-delete-account (as amended, main 336aae1): needs only a signed-in user
-// (not membership), acts only on that user, idempotent. Removes users/{uid}/
-// objects through the Storage API (listed and removed page by page), then the
-// ten_ws_files, ten_gate_log and 'credit' ledger rows. KEEPS the shared sign-in
-// and the 'call' ledger rows, so the daily ceiling and cost history stay intact.
+// § 8 ten-delete-account (as amended, main 336aae1, and by § 17.4 on
+// 2026-09-25): needs only a signed-in user (not membership), acts only on that
+// user, idempotent. Removes users/{uid}/ objects through the Storage API
+// (listed and removed page by page), then the ten_ws_files, ten_gate_log and
+// ten_conversations rows. KEEPS the shared sign-in and EVERY ledger row, the
+// $5 starter and paid credit included (§ 17.4: "stops deleting ledger rows"),
+// so membership and balance survive with an empty workspace.
 
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { call, DEL, harness, member, observe, preq, spendTodayIn, t, userJwt } from "./_harness.ts";
+import { balanceIn, call, conversation, DEL, harness, isMemberIn, member, observe, preq, spendTodayIn, t, userJwt } from "./_harness.ts";
 
 const B = "ten-workspaces";
 
@@ -35,7 +37,7 @@ const rowsOf = (h: Awaited<ReturnType<typeof harness>>, uid: string) => ({
   calls: h.st.ledger.filter((r) => r.user_id === uid && r.kind === "call").length,
 });
 
-t("delete: only the caller's beta data goes; call rows kept; the other user's rows and objects survive; auth users kept", async () => {
+t("delete: only the caller's beta data goes; every ledger row kept (§ 17.4); the other user's rows and objects survive; auth users kept", async () => {
   const h = await harness();
   h.reset();
   const [a, ta] = await member(h);
@@ -49,7 +51,7 @@ t("delete: only the caller's beta data goes; call rows kept; the other user's ro
   const bObjects = [...h.st.objects].filter((o) => o.includes(b));
   const { res, txt } = await del(ta);
   assertEquals(res.status, 200, txt);
-  assertEquals(rowsOf(h, a), { objects: 0, files: 0, gates: 0, credits: 0, calls: 1 }, "A: career data gone, call rows kept");
+  assertEquals(rowsOf(h, a), { objects: 0, files: 0, gates: 0, credits: 1, calls: 1 }, "A: career data gone, the $5 starter and call rows kept");
   assertEquals(rowsOf(h, b), bBefore, "B untouched");
   for (const o of bObjects) assert(h.st.objects.has(o), `B's object survived: ${o}`);
   assert(h.st.objects.has(`avatars/users/${a}/ws/documents/cv-0.pdf`), "other bucket untouched");
@@ -62,7 +64,6 @@ t("delete: only the caller's beta data goes; call rows kept; the other user's ro
     [
       "DELETE /rest/v1/ten_conversations", // § 11.7 (amended 2026-09-24): the saved conversation goes too
       "DELETE /rest/v1/ten_gate_log",
-      "DELETE /rest/v1/ten_usage_ledger",
       "DELETE /rest/v1/ten_ws_files",
       `DELETE /storage/v1/object/${B}`,
     ],
@@ -71,11 +72,11 @@ t("delete: only the caller's beta data goes; call rows kept; the other user's ro
   const iStorage = touched.indexOf(`DELETE /storage/v1/object/${B}`);
   const iRows = touched.findIndex((x) => x.startsWith("DELETE /rest/v1/"));
   assert(iStorage >= 0 && iStorage < iRows, "Storage API removal happens before the row deletes");
-  // every row DELETE is scoped to A (and the ledger one to credit rows)
+  // every row DELETE is scoped to A; none touches the ledger (§ 17.4)
   for (const r of h.st.requests.filter((r) => r.method === "DELETE" && r.path.startsWith("/rest/"))) {
     const q = new URL("http://x" + r.path).searchParams;
     assertEquals(q.getAll("user_id"), [`eq.${a}`], r.path);
-    if (r.path.startsWith("/rest/v1/ten_usage_ledger")) assertEquals(q.getAll("kind"), ["eq.credit"], r.path);
+    assert(!r.path.startsWith("/rest/v1/ten_usage_ledger"), `a ledger DELETE was sent: ${r.path}`);
   }
 });
 
@@ -139,7 +140,7 @@ t("delete: a failure part-way (gate_log delete errors) -> 503 with CORS; a retry
   h.st.fail = {};
   const second = await del(ta);
   assertEquals(second.res.status, 200, second.txt);
-  assertEquals(rowsOf(h, a), { objects: 0, files: 0, gates: 0, credits: 0, calls: 1 });
+  assertEquals(rowsOf(h, a), { objects: 0, files: 0, gates: 0, credits: 1, calls: 1 });
 });
 
 t("delete: a storage listing failure stops before any row is deleted", async () => {
@@ -197,4 +198,30 @@ t("delete: GET/PUT/DELETE/PATCH -> 404, nothing deleted; OPTIONS answers without
   assertEquals(rowsOf(h, a).files, 3);
   const pre = await h.del(new Request(DEL, { method: "OPTIONS", headers: { origin: "https://ten.example.com" } }));
   assertEquals(pre.headers.get("access-control-allow-origin"), "https://ten.example.com");
+});
+
+t("§ 17.8(8) delete, twice, with a paid credit: files, conversation, gates gone; ledger, membership and balance stay", async () => {
+  const h = await harness();
+  h.reset();
+  const [a, ta] = await member(h);
+  plant(h, a);
+  conversation(h.st, a);
+  h.st.ledger.push({
+    id: crypto.randomUUID(), user_id: a, kind: "credit", request_id: "paypal:CAPDELETE01", model: null,
+    tokens_in: 0, tokens_out: 0, tokens_cached: 0, usd: 9.16, finish_reason: null, created_at: h.st.now(),
+    gross_cents: 1000, fee_cents: 84, usd_micros: 9_160_000,
+  });
+  const ledgerBefore = JSON.stringify(h.st.ledger.filter((r) => r.user_id === a));
+  const balBefore = balanceIn(h.st, a);
+  for (const n of [1, 2]) {
+    const { res, txt } = await del(ta);
+    assertEquals(res.status, 200, `delete #${n}: ${txt}`);
+    const r = rowsOf(h, a);
+    assertEquals([r.objects, r.files, r.gates], [0, 0, 0], `delete #${n}`);
+    assertEquals(h.st.conversations.filter((c) => c.user_id === a).length, 0);
+    assertEquals(JSON.stringify(h.st.ledger.filter((x) => x.user_id === a)), ledgerBefore, `delete #${n}: the ledger is untouched`);
+    assert(isMemberIn(h.st, a), `delete #${n}: still a member`);
+    assertEquals(balanceIn(h.st, a), balBefore, `delete #${n}: balance unchanged`);
+  }
+  observe(`balance after two deletes: ${balBefore.toFixed(2)} (starter 5 + paid 9.16 - calls)`);
 });

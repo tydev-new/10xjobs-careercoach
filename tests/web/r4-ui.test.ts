@@ -64,7 +64,8 @@ function renderErrorPart(data: unknown): string {
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
 const metas = (html: string) => [...html.matchAll(/<p class="card-meta">([^<]*)<\/p>/g)].map((m) => m[1]);
 
-const OVER = "Your beta credit is used up. Ask the person who invited you for more.";
+// design-web-ui.md § 1.11 (replaced after C § 17.4), word for word.
+const OVER = "Your credit is used up. You can buy more from your balance at the top.";
 const CEILING = "The beta has reached today's limit. Try again tomorrow.";
 // The proxy's other real model_error sentence (handler.ts MESSAGES.modelError). The old
 // cut-off model_error sentence is retired: a cut-off is its own code, cut_off (§ 9.3).

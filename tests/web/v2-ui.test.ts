@@ -263,3 +263,20 @@ test("v2 at 375 px: no horizontal scroll on any fixture; the gate card has no bu
   assert.equal(await page.locator(".card--gate button, .card--gate [role=button], .card--gate input").count(), 0);
   await page.context().close();
 });
+
+// ------------------------------------------------------------------ light-theme-always (e750910): the mock keeps both
+
+test("light theme always (owner ruling 2026-09-24): the preview mock still follows a dark OS, renders the dark tokens, and keeps its theme toggle", async () => {
+  const page = await open({ colorScheme: "dark" });
+  const dark = await page.evaluate(() => {
+    const r = document.querySelector(".app-root") as HTMLElement | null;
+    return { theme: r?.getAttribute("data-theme"), bg: r ? getComputedStyle(r).getPropertyValue("--bg").trim() : "", scheme: r ? getComputedStyle(r).colorScheme : "" };
+  });
+  assert.deepEqual(dark, { theme: "dark", bg: "#11131c", scheme: "dark" }, "the dark tokens stay renderable for design review");
+  await page.locator(".menu-trigger").click();
+  const item = page.getByRole("menuitem", { name: "Switch to light" });
+  assert.equal(await item.count(), 1, "the mock's menu keeps its theme item");
+  await item.click();
+  assert.equal(await page.evaluate(() => document.querySelector(".app-root")?.getAttribute("data-theme")), "light", "and it works");
+  await page.context().close();
+});

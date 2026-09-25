@@ -6,7 +6,8 @@ the receipt is named so the step can be re-litigated if the evidence
 changes (P2.13 — every rule derivable or earned).
 
 **Precedence chain for every judgment:** `PRINCIPLES.md` →
-`docs/design-cowork-coaching-goals.md` → `docs/design-cowork-coaching.md`.
+`docs/design-cowork-coaching-goals.md` → `docs/design-cowork-coaching.md`
+→ `docs/skill-shape.md` (the same chain as `CLAUDE.md`).
 A conflict means one of them is wrong — fix the chain, never pick a
 winner ad hoc.
 
@@ -37,15 +38,18 @@ winner ad hoc.
    greps. *(Receipt 2026-08-15: the apply fix-pass shipped a corrupted
    file and two dangling sentences; the fixer's verification missed all
    three, the reviewer's caught all three.)*
-6. **Live run first — on a fixture persona.** Before the harness, run
-   the change live in a fresh test workspace (or a fresh test account on
-   the web app) seeded with an invented persona. The live run is the
-   acceptance test AND the design input for what the harness should
-   bait. Only the owner runs it on real data, in their own workspace or
-   account; what they learn comes back as a numbers-only receipt, and
-   real data never enters the repo. *(Receipt: the S002 "most
-   left"→"about half" catch; the pitch anti-pattern catch; every t6/t7
-   case came from a live lesson.)*
+6. **Live run first.** Contributors run the change live on a fixture
+   persona (an invented candidate) in a fresh test workspace, or a fresh
+   test account on the web app; never on real candidate data. The live
+   run is the acceptance test AND the design input for what the harness
+   should bait. **Closing a skill change still needs the owner's live run
+   on real data,** in their own workspace or account, or a waiver
+   recorded in the issue that carries assumption A14's caveat: a fixture
+   replay may not predict live behaviour (`docs/design-cowork-coaching.md`
+   § 10, row A14). What the owner learns comes back as a numbers-only
+   receipt; real data never enters the repo. *(Receipts, all earned on
+   the owner's real data: the S002 "most left"→"about half" catch; the
+   pitch anti-pattern catch; every t6/t7 case came from a live lesson.)*
 7. **Conduct harness (tN) after the live run.** Planted workspaces, ~3
    cases per failure mode, Sonnet runner + Opus judge; the judge sees
    the written files, the skill text, and a deterministic check output;

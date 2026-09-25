@@ -38,8 +38,10 @@ const coach = createCoach({
 (window as any).__h = { chatId, builtId: BUILT_VERSION_ID, pending: () => gate.pending(chatId) };
 
 function App() {
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark">(((window as any).__theme as "light" | "dark") ?? "light");
+  // the same theme root RealApp.tsx renders the member screen under
   return (
+    <div className="app-root" data-theme={theme}>
     <RealChatShell
       coach={coach}
       workspace={workspace as any}
@@ -52,6 +54,7 @@ function App() {
       theme={theme}
       onThemeToggle={() => setTheme((t) => (t === "light" ? "dark" : "light"))}
     />
+    </div>
   );
 }
 

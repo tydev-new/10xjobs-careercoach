@@ -107,28 +107,59 @@ export const textReply = (text: string, cost = 0.01) => sse().text(text).finish(
 export const toolReply = (name: string, input: unknown, cost = 0.01, callId = `call_${Math.random().toString(36).slice(2, 10)}`) =>
   sse().toolCall(0, callId, name, input).finish("tool_calls").usage(cost);
 
+/** A non-SSE HTTP answer from the proxy (e.g. its 413 refusal). */
+export class HttpReply {
+  readonly status: number;
+  readonly body: unknown;
+  constructor(status: number, body: unknown) {
+    this.status = status;
+    this.body = body;
+  }
+}
+/** The proxy's own 413 (supabase/functions/ten-model-proxy/handler.ts's jsonError). */
+export const proxyTooLarge = () => new HttpReply(413, { error: { code: "too_large", message: "Request too large." } });
+
 export interface StubbedModel {
   model: any;
   /** Every request body the provider sent, parsed. */
   requests: any[];
+  /** Every LanguageModel prompt the SDK handed the provider (the
+   *  ModelMessage-level array, system message included), in order. */
+  prompts: any[];
   get used(): number;
 }
 
 /** The real provider, same construction as apps/web/src/backend/model.ts
  *  (baseURL = the proxy, placeholder apiKey, custom fetch). */
-export function stubbedOpenRouter(script: SseScript[]): StubbedModel {
+export function stubbedOpenRouter(script: Array<SseScript | HttpReply>): StubbedModel {
   const requests: any[] = [];
+  const prompts: any[] = [];
   let i = 0;
   const fetchStub = async (_url: any, init?: any) => {
     requests.push(JSON.parse(String(init?.body ?? "{}")));
     const s = script[i++];
     if (!s) throw new Error(`stubbed fetch: request #${i} has no scripted response (script has ${script.length})`);
+    if (s instanceof HttpReply) {
+      return new Response(JSON.stringify(s.body), { status: s.status, headers: { "content-type": "application/json" } });
+    }
     const body = s.delayMs > 0 ? s.stream(init?.signal) : s.body();
     return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
   };
   const openrouter = createOpenRouter({ apiKey: "unused-stub", baseURL: "http://127.0.0.1:9/ten-model-proxy", fetch: fetchStub as any });
-  const model = openrouter.chat("anthropic/claude-sonnet-5", { provider: { data_collection: "deny", zdr: true }, cache_control: { type: "ephemeral" } } as any);
-  return { model, requests, get used() { return i; } };
+  const real = openrouter.chat("anthropic/claude-sonnet-5", { provider: { data_collection: "deny", zdr: true }, cache_control: { type: "ephemeral" } } as any);
+  const model = new Proxy(real, {
+    get(target, prop, recv) {
+      if (prop === "doStream") {
+        return (opts: any) => {
+          prompts.push(JSON.parse(JSON.stringify(opts.prompt)));
+          return target.doStream(opts);
+        };
+      }
+      const v = Reflect.get(target, prop, recv);
+      return typeof v === "function" ? v.bind(target) : v;
+    },
+  });
+  return { model, requests, prompts, get used() { return i; } };
 }
 
 // ---------------------------------------------------------------- request views

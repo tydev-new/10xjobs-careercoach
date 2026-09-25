@@ -4,7 +4,7 @@
   "type": "module",
   "description": "PGlite harness for supabase/migrations/*.sql (applied in order) and supabase/teardown/ten_beta_teardown.sql",
   "scripts": {
-    "test": "node run.mjs && node run-r2.mjs && node r3-own.mjs && node r4-own.mjs && node r5-finish-reason.mjs && node r6-conversations.mjs"
+    "test": "node run.mjs && node run-r2.mjs && node r3-own.mjs && node r4-own.mjs && node r5-finish-reason.mjs && node r6-conversations.mjs && node r7-conversations-own.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8"

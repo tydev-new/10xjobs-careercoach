@@ -27,7 +27,10 @@
 // can assert who called what with which token. Never touches a real
 // project: it binds 127.0.0.1 only.
 import { createHmac, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import http from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createBackend, type Backend } from "../store/pglite-backend.ts";
 
 export const JWT_SECRET = "e2e-real-jwt-secret-at-least-32-characters!!";
@@ -96,9 +99,16 @@ interface AuthUser {
   expiresIn: number;
 }
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+
 export async function startStandIn(): Promise<StandIn> {
   const backend = await createBackend({});
   const db = backend.db;
+  // § 9.6 and § 11.2 (amended 2026-09-24): the applied files, in order, after
+  // the init file the reused backend already ran.
+  for (const f of ["20260924000000_ten_ledger_finish_reason.sql", "20260924100000_ten_conversations.sql"]) {
+    await db.exec(readFileSync(path.join(REPO_ROOT, "supabase/migrations", f), "utf8"));
+  }
   const log: LoggedRequest[] = [];
   const users = new Map<string, AuthUser>(); // email -> user
   const byId = new Map<string, AuthUser>();
@@ -326,6 +336,18 @@ export async function startStandIn(): Promise<StandIn> {
           ten_gate_decide: { sql: "select public.ten_gate_decide($1,$2,$3) as v", args: [a.p_id, a.p_status, a.p_typed] },
           ten_gate_expire_other_chats: { sql: "select public.ten_gate_expire_other_chats($1) as v", args: [a.p_chat], void: true },
         };
+        if (fn === "ten_conversation_save") {
+          try {
+            const rows = await locked(() =>
+              asRole(c.role, c.sub, () =>
+                db.query<any>("select * from public.ten_conversation_save($1, $2::jsonb, $3, $4)", [a.p_chat_id, a.p_messages === undefined ? null : JSON.stringify(a.p_messages), a.p_older_dropped, a.p_expected]),
+              ),
+            );
+            return send(200, rows.rows);
+          } catch (e) {
+            return pgErr(e);
+          }
+        }
         const call = calls[fn];
         if (!call) return send(404, { code: "PGRST202", message: `stand-in: no rpc ${fn}` });
         try {
@@ -334,6 +356,19 @@ export async function startStandIn(): Promise<StandIn> {
           const v = rows.rows[0]?.v;
           // PostgREST renders numeric as a JSON number.
           return send(200, typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v);
+        } catch (e) {
+          return pgErr(e);
+        }
+      }
+
+      // ---- ten_conversations reads (§ 11.6 load, § 11.5 readVersion) ----
+      if (url.pathname === "/rest/v1/ten_conversations" && req.method === "GET") {
+        const sel = (url.searchParams.get("select") ?? "*").split(",").map((x) => x.trim());
+        for (const x of sel) if (!/^[a-z_]+$/.test(x) && x !== "*") return send(400, { message: "bad select" });
+        const limit = Number(url.searchParams.get("limit") ?? "1000");
+        try {
+          const rows = await locked(() => asRole(c.role, c.sub, () => db.query<any>(`select ${sel.join(", ")} from public.ten_conversations limit ${limit}`)));
+          return send(200, rows.rows);
         } catch (e) {
           return pgErr(e);
         }
@@ -383,7 +418,7 @@ export async function startStandIn(): Promise<StandIn> {
       }
 
       // ---- service role: row deletes (ten-delete-account) ----
-      const delM = /^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger)$/.exec(url.pathname);
+      const delM = /^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger|ten_conversations)$/.exec(url.pathname);
       if (delM && req.method === "DELETE") {
         const params: unknown[] = [];
         const where: string[] = [];

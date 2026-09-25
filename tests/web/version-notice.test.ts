@@ -413,6 +413,42 @@ test("(vi) one line above the composer, one Reload button, not dismissible, neut
   await h.page.context().close();
 });
 
+for (const theme of ["light", "dark"] as const) {
+  test(`(vi) v2 styling (${theme}): the notice's text and Reload label meet WCAG AA (4.5:1) as rendered`, async () => {
+    const h = await open({ mode: { kind: "id", id: "6666666-20990101T000000Z" } });
+    if (theme === "dark") {
+      await h.page.locator(".menu-trigger").click();
+      await h.page.getByRole("menuitem", { name: "Switch to dark" }).click();
+    }
+    await notice(h.page).waitFor();
+    const r = await h.page.evaluate(() => {
+      const parse = (c: string) => { const m = c.match(/rgba?\(([^)]+)\)/)!; const p = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return { r: p[0], g: p[1], b: p[2], a: p[3] ?? 1 }; };
+      const over = (t: any, b: any) => ({ r: t.r * t.a + b.r * (1 - t.a), g: t.g * t.a + b.g * (1 - t.a), b: t.b * t.a + b.b * (1 - t.a), a: 1 });
+      const lum = (c: any) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+      const ratioOf = (el: Element) => {
+        const chain: Element[] = [];
+        for (let n: Element | null = el; n; n = n.parentElement) chain.unshift(n);
+        let bg = { r: 255, g: 255, b: 255, a: 1 };
+        let op = 1;
+        for (const n of chain) { const s = getComputedStyle(n); const c = parse(s.backgroundColor); if (c.a > 0) bg = over(c, bg); op *= Number(s.opacity); }
+        const fg0 = parse(getComputedStyle(el).color);
+        const fg = over({ ...fg0, a: fg0.a * op }, bg);
+        const [x, y] = [lum(fg), lum(bg)].sort((a, b) => b - a);
+        return (x + 0.05) / (y + 0.05);
+      };
+      return {
+        theme: document.querySelector(".app-root")?.getAttribute("data-theme"),
+        text: ratioOf(document.querySelector(".version-notice-text")!),
+        button: ratioOf(document.querySelector(".version-notice-reload")!),
+      };
+    });
+    assert.equal(r.theme, theme);
+    assert.ok(r.text >= 4.5, `notice text ${r.text.toFixed(2)}:1`);
+    assert.ok(r.button >= 4.5, `Reload label ${r.button.toFixed(2)}:1`);
+    await h.page.context().close();
+  });
+}
+
 test("(vi) Reload calls location.reload()", async () => {
   const h = await open({ mode: { kind: "id", id: "3333333-20990101T000000Z" } });
   await notice(h.page).waitFor();

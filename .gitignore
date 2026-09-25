@@ -11,3 +11,6 @@ dist/
 *.env.local
 # Vercel project link (IDs); never commit
 .vercel/
+
+# Test harnesses symlink node_modules on the fly; a trailing-slash rule misses symlinks.
+tests/web/*/node_modules

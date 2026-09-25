@@ -1832,7 +1832,9 @@ neither was right:
   including up to 10 results**, then $0.001 per extra result, plus the
   model's own tokens for the results it reads. The proxy never sets a
   mode, so Auto applies, and it caps results at 5, so there are never
-  extra results.
+  extra results. The Exa price applies only because the proxy forces
+  `engine: "exa"`: with no engine, Anthropic models use their native
+  search, priced differently (same docs).
 - **The ledger** (`ten_usage_ledger`, all 189 Claude `call` rows, read
   only, 2026-09-24): each row's `usd` minus its tokens at $2.50/M
   uncached input (the cache-write price), $0.20/M cached input and $10/M
@@ -1878,9 +1880,9 @@ about five times.
   about $0.22** (§ 9.5 had $0.22992).
 - The ceiling drops by $0.013. It is still the meter's fallback charge
   and the 10× bound. § 13's separate finding (a cache write on a regional
-  host puts Claude's real worst case above this ceiling) is untouched and
-  still open for the owner. With this section, its numbers are $0.273112
-  for Claude and $0.043288 for DeepSeek.
+  host puts Claude's real worst case above this ceiling) was approved
+  by the owner (§ 13.6 (1)). Once § 13 is built, with this search term,
+  the ceiling is $0.273112 for Claude and $0.043288 for DeepSeek.
 - `MAX_WEB_RESULTS` stays 5. Past 10 results, each extra one costs $0.001
   and the search term becomes $0.007 + (n − 10) × $0.001. A comment at
   the constant says so.
@@ -1912,7 +1914,8 @@ about five times.
 - **(v) Ceiling:** `CEILING_USD` = 64,000 × 2e-6 + 8,192 × 1e-5 + 0.007 =
   0.21692 (1e-9); a meter with no readable cost records 0.21692. Every
   0.22992 assertion is updated (`core.test.ts`, `handler.test.ts`,
-  `tests/functions/*.test.ts`).
+  `tests/functions/*.test.ts`). These are the single-model values; once
+  § 13 is built, § 13.5 (iv)'s per-model ceilings replace them.
 - **(vi) No stale price:** no `0.004` search price and no
   `CEILING_SEARCH_USD_PER_RESULT` remain in `packages/`, `apps/web/src/`
   or `supabase/functions/`.

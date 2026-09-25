@@ -32,7 +32,7 @@ test("posts one call with plugins: [{ id: 'web' }] and the live JWT, and parses 
     return sseResponse(body);
   }) as typeof fetch;
 
-  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt-1", fetchImpl, defaultUsd: 0.004 });
+  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt-1", fetchImpl, defaultUsd: 0.047 });
   const out = await webSearch({ query: "Acme Staff PM", maxResults: 5 });
 
   assert.equal(seenAuth, "Bearer jwt-1");
@@ -51,28 +51,28 @@ test("clamps maxResults to 5 both on the request and the returned results", asyn
     url_citation: { url: `https://x.example/${i}`, title: `Result ${i}` },
   }));
   const fetchImpl = (async () => sseResponse(sse({ choices: [{ delta: { annotations: manyAnnotations } }] }) + "data: [DONE]\n\n")) as typeof fetch;
-  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.004 });
+  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.047 });
   const out = await webSearch({ query: "q", maxResults: 20 });
   assert.equal(out.results.length, 5);
 });
 
 test("no usage.cost in the stream falls back to the injected default", async () => {
   const fetchImpl = (async () => sseResponse(sse({ choices: [{ delta: { content: "hi" } }] }) + "data: [DONE]\n\n")) as typeof fetch;
-  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.004 });
+  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.047 });
   const out = await webSearch({ query: "q" });
-  assert.equal(out.usd, 0.004);
+  assert.equal(out.usd, 0.047);
   assert.deepEqual(out.results, []);
 });
 
 test("no annotations at all degrades to an empty result list, not a thrown error (fail soft — UNVERIFIED wire shape)", async () => {
   const fetchImpl = (async () => sseResponse("data: [DONE]\n\n")) as typeof fetch;
-  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.004 });
+  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.047 });
   const out = await webSearch({ query: "q" });
   assert.deepEqual(out.results, []);
 });
 
 test("a non-2xx response is a thrown error (the tool wraps it as tool_error)", async () => {
   const fetchImpl = (async () => new Response(JSON.stringify({ error: { code: "over_balance", message: "Your beta credit is used up." } }), { status: 402 })) as typeof fetch;
-  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.004 });
+  const webSearch = createWebSearch({ proxyUrl: "https://proj.supabase.co/functions/v1/ten-model-proxy", getAccessToken: async () => "jwt", fetchImpl, defaultUsd: 0.047 });
   await assert.rejects(() => webSearch({ query: "q" }), /HTTP 402/);
 });

@@ -10,6 +10,9 @@ by the owner as written (2026-09-24). Each wins over earlier text it names.
 Again 2026-09-24: § 13 (the site's model is a setting; approved by the owner,
 2026-09-24, with the answers in § 13.6).
 Again 2026-09-24: § 14 (web search is billed per request; owner request).
+Again 2026-09-25: § 15 (who runs production changes; lead ruling recording
+the owner's practice). It wins over every earlier "the owner applies …,
+never an agent" line.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -525,8 +528,9 @@ The beta shares the owner's **existing production Supabase project**,
 2026-09-23 it had zero storage policies and RLS on for `storage.objects` and
 `storage.buckets` (the observed baseline). Every object it adds is named `ten_…`/`ten-…`,
 created by `supabase/migrations/20260923000000_ten_beta_init.sql` and dropped
-by `supabase/teardown/ten_beta_teardown.sql`; the owner applies both, never an
-agent, at a quiet time (3 s lock timeout; on a timeout nothing changes). Its
+by `supabase/teardown/ten_beta_teardown.sql`; both are applied at a quiet time,
+each with the owner's explicit approval, by the owner or the lead acting on it
+(§ 15, amended 2026-09-25) (3 s lock timeout; on a timeout nothing changes). Its
 lasting protection is three **restrictive pins** (built-in functions only):
 no permissive policy, now or added later by the old app, can open
 `ten-workspaces` rows to anyone but their owner, or make the bucket public or
@@ -910,7 +914,8 @@ This lets a cut-off show in the data without anyone reading a chat.
     `supabase/migrations/20260924000000_ten_ledger_finish_reason.sql` (3 s
     lock timeout, one `alter table … add column`). The applied
     `20260923000000_ten_beta_init.sql` is never edited.
-  - The owner applies it, never an agent, **before** deploying the proxy
+  - It is applied (with the owner's approval, by the owner or the lead
+    acting on it, § 15) **before** deploying the proxy
     that writes the column. Otherwise every insert would name an unknown
     column and fail: the meter retries once, then logs the row as lost,
     so the call is never charged to the balance or the $5 daily ceiling.
@@ -1351,7 +1356,8 @@ was removed.
 
 ### 11.8 Deploy order
 
-The owner applies: migration → `NOTIFY pgrst, 'reload schema';` →
+Applied in this order, each step with the owner's approval (§ 15):
+migration → `NOTIFY pgrst, 'reload schema';` →
 `ten-delete-account` → site (the delete must cover conversations before
 any site writes one, rule 9). The teardown drops
 `ten_conversation_save(text, jsonb, boolean, text)` and
@@ -1922,6 +1928,39 @@ about five times.
 
 ---
 
+## 15. Who runs production changes (amendment, 2026-09-25)
+
+Lead ruling, recording the owner's actual practice (2026-09-25). Where an
+earlier line says "the owner applies …, never an agent", this section wins.
+
+- **Every production change needs the owner's explicit approval for that
+  action.** A production change is a migration or teardown, an Edge
+  Function deploy or secret, a site deploy, or a setting (a Vercel
+  variable, an Auth setting, a credit row). One approval covers one action;
+  it is never reused for the next one.
+- **The owner, or the lead acting on that approval, runs the step.** The
+  lead is the main agent session (`agents/README.md`).
+- **No other agent role ever deploys or touches production:** not the
+  architect, the designer, the coder or the tester. Their work stays on
+  fixtures, stubs and local test databases.
+- **Historical headers predate this rule.** The applied migrations
+  (`20260923000000_ten_beta_init.sql`, `20260924000000_ten_ledger_finish_reason.sql`,
+  `20260924100000_ten_conversations.sql`) and the teardown
+  (`supabase/teardown/ten_beta_teardown.sql`) still say "never an agent" in
+  their headers. Applied migrations are never edited; read those lines as
+  this rule.
+
+**Prevents:** a contract that says one thing while production is changed
+another way (rule 11: believe what happened, not the narration); an agent
+role other than the lead changing production; one approval stretched over
+several actions.
+**Proved by:** a review, not a test: every production change in an issue
+or commit names the owner's approval for that action. A grep for "never an
+agent" finds it only in the historical headers above and in this
+section's own quotes of them.
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -2011,6 +2050,10 @@ spike replaced (owner, 2026-09-23).
   outside members are invited (B2 stands); the privacy terms start as
   `/privacy.html`, naming OpenRouter, Exa and each model's hosts, and ship
   with § 13; the menu keeps "(testing)".
+- Who runs production changes (§ 15; lead ruling recording the owner's
+  practice, 09-25): the owner's explicit approval per action; the owner or
+  the lead acting on it runs the step; no other agent role deploys.
+  Historical migration and teardown headers predate the rule.
 - Fix round 2 of § 10–12 (lead rulings, 09-24): § 9.4 skips an assistant
   message made only of `data-gate-status` parts, so § 11.6's
   reconciliation message can't hide a stop; each reconciliation message

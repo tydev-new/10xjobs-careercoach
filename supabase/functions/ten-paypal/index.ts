@@ -5,6 +5,7 @@
 
 import { handleRequest, type PaypalDeps } from "./handler.ts";
 import { captureOrder, createOrder, getAccessToken, getOrder, type PayPalConfig } from "../_shared/paypal.ts";
+import { buildInvoiceId, verifyInvoiceId } from "../_shared/paypal-invoice.ts";
 import { envFromDeno, insertLedgerCredit, isMember, verifyUser } from "../_shared/supabase.ts";
 
 const env = envFromDeno((name) => Deno.env.get(name));
@@ -42,8 +43,11 @@ const deps: PaypalDeps = {
     return captureOrder(paypalConfig, accessToken, orderId, requestId);
   },
   insertLedgerCredit: (row) => insertLedgerCredit(env, row),
-  randomId: () => crypto.randomUUID(),
-  log: { warn: (e) => console.warn(e) },
+  // F1 (fix round 2): the client secret never leaves this closure — handler.ts
+  // only ever sees these two functions, never the raw string.
+  signInvoiceId: (uid, pack, amountUsd) => buildInvoiceId(paypalConfig.clientSecret, uid, pack, amountUsd),
+  verifyInvoiceId: (invoiceId, uid, pack, amountUsd) => verifyInvoiceId(paypalConfig.clientSecret, invoiceId, uid, pack, amountUsd),
+  log: { warn: (e) => console.warn(e), error: (e) => console.error(e) },
 };
 
 Deno.serve((req) => handleRequest(req, deps, Deno.env.toObject()));

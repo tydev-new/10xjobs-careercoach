@@ -108,13 +108,31 @@ export interface CaptureInfo {
   status: string; // "COMPLETED" | "PENDING" | "DECLINED" | ...
   customId: string;
   currencyCode: string;
+  /** § 17.1 step 2/F1 (fix round 2) — the SAME invoice_id create-order set
+   *  on the order; captures inherit their order's own invoice_id. Read here
+   *  so capture-order/the webhook can re-verify F1's HMAC tag from the
+   *  resource itself, before ever crediting. */
+  invoiceId: string;
   /** PayPal's own decimal strings from `seller_receivable_breakdown`, or
    *  `null` when the breakdown isn't there yet (e.g. status PENDING —
-   *  § 17.1 step 4: "no fee breakdown until it clears"). Never parsed to a
-   *  JS number here — see the file header. */
+   *  § 17.1 step 4: "no fee breakdown until it clears") OR when that
+   *  breakdown LINE's own `currency_code` isn't "USD" (F5, fix round 2:
+   *  each of gross/fee/net carries its OWN currency field in PayPal's
+   *  response — a mismatched line must not silently pass just because the
+   *  capture's overall `amount.currency_code` happens to read USD). Never
+   *  parsed to a JS number here — see the file header. */
   grossUsd: string | null;
   feeUsd: string | null;
   netUsd: string | null;
+}
+
+/** True only when `obj.currency_code` is exactly "USD" and `obj.value` is a
+ * string — F5's "require USD on every breakdown value, not only
+ * capture.amount" check, applied per line (gross/fee/net each carry their
+ * own currency_code in PayPal's response). */
+// deno-lint-ignore no-explicit-any
+function usdStringValue(obj: any): string | null {
+  return obj?.currency_code === "USD" && typeof obj?.value === "string" ? obj.value : null;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -132,9 +150,10 @@ function captureInfoFrom(capture: any): CaptureInfo {
     status: String(capture.status ?? ""),
     customId: String(capture.custom_id ?? ""),
     currencyCode: String(capture.amount?.currency_code ?? ""),
-    grossUsd: typeof breakdown?.gross_amount?.value === "string" ? breakdown.gross_amount.value : null,
-    feeUsd: typeof breakdown?.paypal_fee?.value === "string" ? breakdown.paypal_fee.value : null,
-    netUsd: typeof breakdown?.net_amount?.value === "string" ? breakdown.net_amount.value : null,
+    invoiceId: String(capture.invoice_id ?? ""),
+    grossUsd: usdStringValue(breakdown?.gross_amount),
+    feeUsd: usdStringValue(breakdown?.paypal_fee),
+    netUsd: usdStringValue(breakdown?.net_amount),
   };
 }
 
@@ -144,6 +163,9 @@ export interface OrderInfo {
   customId: string;
   amountValue: string;
   currencyCode: string;
+  /** § 17.1 step 2/F1 — the invoice_id create-order set on this order;
+   *  capture-order re-verifies F1's HMAC tag against it before capturing. */
+  invoiceId: string;
   /** Present once the order has been captured — read here so
    *  ORDER_ALREADY_CAPTURED can be resolved with one more GET, not a
    *  second capture call (§ 17.1 step 4). */
@@ -172,6 +194,7 @@ export async function getOrder(
     customId: String(body?.purchase_units?.[0]?.custom_id ?? ""),
     amountValue: String(body?.purchase_units?.[0]?.amount?.value ?? ""),
     currencyCode: String(body?.purchase_units?.[0]?.amount?.currency_code ?? ""),
+    invoiceId: String(body?.purchase_units?.[0]?.invoice_id ?? ""),
     capture: extractCaptureFromOrderBody(body),
   };
 }
@@ -194,7 +217,13 @@ function firstIssue(body: any): string | undefined {
  * client has to implement). Returns a result instead of throwing for the
  * two outcomes the caller must handle differently (ORDER_ALREADY_CAPTURED
  * → read the order's own capture; ORDER_NOT_APPROVED → the payer never
- * confirmed) — still throws on a transport failure or a malformed 2xx body. */
+ * confirmed) — still throws on a transport failure or a malformed 2xx body.
+ * F2 (fix round 2): `{ kind: "error" }` covers BOTH a 5xx from PayPal and
+ * any OTHER non-2xx PayPal answers with no recognized `issue` — the caller
+ * MUST NOT read either as "declined, no money moved": PayPal may already
+ * have captured the money and simply failed to answer (§ 1.11's "no answer
+ * from capture" case) — the caller's only honest outcome for this kind is
+ * "not confirmed yet", never "declined". */
 export async function captureOrder(
   config: PayPalConfig,
   accessToken: string,
@@ -225,7 +254,10 @@ export async function captureOrder(
 
 /** GET /v2/payments/captures/{id} — the webhook's own re-fetch (§ 17.1 step
  * 5: "the signature proves PayPal sent the event, the re-fetch proves the
- * capture"). Throws on any failure. */
+ * capture"). Throws on any failure; the thrown Error carries a `status`
+ * property (F7, fix round 2) so the caller can tell a 404 (PayPal has no
+ * such capture — an unknown/forged id, never retriable) from every other
+ * failure (a transient 5xx, network error — worth PayPal's own retry). */
 export async function getCapture(
   config: PayPalConfig,
   accessToken: string,
@@ -238,7 +270,9 @@ export async function getCapture(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`paypal get capture failed: ${res.status} ${text}`);
+    const err = new Error(`paypal get capture failed: ${res.status} ${text}`);
+    Object.assign(err, { status: res.status });
+    throw err;
   }
   const body = await res.json();
   return captureInfoFrom(body);

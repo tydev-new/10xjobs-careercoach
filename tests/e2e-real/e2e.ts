@@ -31,7 +31,7 @@
 //   E2E_KEEP=1 keeps the temp dir (builds, failure screenshots);
 //   E2E_CONSOLE=1 echoes browser console errors; E2E_STACKS=1 page-error stacks.
 // Per-browser sections: journey import gate balance ceiling member delete
-// refresh phone cors setup uploads env; then once: preview. Firefox/WebKit
+// refresh password phone cors setup uploads env; then once: preview. Firefox/WebKit
 // need `npx playwright install firefox webkit` in apps/web.
 // Exit code 0 = all PASS; one PASS/FAIL line per assertion.
 // Also here: upload-errors.test.ts (node --test), the upload messages over PGlite.
@@ -669,7 +669,11 @@ await section("journey", async () => {
   rec(pc.every((l) => l.path === "/functions/v1/ten-model-proxy/chat/completions"), "env: VITE_MODEL_PROXY_URL unset -> <SUPABASE_URL>/functions/v1/ten-model-proxy (the default)");
   rec(stub.hits.slice(hitsAtStart).every((h) => h.auth === `Bearer ${OPENROUTER_CANARY}`), "auth: upstream calls carry the host-side OpenRouter key only (never the JWT)");
   rec(stub.hits.every((h) => !JSON.stringify(h.body).includes("eyJ")), "auth: no JWT in any upstream body");
-  rec(stub.hits.filter((h) => h.kind === "chat").every((h) => h.body.model === "anthropic/claude-sonnet-5" && h.body.stream === true && h.body.provider?.zdr === true), "proxy: upstream body forced (model, stream, provider zdr)");
+  // Only this section's hits: a later browser's run would otherwise also see
+  // the DeepSeek calls an earlier browser's "model" section made on purpose
+  // (it failed in firefox/webkit for that reason alone, 2026-09-25).
+  const journeyChats = stub.hits.slice(hitsAtStart).filter((h) => h.kind === "chat");
+  rec(journeyChats.length > 0 && journeyChats.every((h) => h.body.model === "anthropic/claude-sonnet-5" && h.body.stream === true && h.body.provider?.zdr === true), "proxy: upstream body forced (model, stream, provider zdr)", `${journeyChats.length} chat call(s) this section`);
 
   // ---- CORS: every preflight's requested headers are all allowed (fix round 1, item 2)
   const pre = standIn.log.filter((l) => l.method === "OPTIONS" && l.path.startsWith("/functions/v1/ten-model-proxy") && l.at >= (pc[0]?.at ?? 0) - 60000);
@@ -1563,6 +1567,216 @@ await section("refresh", async () => {
   const used = proxyCalls().slice(n).map((l) => /^Bearer (.+)$/.exec(l.auth)?.[1]);
   rec(used.length > 0 && used.every((t) => t === latest || standIn.issued.get(uid)!.indexOf(t!) >= firstCount), "refresh: the proxy call after a refresh carries a refreshed JWT, not the first one", `${used.length} call(s)`);
   await page.context().close();
+});
+
+// ================================================================ PASSWORDS (C § 16, ui § 1.10)
+await section("password", async () => {
+  const pw = standIn.pw;
+  const S1 = `Sentinel-${BROWSER}-Recover9!`;
+  const S2 = `Sentinel-${BROWSER}-Menu9!`;
+  const S3 = `Sentinel-${BROWSER}-Secure9!`;
+  const sentinels = [S1, S2, S3];
+  const codesUsed: string[] = [];
+  const reqs: { method: string; url: string; body: string }[] = [];
+  const consoleMsgs: string[] = [];
+  const snapshots: string[] = [];
+  const open = async (url: string, viewport?: { width: number; height: number }) => {
+    const { page } = await newPage({ noGoto: true, viewport });
+    page.on("request", (r: any) => reqs.push({ method: r.method(), url: r.url(), body: r.postData() ?? "" }));
+    page.on("console", (m: any) => consoleMsgs.push(m.text()));
+    await page.goto(url);
+    return page;
+  };
+  const snap = async (page: any) => snapshots.push(await page.evaluate(() => JSON.stringify({ ls: { ...localStorage }, ss: { ...sessionStorage }, href: location.href, cookie: document.cookie })));
+  const signInWith = async (page: any, email: string, password: string) => {
+    await page.locator(".sign-in-mode-toggle button", { hasText: "Email + password" }).click();
+    await page.locator(".sign-in-form input[type=email]").fill(email);
+    await page.locator(".sign-in-form input[type=password]").fill(password);
+    await page.locator(".sign-in-form button[type=submit]").click();
+  };
+  const memberChecksSince = (t: number) => standIn.log.filter((l) => l.at >= t && l.method === "POST" && l.path === "/rest/v1/rpc/ten_is_member").length;
+  const fillPw = async (page: any, p: string) => {
+    await page.getByLabel("New password").fill(p);
+    await page.getByLabel("Type it again").fill(p);
+    await page.getByRole("button", { name: "Save password" }).click();
+  };
+  const SUCCESS = "Password saved. Use it next time you sign in, here or in the older app.";
+  const email = em("pw.reset");
+  const uid = await standIn.createUser({ email });
+
+  // ---- forgot: POST /recover with redirect_to = VITE_SITE_URL; success, no account and 429 read the same
+  let page = await open(ORIGIN + "/");
+  await page.locator(".sign-in-mode-toggle button", { hasText: "Email + password" }).click();
+  const cardAfterReset = async (addr: string) => {
+    await page.getByRole("button", { name: "Forgot or never set a password?" }).click();
+    await page.getByLabel("Email").fill(addr);
+    await page.getByRole("button", { name: "Send reset link" }).click();
+    const html = await until(async () => {
+      const t = (await page.locator(".sign-in-card").textContent()) ?? "";
+      return t.includes("If an account exists for") || t.includes("Couldn't send") ? await page.locator(".sign-in-card").innerHTML() : false;
+    }, 15000);
+    await page.getByRole("button", { name: "Back to sign in" }).click();
+    return String(html ?? "");
+  };
+  const nRec = pw.recovers.length;
+  const hasHtml = await cardAfterReset(email);
+  const r0 = pw.recovers[nRec];
+  eq({ email: r0?.email, redirectTo: r0?.redirectTo, exists: r0?.exists }, { email, redirectTo: ORIGIN, exists: true }, "password: forgot -> POST /auth/v1/recover with the email and redirect_to = VITE_SITE_URL (C § 16.1)");
+  rec(hasHtml.includes(`If an account exists for ${email}, a link to choose a new password should arrive within a few minutes.`), "password: forgot -> the § 1.10 enumeration-safe line", hasHtml.slice(0, 200));
+  const nobody = em("pw.nobody");
+  const noHtml = await cardAfterReset(nobody);
+  rec(pw.recovers.at(-1)?.exists === false && noHtml.replaceAll(nobody, "{e}") === hasHtml.replaceAll(email, "{e}"), "password: forgot for an address with no account renders the same card, byte for byte (email aside)");
+  pw.recoverRateLimited = true;
+  const limitedHtml = await cardAfterReset(email);
+  pw.recoverRateLimited = false;
+  rec(limitedHtml === hasHtml, "password: forgot answered 429 renders the success card byte for byte (C § 16.2 enumeration)", limitedHtml === hasHtml ? "" : limitedHtml.slice(0, 300));
+  await page.context().close();
+
+  // ---- the recovery link, opened in a different browser context (implicit flow: any browser)
+  let t0 = Date.now();
+  page = await open(ORIGIN + "/" + pw.recoveryHash(email));
+  const recShown = await page.getByRole("heading", { name: "Choose a new password" }).waitFor({ timeout: 20000 }).then(() => true, () => false);
+  await page.waitForTimeout(1500);
+  rec(recShown && memberChecksSince(t0) === 0 && (await page.locator(".composer-input").count()) === 0, "password: a recovery link shows 'Choose a new password', with no ten_is_member call and no chat (C § 16.1)", `shown=${recShown} checks=${memberChecksSince(t0)}`);
+  const hrefAfter = await page.evaluate(() => location.href);
+  rec(!/access_token|refresh_token|type=recovery/.test(hrefAfter), "password: the recovery link's tokens are gone from the URL", hrefAfter);
+  await fillPw(page, S1);
+  const saved1 = await page.getByText(SUCCESS).waitFor({ timeout: 15000 }).then(() => true, () => false);
+  await page.waitForTimeout(500);
+  rec(saved1 && pw.passwordOf(email) === S1 && memberChecksSince(t0) === 0, "password: recovery save -> PUT /auth/v1/user saved it; still no membership check before Continue", `saved=${saved1} checks=${memberChecksSince(t0)}`);
+  await snap(page);
+  await page.getByRole("button", { name: "Continue" }).click();
+  const chat1 = await page.locator(".composer-input").waitFor({ timeout: 20000 }).then(() => true, () => false);
+  await page.waitForTimeout(500);
+  rec(chat1 && memberChecksSince(t0) === 1, "password: Continue runs the membership check once and a member reaches the chat", `chat=${chat1} checks=${memberChecksSince(t0)}`);
+
+  // ---- the menu: 'Set a new password' above Sign out; secure change off
+  await page.getByRole("button", { name: "Menu" }).click();
+  const items = await page.locator("[role=menu] [role=menuitem]").allTextContents();
+  const iSet = items.findIndex((t: string) => t.trim() === "Set a new password");
+  rec(iSet >= 0 && items[iSet + 1]?.trim() === "Sign out", "password: the member ⋯ menu has 'Set a new password' directly above Sign out", items.join(" | "));
+  await page.getByRole("menuitem", { name: "Set a new password" }).click();
+  const putsBefore = reqs.filter((r) => r.method === "PUT" && r.url.endsWith("/auth/v1/user")).length;
+  await fillPw(page, S2);
+  const saved2 = await page.getByText(SUCCESS).waitFor({ timeout: 15000 }).then(() => true, () => false);
+  const puts = reqs.filter((r) => r.method === "PUT" && r.url.endsWith("/auth/v1/user")).slice(putsBefore);
+  const putBody = (() => {
+    try {
+      const b = JSON.parse(puts[0]?.body ?? "{}");
+      return { password: b.password, nonce: b.nonce, email: b.email };
+    } catch {
+      return {};
+    }
+  })();
+  rec(saved2 && puts.length === 1 && pw.passwordOf(email) === S2, "password: menu, secure change off -> one PUT /auth/v1/user, saved", `puts=${puts.length}`);
+  eq(putBody, { password: S2 }, "password: menu, secure change off -> the PUT body carries only the password (no nonce, no email)");
+  await page.getByRole("button", { name: "Done" }).click();
+
+  // ---- secure change on, session older than 24 h: code step, wrong code, resend, right code
+  pw.secureChange = true;
+  pw.staleSessions.add(uid);
+  const reauths = () => standIn.log.filter((l) => l.method === "GET" && l.path === "/auth/v1/reauthenticate").length;
+  const ra0 = reauths();
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("menuitem", { name: "Set a new password" }).click();
+  await fillPw(page, S3);
+  const codeStep = await page.getByLabel("Code").waitFor({ timeout: 15000 }).then(() => true, () => false);
+  const dlg = async () => ((await page.locator("[role=dialog]").textContent()) ?? "").replace(/\s+/g, " ");
+  rec(codeStep && reauths() - ra0 === 1 && (await dlg()).includes(`we emailed a 6-digit code to ${email}.`), "password: secure change on -> reauthentication_needed -> one GET /reauthenticate -> the code step names the email", `reauth=${reauths() - ra0} ${(await dlg()).slice(0, 160)}`);
+  await page.getByLabel("Code").fill("000000");
+  codesUsed.push("000000");
+  await page.getByRole("button", { name: "Save password" }).click();
+  const wrong = await page.getByText("That code didn't work.", { exact: false }).waitFor({ timeout: 15000 }).then(() => true, () => false);
+  rec(wrong && (await page.getByLabel("New password").inputValue()) === S3 && pw.passwordOf(email) === S2, "password: a wrong code -> its § 1.10 line, the password kept, nothing saved");
+  await page.getByRole("button", { name: "Send a new code" }).click();
+  const resent = await page.getByText(`A new code is on its way to ${email}. Use the newest one.`).waitFor({ timeout: 15000 }).then(() => true, () => false);
+  rec(resent && reauths() - ra0 === 2, "password: Send a new code -> a second GET /reauthenticate and the resend line", `reauth=${reauths() - ra0}`);
+  const code = pw.codes.get(uid)!.at(-1)!;
+  codesUsed.push(code);
+  await page.getByLabel("Code").fill(code);
+  await page.getByRole("button", { name: "Save password" }).click();
+  const saved3 = await page.getByText(SUCCESS).waitFor({ timeout: 15000 }).then(() => true, () => false);
+  const lastPut = reqs.filter((r) => r.method === "PUT" && r.url.endsWith("/auth/v1/user")).at(-1);
+  const lastBody = (() => {
+    try {
+      const b = JSON.parse(lastPut?.body ?? "{}");
+      return { password: b.password, nonce: b.nonce };
+    } catch {
+      return {};
+    }
+  })();
+  rec(saved3 && pw.passwordOf(email) === S3, "password: the right code -> saved");
+  eq(lastBody, { password: S3, nonce: code }, "password: the right code's PUT body is { password, nonce }");
+  pw.secureChange = false;
+  pw.staleSessions.delete(uid);
+  await page.getByRole("button", { name: "Done" }).click();
+  await snap(page);
+  await page.context().close();
+
+  // ---- the new password signs in; the old one no longer does
+  page = await open(ORIGIN + "/");
+  await signInWith(page, email, PASSWORD);
+  const oldRefused = await page.locator(".sign-in-error").waitFor({ timeout: 10000 }).then(() => true, () => false);
+  await page.locator(".sign-in-form input[type=password]").fill(S3);
+  await page.locator(".sign-in-form button[type=submit]").click();
+  const newWorks = await page.locator(".composer-input").waitFor({ timeout: 20000 }).then(() => true, () => false);
+  rec(oldRefused && newWorks, "password: after the change the old password is refused and the new one signs in", `old refused=${oldRefused} new works=${newWorks}`);
+  await snap(page);
+  await page.context().close();
+
+  // ---- a reload during recovery goes on to the app signed in (nothing stored)
+  t0 = Date.now();
+  page = await open(ORIGIN + "/" + pw.recoveryHash(email));
+  await page.getByRole("heading", { name: "Choose a new password" }).waitFor({ timeout: 20000 });
+  // let the client finish clearing the hash (a same-document navigation):
+  // WebKit cancels a reload that races it ("Navigation canceled by policy check")
+  await until(async () => !(await page.evaluate(() => location.hash.includes("access_token"))), 10000);
+  await page.waitForTimeout(1000);
+  await page.reload().catch(async () => {
+    await page.waitForTimeout(1000);
+    await page.reload();
+  });
+  const afterReload = await page.locator(".composer-input").waitFor({ timeout: 20000 }).then(() => true, () => false);
+  rec(afterReload && (await page.getByRole("heading", { name: "Choose a new password" }).count()) === 0, "password: a reload during recovery goes on to the app, signed in (C § 16.1: nothing is stored)");
+  await snap(page);
+  await page.context().close();
+
+  // ---- an expired / used link: the line, then the URL is cleaned
+  page = await open(ORIGIN + "/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired");
+  const EXPIRED = "That email link has expired or was already used. Ask for a new one below.";
+  const expShown = await page.getByText(EXPIRED).waitFor({ timeout: 15000 }).then(() => true, () => false);
+  await page.waitForTimeout(500);
+  const expHref = await page.evaluate(() => location.href);
+  rec(expShown && !/error_code|otp_expired/.test(expHref), "password: an otp_expired link shows the expired line and the URL loses the error", expHref);
+  await page.reload();
+  await page.locator(".sign-in-screen").waitFor({ timeout: 15000 });
+  await page.waitForTimeout(800);
+  rec((await page.getByText(EXPIRED).count()) === 0, "password: a reload doesn't repeat the expired line");
+  await page.context().close();
+
+  // ---- 375px: the recovery screen
+  page = await open(ORIGIN + "/" + pw.recoveryHash(email), { width: 375, height: 812 });
+  await page.getByRole("heading", { name: "Choose a new password" }).waitFor({ timeout: 20000 });
+  const sw = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
+  rec(sw[0] <= sw[1], "password: the recovery screen has no horizontal scroll at 375px", JSON.stringify(sw));
+  await page.context().close();
+
+  // ---- no leak: every sentinel and code only in Supabase Auth request bodies
+  const authBody = (r: { method: string; url: string }) =>
+    r.url.startsWith(standIn.url + "/auth/v1/") && ((r.method === "PUT" && r.url.endsWith("/auth/v1/user")) || (r.method === "POST" && r.url.includes("/auth/v1/token?grant_type=password")));
+  const secrets = [...sentinels, ...codesUsed.filter((c) => c !== "000000")];
+  const leaks: string[] = [];
+  for (const s of secrets) {
+    for (const r of reqs) {
+      if (r.url.includes(s)) leaks.push(`URL ${r.method} ${r.url}`);
+      if (r.body.includes(s) && !authBody(r)) leaks.push(`body ${r.method} ${r.url}`);
+    }
+    for (const m of consoleMsgs) if (m.includes(s)) leaks.push(`console: ${m.slice(0, 120)}`);
+    for (const x of snapshots) if (x.includes(s)) leaks.push(`storage/url snapshot`);
+    for (const l of standIn.log) if ((l.path + l.search).includes(s)) leaks.push(`stand-in URL ${l.method} ${l.path}`);
+  }
+  const positive = reqs.filter((r) => authBody(r) && sentinels.some((s) => r.body.includes(s))).length;
+  rec(positive >= 4 && leaks.length === 0, "password: no leak — the passwords and the code appear only in Supabase Auth request bodies (PUT /user, the password grant); never a URL, the console or storage (C § 16.2)", `auth bodies with a sentinel: ${positive}; leaks: ${[...new Set(leaks)].slice(0, 6).join(" | ")}`);
 });
 
 // ================================================================ PHONE (375px)

@@ -5,8 +5,17 @@
 // one import to reach for. No side effects, no `window`/`document`/
 // `localStorage`/`node:` API — testable with plain `deno test`.
 
-export { customIdFor, isKnownPack, isPackAmount, packAmountUsd, PACKS, uidFromCustomId } from "../_shared/paypal-packs.ts";
-export type { PackId } from "../_shared/paypal-packs.ts";
+export {
+  breakdownIsSane,
+  customIdFor,
+  isKnownPack,
+  isPackAmount,
+  packAmountUsd,
+  packForAmount,
+  PACKS,
+  uidFromCustomId,
+} from "../_shared/paypal-packs.ts";
+export type { BreakdownLike, PackId } from "../_shared/paypal-packs.ts";
 
 export function pathTail(url: URL): string {
   const marker = "/ten-paypal";

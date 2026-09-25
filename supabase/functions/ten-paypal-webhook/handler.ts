@@ -11,7 +11,7 @@
 // CORS") — a browser could never read this function's response anyway, and
 // adding CORS headers would only be misleading about who this is for.
 
-import { customIdFor, isPackAmount, uidFromCustomId } from "../_shared/paypal-packs.ts";
+import { breakdownIsSane, customIdFor, packForAmount, uidFromCustomId } from "../_shared/paypal-packs.ts";
 import type { CaptureInfo, WebhookHeaders } from "../_shared/paypal.ts";
 import type { LedgerCreditRow } from "../_shared/supabase.ts";
 
@@ -28,9 +28,17 @@ export interface WebhookDeps {
     event: unknown,
   ): Promise<{ ok: true; verified: boolean } | { ok: false }>;
   isMemberByUid(uid: string): Promise<boolean>;
+  /** Rejects with an Error carrying `status` (F7, fix round 2): a 404
+   *  (`status === 404`) means PayPal has no such capture at all — handled
+   *  distinctly from every other failure, which stays a 503 so PayPal
+   *  retries. */
   getCapture(captureId: string): Promise<CaptureInfo>;
   insertLedgerCredit(row: LedgerCreditRow): Promise<void>;
-  log?: { warn(e: unknown): void };
+  /** F1 (fix round 2): re-verifies create-order's own HMAC binding (uid +
+   *  pack + amount) from the re-fetched capture's own invoice_id, before
+   *  ever crediting. Never throws. */
+  verifyInvoiceId(invoiceId: string, uid: string, pack: string, amountUsd: string): Promise<boolean>;
+  log?: { warn(e: unknown): void; error?(e: unknown): void };
 }
 
 function json(status: number, body: Record<string, unknown>): Response {
@@ -71,19 +79,21 @@ function isDuplicateRequestId(err: unknown): boolean {
   return typeof err === "object" && err !== null && (err as { duplicate?: unknown }).duplicate === true;
 }
 
-/** § 17.1 step 5 / § 17.8 test 6: "a breakdown that doesn't add up,
- * non-USD, no net_amount" — never credited, only alerted. */
-function breakdownLooksSane(capture: CaptureInfo): capture is CaptureInfo & {
-  grossUsd: string;
-  feeUsd: string;
-  netUsd: string;
-} {
-  return (
-    typeof capture.grossUsd === "string" &&
-    typeof capture.feeUsd === "string" &&
-    typeof capture.netUsd === "string" &&
-    isPackAmount(capture.grossUsd, capture.currencyCode)
-  );
+/** F4 (fix round 2): the shared "ALERT paypal breakdown mismatch" line, at
+ * error level when available (mirrors ten-model-proxy/handler.ts's own
+ * `deps.log?.error` fallback) — no secret in it, capture id/amounts/
+ * currency only. */
+function alertBreakdownMismatch(deps: WebhookDeps, capture: CaptureInfo): void {
+  const alert = {
+    msg: "ten-paypal-webhook: ALERT paypal breakdown mismatch",
+    captureId: capture.captureId,
+    grossUsd: capture.grossUsd,
+    feeUsd: capture.feeUsd,
+    netUsd: capture.netUsd,
+    currencyCode: capture.currencyCode,
+  };
+  if (deps.log?.error) deps.log.error(alert);
+  else deps.log?.warn(alert);
 }
 
 export async function handleRequest(req: Request, deps: WebhookDeps): Promise<Response> {
@@ -116,6 +126,13 @@ export async function handleRequest(req: Request, deps: WebhookDeps): Promise<Re
       transmissionSig: req.headers.get("paypal-transmission-sig") ?? "",
       transmissionTime: req.headers.get("paypal-transmission-time") ?? "",
     };
+    // F8 (fix round 2): any of the five headers missing/empty is refused
+    // with 401 directly — never even calls PayPal's verify endpoint (there
+    // is nothing for it to check; treating a missing header as "the call
+    // failed" would wrongly cost a 503 retry instead of a flat refusal).
+    if (Object.values(headers).some((v) => v === "")) {
+      return json(401, { error: "bad_signature" });
+    }
     const verify = await deps.verifyWebhookSignature(headers, event);
     if (!verify.ok) {
       return json(503, { error: "verify_unavailable" });
@@ -165,6 +182,16 @@ export async function handleRequest(req: Request, deps: WebhookDeps): Promise<Re
     try {
       capture = await deps.getCapture(captureId);
     } catch (e) {
+      // F7 (fix round 2): a 404 means PayPal has no such capture at all —
+      // an unknown/forged id, never a race with a not-yet-visible capture
+      // (PayPal doesn't send this event before the capture itself exists) —
+      // so it's ignored, not retried. Every OTHER re-fetch failure (a
+      // transient 5xx, a network error) stays a 503, worth PayPal's retry.
+      const status = (e as { status?: unknown })?.status;
+      if (status === 404) {
+        deps.log?.warn({ msg: "ten-paypal-webhook: re-fetch 404 — unknown capture", captureId });
+        return json(200, { status: "ignored" });
+      }
       deps.log?.warn({ msg: "ten-paypal-webhook: capture re-fetch failed", err: String(e), captureId });
       return json(503, { error: "capture_unavailable" });
     }
@@ -181,15 +208,17 @@ export async function handleRequest(req: Request, deps: WebhookDeps): Promise<Re
       });
       return json(200, { status: "ignored" });
     }
-    if (!breakdownLooksSane(capture)) {
-      deps.log?.warn({
-        msg: "ten-paypal-webhook: ALERT completed capture with a breakdown that doesn't check out",
-        captureId,
-        grossUsd: capture.grossUsd,
-        feeUsd: capture.feeUsd,
-        netUsd: capture.netUsd,
-        currencyCode: capture.currencyCode,
-      });
+    if (!breakdownIsSane(capture)) {
+      alertBreakdownMismatch(deps, capture);
+      return json(200, { status: "ignored" });
+    }
+    // F1 (fix round 2, lead ruling): re-verify create-order's own HMAC
+    // binding from the re-fetched capture's OWN invoice_id before crediting
+    // — a forged/foreign capture whose custom_id merely happens to read
+    // ten:<uid> has no way to carry a tag that verifies.
+    const pack = packForAmount(capture.grossUsd);
+    if (!pack || !(await deps.verifyInvoiceId(capture.invoiceId, uid, pack, capture.grossUsd))) {
+      deps.log?.warn({ msg: "ten-paypal-webhook: ALERT invoice tag failed to verify — not Ten's own order", captureId });
       return json(200, { status: "ignored" });
     }
 

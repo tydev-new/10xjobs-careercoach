@@ -3,8 +3,9 @@
 // the Supabase project the production build is pointed at:
 //
 //   /auth/v1/*        GoTrue: password grant, refresh_token grant, /user,
-//                     /logout. Tokens are HS256 JWTs (like GoTrue), so
-//                     supabase-js decodes and refreshes them for real.
+//                     /logout, and (C § 16.4) POST /recover, PUT /user and
+//                     GET /reauthenticate. Tokens are HS256 JWTs (like
+//                     GoTrue), so supabase-js decodes and refreshes them for real.
 //   /rest/v1/*        PostgREST over PGlite running the REAL applied
 //                     migration (supabase/migrations/20260923000000_ten_beta_init.sql)
 //                     on tests/sql/stub.sql — the role comes from the JWT
@@ -88,6 +89,8 @@ export interface StandIn {
   /** tokens issued per uid, oldest first */
   issued: Map<string, string[]>;
   createUser(opts: { email: string; member?: boolean; expiresIn?: number }): Promise<string>;
+  /** C § 16.4: the password routes (POST /recover, PUT /user, GET /reauthenticate). */
+  pw: PasswordAuth;
   sql<T = any>(query: string, params?: unknown[]): Promise<T[]>;
   setFunctionsTarget(url: string): void;
   close(): Promise<void>;
@@ -97,6 +100,29 @@ interface AuthUser {
   id: string;
   email: string;
   expiresIn: number;
+  password: string;
+}
+
+/** The GoTrue password routes C § 16.4 asks the stand-in to gain, modelled
+ *  on Supabase Auth's documented behaviour (C § 16.1): /recover answers the
+ *  same whether or not an account exists; PUT /user with "secure password
+ *  change" on and a session older than 24 h answers reauthentication_needed
+ *  until it carries the nonce GET /reauthenticate emailed. */
+export interface PasswordAuth {
+  /** Supabase's "Secure password change" setting */
+  secureChange: boolean;
+  /** uids whose sessions count as older than 24 hours */
+  staleSessions: Set<string>;
+  /** when true, /recover answers 429 (the project's email rate limit) */
+  recoverRateLimited: boolean;
+  minLength: number;
+  /** every /recover call: the email and the redirect_to it carried */
+  recovers: { email: string; redirectTo: string | null; exists: boolean }[];
+  /** codes "emailed" by /reauthenticate, per uid, newest last */
+  codes: Map<string, string[]>;
+  /** the link Supabase would email: `#access_token=…&type=recovery` for this account */
+  recoveryHash(email: string): string;
+  passwordOf(email: string): string | undefined;
 }
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -115,6 +141,23 @@ export async function startStandIn(): Promise<StandIn> {
   const refresh = new Map<string, string>(); // refresh token -> uid
   const issued = new Map<string, string[]>();
   let functionsTarget = "";
+  const pw: PasswordAuth = {
+    secureChange: false,
+    staleSessions: new Set(),
+    recoverRateLimited: false,
+    minLength: 8,
+    recovers: [],
+    codes: new Map(),
+    recoveryHash(email: string) {
+      const u = users.get(email.toLowerCase());
+      if (!u) throw new Error("stand-in: no account " + email);
+      // what GoTrue's /verify redirect puts on redirect_to (implicit flow)
+      const s = issueSession(u);
+      const q = new URLSearchParams({ access_token: s.access_token, expires_at: String(s.expires_at), expires_in: String(s.expires_in), refresh_token: s.refresh_token, token_type: "bearer", type: "recovery" });
+      return "#" + q.toString();
+    },
+    passwordOf: (email: string) => users.get(email.toLowerCase())?.password,
+  };
 
   // ONE lock for every DB touch (PGlite is one connection; a role switch
   // must never leak between requests). Delegated backend calls run under it.
@@ -221,7 +264,7 @@ export async function startStandIn(): Promise<StandIn> {
 
     const cors: Record<string, string> = {
       "access-control-allow-origin": "*",
-      "access-control-expose-headers": "content-range, content-length, etag, x-total-count",
+      "access-control-expose-headers": "content-range, content-length, etag, x-total-count, x-supabase-api-version",
     };
     if (req.method === "OPTIONS") {
       res.writeHead(200, {
@@ -263,7 +306,7 @@ export async function startStandIn(): Promise<StandIn> {
         const b = jsonBody();
         if (grant === "password") {
           const u = users.get(String(b.email ?? "").toLowerCase());
-          if (!u || b.password !== "correct horse battery") return send(400, { error: "invalid_grant", error_description: "Invalid login credentials", code: "invalid_credentials", msg: "Invalid login credentials" });
+          if (!u || b.password !== u.password) return send(400, { error: "invalid_grant", error_description: "Invalid login credentials", code: "invalid_credentials", msg: "Invalid login credentials" });
           return send(200, issueSession(u));
         }
         if (grant === "refresh_token") {
@@ -278,6 +321,38 @@ export async function startStandIn(): Promise<StandIn> {
         const c = claimsOf(req);
         if (!c.ok || c.role !== "authenticated" || !c.sub || !byId.has(c.sub)) return send(401, { code: 401, msg: "invalid JWT" });
         return send(200, userJson(byId.get(c.sub)!));
+      }
+      // ---- C § 16.4: the password routes. Errors answer like GoTrue on API
+      // version 2024-01-01: the header, and { code, message } in the body.
+      const authErr = (status: number, code: string, message: string, extra: Record<string, unknown> = {}) =>
+        send(status, { code, message, ...extra }, { "x-supabase-api-version": "2024-01-01" });
+      if (url.pathname === "/auth/v1/recover" && req.method === "POST") {
+        const email = String(jsonBody().email ?? "").toLowerCase();
+        pw.recovers.push({ email, redirectTo: url.searchParams.get("redirect_to"), exists: users.has(email) });
+        if (pw.recoverRateLimited) return authErr(429, "over_email_send_rate_limit", "email rate limit exceeded");
+        return send(200, {}); // the same answer whether or not the account exists
+      }
+      if ((url.pathname === "/auth/v1/user" && req.method === "PUT") || (url.pathname === "/auth/v1/reauthenticate" && req.method === "GET")) {
+        const c = claimsOf(req);
+        if (!c.ok || c.role !== "authenticated" || !c.sub || !byId.has(c.sub)) return authErr(401, "bad_jwt", "invalid JWT");
+        const u = byId.get(c.sub)!;
+        if (req.method === "GET") {
+          const code = String(100000 + Math.floor(Math.random() * 900000));
+          pw.codes.set(u.id, [...(pw.codes.get(u.id) ?? []), code]);
+          return send(200, {});
+        }
+        const b = jsonBody();
+        if (typeof b.email === "string") return authErr(400, "validation_failed", "stand-in: email change not modelled");
+        const password = String(b.password ?? "");
+        if (password.length < pw.minLength) return authErr(422, "weak_password", `Password should be at least ${pw.minLength} characters.`, { weak_password: { reasons: ["length"] } });
+        if (pw.secureChange && pw.staleSessions.has(u.id)) {
+          if (b.nonce === undefined || b.nonce === null || b.nonce === "") return authErr(400, "reauthentication_needed", "Password update requires reauthentication");
+          if (b.nonce !== (pw.codes.get(u.id) ?? []).at(-1)) return authErr(400, "reauthentication_not_valid", "Verification code is invalid or has expired");
+        }
+        if (password === u.password) return authErr(422, "same_password", "New password should be different from the old password.");
+        u.password = password;
+        pw.codes.delete(u.id);
+        return send(200, userJson(u));
       }
       if (url.pathname === "/auth/v1/logout") return send(204, null);
       if (url.pathname.startsWith("/auth/v1/")) return send(404, { msg: "stand-in: no auth route " + url.pathname });
@@ -498,9 +573,11 @@ export async function startStandIn(): Promise<StandIn> {
     backend,
     log,
     issued,
+    pw,
     async createUser({ email, member = true, expiresIn = 3600 }) {
       const id = await locked(() => backend.newUser({ member }));
-      const u = { id, email: email.toLowerCase(), expiresIn };
+      // every account starts with the password the e2e signs in with
+      const u = { id, email: email.toLowerCase(), expiresIn, password: "correct horse battery" };
       users.set(u.email, u);
       byId.set(id, u);
       return id;

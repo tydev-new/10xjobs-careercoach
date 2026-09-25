@@ -7,13 +7,14 @@
 // index.ts wires the real deps and calls `Deno.serve`.
 
 import { allowedOrigins, corsHeaders } from "../_shared/cors.ts";
-import { captureRequestId, customIdFor, isPackAmount, packAmountUsd, pathTail } from "./core.ts";
+import { breakdownIsSane, captureRequestId, customIdFor, isPackAmount, packAmountUsd, packForAmount, pathTail, uidFromCustomId } from "./core.ts";
 import type { CaptureInfo, CaptureOutcome, OrderInfo } from "../_shared/paypal.ts";
 import type { LedgerCreditRow } from "../_shared/supabase.ts";
 
 export const MESSAGES = {
   notMember: "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.",
   paypalError: "Couldn't start a payment. No money moved.",
+  notTenOrder: "Ten didn't create that payment.",
   paidNotCredited:
     "Ten couldn't confirm the credit yet. If PayPal took your payment, it's added automatically, usually " +
     "within minutes. If not by tomorrow, email support@10xjobs.co with PayPal's receipt.",
@@ -31,8 +32,14 @@ export interface PaypalDeps {
   getOrder(orderId: string): Promise<OrderInfo>;
   captureOrder(orderId: string, requestId: string): Promise<CaptureOutcome>;
   insertLedgerCredit(row: LedgerCreditRow): Promise<void>;
-  randomId(): string;
-  log?: { warn(e: unknown): void };
+  /** F1 (fix round 2): the invoice_id create-order stamps on a fresh order —
+   *  bound (HMAC) to uid + pack + amount + a timestamp it carries itself. */
+  signInvoiceId(uid: string, pack: string, amountUsd: string): Promise<string>;
+  /** F1: re-verifies that binding from an order/capture's OWN invoice_id
+   *  (constant-time tag comparison) before capture-order ever captures
+   *  anything. Never throws. */
+  verifyInvoiceId(invoiceId: string, uid: string, pack: string, amountUsd: string): Promise<boolean>;
+  log?: { warn(e: unknown): void; error?(e: unknown): void };
 }
 
 function jsonError(status: number, code: string, message: string, cors: HeadersInit): Response {
@@ -85,10 +92,11 @@ async function handleCreateOrder(
   }
   const pack = body.pack as string;
   try {
+    const invoiceId = await deps.signInvoiceId(user.id, pack, amountUsd);
     const { orderId } = await deps.createOrder({
       amountUsd,
       customId: customIdFor(user.id),
-      invoiceId: `ten-${deps.randomId()}`,
+      invoiceId,
       description: `Ten credit $${pack}`,
     });
     return json(200, { orderId }, cors);
@@ -98,21 +106,22 @@ async function handleCreateOrder(
   }
 }
 
-/** True once a capture's own breakdown is present AND matches a known pack
- * amount in USD — the § 17.1 step 4 "a breakdown that doesn't add up" guard
- * (the migration's own check constraint is the backstop; this is the
- * pre-insert guard that turns a bad breakdown into an alert, not a 500). */
-function breakdownLooksSane(capture: CaptureInfo): capture is CaptureInfo & {
-  grossUsd: string;
-  feeUsd: string;
-  netUsd: string;
-} {
-  return (
-    typeof capture.grossUsd === "string" &&
-    typeof capture.feeUsd === "string" &&
-    typeof capture.netUsd === "string" &&
-    isPackAmount(capture.grossUsd, capture.currencyCode)
-  );
+/** F4 (fix round 2): logs the shared "ALERT paypal breakdown mismatch" line
+ * (no secrets — capture id, amounts and currency only) at error level when
+ * available, falling back to warn (mirrors ten-model-proxy/handler.ts's own
+ * `deps.log?.error` fallback). Shared wording so both this function and the
+ * webhook's own alert read identically in the logs. */
+function alertBreakdownMismatch(deps: PaypalDeps, capture: CaptureInfo, where: string): void {
+  const alert = {
+    msg: `${where}: ALERT paypal breakdown mismatch`,
+    captureId: capture.captureId,
+    grossUsd: capture.grossUsd,
+    feeUsd: capture.feeUsd,
+    netUsd: capture.netUsd,
+    currencyCode: capture.currencyCode,
+  };
+  if (deps.log?.error) deps.log.error(alert);
+  else deps.log?.warn(alert);
 }
 
 async function handleCaptureOrder(
@@ -128,7 +137,6 @@ async function handleCaptureOrder(
   if (typeof orderId !== "string" || orderId.length === 0) {
     return jsonError(400, "bad_request", "Missing orderId.", cors);
   }
-  const wantCustomId = customIdFor(user.id);
 
   // § 17.1 step 4: "Reads the order first: unless custom_id is ten:<caller>
   // (403) and the amount a pack in USD (400), nothing is captured."
@@ -139,19 +147,41 @@ async function handleCaptureOrder(
     deps.log?.warn({ msg: "ten-paypal: capture-order pre-read failed", err: String(e) });
     return jsonError(503, "paypal_error", MESSAGES.paypalError, cors);
   }
-  if (order.customId !== wantCustomId) {
+  // F6 (fix round 2): the strict `ten:<lowercase-uuid>` shape, not a loose
+  // string compare — a lookalike custom_id (wrong case, trailing text, a
+  // bare UUID) never parses to a uid at all, so it mismatches the caller's
+  // own uid the same way a genuinely different owner's order would (403
+  // either way — this function has no separate "malformed" status to give
+  // a possible attacker, only "not yours").
+  if (uidFromCustomId(order.customId) !== user.id) {
     return jsonError(403, "not_your_order", "That payment isn't yours.", cors);
   }
   if (!isPackAmount(order.amountValue, order.currencyCode)) {
     return jsonError(400, "bad_amount", "That payment doesn't match a credit pack.", cors);
+  }
+  // F1 (fix round 2, lead ruling): re-verify create-order's own HMAC binding
+  // (uid + pack + amount + the timestamp the invoice_id itself carries)
+  // BEFORE ever calling PayPal's capture endpoint — an order the browser
+  // created directly against PayPal's own API (never through create-order)
+  // has no way to produce a tag that verifies, even if its custom_id reads
+  // exactly ten:<a real member's uid> (the independent tester's own "SPEC
+  // GAP" case). Invalid or missing -> 403 not_ten_order, no capture call.
+  const pack = packForAmount(order.amountValue);
+  if (!pack || !(await deps.verifyInvoiceId(order.invoiceId, user.id, pack, order.amountValue))) {
+    deps.log?.warn({ msg: "ten-paypal: ALERT invoice tag failed to verify — not Ten's own order", orderId });
+    return jsonError(403, "not_ten_order", MESSAGES.notTenOrder, cors);
   }
 
   let outcome: CaptureOutcome;
   try {
     outcome = await deps.captureOrder(orderId, captureRequestId(orderId));
   } catch (e) {
-    deps.log?.warn({ msg: "ten-paypal: capture failed", err: String(e) });
-    return jsonError(503, "paypal_error", MESSAGES.paypalError, cors);
+    // F2 (fix round 2): a transport failure calling capture itself must
+    // NEVER be read as "declined, no money moved" — PayPal may already
+    // have captured the money and simply failed to answer (§ 1.11's "no
+    // answer from capture"); the webhook is the backup either way.
+    deps.log?.warn({ msg: "ten-paypal: capture call failed", err: String(e) });
+    return jsonError(503, "paid_not_credited", MESSAGES.paidNotCredited, cors);
   }
 
   let capture: CaptureInfo;
@@ -159,16 +189,19 @@ async function handleCaptureOrder(
     capture = outcome.capture;
   } else if (outcome.kind === "already_captured") {
     // § 17.1 step 4: "ORDER_ALREADY_CAPTURED → read the order's capture."
+    // Money already moved at PayPal by definition of this outcome, so a
+    // re-read failure here is "not confirmed yet" too (F2), never
+    // "couldn't start a payment" (nothing here is starting one).
     let reread: OrderInfo;
     try {
       reread = await deps.getOrder(orderId);
     } catch (e) {
       deps.log?.warn({ msg: "ten-paypal: already-captured re-read failed", err: String(e) });
-      return jsonError(503, "paypal_error", MESSAGES.paypalError, cors);
+      return jsonError(503, "paid_not_credited", MESSAGES.paidNotCredited, cors);
     }
     if (!reread.capture) {
       deps.log?.warn({ msg: "ten-paypal: ORDER_ALREADY_CAPTURED but re-read order carries no capture", orderId });
-      return jsonError(503, "paypal_error", MESSAGES.paypalError, cors);
+      return jsonError(503, "paid_not_credited", MESSAGES.paidNotCredited, cors);
     }
     capture = reread.capture;
   } else if (outcome.kind === "not_approved") {
@@ -176,14 +209,17 @@ async function handleCaptureOrder(
     // ORDER_NOT_APPROVED)." ui § 1.11: "Window closed: 'No payment was made.'"
     return json(200, { status: "window_closed" }, cors);
   } else {
-    deps.log?.warn({ msg: "ten-paypal: capture error", status: outcome.status, message: outcome.message });
-    return json(200, { status: "declined" }, cors);
+    // F2: a PayPal 5xx or any other unrecognized capture answer — never
+    // "declined" (that would tell the payer "No money moved" when we
+    // genuinely don't know). The webhook is the backup that finds out.
+    deps.log?.warn({ msg: "ten-paypal: capture answered an error", status: outcome.status, message: outcome.message });
+    return jsonError(503, "paid_not_credited", MESSAGES.paidNotCredited, cors);
   }
 
   // Defense in depth: the capture's OWN custom_id is re-checked even though
   // the pre-capture order check above already passed (mirrors the older
   // app's own capture-order route).
-  if (capture.customId !== wantCustomId) {
+  if (uidFromCustomId(capture.customId) !== user.id) {
     deps.log?.warn({ msg: "ten-paypal: capture custom_id mismatch after capture", orderId });
     return jsonError(403, "not_your_order", "That payment isn't yours.", cors);
   }
@@ -196,18 +232,12 @@ async function handleCaptureOrder(
     return json(200, { status: "declined" }, cors);
   }
 
-  if (!breakdownLooksSane(capture)) {
-    // § 17.8 test 6: "a breakdown that doesn't add up, non-USD, no
-    // net_amount: no row, an alert." The migration's check constraint is
-    // the backstop if this guard is ever wrong; this alert fires first.
-    deps.log?.warn({
-      msg: "ten-paypal: ALERT completed capture with a breakdown that doesn't check out",
-      captureId: capture.captureId,
-      grossUsd: capture.grossUsd,
-      feeUsd: capture.feeUsd,
-      netUsd: capture.netUsd,
-      currencyCode: capture.currencyCode,
-    });
+  if (!breakdownIsSane(capture)) {
+    // § 17.8 test 6 / F4 (fix round 2): "a breakdown that doesn't add up,
+    // non-USD, no net_amount: no row, an alert." The migration's check
+    // constraint is the backstop if this guard is ever wrong; this alert
+    // fires first, at error level, with no secret in it.
+    alertBreakdownMismatch(deps, capture, "ten-paypal");
     return jsonError(503, "paid_not_credited", MESSAGES.paidNotCredited, cors);
   }
 

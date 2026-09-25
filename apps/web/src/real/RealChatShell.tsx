@@ -12,6 +12,7 @@
 //     (plan step 5b item 3)
 import { useChat } from "@ai-sdk/react";
 import type { Coach, WorkspaceStore } from "../../../../packages/agent/src/types.ts";
+import type { AuthClientLike } from "../backend/auth.ts";
 import type { CoachModel } from "../backend/coach-model.ts";
 import { prepareConversationForSave, CONVERSATION_BYTE_CAP } from "../../../../packages/agent/src/index.ts";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
@@ -27,6 +28,7 @@ import { ConversationError, type ConversationStore } from "../backend/conversati
 import type { AppMessage, DataCardData, FileRead } from "../types.ts";
 import { BuyCreditDialog } from "./BuyCreditDialog";
 import { DeleteBetaDataConfirm } from "./DeleteBetaDataConfirm";
+import { SetPasswordDialog } from "./SetPasswordDialog";
 import { checkConversationStale, CONVERSATION_CHECK_TIMEOUT_MS } from "./conversation-stale-check.ts";
 import { useVersionMonitor } from "./version-check.ts";
 import { VersionNotice } from "./VersionNotice";
@@ -95,6 +97,13 @@ export interface RealChatShellProps {
    *  directly, without PayPal) keeps working unchanged — RealApp.tsx
    *  always supplies it from env.paypalClientId. */
   paypalClientId?: string;
+  /** design-web-ui.md § 1.10 — the ⋯ menu's "Set a new password" dialog
+   *  (updateUser/reauthenticate) and the recovery screen's own save both
+   *  go through this same client. */
+  authClient: AuthClientLike;
+  /** The signed-in member's own email — shown in the code-step and resend
+   *  lines ("we emailed a 6-digit code to {email}"). */
+  userEmail: string;
   onSignOut: () => void;
   /** Once ten-delete-account returns, the caller signs out and returns to
    *  sign-in (design-web-ui.md § 1.7 point 4). */
@@ -121,6 +130,8 @@ export function RealChatShell({
   supabaseUrl,
   accessToken,
   paypalClientId = "",
+  authClient,
+  userEmail,
   onSignOut,
   onDeleted,
   theme,
@@ -222,6 +233,7 @@ export function RealChatShell({
   const [attachError, setAttachError] = useState<string | undefined>(undefined);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showBuyCredit, setShowBuyCredit] = useState(false);
+  const [showSetPassword, setShowSetPassword] = useState(false);
   const [importError, setImportError] = useState<string | undefined>(undefined);
   // § 10 / ui § 1.8 — a newer deployed build. `sendBlockedOnce` switches the
   // notice's copy the moment a send is actually blocked (§ 10.3); it only
@@ -469,6 +481,7 @@ export function RealChatShell({
           onImportWorkspace={() => importInputRef.current?.click()}
           onDeleteBetaData={() => setShowDeleteConfirm(true)}
           onBuyCredit={() => setShowBuyCredit(true)}
+          onSetPassword={() => setShowSetPassword(true)}
           onSignOut={onSignOut}
           coachModel={coachModel}
         />
@@ -544,6 +557,9 @@ export function RealChatShell({
           onClose={() => setShowBuyCredit(false)}
           onCredited={refreshBalance}
         />
+      ) : null}
+      {showSetPassword ? (
+        <SetPasswordDialog client={authClient} email={userEmail} onClose={() => setShowSetPassword(false)} />
       ) : null}
     </div>
   );

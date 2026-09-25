@@ -122,7 +122,9 @@ def test_no_reference_restates_a_loop_rule_verbatim():
 # public push and one `cp -r skills/*` from the deployed copy.
 PII = re.compile(
     r"/Users/[A-Za-z]|/home/[a-z]+/"                           # a real home path
-    r"|[A-Za-z0-9._%+-]+@(?!example\.)[A-Za-z0-9.-]+\.[a-z]{2,}"  # an email
+    # an email -- except example.* and the project's one public support
+    # address (owner, 2026-09-25: the refund contact shown in the app).
+    r"|(?<![A-Za-z0-9._%+-])(?!support@10xjobs\.co\b)[A-Za-z0-9._%+-]+@(?!example\.)[A-Za-z0-9.-]+\.[a-z]{2,}"
     r"|\(?\b\d{3}\)?[-. ]\d{3}[-. ]\d{4}\b"                   # a phone number
     r"|linkedin\.com/in/[A-Za-z0-9-]+"                        # a profile URL
 )
@@ -141,6 +143,9 @@ def test_pii_pattern_catches_the_known_shapes():
                 "212.555.0143", "(415) 555-0100", "linkedin.com/in/janedoe"):
         assert pii_hits(bad), bad
     assert not pii_hits("jane@example.com, $HOME/job-search, 2026-09-22")
+    assert not pii_hits("email support@10xjobs.co for a refund")
+    for bad in ("xsupport@10xjobs.co", "support@10xjobs.com", "help@10xjobs.co"):
+        assert pii_hits(bad), bad
 
 
 def test_no_candidate_data_in_shipped_files():

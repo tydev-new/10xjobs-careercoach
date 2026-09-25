@@ -11,6 +11,10 @@ Again 2026-09-24: § 13 (the site's model is a setting; approved by the owner,
 2026-09-24, with the answers in § 13.6).
 Again 2026-09-24: § 14 (web search is billed per request; owner request).
 Again 2026-09-25: § 15 (production is owner-only; owner decision).
+Again 2026-09-25: § 16 (setting and resetting a password; owner-reported
+gap; draft for owner approval).
+Again 2026-09-25: § 17 (buying credit with PayPal; approved by the owner,
+2026-09-25, with the answers in § 17.9).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -1945,6 +1949,351 @@ or commit names the owner as the one who ran it.
 
 ---
 
+## 16. Setting and resetting a password (amendment, 2026-09-25)
+
+Owner-reported gap (2026-09-25); **draft for owner approval.** Screens and
+exact copy: `design-web-ui.md` § 1.10. No new table, Edge Function, secret
+or server code: every call goes from the browser to Supabase Auth.
+
+**Prevents:** an email-link account with no way to get a password; a
+forgotten password with no way back; the reset form telling a stranger
+whether an email has an account; a password reaching anything but
+Supabase Auth; a recovery link that opens the chat without asking for the
+new password.
+
+### 16.1 The calls
+
+Read in the installed package (`supabase-js` 2.58.0, `auth-js` 2.72.0,
+`apps/web/node_modules/@supabase/auth-js/src/GoTrueClient.ts`).
+
+- **`auth.ts` gains** three methods the real client already has, added to
+  `AuthClientLike`: `resetPasswordForEmail(email, { redirectTo })`,
+  `updateUser({ password, nonce? })`, `reauthenticate()`. Also
+  `MIN_PASSWORD_LENGTH = 8`, which `SignIn.tsx`'s sign-up `minLength={8}`
+  then uses (one number in code), and the pure
+  `authRedirectFromUrl(href)`: `recovery` when the hash or query has
+  `type=recovery`, `link-error` when it has `error_code`, else `none`.
+- **Set a new password:** `updateUser({ password })`. Supabase's User
+  object has no "has a password" field, hence one menu label.
+- **Secure password change**, designed for both settings. The app never
+  reads the setting; it reacts to the answer. Off, or on with a session
+  under 24 hours old: the call saves. On with an older session: error
+  code `reauthentication_needed`. The app then calls `reauthenticate()`,
+  which emails a 6-digit code, and retries with
+  `updateUser({ password, nonce: code })`. A wrong or expired code is
+  `reauthentication_not_valid`. The setting is the owner's and can change
+  without a deploy, so the app must not assume either.
+- **Forgot:** `resetPasswordForEmail(email, { redirectTo: siteRedirectUrl() })`,
+  which is `VITE_SITE_URL` (§ 8: every auth link passes `redirectTo`).
+  Supabase returns no error when no account exists (its password guide).
+- **The link back.** The flow stays **implicit**, the client's default
+  (nothing sets `flowType`), so the link works in any browser, not only the
+  one that asked. It lands as `#access_token=…&type=recovery`.
+  `detectSessionInUrl` saves the session, then fires `PASSWORD_RECOVERY`
+  a tick later (`setTimeout`, line 424). Each listener also gets
+  `INITIAL_SESSION` with that session once setup finishes (line 2075), and
+  the two have no guaranteed order. Today `RealApp.tsx`'s listener would
+  run the membership check and open the chat on `INITIAL_SESSION`.
+  So `RealApp` reads `authRedirectFromUrl(window.location.href)` **once,
+  before creating the client** (the client clears the hash). `recovery`, or
+  a `PASSWORD_RECOVERY` event, shows "Choose a new password" in place of
+  every other screen; while it shows, the listener acts only on sign-out.
+  After a save, `Continue` runs the normal membership check once.
+  Nothing is stored: a reload during recovery goes on to the app signed
+  in (the link was a valid sign-in), and the menu still offers the
+  password.
+- **A link error** (`error_code`, for example `otp_expired`): the sign-in
+  screen shows the expired line, then `history.replaceState` removes the
+  parameters so a reload doesn't repeat it.
+
+### 16.2 Security
+
+- The password and the code live only in the form's React state, cleared
+  on success, `Cancel`, sign-out and unmount. They leave the tab only in
+  the body of Supabase Auth's own calls (HTTPS).
+- Never: the console or `logSetupError`, `localStorage` or
+  `sessionStorage`, the conversation (§ 11), workspace files, the gate log,
+  the agent, any URL. Shown errors come from § 1.10's table, never
+  `error.message`. Forms are `method="post"` and the fields have no `name`,
+  so no fallback submit can put a password in a URL. Fields are
+  `type="password"` until Show; `autocomplete="new-password"`, and the
+  code is `autocomplete="one-time-code"`.
+- Supabase enforces the password rules; the app's 8 is only a first
+  check. If the dashboard asks for more, the `weak_password` line says so.
+- **The sign-in is shared** (§ 8): the new password, and every setting
+  below, also applies to the older app. The copy says so.
+- Enumeration: the screen shows success and a 429 identically. What the
+  Auth API itself reveals to a script calling it directly is Supabase's
+  behaviour, not this screen's (UNVERIFIED: whether its 429 can differ
+  by account).
+
+### 16.3 Owner checklist (production is owner-only, § 15)
+
+Dashboard of `career-coach-nextgen`. Agents never change these; the owner
+checks each and tells the lead the values. The provider page URL and Rate
+Limits come from Supabase's docs; the menu paths in items 1, 2, 3 and 5
+are UNVERIFIED against today's dashboard (menus move).
+
+1. **Authentication → URL Configuration.** Redirect URLs has
+   `https://ten-coach.vercel.app/**`, and Vercel's `VITE_SITE_URL` falls
+   inside it. Site URL stays the old app's. A `redirectTo` not on the list
+   falls back to the Site URL, so the reset link would open the old app.
+2. **Authentication → Email Templates → Reset Password.** The link is
+   `{{ .ConfirmationURL }}` (it carries `redirect_to`), not a fixed
+   `{{ .SiteURL }}` path. The wording suits both apps: it is shared.
+3. **Authentication → Email Templates → Reauthentication.** It contains
+   `{{ .Token }}`.
+4. **Authentication → Providers → Email**
+   (`/dashboard/project/_/auth/providers?provider=Email`):
+   - *Minimum password length:* 8, or tell the lead the number (the app's
+     first check must not be below it).
+   - *Password requirements* and *leaked password protection* (Pro plan):
+     either value works; report them.
+   - *Secure password change:* either works; report which.
+   - *Require the current password*, if shown: must be **off**.
+     `current_password` needs `supabase-js` 2.102 or later (vendor docs),
+     and email-link accounts have no current password.
+5. **Authentication → Emails → SMTP Settings** and **Authentication → Rate
+   Limits.** Custom SMTP is set: the built-in sender allows 2 emails an
+   hour for the whole project, old app included. Note the per-user 60 s
+   interval and the email OTP expiry (the link's and the code's lifetime).
+6. **After the site deploy**, the owner's live run on a fresh test account
+   (PROCESS step 6): forgot → email → "Choose a new password" → sign out →
+   sign in with it; then "Set a new password" from the menu.
+
+### 16.4 Test plan (independent tester)
+
+A fake `AuthClientLike` for units. For e2e, the GoTrue stand-in in
+`tests/e2e-real/stand-in.ts` gains `POST /recover`, `PUT /user` and
+`GET /reauthenticate`.
+
+1. **Form:** a mismatch and a 7-character password make no call.
+2. **Secure change off**, or on with a fresh session: `updateUser` is
+   called once with exactly `{ password }`; the success line shows.
+3. **Secure change on, older session:** `reauthentication_needed`, then
+   `reauthenticate` once, then the code step. A wrong code gives its
+   line and keeps the password; `Send a new code` calls `reauthenticate`
+   again; the right code sends `{ password, nonce }`.
+4. **Every error code** gives its § 1.10 line, and the shown text never
+   contains the fake's `error.message`.
+5. **Forgot:** called with `(email, { redirectTo: VITE_SITE_URL })`. The
+   has-account, no-account and 429 fakes render byte-identical text;
+   another error gives the failure line.
+6. **Recovery:** `authRedirectFromUrl` cases (recovery hash, error in the
+   hash, error in the query, none). `RealApp` with a fake that emits
+   `INITIAL_SESSION` then `PASSWORD_RECOVERY`, the reverse, and the URL
+   alone: the recovery screen shows, `ten_is_member` is not called and no
+   chat mounts; after save and `Continue` it is called once. An
+   `otp_expired` hash shows the expired line.
+7. **No leak:** a sentinel password and code. Spies on `console.*`,
+   storage `setItem`, `fetch` URLs and bodies, `location` and `history`,
+   the conversation save and workspace writes: the sentinel appears only
+   in a Supabase Auth request body.
+8. **375px:** the dialog, the reset card and the recovery screen have no
+   horizontal scroll, tap targets of at least 44px, `data-theme="light"`,
+   and new CSS uses only `styles.css` custom properties.
+
+---
+
+## 17. Buying credit with PayPal (amendment, 2026-09-25)
+
+**Approved by the owner (2026-09-25)**, with the answers in § 17.9. Owner
+decisions: the older app's PayPal business account and REST app keys;
+credit = what PayPal says arrived, net of its fee; one-time payments, no
+monthly charge. Lead defaults, approved with it: packs of $10, $20, $40;
+the $5 starter stays; refunds by hand; paid credit is never deleted;
+members only (buying adds credit, never membership). Screens: `design-web-ui.md` § 1.11. Wins
+over § 8 where they differ.
+
+**Prevents:** paying without credit, or credit twice; credit for money not
+received (a changed amount, another user's order, the older app's
+payments); agent spending behind a button; a secret outside the owner's
+hands; the older app retrying Ten's payments for 3 days.
+
+### 17.1 The flow
+
+1. A member picks a pack in "Buy credit". PayPal's JS SDK buttons (loaded
+   only then; `VITE_PAYPAL_CLIENT_ID`, `intent=capture`, `currency=USD`,
+   `disable-funding=paylater`) call:
+2. **`POST ten-paypal/create-order`** `{ pack: "10"|"20"|"40" }`: signed in
+   (401), member (403), known pack (400). Creates an Orders v2 order,
+   `intent: CAPTURE`: the pack's amount from the server's table,
+   `custom_id: "ten:<uid>"`, `invoice_id: "ten-<random uuid>"` (PayPal wants
+   it unique), `description: "Ten credit $10"`, no shipping address. No
+   vault, saved method, agreement or plan. Returns `{ orderId }`.
+3. The payer confirms in PayPal's window.
+4. **`POST ten-paypal/capture-order`** `{ orderId }`: signed in, member.
+   Reads the order first: unless `custom_id` is `ten:<caller>` (403) and the
+   amount a pack in USD (400), nothing is captured. Captures with
+   `PayPal-Request-Id: ten-capture-<orderId>` (kept 6 hours: a retry returns
+   the same capture); `ORDER_ALREADY_CAPTURED` → read the order's capture.
+   `COMPLETED` → credit (§ 17.3), `{ status: "credited", grossUsd, feeUsd,
+   creditedUsd }`; `PENDING` → `"pending"` (no fee breakdown until it
+   clears); else `"declined"`. A failed credit write → 503
+   `"paid_not_credited"`.
+5. **`ten-paypal-webhook`, the backup. Decision: Ten registers its own URL
+   on the shared app, event `PAYMENT.CAPTURE.COMPLETED` only.** Without it,
+   a pending payment that clears later, or a failed credit write after the
+   tab closed, stays uncredited until the user complains. PayPal posts to
+   every subscribed URL and retries a non-2xx up to 25 times over 3 days.
+   Checks, in order: POST, ≤ 64 KB, JSON. **Then PayPal's signature**
+   (owner, 2026-09-25): `POST /v1/notifications/verify-webhook-signature`
+   with the five `paypal-*` headers, the event and `TEN_PAYPAL_WEBHOOK_ID`;
+   anything but `SUCCESS` → 401, no credit; the call failing, or the secret
+   unset → 503, so PayPal retries. Then: another event type → 200;
+   `resource.custom_id` not exactly `ten:<uuid>` → 200 (the older app's);
+   not a member → 200 and an alert ("refund by hand"). **Then, still,
+   re-fetch** `GET /v2/payments/captures/{id}` with Ten's keys (failure →
+   503): the signature proves PayPal sent the event, the re-fetch proves
+   the capture (rule 11). It must show the same `custom_id`, `COMPLETED`, a
+   USD pack, else 200 and an alert; credit (a failed write → 503). Deployed
+   with `verify_jwt = false`; no CORS.
+
+### 17.2 Buying is not spending (rule 7)
+
+Rule 7's owner-approved sentence (2026-09-25): "Buying credit, done by you
+in the payment provider's own window, is your action, not Ten's; Ten never
+starts it." Rule 7 covers what Ten does for the candidate, spending included; every
+spend stays behind § 3's typed `yes` and § 8's proxy. Buying is the
+candidate paying, by choice, in PayPal's window, which shows amount and
+payee and takes their confirmation; Ten's button only opens it. Money moves
+into the balance, never out. This holds only while, tested (§ 17.8):
+
+- **Only PayPal's window moves money.** Ten can capture only an order the
+  payer approved (else `ORDER_NOT_APPROVED`); nothing is saved to charge
+  again.
+- **A purchase approves nothing:** no gate opened, approved or raised, no
+  allowance changed; `ten-paypal` never touches `ten_gate_log`.
+- **The agent can't reach it:** no tool, card or model output opens the
+  dialog or calls `ten-paypal`; the coach's prompt and skills never mention
+  buying, so it can't upsell (rule 8). The one pointer is fixed
+  `over_balance` copy.
+
+### 17.3 The ledger (a new migration file)
+
+One `credit` row per capture: `request_id = 'paypal:<captureId>'` (already
+unique, so capture, webhook and replays credit once), `usd` = PayPal's
+`net_amount`, plus new nullable `gross_usd`, `fee_usd` (`numeric(12,2)`).
+PayPal's decimal strings reach Postgres unparsed. The migration adds:
+
+- a check: `gross_usd` and `fee_usd` are set exactly when `request_id`
+  starts with `paypal:`, and then `kind = 'credit'`, `fee_usd >= 0`,
+  `usd > 0`, `usd = gross_usd - fee_usd`, so a breakdown that doesn't add up
+  is refused;
+- the kind `refund` (§ 17.5). `ten_balance_for` already subtracts every
+  non-credit kind; membership and the day's spend read only `credit` and
+  `call`. No function or policy change.
+
+No payer name or email is kept. The teardown refuses while `paypal:` rows
+exist, until the owner exports them (a query in its header).
+
+### 17.4 Delete keeps credit (amends § 8)
+
+`ten-delete-account` stops deleting ledger rows, the $5 starter included:
+calls aren't tied to the credit they used, so deleting any credit row can
+take paid credit with it. A member who deletes keeps membership and
+balance, with an empty workspace; rule 9 holds (amounts, no career
+content). Deploy it before `ten-paypal`, the new copy after it. When built,
+`ARCHITECTURE.md` § 3–4 and the functions README follow.
+
+### 17.5 Limits and refunds
+
+Unchanged: the $5/day beta ceiling, per-call ceilings, gate and allowance
+(§ 3, 4, 8, 13, 14). **Refunds, by hand:** the owner refunds in PayPal, at
+most the current balance, then inserts `kind 'refund'`, `request_id
+'paypal-refund:<refundId>'`, `usd` = the amount. Disputes likewise.
+**When the beta ends,** unused paid credit stays usable; refunds on
+request.
+
+### 17.6 Secrets, sandbox, the older app, privacy
+
+Function secrets, owner-set (§ 15): `TEN_PAYPAL_CLIENT_ID`,
+`TEN_PAYPAL_CLIENT_SECRET`, `TEN_PAYPAL_API_BASE`, `TEN_PAYPAL_WEBHOOK_ID`
+(Supabase secrets are project-wide; the prefix keeps them apart). The functions refuse to start
+unless the base is `https://api-m.sandbox.paypal.com` or
+`https://api-m.paypal.com`. The browser gets only the public
+`VITE_PAYPAL_CLIENT_ID`. `ten-paypal` uses `_shared/cors.ts`. Sandbox
+first; for live, switch secrets, Vercel value, webhook and its id together.
+
+The older app's webhook gets every Ten payment too; today it fails on
+`ten:<uuid>`, answers 500 and is retried for 3 days. Its patch:
+[`old-app-paypal-ten-prefix.md`](old-app-paypal-ten-prefix.md).
+
+`/privacy.html` gains "Payments go through PayPal": you pay in PayPal's
+window; Ten never sees your card or login; PayPal gets an internal account
+id; Ten keeps the amount, fee and PayPal's transaction id, nothing else;
+records survive a delete.
+
+### 17.7 Owner checklist (sandbox, then live)
+
+**Refund contact:** `support@10xjobs.co` (owner, 2026-09-25; shown in
+`design-web-ui.md` § 1.11). The earlier release blocker is cleared.
+
+1. Deploy the older-app patch; a `ten:` payment gets 200 "ignored" there.
+2. PayPal: the account takes USD without manual acceptance (else payments
+   sit `PENDING`); unique invoice ids stays on.
+3. Apply the migration; `NOTIFY pgrst, 'reload schema';`.
+4. `supabase secrets set TEN_PAYPAL_CLIENT_ID=… TEN_PAYPAL_CLIENT_SECRET=…
+   TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com --project-ref
+   ivunfotoggdxbjouumdk`.
+5. `supabase functions deploy ten-delete-account`, then `ten-paypal`, then
+   `ten-paypal-webhook --no-verify-jwt` (same project ref).
+6. developer.paypal.com → the app → Webhooks → Add:
+   `https://ivunfotoggdxbjouumdk.supabase.co/functions/v1/ten-paypal-webhook`,
+   "Payment capture completed" only. Copy the Webhook ID PayPal shows,
+   `supabase secrets set TEN_PAYPAL_WEBHOOK_ID=<it> --project-ref
+   ivunfotoggdxbjouumdk`, then redeploy `ten-paypal-webhook
+   --no-verify-jwt`. Until the id is set, it answers 503.
+7. Vercel: `VITE_PAYPAL_CLIENT_ID`, then deploy the site.
+8. Buy $10: one `paypal:` row, `usd` = net, the chip up by net, the webhook
+   delivery 200 with no second row. Live: refund it by hand.
+
+### 17.8 Test plan (independent tester)
+
+Mocked PayPal (a loopback stub, as in `_shared/test-support.ts`) and
+Supabase; sandbox is the owner's step 8.
+
+1. create-order: 401, 403, 400; the amount comes from the table whatever
+   the body adds (`amount`, `custom_id`); `custom_id` is `ten:<caller>`; no
+   vault or agreement field.
+2. capture-order on another user's order, an older-app order (bare UUID),
+   a `ten:` order with a non-pack amount: 403, 403, 400; no capture call.
+3. Parallel captures, capture then webhook, webhook then capture, a webhook
+   replayed 3 times, `ORDER_ALREADY_CAPTURED`: one row.
+4. Webhook: a bad or missing signature → 401, no re-fetch, no row; the
+   verify call failing or no `TEN_PAYPAL_WEBHOOK_ID` → 503, no row. A valid
+   signature with a non-`ten:` `custom_id` (bare UUID, other text), an
+   unknown capture, a non-member, or a re-fetched `custom_id` unlike the
+   event's → 200, no row. Valid and `ten:` → re-fetch → one row, replayed
+   or not. A PayPal or DB failure: 503.
+5. `PENDING`: no row; the later webhook: one row.
+6. A breakdown that doesn't add up, non-USD, no `net_amount`: no row, an
+   alert.
+7. `tests/sql`: the checks; users can't insert; a refund lowers
+   `ten_balance()`, not `ten_beta_spend_today()`; the teardown refuses.
+8. Delete, twice: files, conversation, gates gone; ledger, membership and
+   balance stay.
+9. Rule 7: after a purchase a run over the allowance still stops at a gate;
+   no tool or bundled skill offers buying; no card opens the dialog.
+
+### 17.9 Resolved (owner, 2026-09-25)
+
+Approved with the lead's recommendations:
+
+- Rule 7 gains the sentence quoted in § 17.2 (`PRINCIPLES.md`).
+- The webhook checks PayPal's signature first and still re-fetches the
+  capture before crediting (§ 17.1 step 5; was "no signature check").
+- Delete keeps the $5 starter row, so the person stays a member (§ 17.4).
+- Unused paid credit stays usable when the beta ends; refunds on request.
+- Pay Later off; the teardown refuses while paid rows exist.
+- The refund contact is PENDING OWNER: a release blocker for live PayPal
+  only (§ 17.7).
+- The older app credits gross from its webhook and net from its capture
+  route: a known issue, a separate fix for the older app, not part of
+  Ten's build (`old-app-paypal-ten-prefix.md`).
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -2042,3 +2391,13 @@ spike replaced (owner, 2026-09-23).
   reconciliation message can't hide a stop; each reconciliation message
   gets a unique id; § 12.3 (i) uses 22 reads so the trim really fires;
   the § 11.3/§ 12.1 stub is one shared implementation.
+- Password reset stays on the implicit flow (§ 16; draft, 09-25): the
+  link works in any browser; the recovery screen is chosen from the URL,
+  read before the client exists, because the two auth events have no
+  guaranteed order. The app reacts to `reauthentication_needed` rather
+  than reading the secure-change setting.
+- Buying credit (§ 17; approved by the owner, 09-25): PayPal on the older
+  app's account, credit = PayPal's net, one row per capture keyed
+  `paypal:<captureId>`; Ten's own capture webhook as the backup, checked by
+  PayPal's signature and then a re-fetch; buying is paying in PayPal's window, never Ten spending
+  (rule 7); delete keeps every ledger row.

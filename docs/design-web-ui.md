@@ -302,12 +302,12 @@ and `Sign out`. Success: "Password saved. Use it next time you sign in,
 here or in the older app." and `Continue`, which runs the normal
 membership check (§ 1.4). Errors: the table above.
 
-### 1.11 Buy credit (amendment, 2026-09-25; draft for owner approval)
+### 1.11 Buy credit (amendment, 2026-09-25; approved by the owner, 2026-09-25)
 
 Mechanism: C § 17. Members only (§ 1.6 has none). Opened from the balance
 chip or "Buy credit" in the `⋯` menu, never from a card or the chat. A
-dialog; Close or Esc shuts it. `<contact>` is PENDING OWNER. Copy, word for
-word:
+dialog; Close or Esc shuts it. `<contact>` is PENDING OWNER, and live
+PayPal can't ship without it (C § 17.7); sandbox can. Copy, word for word:
 
 - "Buy credit". "Credit pays for Ten's work. You pay in PayPal's window;
   Ten adds what arrives after PayPal's fee, a few percent plus a fixed

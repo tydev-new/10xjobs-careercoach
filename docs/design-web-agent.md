@@ -13,8 +13,8 @@ Again 2026-09-24: § 14 (web search is billed per request; owner request).
 Again 2026-09-25: § 15 (production is owner-only; owner decision).
 Again 2026-09-25: § 16 (setting and resetting a password; owner-reported
 gap; draft for owner approval).
-Again 2026-09-25: § 17 (buying credit with PayPal; owner decisions, draft
-for owner approval).
+Again 2026-09-25: § 17 (buying credit with PayPal; approved by the owner,
+2026-09-25, with the answers in § 17.9).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -2097,12 +2097,12 @@ A fake `AuthClientLike` for units. For e2e, the GoTrue stand-in in
 
 ## 17. Buying credit with PayPal (amendment, 2026-09-25)
 
-**Draft for owner approval.** Owner decisions (2026-09-25): the older app's
-PayPal business account and REST app keys; credit = what PayPal says
-arrived, net of its fee; one-time payments, no monthly charge. Lead
-defaults the owner can change: packs of $10, $20, $40; the $5 starter
-stays; refunds by hand; paid credit is never deleted; members only (buying
-adds credit, never membership). Screens: `design-web-ui.md` § 1.11. Wins
+**Approved by the owner (2026-09-25)**, with the answers in § 17.9. Owner
+decisions: the older app's PayPal business account and REST app keys;
+credit = what PayPal says arrived, net of its fee; one-time payments, no
+monthly charge. Lead defaults, approved with it: packs of $10, $20, $40;
+the $5 starter stays; refunds by hand; paid credit is never deleted;
+members only (buying adds credit, never membership). Screens: `design-web-ui.md` § 1.11. Wins
 over § 8 where they differ.
 
 **Prevents:** paying without credit, or credit twice; credit for money not
@@ -2136,27 +2136,28 @@ hands; the older app retrying Ten's payments for 3 days.
    a pending payment that clears later, or a failed credit write after the
    tab closed, stays uncredited until the user complains. PayPal posts to
    every subscribed URL and retries a non-2xx up to 25 times over 3 days.
-   Checks, cheapest first: POST, ≤ 64 KB, JSON; another event type → 200;
+   Checks, in order: POST, ≤ 64 KB, JSON. **Then PayPal's signature**
+   (owner, 2026-09-25): `POST /v1/notifications/verify-webhook-signature`
+   with the five `paypal-*` headers, the event and `TEN_PAYPAL_WEBHOOK_ID`;
+   anything but `SUCCESS` → 401, no credit; the call failing, or the secret
+   unset → 503, so PayPal retries. Then: another event type → 200;
    `resource.custom_id` not exactly `ten:<uuid>` → 200 (the older app's);
-   not a member → 200 and an alert ("refund by hand"); re-fetch
-   `GET /v2/payments/captures/{id}` (failure → 503); it must show the same
-   `custom_id`, `COMPLETED`, a USD pack, else 200 and an alert; credit (a
-   failed write → 503). Deployed with `verify_jwt = false`; no CORS.
-
-   **No signature check (decision).** The re-fetch is the proof (rule 11):
-   a forged event can only name a real Ten capture, owed and keyed once.
-   PayPal's verify call costs one PayPal call per event anyway, adds a
-   secret, and a wrong webhook id would silently refuse every real event.
-   PayPal recommends it; if the owner wants it, it runs first
-   (`TEN_PAYPAL_WEBHOOK_ID`).
+   not a member → 200 and an alert ("refund by hand"). **Then, still,
+   re-fetch** `GET /v2/payments/captures/{id}` with Ten's keys (failure →
+   503): the signature proves PayPal sent the event, the re-fetch proves
+   the capture (rule 11). It must show the same `custom_id`, `COMPLETED`, a
+   USD pack, else 200 and an alert; credit (a failed write → 503). Deployed
+   with `verify_jwt = false`; no CORS.
 
 ### 17.2 Buying is not spending (rule 7)
 
-Rule 7 covers what Ten does for the candidate, spending included; every
+Rule 7's owner-approved sentence (2026-09-25): "Buying credit, done by you
+in the payment provider's own window, is your action, not Ten's; Ten never
+starts it." Rule 7 covers what Ten does for the candidate, spending included; every
 spend stays behind § 3's typed `yes` and § 8's proxy. Buying is the
 candidate paying, by choice, in PayPal's window, which shows amount and
 payee and takes their confirmation; Ten's button only opens it. Money moves
-into the balance, never out. This holds only while, tested (§ 17.9):
+into the balance, never out. This holds only while, tested (§ 17.8):
 
 - **Only PayPal's window moves money.** Ten can capture only an order the
   payer approved (else `ORDER_NOT_APPROVED`); nothing is saved to charge
@@ -2201,16 +2202,18 @@ Unchanged: the $5/day beta ceiling, per-call ceilings, gate and allowance
 (§ 3, 4, 8, 13, 14). **Refunds, by hand:** the owner refunds in PayPal, at
 most the current balance, then inserts `kind 'refund'`, `request_id
 'paypal-refund:<refundId>'`, `usd` = the amount. Disputes likewise.
+**When the beta ends,** unused paid credit stays usable; refunds on
+request.
 
 ### 17.6 Secrets, sandbox, the older app, privacy
 
 Function secrets, owner-set (§ 15): `TEN_PAYPAL_CLIENT_ID`,
-`TEN_PAYPAL_CLIENT_SECRET`, `TEN_PAYPAL_API_BASE` (Supabase secrets are
-project-wide; the prefix keeps them apart). The functions refuse to start
+`TEN_PAYPAL_CLIENT_SECRET`, `TEN_PAYPAL_API_BASE`, `TEN_PAYPAL_WEBHOOK_ID`
+(Supabase secrets are project-wide; the prefix keeps them apart). The functions refuse to start
 unless the base is `https://api-m.sandbox.paypal.com` or
 `https://api-m.paypal.com`. The browser gets only the public
 `VITE_PAYPAL_CLIENT_ID`. `ten-paypal` uses `_shared/cors.ts`. Sandbox
-first; for live, switch secrets, Vercel value and webhook together.
+first; for live, switch secrets, Vercel value, webhook and its id together.
 
 The older app's webhook gets every Ten payment too; today it fails on
 `ten:<uuid>`, answers 500 and is retried for 3 days. Its patch:
@@ -2223,6 +2226,9 @@ records survive a delete.
 
 ### 17.7 Owner checklist (sandbox, then live)
 
+**Release blocker:** live PayPal waits until the owner supplies the refund
+contact (`<contact>`, `design-web-ui.md` § 1.11). Sandbox doesn't.
+
 1. Deploy the older-app patch; a `ten:` payment gets 200 "ignored" there.
 2. PayPal: the account takes USD without manual acceptance (else payments
    sit `PENDING`); unique invoice ids stays on.
@@ -2234,7 +2240,10 @@ records survive a delete.
    `ten-paypal-webhook --no-verify-jwt` (same project ref).
 6. developer.paypal.com → the app → Webhooks → Add:
    `https://ivunfotoggdxbjouumdk.supabase.co/functions/v1/ten-paypal-webhook`,
-   "Payment capture completed" only.
+   "Payment capture completed" only. Copy the Webhook ID PayPal shows,
+   `supabase secrets set TEN_PAYPAL_WEBHOOK_ID=<it> --project-ref
+   ivunfotoggdxbjouumdk`, then redeploy `ten-paypal-webhook
+   --no-verify-jwt`. Until the id is set, it answers 503.
 7. Vercel: `VITE_PAYPAL_CLIENT_ID`, then deploy the site.
 8. Buy $10: one `paypal:` row, `usd` = net, the chip up by net, the webhook
    delivery 200 with no second row. Live: refund it by hand.
@@ -2251,8 +2260,12 @@ Supabase; sandbox is the owner's step 8.
    a `ten:` order with a non-pack amount: 403, 403, 400; no capture call.
 3. Parallel captures, capture then webhook, webhook then capture, a webhook
    replayed 3 times, `ORDER_ALREADY_CAPTURED`: one row.
-4. Webhook: non-`ten:`, unknown capture, non-member: 200, no row; a
-   PayPal or DB failure: 503.
+4. Webhook: a bad or missing signature → 401, no re-fetch, no row; the
+   verify call failing or no `TEN_PAYPAL_WEBHOOK_ID` → 503, no row. A valid
+   signature with a non-`ten:` `custom_id` (bare UUID, other text), an
+   unknown capture, a non-member, or a re-fetched `custom_id` unlike the
+   event's → 200, no row. Valid and `ten:` → re-fetch → one row, replayed
+   or not. A PayPal or DB failure: 503.
 5. `PENDING`: no row; the later webhook: one row.
 6. A breakdown that doesn't add up, non-USD, no `net_amount`: no row, an
    alert.
@@ -2262,6 +2275,22 @@ Supabase; sandbox is the owner's step 8.
    balance stay.
 9. Rule 7: after a purchase a run over the allowance still stops at a gate;
    no tool or bundled skill offers buying; no card opens the dialog.
+
+### 17.9 Resolved (owner, 2026-09-25)
+
+Approved with the lead's recommendations:
+
+- Rule 7 gains the sentence quoted in § 17.2 (`PRINCIPLES.md`).
+- The webhook checks PayPal's signature first and still re-fetches the
+  capture before crediting (§ 17.1 step 5; was "no signature check").
+- Delete keeps the $5 starter row, so the person stays a member (§ 17.4).
+- Unused paid credit stays usable when the beta ends; refunds on request.
+- Pay Later off; the teardown refuses while paid rows exist.
+- The refund contact is PENDING OWNER: a release blocker for live PayPal
+  only (§ 17.7).
+- The older app credits gross from its webhook and net from its capture
+  route: a known issue, a separate fix for the older app, not part of
+  Ten's build (`old-app-paypal-ten-prefix.md`).
 
 ---
 
@@ -2367,8 +2396,8 @@ spike replaced (owner, 2026-09-23).
   read before the client exists, because the two auth events have no
   guaranteed order. The app reacts to `reauthentication_needed` rather
   than reading the secure-change setting.
-- Buying credit (§ 17; draft, 09-25): PayPal on the older app's account,
-  credit = PayPal's net, one row per capture keyed `paypal:<captureId>`;
-  Ten's own capture webhook as the backup, trusted by re-fetch, not
-  signature; buying is paying in PayPal's window, never Ten spending
+- Buying credit (§ 17; approved by the owner, 09-25): PayPal on the older
+  app's account, credit = PayPal's net, one row per capture keyed
+  `paypal:<captureId>`; Ten's own capture webhook as the backup, checked by
+  PayPal's signature and then a re-fetch; buying is paying in PayPal's window, never Ten spending
   (rule 7); delete keeps every ledger row.

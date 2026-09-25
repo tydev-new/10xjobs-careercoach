@@ -26,3 +26,14 @@ signed `PAYMENT.CAPTURE.COMPLETED` with `custom_id: "ten:<uuid>"` returns
 200 `{ status: "ignored" }` and calls neither `getPayPalCapture` nor
 `activateCredit`; a bare-UUID event still credits. The capture route needs
 nothing: it already refuses an order whose `custom_id` isn't the caller's.
+
+**Known issue, a separate fix (not part of Ten's build).** The older app
+credits two different amounts for one payment. Its capture route
+(`packages/web-ui-shared/src/lib/billing/capture-order.ts`) credits PayPal's
+net (`seller_receivable_breakdown.net_amount`); its webhook passes the
+capture's `amount.value`, the gross, to `activateCredit`
+(`apps/web-ui-10xjobs/lib/billing.ts`). Both key on the capture id, so
+whichever lands first decides the credit: a user whose browser closed
+before capture returned gets the fee too. Recommended: the webhook reads
+the breakdown's `net_amount` (refusing a capture without one, as the
+capture route does). Owner-reviewed, deployed on its own.

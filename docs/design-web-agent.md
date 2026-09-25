@@ -2226,8 +2226,8 @@ records survive a delete.
 
 ### 17.7 Owner checklist (sandbox, then live)
 
-**Release blocker:** live PayPal waits until the owner supplies the refund
-contact (`<contact>`, `design-web-ui.md` § 1.11). Sandbox doesn't.
+**Refund contact:** `support@10xjobs.co` (owner, 2026-09-25; shown in
+`design-web-ui.md` § 1.11). The earlier release blocker is cleared.
 
 1. Deploy the older-app patch; a `ten:` payment gets 200 "ignored" there.
 2. PayPal: the account takes USD without manual acceptance (else payments

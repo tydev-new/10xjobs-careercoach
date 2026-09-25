@@ -13,6 +13,7 @@ import {
   DEL,
   harness,
   HOOK,
+  mintTag,
   member,
   nonMember,
   observe,
@@ -34,16 +35,27 @@ type H = Awaited<ReturnType<typeof harness>>;
 const refetches = (h: H) => h.pp.hits.filter((x) => x.method === "GET" && x.path.startsWith("/v2/payments/captures/"));
 const verifies = (h: H) => h.pp.hits.filter((x) => x.path === "/v1/notifications/verify-webhook-signature");
 
-/** A completed capture at PayPal for `customId` (not through ten-paypal). */
-function plantCapture(h: H, customId: string, value = "10.00", status = "COMPLETED") {
-  const orderId = ppPlantOrder(h.pp, { customId, value, status: "COMPLETED" });
+/** A completed capture at PayPal for `customId` (not through ten-paypal). Per
+ * § 17.10 it carries a valid Ten tag for a `ten:<uuid>` custom_id (pack from
+ * the value) and its order names Ten's payee, unless the caller overrides. */
+async function plantCapture(
+  h: H,
+  customId: string,
+  value = "10.00",
+  status = "COMPLETED",
+  o: { invoiceId?: string; payee?: string | null } = {},
+) {
+  const m = /^ten:(.+)$/.exec(customId);
+  const pack = { "10.00": "10", "20.00": "20", "40.00": "40" }[value] ?? "10";
+  const invoiceId = o.invoiceId ?? (m ? await mintTag(m[1], pack, { amount: value }) : `inv-${crypto.randomUUID()}`);
+  const orderId = ppPlantOrder(h.pp, { customId, value, status: "COMPLETED", invoiceId, payee: o.payee });
   const id = "C" + crypto.randomUUID().replace(/-/g, "").slice(0, 15).toUpperCase();
   const cap: any = {
     id,
     status,
     amount: { currency_code: "USD", value },
     custom_id: customId,
-    invoice_id: `inv-${id}`,
+    invoice_id: invoiceId,
     supplementary_data: { related_ids: { order_id: orderId } },
   };
   if (status === "COMPLETED") cap.seller_receivable_breakdown = breakdownFor(value);
@@ -57,7 +69,7 @@ t("§ 17.8(4) a bad signature -> 401; no re-fetch, no row", async () => {
   const h = await harness();
   h.reset();
   const [a] = await member(h);
-  const cap = plantCapture(h, `ten:${a}`);
+  const cap = await plantCapture(h, `ten:${a}`);
   const { event, headers } = ppSignedEvent(h.pp, structuredClone(cap));
   const variants: Array<[string, Record<string, string>, any]> = [
     ["forged sig", { ...headers, "paypal-transmission-sig": "forged" }, event],
@@ -77,7 +89,7 @@ t("§ 17.8(4) a MISSING signature (no paypal-* headers, or one missing) -> 401; 
   const h = await harness();
   h.reset();
   const [a] = await member(h);
-  const cap = plantCapture(h, `ten:${a}`);
+  const cap = await plantCapture(h, `ten:${a}`);
   const { event, headers } = ppSignedEvent(h.pp, structuredClone(cap));
   const results: string[] = [];
   const r0 = await hook(h, event, {});
@@ -89,6 +101,7 @@ t("§ 17.8(4) a MISSING signature (no paypal-* headers, or one missing) -> 401; 
     results.push(`without ${k} -> ${r.status}`);
   }
   observe(results.join("; "));
+  assertEquals(verifies(h).length, 0, "§ 17.1(5): a missing header -> 401 without calling PayPal");
   assertEquals(refetches(h).length, 0);
   assertEquals(paid(h).length, 0);
   assert(results.every((x) => x.endsWith("-> 401")), `a missing signature is not a 401: ${results.join("; ")}`);
@@ -98,7 +111,7 @@ t("§ 17.8(4) the verify call failing -> 503, no re-fetch, no row; TEN_PAYPAL_WE
   const h = await harness();
   h.reset();
   const [a] = await member(h);
-  const cap = plantCapture(h, `ten:${a}`);
+  const cap = await plantCapture(h, `ten:${a}`);
   const { event, headers } = ppSignedEvent(h.pp, structuredClone(cap));
   for (const f of ["/v1/notifications/verify-webhook-signature", "/v1/oauth2/token"]) {
     h.pp.fail = { [f]: 500 };
@@ -123,7 +136,7 @@ t("the verify call carries the five headers, TEN_PAYPAL_WEBHOOK_ID and the event
   const h = await harness();
   h.reset();
   const [a] = await member(h);
-  const cap = plantCapture(h, `ten:${a}`);
+  const cap = await plantCapture(h, `ten:${a}`);
   const { event, headers } = ppSignedEvent(h.pp, structuredClone(cap));
   await hook(h, event, headers);
   const v = verifies(h)[0];
@@ -143,17 +156,17 @@ t("§ 17.8(4) valid signature, but another event type / a non-ten: custom_id / o
   h.reset();
   const [a] = await member(h);
   const cases: Array<[string, any, string?]> = [];
-  const capA = plantCapture(h, `ten:${a}`);
+  const capA = await plantCapture(h, `ten:${a}`);
   for (const et of ["PAYMENT.CAPTURE.PENDING", "PAYMENT.CAPTURE.REFUNDED", "PAYMENT.CAPTURE.REVERSED", "CHECKOUT.ORDER.APPROVED", "PAYMENT.CAPTURE.DENIED"]) {
     cases.push([et, structuredClone(capA), et]);
   }
-  const bare = plantCapture(h, a); // the older app's: a bare UUID that IS a Ten member
+  const bare = await plantCapture(h, a); // the older app's: a bare UUID that IS a Ten member
   cases.push(["older app bare UUID of a member", structuredClone(bare)]);
   for (const c of ["user-abc", "", `TEN:${a}`, `xten:${a}`, `ten-${a}`, `ten:`, `ten:${a}\n`]) {
-    const cap = plantCapture(h, c);
+    const cap = await plantCapture(h, c);
     cases.push([`custom_id ${JSON.stringify(c)}`, structuredClone(cap)]);
   }
-  const noCustom = plantCapture(h, "x");
+  const noCustom = await plantCapture(h, "x");
   delete (noCustom as any).custom_id;
   cases.push(["no custom_id", structuredClone(noCustom)]);
   const problems: string[] = [];
@@ -174,8 +187,8 @@ t("§ 17.8(4) valid signature, custom_id 'ten:' + text that is not exactly a uui
   h.reset();
   const [a] = await member(h);
   const cases: Array<[string, any, string?]> = [];
-  for (const c of [`ten: ${a}`, `ten:${a} `, `ten:${a}:extra`, `ten:not-a-uuid`, `ten:../${a}`]) {
-    const cap = plantCapture(h, c);
+  for (const c of [`ten: ${a}`, `ten:${a} `, `ten:${a}:extra`, `ten:not-a-uuid`, `ten:../${a}`, `ten:${a.toUpperCase()}`]) {
+    const cap = await plantCapture(h, c);
     cases.push([`custom_id ${JSON.stringify(c)}`, structuredClone(cap)]);
   }
   const problems: string[] = [];
@@ -195,20 +208,21 @@ t("§ 17.8(4) valid ten: signature but an UNKNOWN capture -> 200, no row", async
   const h = await harness();
   h.reset();
   const [a] = await member(h);
-  const cap = plantCapture(h, `ten:${a}`);
+  const cap = await plantCapture(h, `ten:${a}`);
   const ghost = { ...structuredClone(cap), id: "CNOSUCHCAPTURE01" };
   const { event, headers } = ppSignedEvent(h.pp, ghost);
   const r = await hook(h, event, headers);
   observe(`unknown capture -> ${r.status} ${r.txt}`);
   assertEquals(paid(h).length, 0);
   assertEquals(r.status, 200, `an unknown capture is answered ${r.status} (PayPal retries a non-2xx for 3 days)`);
+  assert(h.logs.some((l) => l.includes(ghost.id)), "§ 17.1(5): a log line naming the capture");
 });
 
 t("§ 17.8(4) a non-member ten:<uuid> -> 200, no row, an ALERT naming a refund by hand", async () => {
   const h = await harness();
   h.reset();
   const [n] = await nonMember(h);
-  const cap = plantCapture(h, `ten:${n}`);
+  const cap = await plantCapture(h, `ten:${n}`);
   const { event, headers } = ppSignedEvent(h.pp, structuredClone(cap));
   const r = await hook(h, event, headers);
   assertEquals(r.status, 200, r.txt);
@@ -216,7 +230,7 @@ t("§ 17.8(4) a non-member ten:<uuid> -> 200, no row, an ALERT naming a refund b
   assert(h.logs.some((l) => /ALERT/.test(l) && /refund/i.test(l)), JSON.stringify(h.logs));
   // a ten:<uuid> for no auth user at all
   const ghostUid = crypto.randomUUID();
-  const cap2 = plantCapture(h, `ten:${ghostUid}`);
+  const cap2 = await plantCapture(h, `ten:${ghostUid}`);
   const e2 = ppSignedEvent(h.pp, structuredClone(cap2));
   const r2 = await hook(h, e2.event, e2.headers);
   assertEquals(r2.status, 200, r2.txt);
@@ -229,26 +243,26 @@ t("§ 17.8(4) the re-fetch disagrees with the event (custom_id, status, amount) 
   const [a] = await member(h);
   const [b] = await member(h);
   // event says ten:A, PayPal's capture says ten:B
-  const capB = plantCapture(h, `ten:${b}`);
+  const capB = await plantCapture(h, `ten:${b}`);
   const e1 = ppSignedEvent(h.pp, { ...structuredClone(capB), custom_id: `ten:${a}` });
   const r1 = await hook(h, e1.event, e1.headers);
   assertEquals(r1.status, 200, r1.txt);
   assertEquals(paid(h).length, 0, "custom_id mismatch credits no one");
   assert(h.logs.some((l) => /ALERT/.test(l)), "an alert for the mismatch");
   // event says COMPLETED, PayPal says REFUNDED
-  const capR = plantCapture(h, `ten:${a}`);
+  const capR = await plantCapture(h, `ten:${a}`);
   capR.status = "REFUNDED";
   const e2 = ppSignedEvent(h.pp, { ...structuredClone(capR), status: "COMPLETED" });
   assertEquals((await hook(h, e2.event, e2.headers)).status, 200);
   assertEquals(paid(h).length, 0);
   // event's amount/breakdown say $40, PayPal's capture is $10 -> the $10 net is credited
-  const cap10 = plantCapture(h, `ten:${a}`, "10.00");
+  const cap10 = await plantCapture(h, `ten:${a}`, "10.00");
   const e3 = ppSignedEvent(h.pp, { ...structuredClone(cap10), amount: { currency_code: "USD", value: "40.00" }, seller_receivable_breakdown: breakdownFor("40.00") });
   assertEquals((await hook(h, e3.event, e3.headers)).status, 200);
   assertEquals(paid(h, a).length, 1);
   assertEquals(paid(h, a)[0].usd_micros, 9_160_000, "the re-fetched net, not the event's");
   // re-fetched capture with a non-pack amount
-  const odd = plantCapture(h, `ten:${a}`, "12.34");
+  const odd = await plantCapture(h, `ten:${a}`, "12.34");
   const e4 = ppSignedEvent(h.pp, structuredClone(odd));
   assertEquals((await hook(h, e4.event, e4.headers)).status, 200);
   assertEquals(paid(h, a).length, 1, "a non-pack capture credits nothing");
@@ -258,7 +272,7 @@ t("§ 17.8(4) valid and ten: -> re-fetch -> one row at the net, replayed or not;
   const h = await harness();
   h.reset();
   const [a] = await member(h);
-  const cap = plantCapture(h, `ten:${a}`, "20.00");
+  const cap = await plantCapture(h, `ten:${a}`, "20.00");
   const { event, headers } = ppSignedEvent(h.pp, structuredClone(cap));
   h.pp.fail = { "/v2/payments/captures/": 500 };
   assertEquals((await hook(h, event, headers)).status, 503, "re-fetch failure");
@@ -291,7 +305,7 @@ t("§ 17.1(5) order of checks: non-POST, > 64 KB, non-JSON are refused before an
   const opt = await h.webhook(new Request(HOOK, { method: "OPTIONS", headers: { origin: PROD_ORIGIN, "access-control-request-method": "POST" } }));
   await opt.body?.cancel();
   assertEquals([...opt.headers.keys()].filter((k) => k.startsWith("access-control")), [], "no CORS on a preflight");
-  const cap = plantCapture(h, `ten:${a}`);
+  const cap = await plantCapture(h, `ten:${a}`);
   const { event, headers } = ppSignedEvent(h.pp, structuredClone(cap));
   const big = { ...event, pad: "x".repeat(64 * 1024) };
   const rBig = await hook(h, big, headers);
@@ -368,7 +382,7 @@ t("§ 17.6 secrets never logged or returned: client secret, basic auth, access t
   h.st.ledgerPlan = ["fail"];
   bodies.push((await hook(h, event, headers)).txt);
   bodies.push((await hook(h, event, headers, h.webhookNoId)).txt);
-  const nonTen = plantCapture(h, `ten:${(await nonMember(h))[0]}`);
+  const nonTen = await plantCapture(h, `ten:${(await nonMember(h))[0]}`);
   const e2 = ppSignedEvent(h.pp, structuredClone(nonTen));
   bodies.push((await hook(h, e2.event, e2.headers)).txt);
   const secrets: Record<string, string> = {

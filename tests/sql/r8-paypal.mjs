@@ -93,6 +93,10 @@ let DB;
   expect("§ 17.3 'set EXACTLY when paypal:': a call row carrying gross/fee is refused", !r.ok && /23514/.test(r.e), r.ok ? "accepted" : r.e);
   r = await ins(db, { kind: "refund", request_id: "paypal-refund:R1x", usd: "1", fee_usd: "0.10" });
   expect("§ 17.3 'set EXACTLY when paypal:': a refund row carrying fee_usd is refused", !r.ok && /23514/.test(r.e), r.ok ? "accepted" : r.e);
+  r = await ins(db, { kind: "call", request_id: "gen-124", usd: "0.01", gross_usd: "0.01" });
+  expect("§ 17.10(6) either column alone on another row is refused (gross only, on a call)", !r.ok && /23514/.test(r.e), r.ok ? "accepted" : r.e);
+  r = await ins(db, { kind: "credit", request_id: null, usd: "5", fee_usd: "0.00" });
+  expect("§ 17.10(6) either column alone on another row is refused (fee only, on a starter credit)", !r.ok && /23514/.test(r.e), r.ok ? "accepted" : r.e);
   // case/lookalike: the prefix is literal
   r = await ins(db, { request_id: "PAYPAL:CAP-X", usd: "9.16" });
   note("'PAYPAL:' (upper case) with no breakdown", r.ok ? "accepted (not the paypal: prefix)" : r.e);

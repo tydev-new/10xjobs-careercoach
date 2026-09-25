@@ -314,6 +314,9 @@ try {
   await outcome("not credited (the credit write failed)", "20", NOT_CREDITED, async () => void (bridgePlan = ["fail"]));
   await outcome("create-order failed", "40", CREATE_FAILED, async () => void (await ctl("/__pp/fail", { "/v2/checkout/orders": 500 })));
   await ctl("/__pp/fail", {});
+  // § 17.10: a capture 5xx is "couldn't confirm", never "declined"
+  await outcome("capture answered 500 (unconfirmed)", "10", NOT_CREDITED, async () => void (await ctl("/__pp/fail", { "/capture": 500 })));
+  await ctl("/__pp/fail", {});
   rec((await paypalRows(uid)).length === 1, "no outcome but 'credited' wrote a row");
   rec(sdkLoads.length === 1, "the SDK script is loaded once per page, not per open", `${sdkLoads.length}`);
   await ctx.close();

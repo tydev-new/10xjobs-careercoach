@@ -20,6 +20,7 @@ import {
   PAYPAL_BASE,
   PAYPAL_CLIENT_ID,
   PAYPAL_CLIENT_SECRET,
+  PAYPAL_MERCHANT_ID,
   PAYPAL_WEBHOOK_ID,
   paypalHandler,
   ppApprove,
@@ -61,6 +62,7 @@ const env: Record<string, string> = {
   TEN_PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID,
   TEN_PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET,
   TEN_PAYPAL_WEBHOOK_ID: PAYPAL_WEBHOOK_ID,
+  TEN_PAYPAL_MERCHANT_ID: PAYPAL_MERCHANT_ID, // § 17.10
 };
 (Deno.env as any).get = (k: string) => env[k];
 (Deno.env as any).toObject = () => ({ ...env });

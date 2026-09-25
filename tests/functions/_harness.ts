@@ -486,6 +486,35 @@ export const PAYPAL_CLIENT_ID = "AcanaryPAYPALclientID-4b1e";
 export const PAYPAL_CLIENT_SECRET = "EcanaryPAYPALsecret-9f3a7c2e1d5b8a6f4c0e2d7b9a1f3c5e";
 export const PAYPAL_WEBHOOK_ID = "8PT597110X687430LKGECATA";
 export const PAYPAL_TOKEN = "A21AAcanaryACCESStoken-77d2e";
+/** § 17.10: Ten's own PayPal account (non-secret). PayPal fills an order's
+ * payee with the caller's account when the order names none, so the stub's
+ * orders default to this payee. */
+export const PAYPAL_MERCHANT_ID = "TENMERCHANT7Q2";
+export const FOREIGN_MERCHANT_ID = "OTHERMERCHANT9";
+
+// ---- § 17.10 signed invoice_id, the tester's own implementation of the spec
+// (checked against a Python HMAC vector in paypal_r2.test.ts).
+const te = new TextEncoder();
+async function hmacRaw(key: Uint8Array, msg: string): Promise<Uint8Array> {
+  const k = await crypto.subtle.importKey("raw", key as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", k, te.encode(msg)));
+}
+const hexOf = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+export async function tagHash(secret: string, uid: string, pack: string, amount: string, t: string, n: string): Promise<string> {
+  const key = await hmacRaw(te.encode(secret), "ten-invoice-v1");
+  return hexOf(await hmacRaw(key, `v1|${uid}|${pack}|${amount}|${t}|${n}`)).slice(0, 32);
+}
+export async function mintTag(
+  uid: string,
+  pack = "10",
+  o: { secret?: string; amount?: string; t?: string; n?: string } = {},
+): Promise<string> {
+  const amount = o.amount ?? `${pack}.00`;
+  const t = o.t ?? String(Math.floor(Date.now() / 1000));
+  const n = o.n ?? hexOf(crypto.getRandomValues(new Uint8Array(8)));
+  return `ten-${uid.slice(0, 8)}-${t}-${n}-${await tagHash(o.secret ?? PAYPAL_CLIENT_SECRET, uid, pack, amount, t, n)}`;
+}
+export const TAG_RE = /^ten-[0-9a-f]{8}-[0-9]{10}-[0-9a-f]{16}-[0-9a-f]{32}$/;
 
 export interface PpCapture {
   id: string;
@@ -515,6 +544,8 @@ export interface PpState {
   issued: Map<string, { sig: string; eventJson: string }>;
   /** capture calls are held until released (race tests) */
   captureGate?: Promise<void>;
+  /** path-substring -> a transport failure (the fetch itself rejects, e.g. a timeout) */
+  throwOn?: Record<string, string>;
 }
 export function newPpState(): PpState {
   return { orders: new Map(), captures: new Map(), hits: [], fail: {}, nextCapture: {}, issued: new Map() };
@@ -549,7 +580,10 @@ function orderView(o: PpOrder) {
 }
 
 /** Plant an order as if created with Ten's (or the older app's) keys. */
-export function ppPlantOrder(pp: PpState, o: { customId: string; value?: string; currency?: string; status?: string }): string {
+export function ppPlantOrder(
+  pp: PpState,
+  o: { customId: string; value?: string; currency?: string; status?: string; invoiceId?: string; payee?: string | null },
+): string {
   const id = ppId("O");
   pp.orders.set(id, {
     id,
@@ -558,7 +592,8 @@ export function ppPlantOrder(pp: PpState, o: { customId: string; value?: string;
       reference_id: "default",
       amount: { currency_code: o.currency ?? "USD", value: o.value ?? "10.00" },
       custom_id: o.customId,
-      invoice_id: `inv-${id}`,
+      invoice_id: o.invoiceId ?? `inv-${id}`,
+      ...(o.payee === null ? {} : { payee: { merchant_id: o.payee ?? PAYPAL_MERCHANT_ID, email_address: "merchant@example.com" } }),
     }],
   });
   return id;
@@ -628,7 +663,10 @@ export async function paypalHandler(req: Request, pp: PpState): Promise<Response
   if (url.pathname === "/v2/checkout/orders" && req.method === "POST") {
     if (!body || body.intent !== "CAPTURE" || !Array.isArray(body.purchase_units)) return ppErr(400, "INVALID_REQUEST");
     const id = ppId("O");
-    pp.orders.set(id, { id, status: "CREATED", purchase_units: structuredClone(body.purchase_units) });
+    const pus = structuredClone(body.purchase_units);
+    // PayPal names the API caller's account as payee when the request doesn't.
+    for (const u of pus) u.payee ??= { merchant_id: PAYPAL_MERCHANT_ID, email_address: "merchant@example.com" };
+    pp.orders.set(id, { id, status: "CREATED", purchase_units: pus });
     return Response.json({ id, status: "CREATED", links: [] }, { status: 201 });
   }
   let m = url.pathname.match(/^\/v2\/checkout\/orders\/([^/]+)$/);
@@ -701,6 +739,9 @@ export interface Harness {
   webhook: (req: Request) => Promise<Response>;
   /** ten-paypal-webhook loaded with TEN_PAYPAL_WEBHOOK_ID unset. */
   webhookNoId: (req: Request) => Promise<Response>;
+  /** both loaded with TEN_PAYPAL_MERCHANT_ID unset (§ 17.10). */
+  paypalNoMerchant: (req: Request) => Promise<Response>;
+  webhookNoMerchant: (req: Request) => Promise<Response>;
   pp: PpState;
   pending: Promise<unknown>[];
   logs: string[];
@@ -759,6 +800,9 @@ async function build(): Promise<Harness> {
       return realFetch(`${upUrl}/api/v1/chat/completions`, init);
     }
     if (u.origin === PAYPAL_BASE) {
+      for (const [k, name] of Object.entries(pp.throwOn ?? {})) {
+        if (u.pathname.includes(k)) return Promise.reject(new DOMException("The operation timed out.", name));
+      }
       if (input instanceof Request) return realFetch(new Request(ppUrl + u.pathname + u.search, input), init);
       return realFetch(ppUrl + u.pathname + u.search, init);
     }
@@ -778,6 +822,7 @@ async function build(): Promise<Harness> {
     TEN_PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID,
     TEN_PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET,
     TEN_PAYPAL_WEBHOOK_ID: PAYPAL_WEBHOOK_ID,
+    TEN_PAYPAL_MERCHANT_ID: PAYPAL_MERCHANT_ID,
   };
   (Deno.env as any).get = (k: string) => fakeEnv[k];
   (Deno.env as any).toObject = () => ({ ...fakeEnv });
@@ -815,6 +860,14 @@ async function build(): Promise<Harness> {
   await import("../../supabase/functions/ten-paypal-webhook/index.ts?no-webhook-id");
   const webhookNoId = captured!;
   fakeEnv.TEN_PAYPAL_WEBHOOK_ID = PAYPAL_WEBHOOK_ID;
+  captured = null;
+  delete fakeEnv.TEN_PAYPAL_MERCHANT_ID;
+  await import("../../supabase/functions/ten-paypal/index.ts?no-merchant-id");
+  const paypalNoMerchant = captured!;
+  captured = null;
+  await import("../../supabase/functions/ten-paypal-webhook/index.ts?no-merchant-id");
+  const webhookNoMerchant = captured!;
+  fakeEnv.TEN_PAYPAL_MERCHANT_ID = PAYPAL_MERCHANT_ID;
   (Deno as any).serve = realServe;
 
   const h: Harness = {
@@ -827,6 +880,8 @@ async function build(): Promise<Harness> {
     paypal,
     webhook,
     webhookNoId,
+    paypalNoMerchant,
+    webhookNoMerchant,
     pp,
     pending,
     logs,

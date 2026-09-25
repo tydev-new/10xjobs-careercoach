@@ -21,6 +21,9 @@ import {
   ppSignedEvent,
   preq,
   t,
+  TAG_RE,
+  tagHash,
+  PAYPAL_CLIENT_SECRET,
   userJwt,
 } from "./_harness.ts";
 import { createApproved, hook, paid, pay } from "./_paypal.ts";
@@ -89,7 +92,12 @@ t("§ 17.8(1) create-order: the amount comes from the table whatever the body ad
     const pu = sent.purchase_units[0];
     assertEquals(pu.amount, { currency_code: "USD", value: want[pack] }, "amount from the server's table, not the body");
     assertEquals(pu.custom_id, `ten:${uid}`, "custom_id is ten:<caller>, never the body's");
-    assertMatch(pu.invoice_id, /^ten-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    // § 17.10: ten-<U>-<T>-<N>-<H>, 73 chars, H recomputed from the spec
+    assertMatch(pu.invoice_id, TAG_RE);
+    assertEquals(pu.invoice_id.length, 73);
+    const [, U, T, N, Hh] = pu.invoice_id.split("-");
+    assertEquals(U, uid.slice(0, 8));
+    assertEquals(Hh, await tagHash(PAYPAL_CLIENT_SECRET, uid, pack, want[pack], T, N), "H = HMAC(K, v1|uid|pack|amount|T|N)");
     invoices.add(pu.invoice_id);
     assertEquals(pu.description, `Ten credit $${pack}`);
     assert(!("shipping" in pu), "no shipping address");
@@ -155,11 +163,12 @@ t("§ 17.8(2) capture-order: another user's order 403, an older-app order (bare 
   const cases: Array<[string, string, number]> = [
     ["B's order", bOrder, 403],
     ["older-app bare UUID", oldApp, 403],
-    ["10.01", oddAmount, 400],
-    ["5.00 (the starter is not a pack)", five, 400],
-    ["1000.00", big, 400],
-    ["EUR", eur, 400],
-    ["'10' without cents", noDec, 400],
+    // § 17.8(2) as amended by § 17.10: "all 403 (the last two not_ten_order)"
+    ["10.01", oddAmount, 403],
+    ["5.00 (the starter is not a pack)", five, 403],
+    ["1000.00", big, 403],
+    ["EUR", eur, 403],
+    ["'10' without cents", noDec, 403],
     ...lookalikes.map((o, i) => [`lookalike custom_id #${i}`, o, 403] as [string, string, number]),
   ];
   for (const [label, orderId, want] of cases) {
@@ -375,6 +384,9 @@ t("§ 1.11 'no answer from capture': PayPal captures but its answer is a 5xx -> 
   observe(`capture answered 500 -> ${r.status} ${r.txt}`);
   assert(!(r.status === 200 && r.j?.status === "declined"), `a 5xx from PayPal is reported to the payer as "declined. No money moved": ${r.txt}`);
   assert(!r.txt.includes("No money moved"), `the function's own message claims no money moved: ${r.txt}`);
+  // § 17.10: "A capture call answering 5xx ... -> 503 unconfirmed"
+  assertEquals(r.status, 503, r.txt);
+  assertEquals(r.j?.error?.code, "unconfirmed", r.txt);
   assertEquals(paid(h, a).length, 0, "nothing credited yet; the webhook is the backup");
 });
 
@@ -484,7 +496,7 @@ t("§ 17.2 a purchase opens, approves or raises no gate and no allowance: ten-pa
   for (const w of writes) assertEquals(JSON.parse(w.body).kind, "credit");
 });
 
-t("SPEC GAP (reported, not a § 17.8 criterion): an order Ten never created (invoice not ten-, another payee) with custom_id ten:<caller> and a pack amount is captured and credited", async () => {
+t("§ 17.10 (was round 1's SPEC GAP / F1): an order Ten never created (invoice not ten-, another payee) with custom_id ten:<caller> and a pack amount -> 403 not_ten_order, no capture, no row", async () => {
   const h = await harness();
   h.reset();
   const [a, ta] = await member(h);
@@ -494,5 +506,9 @@ t("SPEC GAP (reported, not a § 17.8 criterion): an order Ten never created (inv
   o.purchase_units[0].payee = { email_address: "someone-else@example.com", merchant_id: "OTHERMERCHANT1" };
   const r = await pay(h, "/capture-order", { orderId }, ta);
   observe(`client-created order with a foreign payee -> ${r.status} ${r.txt}; rows=${paid(h, a).length}; capture calls=${captureHits(h).length}`);
+  assertEquals(r.status, 403, r.txt);
+  assertEquals(r.j?.error?.code, "not_ten_order");
+  assertEquals(captureHits(h).length, 0, "no capture call");
+  assertEquals(paid(h, a).length, 0, "no row");
 });
 

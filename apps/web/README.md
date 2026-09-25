@@ -210,11 +210,20 @@ it separately, as above, against a built preview server).
 shapes, each with its own `node --test` unit tests (no live network, no
 real key):
 
-- `model.ts` — `createCoachModel({ proxyUrl, getAccessToken })`: the
-  `@openrouter/ai-sdk-provider` (pinned as in `spikes/1-browser-loop`)
+- `coach-model.ts` (§ 13.2) — the ONE list, NO imports: the two allowed
+  model ids and their candidate-facing names (`"Claude Sonnet 5"` /
+  `"DeepSeek V4.1 Flash (testing)"`). `coach-model.test.ts` checks these
+  ids against the proxy's own `MODEL_IDS`
+  (`supabase/functions/ten-model-proxy/core.ts`) directly — a repo test,
+  not a live check, and it fails if the two ever disagree.
+- `model.ts` — `createCoachModel({ modelId, proxyUrl, getAccessToken })`:
+  the `@openrouter/ai-sdk-provider` (pinned as in `spikes/1-browser-loop`)
   pointed at `ten-model-proxy` instead of `openrouter.ai`; a custom
   `authedFetch` sets `Authorization: Bearer <current Supabase JWT>` fresh
-  on every call (never a cached/baked-in key).
+  on every call (never a cached/baked-in key). `modelId` is the active
+  model's id (`env.coachModel.id`, § 13.2); the client no longer sets
+  `cache_control` itself (the proxy forces its own, Claude only, § 13.1) —
+  one place for that fact, not two.
 - `gate.ts` — `createSupabaseGate(...)`: the `Gate` interface
   (`docs/design-web-agent.md` § 3) over `ten_gate_open`/`ten_gate_decide`/
   `ten_gate_expire_other_chats`, plus a plain `select` for `pending()`
@@ -226,8 +235,9 @@ real key):
   file-name `python3` dispatch (`packages/checkers/src/just-bash-command.mjs`).
   Its own tests run the REAL ported checkers (`check_materials.py`,
   `record_verdict.py`, …), not canned output.
-- `web-search.ts` — `createWebSearch(...)`: `deps.webSearch`, one raw
-  `ten-model-proxy` call with `plugins: [{ id: "web" }]`, parsing the
+- `web-search.ts` — `createWebSearch({ modelId, ... })`: `deps.webSearch`,
+  one raw `ten-model-proxy` call with `model` (§ 13.2: "web search passes
+  the model too") and `plugins: [{ id: "web" }]`, parsing the
   forced-`stream: true` SSE response for `url_citation` annotations.
   **UNVERIFIED** (design-web-agent.md § 4's own flag) how the provider
   actually shapes them — this parser degrades to an empty result list
@@ -254,6 +264,14 @@ real key):
   defaulting to `<VITE_SUPABASE_URL>/functions/v1/ten-model-proxy`.
   Throws `MissingEnvError` (never silently guesses); `src/main.tsx`
   catches it and shows a plain config-error screen instead of a blank one.
+  § 13.2 adds `VITE_COACH_MODEL` to the same resolution: unset/blank ->
+  Claude (`coach-model.ts`'s `CLAUDE_COACH_MODEL`, never a silent fallback
+  to something else); exactly one of the two ids (trimmed) -> that model;
+  anything else is pushed onto the SAME `missing` list under the var's own
+  name, so it fails exactly like a missing required var — the existing
+  config-error screen already names whatever's in `missing`, so a typo'd
+  setting can never make the owner think DeepSeek is running when it
+  isn't.
 - `delete-account.ts` — calls the `ten-delete-account` Edge Function and
   returns its summary.
 - `auth.ts`, `supabase-workspace-store.ts`, `workspace-export.ts` — from
@@ -308,10 +326,20 @@ abortSignal })` already returns the exact `ReadableStream<UIMessageChunk>`
 | `VITE_SITE_URL` | yes (read by `auth.ts`'s `siteRedirectUrl()`) | — |
 | `VITE_MODEL_PROXY_URL` | no | `<VITE_SUPABASE_URL>/functions/v1/ten-model-proxy` |
 | `VITE_SHOW_MOCK_CONTROLS` | no (Vercel Preview environment only) | unset (production) |
+| `VITE_COACH_MODEL` (§ 13.2) | no | unset/blank -> `anthropic/claude-sonnet-5` (Claude, the measured model). `deepseek/deepseek-v4.1-flash` switches to DeepSeek (testing only, § 13.6 (2)). Any other value fails the build-time config check the same way a missing required var does. |
 
 Nothing here is secret — the anon key is meant to ship in the client
 bundle (RLS is the actual boundary); no OpenRouter key, no Supabase
 service-role key ever reaches this package.
+
+**Switching models (§ 13.2/§ 13.6 (2)):** set or remove `VITE_COACH_MODEL`
+on Vercel (Production), then run `deploy-prod.sh` — it's a setting change
+and a redeploy, never a code change. DeepSeek runs only while the owner
+and testers who know it's testing are the active users; before any
+outside beta member is invited, remove `VITE_COACH_MODEL` (back to
+Claude) and redeploy. § 10's new-version notice stops an already-open tab
+from sending on the old build, so the very next send after a switch uses
+the new model.
 
 ### Deploying to Vercel (project `ten-coach`)
 
@@ -333,6 +361,30 @@ needs a fresh run of the script. The Edge Functions deploy
 separately (`supabase/functions/README.md`); `TEN_APP_ORIGIN` must equal the
 production origin above or the browser's calls are refused by CORS.
 
+**Deploy order for § 13 (the site's model is a setting), first time —
+site → proxy → setting, per `docs/design-web-agent.md` § 13.2 (an agent
+never runs any of this; the owner does, in this order):**
+
+1. **Site first.** Deploy `apps/web` with the § 13 code (this change) but
+   `VITE_COACH_MODEL` still unset — the site keeps sending Claude, and
+   every request (chat AND web search) now names `model` explicitly. The
+   OLD proxy still accepts a named `anthropic/claude-sonnet-5` (it only
+   ever forced that one model), so nothing breaks mid-rollout.
+2. **Proxy second.** Deploy `ten-model-proxy` with the § 13 allowlist
+   (`supabase/functions/README.md`'s own deploy steps). It refuses a
+   missing `model` (400 `model_not_allowed`) — which, by now, only an OLD
+   (pre-§ 13) site tab would ever send, and § 10's new-version notice
+   already stops those tabs from sending once the new site build (step 1)
+   is live.
+3. **Setting last.** Only once both of the above are live, set
+   `VITE_COACH_MODEL=deepseek/deepseek-v4.1-flash` on Vercel (Production)
+   and run `deploy-prod.sh` again, if/when testing DeepSeek is wanted.
+   Until then the setting stays unset and the site keeps running Claude.
+
+Reversing steps 1/2 (proxy before site) would 400 every call from the
+CURRENT (pre-§ 13) site build, which never sends `model` at all — that's
+why site goes first.
+
 ### Verifying the production build
 
 ```sh
@@ -341,9 +393,11 @@ grep -o "Preview: fixture" dist/assets/*.js   # -> nothing (mock UI tree-shaken 
 grep -oE '"Autoplay"' dist/assets/*.js         # -> nothing
 grep -c "record_verdict\|check_materials" dist/assets/*.js  # -> >0 (the skills glob worked)
 grep -riE "sk-or-|service_role" dist/assets/*.js             # -> nothing (no secret baked in)
+ls dist/privacy.html                                          # -> present (§ 13.6)
 
 npm run build:preview  # the mock; VITE_SHOW_MOCK_CONTROLS=1
 grep -o "Preview: fixture" dist/assets/*.js   # -> present
+ls dist/privacy.html                                          # -> present in the mock build too
 ```
 
 ### Known gaps / open questions for the lead (step 5b)

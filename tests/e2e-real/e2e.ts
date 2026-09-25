@@ -1403,6 +1403,141 @@ await section("theme", async () => {
   }
 });
 
+// ================================================================ SWITCHABLE MODEL (C § 13)
+// Tester-owned, from docs/design-web-agent.md § 13.1–§ 13.6 (approved): the
+// real app on the stand-in, the REAL proxy (deno) and the stub upstream, for
+// the default build (unset -> Claude), a DeepSeek build, and a mistyped one.
+await section("model", async () => {
+  const CLAUDE = "anthropic/claude-sonnet-5";
+  const DEEPSEEK = "deepseek/deepseek-v4.1-flash";
+  const HOSTS: Record<string, string[]> = {
+    [CLAUDE]: ["Amazon Bedrock", "Google Vertex AI"],
+    [DEEPSEEK]: ["BaseTen", "CoreWeave", "DeepInfra", "DekaLLM", "DigitalOcean", "Fireworks", "Krea", "Makora", "Modal", "Morph", "NextBit", "Novita", "OpenInference", "Parasail", "Phala", "Relace", "Sail Research", "SiliconFlow", "Together", "Venice", "Wafer"],
+  };
+  const clientBodies = (p: any) => {
+    const out: any[] = [];
+    p.on("request", (r: any) => {
+      if (r.method() === "POST" && r.url().includes("/functions/v1/ten-model-proxy")) {
+        try { out.push(r.postDataJSON()); } catch { out.push(null); }
+      }
+    });
+    return out;
+  };
+  const menuShape = async (p: any) => {
+    await p.locator(".menu-trigger").click();
+    const shape = await p.evaluate(() => {
+      const panel = document.querySelector(".menu-panel")!;
+      const kids = [...panel.children] as HTMLElement[];
+      const last = kids[kids.length - 1];
+      const before = kids[kids.length - 2];
+      return {
+        lastText: last?.textContent?.trim() ?? "",
+        lastTag: last?.tagName ?? "",
+        lastRole: last?.getAttribute("role"),
+        lastTab: last?.tabIndex ?? null,
+        lastFocusable: !!last && (last.matches("a,button,input,select,textarea,[tabindex]") || last.tabIndex >= 0),
+        beforeText: before?.textContent?.trim() ?? "",
+        beforeHref: before?.getAttribute("href"),
+      };
+    });
+    await p.locator(".menu-trigger").click();
+    return shape;
+  };
+  const privacyCheck = async (p: any, label: string) => {
+    const pp = await p.context().newPage();
+    const resp = await pp.goto(ORIGIN + "/privacy.html");
+    rec(resp?.status() === 200, `model: ${label} — /privacy.html is served from the build`);
+    const txt = ((await pp.locator("body").innerText()) ?? "").replace(/\s+/g, " ");
+    const missing = ["OpenRouter", "Exa", "2026-09-24", ...HOSTS[CLAUDE], ...HOSTS[DEEPSEEK]].filter((w) => !txt.includes(w));
+    rec(missing.length === 0, `model: ${label} — privacy.html names OpenRouter, Exa, the date and every § 13.6 host for both models`, missing.join(", "));
+    rec(/DeepSeek's own API/i.test(txt) && /never/i.test(txt), `model: ${label} — privacy.html says DeepSeek's own API is never used`);
+    const bg = await pp.evaluate(() => getComputedStyle(document.body).backgroundColor);
+    rec(bg === "rgb(247, 242, 234)", `model: ${label} — privacy.html is light-themed (the v2 light --bg)`, bg);
+    await pp.close();
+  };
+  const ledgerModels = async (uid: string) => (await standIn.sql<{ model: string }>("select model from public.ten_usage_ledger where user_id = $1 and kind = 'call' order by created_at", [uid])).map((r) => r.model);
+  stub.setScenarios(scenarios([{ name: "model-search", match: /^search acme funding$/, steps: [{ tools: [{ name: "web_search", args: { query: "Acme Series C funding", maxResults: 3 } }] }, { text: "Found it." }] }]));
+
+  // ---- the default build: VITE_COACH_MODEL unset -> Claude
+  {
+    const uid = await standIn.createUser({ email: em("model.claude") });
+    const { page } = await newPage({ colorScheme: "dark" });
+    const bodies = clientBodies(page);
+    await signIn(page, em("model.claude"));
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    const m = await menuShape(page);
+    rec(m.lastText === "Model: Claude Sonnet 5", "model: unset setting -> the menu's last line is 'Model: Claude Sonnet 5', word for word", m.lastText);
+    rec(!m.lastFocusable && m.lastRole !== "menuitem" && !["A", "BUTTON"].includes(m.lastTag), "model: the Model line is plain text, not a focusable control", JSON.stringify(m));
+    rec(m.beforeText === "Privacy" && m.beforeHref === "/privacy.html", "model: a Privacy link to /privacy.html sits just above it", JSON.stringify({ t: m.beforeText, h: m.beforeHref }));
+    const h0 = stub.hits.length;
+    await say(page, "search acme funding");
+    const ups = stub.hits.slice(h0);
+    rec(bodies.length >= 2 && bodies.every((b) => b?.model === CLAUDE), "model: every browser request (chat + web search) names Claude", JSON.stringify(bodies.map((b) => b?.model)));
+    rec(bodies.every((b) => !JSON.stringify(b).includes("cache_control")), "model: the site sets no cache_control itself (§ 13.2)");
+    rec(ups.some((h) => h.kind === "web_search") && ups.every((h) => h.body?.model === CLAUDE), "model: the proxy sent Claude upstream for the chat and the search", JSON.stringify(ups.map((h) => [h.kind, h.body?.model])));
+    rec(ups.every((h) => JSON.stringify(h.body?.cache_control) === '{"type":"ephemeral"}' && JSON.stringify(h.body?.provider) === '{"data_collection":"deny","zdr":true}'), "model: Claude's upstream keeps the proxy's cache_control and provider exactly as before", JSON.stringify(ups.map((h) => [h.body?.cache_control, h.body?.provider])));
+    const lm = await until(async () => { const r = await ledgerModels(uid); return r.length >= 2 ? r : false; }, 10000);
+    rec(!!lm && lm.every((x) => x === CLAUDE), "model: every ledger row names Claude", JSON.stringify(lm));
+    await privacyCheck(page, "default build");
+    await page.context().close();
+  }
+
+  // ---- a DeepSeek build (the setting with spaces around it)
+  const dsDir = path.join(tmpRoot, "dist-deepseek");
+  const bd = build(dsDir, { ...prodEnv, VITE_COACH_MODEL: `  ${DEEPSEEK} ` });
+  rec(bd.ok, "model: production build with VITE_COACH_MODEL = DeepSeek", bd.ok ? `${bd.ms} ms` : bd.out.slice(-800));
+  if (bd.ok) {
+    setRoot(dsDir);
+    try {
+      const uid = await standIn.createUser({ email: em("model.deepseek") });
+      const { page } = await newPage();
+      const bodies = clientBodies(page);
+      await signIn(page, em("model.deepseek"));
+      await page.locator(".composer-input").waitFor({ timeout: 20000 });
+      const m = await menuShape(page);
+      rec(m.lastText === "Model: DeepSeek V4.1 Flash (testing)", "model: DeepSeek -> 'Model: DeepSeek V4.1 Flash (testing)', word for word, last", m.lastText);
+      rec(m.beforeText === "Privacy", "model: Privacy just above it");
+      const h0 = stub.hits.length;
+      await say(page, "search acme funding");
+      const ups = stub.hits.slice(h0);
+      rec(bodies.length >= 2 && bodies.every((b) => b?.model === DEEPSEEK), "model: the chat request and the web-search request both name DeepSeek", JSON.stringify(bodies.map((b) => b?.model)));
+      rec(bodies.every((b) => !JSON.stringify(b).includes("cache_control")), "model: no cache_control in any DeepSeek browser request");
+      rec(ups.some((h) => h.kind === "web_search") && ups.every((h) => h.body?.model === DEEPSEEK), "model: the proxy sent DeepSeek upstream for the chat and the search", JSON.stringify(ups.map((h) => [h.kind, h.body?.model])));
+      rec(ups.every((h) => !("cache_control" in (h.body ?? {})) && JSON.stringify(h.body?.provider) === '{"data_collection":"deny","zdr":true,"require_parameters":true}'), "model: DeepSeek's upstream: no cache_control; provider = deny + zdr + require_parameters", JSON.stringify(ups.map((h) => [h.body?.cache_control, h.body?.provider])));
+      rec(ups.every((h) => h.body?.max_tokens <= 8192), "model: max_tokens ≤ 8,192 on DeepSeek too");
+      const lm = await until(async () => { const r = await ledgerModels(uid); return r.length >= 2 ? r : false; }, 10000);
+      rec(!!lm && lm.every((x) => x === DEEPSEEK), "model: every ledger row names DeepSeek", JSON.stringify(lm));
+      await privacyCheck(page, "DeepSeek build");
+      await page.context().close();
+    } finally {
+      setRoot(servedProdDir);
+    }
+  }
+
+  // ---- a mistyped setting: the config screen, never a silent fallback, no model call
+  const badDir = path.join(tmpRoot, "dist-badmodel");
+  const bb = build(badDir, { ...prodEnv, VITE_COACH_MODEL: "deepseek/deepseek-v4.1-flsh" });
+  rec(bb.ok, "model: production build with a mistyped VITE_COACH_MODEL (the build itself succeeds)", bb.ok ? "" : bb.out.slice(-800));
+  if (bb.ok) {
+    setRoot(badDir);
+    try {
+      const { page } = await newPage();
+      const reqs: string[] = [];
+      page.on("request", (r: any) => { if (!r.url().startsWith(ORIGIN)) reqs.push(r.url()); });
+      await page.locator(".app-shell--config-error").waitFor({ timeout: 15000 });
+      const t = ((await page.locator(".app-shell--config-error").textContent()) ?? "").trim();
+      rec(t.includes("VITE_COACH_MODEL"), "model: a mistyped setting shows the configuration screen naming VITE_COACH_MODEL", t);
+      rec((await page.locator(".sign-in-form, .composer-input").count()) === 0, "model: …and nothing else mounts (no sign-in, no chat)");
+      await page.waitForTimeout(800);
+      rec(reqs.length === 0, "model: …and it makes no network call at all (no model call, no Supabase)", reqs.join(" | "));
+      await page.context().close();
+    } finally {
+      setRoot(servedProdDir);
+    }
+  }
+  stub.setScenarios(scenarios());
+});
+
 // ================================================================ JWT REFRESH
 await section("refresh", async () => {
   // expires_in 95 s: supabase-js refreshes when <= 3 ticks (90 s) remain,

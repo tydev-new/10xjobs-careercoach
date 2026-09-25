@@ -6,6 +6,8 @@ import { buildGateLine, openGateForChat, roundUpCents, textHashOf } from "../gat
 import {
   computeCostEstimate,
   DEFAULT_WEB_SEARCH_COST_MAX_USD,
+  MODEL_COST_TABLE,
+  modelIdOf,
   needsGate as isOverGate,
   type StepCostSample,
 } from "../estimate-cost.ts";
@@ -314,11 +316,14 @@ async function webSearchTool(deps: Deps, ctx: ToolContext, input: WebSearchInput
   // model asks (L5, fix round 1): clamp the REQUEST too, then the result.
   const maxResults = Math.max(1, Math.min(input.maxResults ?? MAX_WEB_SEARCH_RESULTS, MAX_WEB_SEARCH_RESULTS));
   const seamOutput = await deps.webSearch({ ...input, maxResults });
-  // H2 (fix round 1): web_search's own cost counts toward the turn's
-  // spend, same as check_language's — the seam MAY report it; a dated
-  // last-resort default (labelled) stands in when it doesn't — the
-  // highest measured search call (§ 14), never an undercount.
-  const usd = (seamOutput as any).usd ?? DEFAULT_WEB_SEARCH_COST_MAX_USD;
+  // H2 (fix round 1) + § 13.3: web_search's own cost counts toward the
+  // turn's spend, same as check_language's — the seam MAY report it; a
+  // dated last-resort default (labelled) stands in when it doesn't — the
+  // highest measured search call for the ACTIVE model (§ 14/§ 13.3),
+  // never an undercount. An unknown/missing model id falls back to
+  // DEFAULT_WEB_SEARCH_COST_MAX_USD, Claude's row (unchanged from § 14).
+  const searchMaxUsd = MODEL_COST_TABLE[modelIdOf(deps.model) ?? ""]?.searchMaxUsd ?? DEFAULT_WEB_SEARCH_COST_MAX_USD;
+  const usd = (seamOutput as any).usd ?? searchMaxUsd;
   ctx.turnState.spentSoFarUsd += usd;
   return { results: seamOutput.results.slice(0, MAX_WEB_SEARCH_RESULTS) };
 }
@@ -399,6 +404,9 @@ async function estimateCostTool(
     steps: input.steps,
     webSearches: input.webSearches,
     measuredSteps,
+    // § 13.3: turn-1 (no measured steps yet) estimates are priced per the
+    // ACTIVE model; deps.model's id, or Claude's row for an unknown id.
+    model: modelIdOf(deps.model),
   });
   const balanceUsd = await deps.balance();
   const spendGateUsd = deps.limits?.spendGateUsd ?? 1.0;

@@ -1,9 +1,26 @@
 // Unit tests for the pure helpers in core.ts — no network, no mocks.
+// docs/design-web-agent.md § 8/§ 14 (single-model baseline) and § 13 (the
+// two-model amendment: the allowlist, per-model ceiling, cache_control
+// only for Claude, require_parameters only for DeepSeek, the ledger's
+// model column, the golden Claude body).
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
-import { CEILING_USD, MODEL, buildUpstreamBody, parseUsageFromSSE, pathTail, sanitizeUsageForLedger } from "./core.ts";
+import {
+  CEILING_USD,
+  CEILING_USD_BY_MODEL,
+  CLAUDE_MODEL_ID,
+  DEEPSEEK_MODEL_ID,
+  MODEL,
+  MODEL_IDS,
+  buildUpstreamBody,
+  ceilingUsdFor,
+  parseUsageFromSSE,
+  pathTail,
+  sanitizeUsageForLedger,
+} from "./core.ts";
 
-Deno.test("buildUpstreamBody: copies the allowlist and forces the rest", () => {
+Deno.test("buildUpstreamBody: copies the allowlist and forces the rest (Claude)", () => {
   const r = buildUpstreamBody({
+    model: CLAUDE_MODEL_ID,
     messages: [{ role: "user", content: "hi" }],
     tools: [{ type: "function", function: { name: "x" } }],
     tool_choice: "auto",
@@ -11,7 +28,7 @@ Deno.test("buildUpstreamBody: copies the allowlist and forces the rest", () => {
   });
   assert(r.ok);
   if (!r.ok) return;
-  assertEquals(r.body.model, MODEL);
+  assertEquals(r.body.model, CLAUDE_MODEL_ID);
   assertEquals(r.body.stream, true);
   assertEquals(r.body.max_tokens, 8192);
   assertEquals(r.body.provider, { data_collection: "deny", zdr: true });
@@ -20,18 +37,21 @@ Deno.test("buildUpstreamBody: copies the allowlist and forces the rest", () => {
   assertEquals(r.body.tool_choice, "auto");
 });
 
-Deno.test("buildUpstreamBody: max_tokens is capped at 8192, never raised (§ 9.5, amended 2026-09-24)", () => {
-  const low = buildUpstreamBody({ max_tokens: 100 });
-  assert(low.ok);
-  if (low.ok) assertEquals(low.body.max_tokens, 100);
+Deno.test("buildUpstreamBody: max_tokens is capped at 8192, never raised (§ 9.5, amended 2026-09-24) — both models", () => {
+  for (const model of MODEL_IDS) {
+    const low = buildUpstreamBody({ model, max_tokens: 100 });
+    assert(low.ok);
+    if (low.ok) assertEquals(low.body.max_tokens, 100, model);
 
-  const high = buildUpstreamBody({ max_tokens: 999999 });
-  assert(high.ok);
-  if (high.ok) assertEquals(high.body.max_tokens, 8192);
+    const high = buildUpstreamBody({ model, max_tokens: 999999 });
+    assert(high.ok);
+    if (high.ok) assertEquals(high.body.max_tokens, 8192, model);
+  }
 });
 
 Deno.test("buildUpstreamBody: drops fields outside the allowlist", () => {
   const r = buildUpstreamBody({
+    model: CLAUDE_MODEL_ID,
     models: ["a", "b"],
     max_completion_tokens: 10,
     reasoning: { effort: "high" },
@@ -47,56 +67,175 @@ Deno.test("buildUpstreamBody: drops fields outside the allowlist", () => {
   assertEquals(r.body.stream, true); // forced, not the client's false
 });
 
+// -------------------------------------------------- § 13.1: the allowlist ----
+
 Deno.test("buildUpstreamBody: model_not_allowed for any other model string", () => {
   const r = buildUpstreamBody({ model: "openai/gpt-4o" });
   assert(!r.ok);
   if (r.ok) return;
   assertEquals(r.status, 400);
   assertEquals(r.code, "model_not_allowed");
+  assertEquals(r.message, "This model is not allowed.");
 });
 
-Deno.test("buildUpstreamBody: model_not_allowed for a suffixed variant of the allowed model", () => {
-  const r = buildUpstreamBody({ model: `${MODEL}:online` });
+Deno.test("buildUpstreamBody: model_not_allowed for a suffixed variant of either allowed model", () => {
+  for (const suffix of [":online", ":free", ":nitro"]) {
+    for (const model of MODEL_IDS) {
+      const r = buildUpstreamBody({ model: `${model}${suffix}` });
+      assert(!r.ok, `${model}${suffix}`);
+      if (r.ok) continue;
+      assertEquals(r.code, "model_not_allowed", `${model}${suffix}`);
+    }
+  }
+});
+
+Deno.test("buildUpstreamBody: model_not_allowed for a missing model — § 13.1: 'the proxy no longer fills in a model'", () => {
+  const r = buildUpstreamBody({ messages: [] });
   assert(!r.ok);
   if (r.ok) return;
+  assertEquals(r.status, 400);
   assertEquals(r.code, "model_not_allowed");
 });
 
-Deno.test("buildUpstreamBody: the exact allowed model string passes", () => {
-  const r = buildUpstreamBody({ model: MODEL });
-  assert(r.ok);
+Deno.test("buildUpstreamBody: model_not_allowed for null, a number, wrong case, other model ids", () => {
+  for (const bad of [null, 5, "Anthropic/Claude-Sonnet-5", "deepseek/deepseek-v4-pro", "DeepSeek/deepseek-v4.1-flash", " " + CLAUDE_MODEL_ID, CLAUDE_MODEL_ID + " "]) {
+    const r = buildUpstreamBody({ model: bad });
+    assert(!r.ok, JSON.stringify(bad));
+    if (r.ok) continue;
+    assertEquals(r.code, "model_not_allowed", JSON.stringify(bad));
+  }
 });
 
-Deno.test("buildUpstreamBody: web plugin rewritten to fixed engine, results capped at 5", () => {
-  const r = buildUpstreamBody({ plugins: [{ id: "web", max_results: 50 }] });
+Deno.test("buildUpstreamBody: the exact allowed model string passes, for each of the two ids", () => {
+  for (const model of MODEL_IDS) {
+    const r = buildUpstreamBody({ model });
+    assert(r.ok, model);
+    if (r.ok) assertEquals(r.body.model, model);
+  }
+});
+
+Deno.test("buildUpstreamBody: a missing/invalid model never reaches upstream — no ok:true, no model field to send", () => {
+  const r = buildUpstreamBody({ model: "not-a-real-model" });
+  assertEquals(r.ok, false);
+});
+
+// -------------------------------------------------- § 13.1: cache_control / provider per model ----
+
+Deno.test("buildUpstreamBody: Claude gets cache_control; DeepSeek does not", () => {
+  const claude = buildUpstreamBody({ model: CLAUDE_MODEL_ID });
+  assert(claude.ok);
+  if (claude.ok) assertEquals(claude.body.cache_control, { type: "ephemeral" });
+
+  const deepseek = buildUpstreamBody({ model: DEEPSEEK_MODEL_ID });
+  assert(deepseek.ok);
+  if (deepseek.ok) assert(!("cache_control" in deepseek.body), "DeepSeek must not get cache_control");
+});
+
+Deno.test("buildUpstreamBody: DeepSeek gets require_parameters: true; Claude does not", () => {
+  const deepseek = buildUpstreamBody({ model: DEEPSEEK_MODEL_ID });
+  assert(deepseek.ok);
+  if (deepseek.ok) {
+    assertEquals(deepseek.body.provider, { data_collection: "deny", zdr: true, require_parameters: true });
+  }
+
+  const claude = buildUpstreamBody({ model: CLAUDE_MODEL_ID });
+  assert(claude.ok);
+  if (claude.ok) {
+    assertEquals(claude.body.provider, { data_collection: "deny", zdr: true });
+    assert(!("require_parameters" in (claude.body.provider as object)), "Claude must not get require_parameters");
+  }
+});
+
+Deno.test("buildUpstreamBody: a client-supplied cache_control/provider can never override the forced ones, for either model", () => {
+  for (const model of MODEL_IDS) {
+    const r = buildUpstreamBody({
+      model,
+      cache_control: { type: "ephemeral", ttl: "1h" },
+      provider: { data_collection: "allow", zdr: false, require_parameters: false },
+    });
+    assert(r.ok, model);
+    if (!r.ok) continue;
+    if (model === CLAUDE_MODEL_ID) assertEquals(r.body.cache_control, { type: "ephemeral" });
+    else assert(!("cache_control" in r.body));
+    const wantProvider =
+      model === DEEPSEEK_MODEL_ID
+        ? { data_collection: "deny", zdr: true, require_parameters: true }
+        : { data_collection: "deny", zdr: true };
+    assertEquals(r.body.provider, wantProvider, model);
+  }
+});
+
+// -------------------------------------------------- § 13.5 (ii): Claude's body is byte-identical ----
+
+/** The golden body: exactly what the single-model (pre-§ 13) proxy sent
+ * upstream for Claude, key order included — `messages` (verbatim), `tools`
+ * (function-only), `tool_choice`, `temperature`, then the forced `model`,
+ * `max_tokens`, `stream`, `provider`, `cache_control`. buildUpstreamBody's
+ * insertion order for the Claude branch must never change, or this test
+ * (comparing JSON.stringify output, so key order counts) fails. */
+function goldenClaudeBody(): string {
+  const messages = [{ role: "user", content: "hi" }];
+  const tools = [{ type: "function", function: { name: "x", parameters: { type: "object" } } }];
+  return JSON.stringify({
+    messages,
+    tools,
+    tool_choice: "auto",
+    temperature: 0.5,
+    model: CLAUDE_MODEL_ID,
+    max_tokens: 8192,
+    stream: true,
+    provider: { data_collection: "deny", zdr: true },
+    cache_control: { type: "ephemeral" },
+  });
+}
+
+Deno.test("§ 13.5 (ii): Claude's outgoing body is byte-identical to today's (golden body)", () => {
+  const messages = [{ role: "user", content: "hi" }];
+  const tools = [{ type: "function", function: { name: "x", parameters: { type: "object" } } }];
+  const r = buildUpstreamBody({
+    model: CLAUDE_MODEL_ID,
+    messages,
+    tools,
+    tool_choice: "auto",
+    temperature: 0.5,
+  });
   assert(r.ok);
   if (!r.ok) return;
-  assertEquals(r.body.plugins, [{ id: "web", engine: "exa", max_results: 5 }]);
+  assertEquals(JSON.stringify(r.body), goldenClaudeBody());
+});
+
+Deno.test("buildUpstreamBody: web plugin rewritten to fixed engine, results capped at 5 — both models", () => {
+  for (const model of MODEL_IDS) {
+    const r = buildUpstreamBody({ model, plugins: [{ id: "web", max_results: 50 }] });
+    assert(r.ok, model);
+    if (!r.ok) continue;
+    assertEquals(r.body.plugins, [{ id: "web", engine: "exa", max_results: 5 }], model);
+  }
 });
 
 Deno.test("buildUpstreamBody: web plugin with no max_results defaults to 5", () => {
-  const r = buildUpstreamBody({ plugins: [{ id: "web" }] });
+  const r = buildUpstreamBody({ model: CLAUDE_MODEL_ID, plugins: [{ id: "web" }] });
   assert(r.ok);
   if (!r.ok) return;
   assertEquals(r.body.plugins, [{ id: "web", engine: "exa", max_results: 5 }]);
 });
 
 Deno.test("buildUpstreamBody: web plugin honors a smaller client max_results", () => {
-  const r = buildUpstreamBody({ plugins: [{ id: "web", max_results: 2 }] });
+  const r = buildUpstreamBody({ model: CLAUDE_MODEL_ID, plugins: [{ id: "web", max_results: 2 }] });
   assert(r.ok);
   if (!r.ok) return;
   assertEquals(r.body.plugins, [{ id: "web", engine: "exa", max_results: 2 }]);
 });
 
 Deno.test("buildUpstreamBody: a non-web plugin is dropped entirely", () => {
-  const r = buildUpstreamBody({ plugins: [{ id: "some-other-plugin" }] });
+  const r = buildUpstreamBody({ model: CLAUDE_MODEL_ID, plugins: [{ id: "some-other-plugin" }] });
   assert(r.ok);
   if (!r.ok) return;
   assert(!("plugins" in r.body));
 });
 
 Deno.test("buildUpstreamBody: no plugins in, no plugins out", () => {
-  const r = buildUpstreamBody({});
+  const r = buildUpstreamBody({ model: CLAUDE_MODEL_ID });
   assert(r.ok);
   if (!r.ok) return;
   assert(!("plugins" in r.body));
@@ -185,6 +324,9 @@ Deno.test("parseUsageFromSSE: a truncated final line is skipped, not thrown", ()
 // from 0 to 10x the ceiling is recorded AS REPORTED (never undercounted); a
 // cost above the ceiling is flagged via costAboveCeiling for the caller's
 // anomaly log; only missing/non-finite/negative/>10x costs record the ceiling.
+// § 13: the ceiling is now per model — sanitizeUsageForLedger's SECOND
+// argument. The default (Claude's ceiling) keeps every pre-§ 13 call site
+// (below, and tests/functions/*.test.ts) working unchanged.
 
 Deno.test("sanitizeUsageForLedger: a normal in-range cost is recorded as reported, no anomaly", () => {
   const r = sanitizeUsageForLedger({ cost: 0.05, tokensIn: 10, tokensOut: 5, tokensCached: 0 });
@@ -239,10 +381,56 @@ Deno.test("sanitizeUsageForLedger: token sanitizing is independent of the cost o
   assertEquals([r.tokensIn, r.tokensOut, r.tokensCached], [0, 0, 2]);
 });
 
-// -------------------------------------------------- § 9.5: the cap and its ceiling ----
+// -------------------------------------------------- § 13.5 (iv): per-model ceiling ----
 
-Deno.test("§ 14: CEILING_USD is $0.21692 (64,000 × $2/M + 8,192 × $10/M + one search at $0.007/request)", () => {
-  assertAlmostEquals(CEILING_USD, 0.21692, 1e-9);
+Deno.test("§ 13.1: CEILING_USD_BY_MODEL is $0.273112 (Claude) and $0.043288 (DeepSeek), 1e-9", () => {
+  assertAlmostEquals(CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], 0.273112, 1e-9);
+  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 0.043288, 1e-9);
+});
+
+Deno.test("§ 13.1: the formula per model — 64,000 × input$/M + 8,192 × output$/M + $0.007", () => {
+  const claude = (64_000 * 2.75) / 1e6 + (8_192 * 11.0) / 1e6 + 0.007;
+  const deepseek = (64_000 * 0.375) / 1e6 + (8_192 * 1.5) / 1e6 + 0.007;
+  assertAlmostEquals(CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], claude, 1e-12);
+  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], deepseek, 1e-12);
+});
+
+Deno.test("ceilingUsdFor: returns each model's own ceiling; an unrecognized/missing id falls back to Claude's (never undercounts)", () => {
+  assertAlmostEquals(ceilingUsdFor(CLAUDE_MODEL_ID), CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], 1e-12);
+  assertAlmostEquals(ceilingUsdFor(DEEPSEEK_MODEL_ID), CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 1e-12);
+  assertAlmostEquals(ceilingUsdFor("openai/gpt-4o"), CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], 1e-12);
+  assertAlmostEquals(ceilingUsdFor(undefined), CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], 1e-12);
+});
+
+Deno.test("§ 13: CEILING_USD (the pre-§ 13 single-model export) equals Claude's raised ceiling, not the old § 14 figure", () => {
+  assertAlmostEquals(CEILING_USD, 0.273112, 1e-9);
+  assertAlmostEquals(CEILING_USD, CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], 1e-12);
+  assert(CEILING_USD !== 0.21692);
+});
+
+Deno.test("sanitizeUsageForLedger: a per-model ceiling (DeepSeek) is honored when passed explicitly", () => {
+  const deepseekCeiling = CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID];
+  const r = sanitizeUsageForLedger({ cost: 0.6 }, deepseekCeiling);
+  // 0.6 is well beyond 10x DeepSeek's ceiling (~0.43), so it's replaced —
+  // exactly § 13.5 (iv)'s "a DeepSeek cost of $0.60 is recorded as
+  // $0.043288" case.
+  assertAlmostEquals(r.usd, deepseekCeiling, 1e-9);
+  assertEquals(r.costAboveCeiling, false);
+
+  const inRange = sanitizeUsageForLedger({ cost: 0.02 }, deepseekCeiling);
+  assertAlmostEquals(inRange.usd, 0.02, 1e-9);
+});
+
+Deno.test("§ 13.5 (iv): a DeepSeek call with no usage.cost records DeepSeek's ceiling, not Claude's", () => {
+  const r = sanitizeUsageForLedger(null, ceilingUsdFor(DEEPSEEK_MODEL_ID));
+  assertAlmostEquals(r.usd, CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 1e-9);
+});
+
+Deno.test("§ 13.5 (iv): a Claude $0.60 reported cost is recorded as reported (within 10x its ceiling), with the anomaly flag", () => {
+  const claudeCeiling = CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID];
+  const r = sanitizeUsageForLedger({ cost: 0.6 }, claudeCeiling);
+  assertAlmostEquals(r.usd, 0.6, 1e-9);
+  assertEquals(r.costAboveCeiling, true);
 });
 
 // -------------------------------------------------- § 9.6: finish_reason parsing ----
@@ -304,4 +492,13 @@ Deno.test("§ 9.6: sanitizeUsageForLedger never blocks the insert — finishReas
   const r = sanitizeUsageForLedger({ cost: -1, tokensIn: -5, finishReason: "stop" });
   assertEquals(r.usd, CEILING_USD, "cost still sanitized independently");
   assertEquals(r.finishReason, "stop", "a valid finish_reason survives a garbled cost");
+});
+
+// -------------------------------------------------- MODEL / MODEL_IDS sanity ----
+
+Deno.test("MODEL is Claude's id, MODEL_IDS holds exactly the two § 13 ids in order", () => {
+  assertEquals(MODEL, CLAUDE_MODEL_ID);
+  assertEquals(MODEL_IDS, [CLAUDE_MODEL_ID, DEEPSEEK_MODEL_ID]);
+  assertEquals(CLAUDE_MODEL_ID, "anthropic/claude-sonnet-5");
+  assertEquals(DEEPSEEK_MODEL_ID, "deepseek/deepseek-v4.1-flash");
 });

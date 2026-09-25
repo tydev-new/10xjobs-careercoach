@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Ten — Privacy</title>
+<style>
+  /* Plain, static copy of the v2 light-theme tokens
+     (docs/design-web-ui-refresh.md) — this page is served as-is from
+     apps/web/public/, outside Vite's module graph, so the values are
+     copied rather than imported. Light theme only (§ 13.6: "light
+     theme"; the real app never renders dark, apps/web/src/theme.ts). */
+  :root {
+    --bg: #f7f2ea;
+    --bg-panel: #ffffff;
+    --fg: #161821;
+    --fg-muted: #585c6c;
+    --border: #e4dbc9;
+    --accent: #155eef;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 4px;
+  }
+  .dated {
+    color: var(--fg-muted);
+    font-size: 13px;
+    margin-top: 0;
+    margin-bottom: 32px;
+  }
+  h2 {
+    font-size: 18px;
+    margin-top: 40px;
+  }
+  p, li {
+    font-size: 15px;
+  }
+  ul {
+    padding-left: 20px;
+  }
+  li + li {
+    margin-top: 6px;
+  }
+  a {
+    color: var(--accent);
+  }
+  .model-hosts {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-panel);
+    padding: 16px 20px;
+    margin: 16px 0;
+  }
+  .model-hosts h3 {
+    margin: 0 0 6px;
+    font-size: 15px;
+  }
+  .back {
+    display: inline-block;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="javascript:history.back()">&larr; Back</a>
+  <h1>Privacy</h1>
+  <p class="dated">What we send, and who can see it — read 2026-09-24 from OpenRouter's own API (<code>GET /api/v1/endpoints/zdr</code>).</p>
+
+  <p>
+    Ten is a coaching assistant. Here's plainly what leaves your browser
+    when you use it, and who can process it.
+  </p>
+
+  <h2>What the model's host receives</h2>
+  <p>
+    Each turn sends the model host the messages in your conversation, the
+    files Ten reads from your workspace to answer you, and the results of
+    any tool it runs (like a résumé check). Nothing more.
+  </p>
+
+  <h2>Every call goes through OpenRouter</h2>
+  <p>
+    Ten never talks to a model provider directly. Every call is routed
+    through <a href="https://openrouter.ai" target="_blank" rel="noreferrer">OpenRouter</a>,
+    and Ten asks OpenRouter to use only hosts that keep no data and don't
+    collect it for training (OpenRouter's own "zero data retention"
+    filter). If no such host is available for a call, the call doesn't
+    go through — it never silently falls back to a host that keeps data.
+  </p>
+
+  <h2>Web search goes through Exa</h2>
+  <p>
+    When Ten searches the web on your behalf, that search is run by
+    <a href="https://exa.ai" target="_blank" rel="noreferrer">Exa</a>,
+    also through OpenRouter — never a direct call from your browser to
+    Exa or any search engine.
+  </p>
+
+  <h2>Which hosts can run each model</h2>
+  <p>
+    OpenRouter picks among whichever zero-data-retention hosts are
+    available at the moment of each call, so this list can change without
+    Ten's own code changing. Neither model's own, first-party API is ever
+    used — only these no-data-kept hosts.
+  </p>
+
+  <div class="model-hosts">
+    <h3>Claude Sonnet 5</h3>
+    <p>Amazon Bedrock, Google Vertex AI.</p>
+  </div>
+
+  <div class="model-hosts">
+    <h3>DeepSeek V4.1 Flash <span style="color: var(--fg-muted); font-weight: normal;">(testing only — see below)</span></h3>
+    <p>
+      BaseTen, CoreWeave, DeepInfra, DekaLLM (web-search calls only — it
+      doesn't support tool calls, so Ten never sends it a turn that needs
+      one), DigitalOcean, Fireworks, Krea, Makora, Modal, Morph, NextBit,
+      Novita, OpenInference, Parasail, Phala, Relace, Sail Research,
+      SiliconFlow, Together, Venice, Wafer.
+    </p>
+  </div>
+
+  <p>
+    DeepSeek is offered only for internal testing, to a small group who
+    know it's running — never to the general beta — and always through
+    the same no-data-kept hosts above, never DeepSeek's own API.
+  </p>
+
+  <h2>Which model is running, right now</h2>
+  <p>
+    The <strong>&ctdot;</strong> menu in the app always names the model
+    that's actually answering you, in plain words, right above this link.
+  </p>
+</main>
+</body>
+</html>

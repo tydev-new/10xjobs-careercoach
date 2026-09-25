@@ -17,7 +17,19 @@ export { validateRef, isReadOnlyPath, isEditableExt, isUploadExt } from "./works
 export { createInMemoryGate, buildGateLine, textHashOf, sha256Hex, findSpendLineTemplate } from "./gate.ts";
 export { CardBuilder } from "./cards.ts";
 export { parseJobsMdRows, findJobsMdRow } from "./jobs-md.ts";
-export { computeCostEstimate, needsGate, DEFAULT_STEP_COST_MEDIAN_USD, DEFAULT_STEP_COST_MAX_USD } from "./estimate-cost.ts";
+export {
+  computeCostEstimate,
+  needsGate,
+  modelIdOf,
+  DEFAULT_STEP_COST_MEDIAN_USD,
+  DEFAULT_STEP_COST_MAX_USD,
+  DEFAULT_WEB_SEARCH_COST_MEDIAN_USD,
+  DEFAULT_WEB_SEARCH_COST_MAX_USD,
+  MODEL_COST_TABLE,
+  CLAUDE_MODEL_ID,
+  DEEPSEEK_MODEL_ID,
+} from "./estimate-cost.ts";
+export type { ModelCostRow, CostEstimateInput, CostEstimateResult, StepCostSample } from "./estimate-cost.ts";
 export { trimHistoryToWindow } from "./window.ts";
 export {
   conversationToSave,

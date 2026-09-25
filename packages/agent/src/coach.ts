@@ -10,7 +10,13 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import { CardBuilder } from "./cards.ts";
-import { DEFAULT_STEP_COST_MAX_USD, DEFAULT_STEP_COST_MEDIAN_USD, type StepCostSample } from "./estimate-cost.ts";
+import {
+  DEFAULT_STEP_COST_MAX_USD,
+  DEFAULT_STEP_COST_MEDIAN_USD,
+  MODEL_COST_TABLE,
+  modelIdOf,
+  type StepCostSample,
+} from "./estimate-cost.ts";
 import { buildGateLine, openGateForChat, roundUpCents, textHashOf } from "./gate.ts";
 import { matchGateReply } from "./helpers.ts";
 import { buildAlwaysOnSystemPrompt } from "./skills/system-prompt.ts";
@@ -596,25 +602,36 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
   // from the request instead of failing it with `MissingToolResultsError`.
   const modelMessages = await convertToModelMessages(windowed as any, { tools: tools as any, ignoreIncompleteToolCalls: true });
 
+  // § 13.3: the active model's row (an unrecognized/missing id falls back
+  // to Claude's, the higher figures — resolved once per turn, not per
+  // step, since deps.model never changes mid-turn).
+  const activeModelId = modelIdOf(deps.model);
+  const activeModelRow = MODEL_COST_TABLE[activeModelId ?? ""];
+  const fallbackStepMaxUsd = activeModelRow?.stepMaxUsd ?? DEFAULT_STEP_COST_MAX_USD;
+  const fallbackStepMedianUsd = activeModelRow?.stepMedianUsd ?? DEFAULT_STEP_COST_MEDIAN_USD;
+
   /** § 4's "allowance" projection for the NEXT step's cost (H1/M6, fix
    *  round 1): this chat's own measured steps so far (persisted, worst
    *  case — "gate BEFORE a step that would exceed it" has to assume the
    *  next step could cost as much as the costliest one seen), else the
    *  most recent estimate_cost's upper bound, else a labelled dated
-   *  constant as the last resort. Never a constant when real data exists. */
+   *  constant (§ 13.3: the ACTIVE model's own highest) as the last
+   *  resort. Never a constant when real data exists. */
   function projectedNextStepUsd(): number {
     if (state.chatMeasuredSteps.length > 0) {
       return Math.max(...state.chatMeasuredSteps.map((s) => s.usd));
     }
     if (turnState.lastHighUsd !== undefined) return turnState.lastHighUsd;
-    return DEFAULT_STEP_COST_MAX_USD;
+    return fallbackStepMaxUsd;
   }
 
   // § 9.2: "every step's cost is added exactly once" — one recorder
   // shared by both calls' stop conditions AND the post-call catch-up
   // below, so nothing here decides cost on its own.
   function recordStepCost(step: { providerMetadata?: any }): void {
-    const measuredUsd = step.providerMetadata?.openrouter?.usage?.cost ?? DEFAULT_STEP_COST_MEDIAN_USD;
+    // § 13.3: the fallback (when the stream reports no cost at all) is
+    // the ACTIVE model's own median, not always Claude's.
+    const measuredUsd = step.providerMetadata?.openrouter?.usage?.cost ?? fallbackStepMedianUsd;
     const sample: StepCostSample = { usd: measuredUsd };
     turnState.measuredSteps.push(sample);
     state.chatMeasuredSteps.push(sample);

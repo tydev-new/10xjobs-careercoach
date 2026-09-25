@@ -264,6 +264,23 @@ test("v2 at 375 px: no horizontal scroll on any fixture; the gate card has no bu
   await page.context().close();
 });
 
+// ------------------------------------------------------------------ § 13.3 / § 13.6 in mock mode
+
+test("§ 13.5 (ix)/(xii): the preview mock's ⋯ menu links Privacy (/privacy.html, which the build serves) and shows NO Model line", async () => {
+  const page = await open();
+  await page.locator(".menu-trigger").click();
+  const m = await page.evaluate(() => {
+    const panel = document.querySelector(".menu-panel")!;
+    const link = [...panel.querySelectorAll("a")].find((a) => a.textContent?.trim() === "Privacy");
+    return { href: link?.getAttribute("href") ?? null, model: /Model:/.test(panel.textContent ?? ""), modelEl: !!panel.querySelector(".menu-item-model") };
+  });
+  assert.equal(m.href, "/privacy.html", "the Privacy link is in mock mode too");
+  assert.equal(m.model || m.modelEl, false, "no Model line in mock mode");
+  const r = await page.request.get(base + "privacy.html");
+  assert.equal(r.status(), 200, "the preview build serves /privacy.html too");
+  await page.context().close();
+});
+
 // ------------------------------------------------------------------ light-theme-always (e750910): the mock keeps both
 
 test("light theme always (owner ruling 2026-09-24): the preview mock still follows a dark OS, renders the dark tokens, and keeps its theme toggle", async () => {

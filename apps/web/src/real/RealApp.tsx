@@ -337,6 +337,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         onDeleted={handleDeleted}
         theme={theme}
         onThemeToggle={onThemeToggle}
+        coachModel={env.coachModel}
       />
     </div>
   );

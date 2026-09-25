@@ -199,14 +199,16 @@ flowchart TD
 - **The limits can be overshot by calls already running.** The checks
   happen before a call, and the cost is known only after it. Calls that
   start together all pass the check, so a balance or the $5 day can go
-  over by whatever those calls cost. Each call's cost is bounded by the
-  output cap and the size cap (C § 8, "the honest bound").
-- **The per-call ceiling is not a cap.** It is the worst case the caps
-  allow, priced per model: about $0.27 for Claude, $0.04 for DeepSeek
-  (C § 13.1). A reported cost up to 10 times the ceiling is recorded as
-  reported. The ceiling is charged instead when the cost is missing,
-  unreadable, negative, over 10 times the ceiling, or the meter ran out
-  of time. It is also that 10-times sanity bound.
+  over by whatever those calls cost (C § 8, "the honest bound"). The
+  output cap and the size cap keep each call small, but that is an
+  expected size, not a bound on the charge (next point).
+- **The per-call ceiling is not a cap.** It is what the caps allow at
+  today's listed prices, per model: about $0.27 for Claude, $0.04 for
+  DeepSeek (C § 13.1). The proxy uses it in two ways. A reported cost
+  from $0 up to 10 times the ceiling is recorded as reported, even above
+  the ceiling. The ceiling itself is charged when the cost is missing,
+  unreadable, negative or over 10 times the ceiling, or when the meter
+  ran out of time.
 - **The balance is derived, never stored:** credits minus calls, from the
   ledger (rule 12).
 
@@ -221,13 +223,16 @@ flowchart TD
   Proxy["ten-model-proxy<br/>(service role)"]
   Owner["Owner"]
   subgraph Beta["The member's beta data"]
-    Gates[("ten_gate_log")]
-    Files[("ten_ws_files")]
-    Conv[("ten_conversations")]
+    subgraph Rows["Rows"]
+      Gates[("ten_gate_log")]
+      Files[("ten_ws_files")]
+      Conv[("ten_conversations")]
+    end
     Bucket[("bucket ten-workspaces")]
   end
   Ledger[("ten_usage_ledger")]
-  Browser -->|through ten_ functions| Beta
+  Browser -->|ten_ functions| Rows
+  Browser -->|"Storage API upload,<br/>RLS insert policy"| Bucket
   Delete -->|removes all of it| Beta
   Delete -->|credit rows only| Ledger
   Proxy -->|call rows| Ledger
@@ -283,8 +288,12 @@ flowchart LR
   V --> L["6. Live check"]
 ```
 
-**Every production change needs the owner's explicit approval.** The
-function and site READMEs say the owner runs the deploy steps.
+**Only the owner runs production steps:** migrations and teardown, Edge
+Function deploys and secrets, site deploys, Vercel and Auth settings,
+credit rows. Agents prepare the exact commands and checks for the owner;
+they never run them and never hold secrets. During the 2026-09-23 to
+2026-09-25 beta setup, the lead agent ran several of these steps, each on
+the owner's explicit approval; that exception is closed (C § 15).
 
 **Why this order:** each layer must exist before the layer that uses it.
 A proxy that writes a new column before the column exists would fail
@@ -292,7 +301,7 @@ every ledger insert, so calls would go unbilled (C § 9.6). The delete
 function must cover new data before the site writes any (C § 11.8). A
 Vercel setting is baked in at build time, so it needs a fresh site
 deploy. Each change's contract states its own order, and it can differ:
-§ 13 went out site first, then proxy, then the setting (2026-09-25),
+§ 13's contract requires site first, then proxy, then the setting,
 because the new proxy refuses requests the old site sends (C § 13.2).
 
 **The site deploy is a script,**

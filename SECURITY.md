@@ -47,9 +47,10 @@ Never include anyone's real data in a report.
 
 ## Production
 
-Production changes only through the owner-approved deploy path:
-migrations, server functions and the site
-(`apps/web/scripts/deploy-prod.sh`), each with the owner's approval.
-Contributors and agents never hold production keys and never touch
-production data. For local work, use your own accounts
+Only the owner changes production: migrations and teardown, server
+function deploys and secrets, site deploys
+(`apps/web/scripts/deploy-prod.sh`), Vercel and Auth settings, credit
+rows. Agents may prepare the exact commands and checks; they never run
+them and never hold secrets. Contributors never hold production keys and
+never touch production data. For local work, use your own accounts
 ([`CONTRIBUTING.md`](CONTRIBUTING.md)).

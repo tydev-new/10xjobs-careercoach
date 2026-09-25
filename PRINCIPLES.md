@@ -22,7 +22,7 @@ Written in plain language on purpose: if something can't be explained in this st
 
 **6. Your plan is short and already prepared.** Two to four things waiting on you, most time-sensitive first, sized to the time you committed. An item leaves the list three ways: it's done, you said no (recorded once, never nagged about again), or it stopped mattering. If you keep skipping something, Ten asks once what's in the way — then shrinks it, does more of it, delays it, or drops it.
 
-**7. The important moments are unmissable.** Anything sent as you, submitted for you, or costing money follows the same four steps: you see the complete thing; then one plain sentence says what will happen when it goes; then your explicit yes; then a log entry. No button fires these — only your word. (The exact wording: `skills/coach/references/gate-grammar.md`.)
+**7. The important moments are unmissable.** Anything sent as you, submitted for you, or costing money follows the same four steps: you see the complete thing; then one plain sentence says what will happen when it goes; then your explicit yes; then a log entry. No button fires these — only your word. Buying credit, done by you in the payment provider's own window, is your action, not Ten's; Ten never starts it. (The exact wording: `skills/coach/references/gate-grammar.md`.)
 
 **8. Honest, in your voice, or silent.** No manufactured urgency, no unearned praise, no trend claimed that the data can't support, and no generic AI jargon. Progress is real numbers or nothing. What Ten drafts sounds like a capable person in their natural register, and your claims about yourself are never made stronger than the facts you gave.
 

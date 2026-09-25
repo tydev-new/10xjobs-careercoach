@@ -241,8 +241,8 @@ Deno.test("sanitizeUsageForLedger: token sanitizing is independent of the cost o
 
 // -------------------------------------------------- § 9.5: the cap and its ceiling ----
 
-Deno.test("§ 9.5: CEILING_USD is $0.22992 (64,000 × $2/M + 8,192 × $10/M + one 5-result search at $0.004/result)", () => {
-  assertAlmostEquals(CEILING_USD, 0.22992, 1e-9);
+Deno.test("§ 14: CEILING_USD is $0.21692 (64,000 × $2/M + 8,192 × $10/M + one search at $0.007/request)", () => {
+  assertAlmostEquals(CEILING_USD, 0.21692, 1e-9);
 });
 
 // -------------------------------------------------- § 9.6: finish_reason parsing ----

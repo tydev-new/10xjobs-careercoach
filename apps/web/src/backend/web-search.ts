@@ -21,8 +21,8 @@ export interface WebSearchOptions {
   getAccessToken: () => Promise<string>;
   /** Injectable for tests; defaults to the global `fetch`. */
   fetchImpl?: typeof fetch;
-  /** § 4's last-resort dated placeholder (estimate-cost.ts's own
-   *  DEFAULT_WEB_SEARCH_COST_USD) — used only when a response carries no
+  /** § 14's last-resort dated fallback (estimate-cost.ts's own
+   *  DEFAULT_WEB_SEARCH_COST_MAX_USD) — used only when a response carries no
    *  `usage.cost` at all. Passed in rather than imported so this module
    *  doesn't have to agree with estimate-cost.ts's own constant twice. */
   defaultUsd: number;

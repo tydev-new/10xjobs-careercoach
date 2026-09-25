@@ -15,15 +15,18 @@ export const MAX_WEB_RESULTS = 5;
 
 // N3 (fix round 1): the ceiling is computed from § 8's own formula, not a
 // hand-picked constant — 64k input tokens, a full output at the cap above,
-// and one search at the fixed plugin's per-result price.
+// and one search at the fixed plugin's per-request price (§ 14).
 const CEILING_INPUT_TOKENS = 64_000;
 const CEILING_INPUT_USD_PER_MILLION = 2;
 const CEILING_OUTPUT_USD_PER_MILLION = 10;
-const CEILING_SEARCH_USD_PER_RESULT = 0.004; // Exa: $4 / 1,000 results
+// Exa Auto: $0.007 per request, up to 10 results included (OpenRouter
+// docs and the ledger, 2026-09-24). MAX_WEB_RESULTS ≤ 10 keeps it flat;
+// past 10 this term becomes 0.007 + (n − 10) × 0.001.
+const CEILING_SEARCH_USD_PER_REQUEST = 0.007;
 export const CEILING_USD =
   (CEILING_INPUT_TOKENS * CEILING_INPUT_USD_PER_MILLION) / 1_000_000 +
   (MAX_TOKENS_CAP * CEILING_OUTPUT_USD_PER_MILLION) / 1_000_000 +
-  MAX_WEB_RESULTS * CEILING_SEARCH_USD_PER_RESULT; // § 9.5: $0.22992, "about $0.23" (was $0.18896)
+  CEILING_SEARCH_USD_PER_REQUEST; // § 14: $0.21692, "about $0.22" (§ 9.5 had $0.22992)
 
 export const MAX_BODY_BYTES = 256 * 1024;
 export const BETA_CEILING_USD = 5;

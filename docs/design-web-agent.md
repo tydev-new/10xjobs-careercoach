@@ -8,6 +8,7 @@ disagree, § 9 wins. Again 2026-09-24: § 11 (the conversation is kept;
 owner requirement) and § 12 (a turn that grows too large), both approved
 by the owner as written (2026-09-24). Each wins over earlier text it names.
 Again 2026-09-24: § 13 (the site's model is a setting; PENDING OWNER).
+Again 2026-09-24: § 14 (web search is billed per request; owner request).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -285,8 +286,9 @@ Nothing is thrown into the stream.
   endpoints.
 - **`estimate_cost`** is computed by code:
   `lowUsd`/`highUsd` = `steps` × the median/highest cost per step so far in
-  this chat (turn 1: step 4's measured constant, dated) + web searches at the
-  plugin price (`GET /api/v1/models`, cached); `balanceUsd` = `deps.balance()`;
+  this chat (turn 1: step 4's measured constant, dated) + `webSearches` ×
+  the median/highest measured cost of one search call (§ 14; was the
+  plugin price alone); `balanceUsd` = `deps.balance()`;
   `needsGate` = `highUsd > spendGateUsd`; it emits a `cost` card.
 
   Past the threshold, code always opens the gate, even when the spend exceeds
@@ -585,7 +587,8 @@ person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
    non-finite, negative or beyond 10×, or the meter passes its ~360 s
    deadline (timed from the request's start), the row records the
    **ceiling**, computed from the formula (64k input tokens ×
-   input price + 8,192 × output price + one search; about $0.23 today, § 9.5;
+   input price + 8,192 × output price + one search; about $0.22 today, § 9.5
+   and § 14;
    per model, § 13).
    One metering path only; the same pass records `finish_reason` (§ 9.6).
 6. **Failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx,
@@ -828,7 +831,13 @@ covers `step_cap`.*
 
 One stateless check runs at the start of each turn. It looks at the
 assistant message just before the latest user message, in the history as
-sent, **before** the window trims it. For each code below that appears on a
+sent, **before** the window trims it. *(Lead ruling, 2026-09-24, fix round
+2 of § 10–12: "just before" means the most recent assistant message
+before the latest user message that has at least one part other than
+`data-gate-status`. An assistant message made only of `data-gate-status`
+parts, such as § 11.6's reconciliation message, is skipped; otherwise it
+hides a `cut_off`, `step_cap` or `too_large` from this check. Measured by
+the tester: the `cut_off` note was lost.)* For each code below that appears on a
 `data-error` part of that message, the coach appends that code's note to
 the turn's system prompt:
 
@@ -876,8 +885,9 @@ the turn's system prompt:
 § 8's formula with `core.ts`'s constants (per model since § 13, which also
 proposes Claude's prices at the dearest allowed host):
 
-64,000 × $2/M + 8,192 × $10/M + one search (5 × $0.004)
-= $0.128 + $0.08192 + $0.02 = **$0.22992, about $0.23** (was $0.18896).
+64,000 × $2/M + 8,192 × $10/M + one search ($0.007 per request, § 14)
+= $0.128 + $0.08192 + $0.007 = **$0.21692, about $0.22** (was $0.18896;
+$0.22992 until § 14 corrected the search term from 5 × $0.004).
 
 **Why 8,192 and no higher:**
 
@@ -1006,7 +1016,8 @@ model, the in-memory store and a fake gate, never a real workspace.
   - A declined gate: no model call.
 - **(v) Cap and ceiling.**
   - Clamp: 8,192 stays; 8,193, absent and garbage all give 8,192.
-  - `CEILING_USD` = 64,000 × 2e-6 + 8,192 × 1e-5 + 5 × 0.004 = 0.22992.
+  - `CEILING_USD` = 64,000 × 2e-6 + 8,192 × 1e-5 + 0.007 = 0.21692 (§ 14;
+    was 5 × 0.004 = 0.22992).
   - Every 4,096 assertion is updated (`core.test.ts`, `handler.test.ts`,
     `tests/functions/*.test.ts`).
 - **(vi) `finish_reason`.**
@@ -1255,6 +1266,10 @@ A **new** migration, `supabase/migrations/20260924100000_ten_conversations.sql`
    > [Removed to save space: N characters. The workspace files hold what
    > was saved; read a file again if you need it.]
 
+   The stub text, the 2,000-character threshold and the walker that
+   replaces strings are **one shared implementation**, used by this
+   section and § 12.1 (rule 12; tester finding 7, fix round 2).
+
    A tool part in any state but `output-available`/`output-error` is saved
    as `output-error`, `errorText` "Stopped before a result came back.
    Check the files for what was saved."
@@ -1305,7 +1320,10 @@ was removed.
   being saved (a closed tab). So before mounting, for each gate whose
   latest restored status is `pending`, the app reads its own
   `ten_gate_log` row and appends the row's status as a `data-gate-status`
-  part. A pending gate whose card is not in the restored messages (the cap
+  part. *(Lead ruling, 2026-09-24, fix round 2:)* these parts go in one
+  data-only assistant message, placed last, whose id is unique per load,
+  `gate-reconcile-${chatId}-${uuid}` (a fixed id repeated across loads).
+  § 9.4's check skips such a message. A pending gate whose card is not in the restored messages (the cap
   dropped it) is expired first: no yes without the complete thing on
   screen (rule 7).
 - The coach's per-chat memory starts empty after a load; each part
@@ -1359,6 +1377,11 @@ Written from this section; fixture personas and fresh workspaces only.
 - **(vi) Pending gate:** reload: card and `needs-you`; typed `yes`
   approves (allowance = amount), `ui` yes doesn't. Row approved, saved
   status pending: shows approved. Card dropped by the cap: row expired.
+- **(vi-b) Reconciliation × § 9.4** (fix round 2): a restored history
+  whose last real assistant message carries `cut_off` (then `step_cap`,
+  then `too_large`), followed by a reconciliation message: the next turn
+  has that code's note. Two loads produce two different reconciliation
+  ids, and no id repeats in the messages.
 - **(vii) Cap:** over 900,000 bytes drops oldest turns only, sets
   `older_dropped`, shows the line.
 - **(viii) Two tabs:** a stale tab's send: not sent, no proxy request,
@@ -1444,8 +1467,10 @@ turn starts small (the window drops the long turn).
 
 ### 12.3 Test plan
 
-- **(i) Trim:** a stubbed model, 12 steps each reading a 10,000-character
-  file. Every request's messages ≤ 160,000 bytes; stubs land oldest step
+- **(i) Trim:** a stubbed model, 22 steps each reading a 10,000-character
+  file (12 peak at ~131 KB, under the trigger, so they never trim; with 22
+  the first trim comes at request 16; fix round 2). Trimming must happen
+  at least once. Every request's messages ≤ 160,000 bytes; stubs land oldest step
   first; the last 2 steps, user messages and model text are byte-identical;
   the system prompt is identical on every request; the stub word for word.
 - **(ii)** Under budget: no override. **(iii)** Between two trims, each
@@ -1539,24 +1564,24 @@ ceiling constants. Everything else in § 8 is unchanged.
 - **Web plugin** unchanged for both (`exa`, at most 5 results).
 - **Per-call ceiling**, per model, by § 8's formula: 64,000 input tokens ×
   the highest input price + 8,192 × the highest output price + one search
-  (5 × $0.004). "Highest" means the dearest no-data-kept, tool-capable
+  ($0.007 per request, § 14). "Highest" means the dearest no-data-kept, tool-capable
   host above, and for Claude the cache-write price, because the proxy
   forces caching and the first call of a turn writes the cache at that
   price.
 
   | model | input $/M | output $/M | ceiling |
   |---|---|---|---|
-  | Claude Sonnet 5 | 2.75 (regional cache write) | 11.00 | 0.176 + 0.090112 + 0.02 = **$0.286112, about $0.29** |
-  | DeepSeek V4.1 Flash | 0.375 | 1.50 | 0.024 + 0.012288 + 0.02 = **$0.056288, about $0.06** |
+  | Claude Sonnet 5 | 2.75 (regional cache write) | 11.00 | 0.176 + 0.090112 + 0.007 = **$0.273112, about $0.27** |
+  | DeepSeek V4.1 Flash | 0.375 | 1.50 | 0.024 + 0.012288 + 0.007 = **$0.043288, about $0.04** |
 
-  **This raises Claude's ceiling** from § 9.5's $0.22992, which used the
+  **This raises Claude's ceiling** from § 9.5's $0.21692, which used the
   global $2/$10 and no cache write. A regional host plus a cache write can
-  cost up to $0.286 per call today, so § 8's "each ≤ the ceiling" was not
+  cost up to $0.273 per call today, so § 8's "each ≤ the ceiling" was not
   true. **PENDING OWNER** as its own decision: if the owner declines, the
-  Claude row stays $0.22992 and § 8's bound carries that caveat.
+  Claude row stays $0.21692 and § 8's bound carries that caveat.
 - **Ceiling uses:** the meter's fallback charge (missing cost, deadline)
   and the 10× sanity bound both use the **request's** model's ceiling.
-  A DeepSeek cost above $0.56288 is recorded as that model's ceiling.
+  A DeepSeek cost above $0.43288 is recorded as that model's ceiling.
   Prices drift. The table is dated, and a cost above the ceiling is
   still recorded as reported, up to 10×, so drift never undercounts.
 - **The $5/day beta ceiling** is unchanged. It sums all models.
@@ -1625,7 +1650,11 @@ site's web search omits, and § 10 blocks sends from old tabs.
   - Once a chat has measured steps, those are used whatever the model.
   - After the first DeepSeek day, the median and highest per-call `usd`
     from the ledger replace the derived values, with the date.
-  - Unchanged: the web search price ($0.004) doesn't depend on the model.
+  - Web search (§ 14): the $0.007 fee doesn't depend on the model; the
+    search call's own tokens do. Claude: median $0.035, highest $0.047
+    per search (measured 2026-09-24). DeepSeek: Claude's token part
+    (each value − $0.007) × 0.1875 + $0.007, rounded up: median $0.013,
+    highest $0.015, **derived, not measured**.
     The `check_language` fallback ($0.0175) is used only when a call reports
     no cost, and on DeepSeek it overstates the cost, the safe direction.
 - **The candidate is never told a wrong model.** Code shows the model:
@@ -1685,11 +1714,11 @@ What to watch in DeepSeek runs (ledger and chat, numbers only):
   `{ data_collection: "deny", zdr: true, require_parameters: true }`;
   `max_tokens` 8,192 for a client 20,000 and 100 for 100; `stream: true`;
   the web plugin rewrite is the same as Claude's.
-- **(iv) Ceiling per model:** the table's values are 0.286112 (or
-  0.22992 if declined) and 0.056288 (1e-9). A DeepSeek call with no
-  `usage.cost` and one that passes the deadline both record $0.056288; a
+- **(iv) Ceiling per model:** the table's values are 0.273112 (or
+  0.21692 if declined) and 0.043288 (1e-9). A DeepSeek call with no
+  `usage.cost` and one that passes the deadline both record $0.043288; a
   Claude call records Claude's ceiling. A DeepSeek cost of $0.60 is
-  recorded as $0.056288; the same $0.60 on Claude is recorded as $0.60
+  recorded as $0.043288; the same $0.60 on Claude is recorded as $0.60
   with the anomaly log.
 - **(v) Ledger model:** the row's `model` is the request's id, even when
   the stream's `model` is `deepseek/deepseek-v4.1-flash-20260910`.
@@ -1727,14 +1756,122 @@ worst case (the meter's deadline fallback covers a slow host); whether
 `require_parameters` interacts with the web plugin ((xi)); that § 12's
 160,000-byte budget stays under 64k DeepSeek tokens ((xi)'s `tokens_in`).
 
-**Open for the owner:** (1) Claude's ceiling to $0.286112, or keep
-$0.22992. (2) While the site runs DeepSeek, will outside beta members use
+**Open for the owner:** (1) Claude's ceiling to $0.273112, or keep
+$0.21692 (both with § 14's search term). (2) While the site runs DeepSeek, will outside beta members use
 it? B2 says a model offered to them passes the conduct subset first. The
 recommendation: DeepSeek only while the owner and informed testers are
 the active users, with the menu line in place. (3) The processors change:
 about 20 hosting companies (Together, Fireworks, DeepInfra, …), all
 no-data-kept. The plan's Risks section says to name them in the privacy
 terms. (4) The menu wording "(testing)".
+
+---
+
+## 14. Web search is billed per request (amendment, 2026-09-24)
+
+Owner request (2026-09-24): make the cost estimate match what a web search
+actually bills, and keep the proxy's ceiling consistent with it. Found by
+the architect while drafting § 13. Where this section and an earlier one
+disagree, this one wins; § 4, § 8, § 9.5 and § 13 point here.
+
+**The finding.** Two constants priced the same search two ways, and
+neither was right:
+
+- `estimate-cost.ts` charged $0.004 per search.
+- `core.ts`'s ceiling charged $0.004 per result × 5 results = $0.02 per
+  search.
+
+**What a search bills (two sources, and they agree).**
+
+- **OpenRouter's web-search docs** ("Exa Search Pricing", read
+  2026-09-24): Exa's default mode, Auto, costs **$0.007 per request,
+  including up to 10 results**, then $0.001 per extra result, plus the
+  model's own tokens for the results it reads. The proxy never sets a
+  mode, so Auto applies, and it caps results at 5, so there are never
+  extra results.
+- **The ledger** (`ten_usage_ledger`, all 189 Claude `call` rows, read
+  only, 2026-09-24): each row's `usd` minus its tokens at $2.50/M
+  uncached input (the cache-write price), $0.20/M cached input and $10/M
+  output leaves either $0.0000 (165 agent steps) or exactly **$0.0070**
+  (24 search calls), whatever the result count. The fee is inside
+  `usage.cost`, so the meter already records it. This settles spike 4's
+  "does `usage.cost` include the plugin price" bullet: it does.
+
+So search is billed **per request**: $0.007.
+
+**A second finding: the fee is the small part.** A `web_search` is a
+whole proxy call. The model reads the results (median 3,641 tokens in)
+and writes an answer that the tool throws away (median 1,811 tokens out,
+up to 3,038). Over the 24 calls, one search cost a median **$0.0347**,
+lowest $0.0254, highest **$0.0468**. The $0.007 fee is about a fifth of
+that, so pricing the estimate at the fee alone would still undercount
+about five times.
+
+### 14.1 The estimate (`packages/agent/src/estimate-cost.ts`)
+
+- One search is priced at what a search call bills, measured and dated
+  like the step constants: median **$0.035**, highest **$0.047** (the 24
+  calls above, rounded up).
+- `lowUsd` = `steps` × the step median + `webSearches` × $0.035;
+  `highUsd` = `steps` × the step highest + `webSearches` × $0.047.
+  Before, both used $0.004.
+- The search constants apply with or without the chat's measured steps: a
+  step's measured cost never includes a search, which the tool makes as a
+  separate call.
+- **The spend fallback**, when a search call reports no `usage.cost` (the
+  `web_search` tool, and `createWebSearch`'s `defaultUsd` from the real
+  deps), is the highest, $0.047, so a missing cost never undercounts.
+- These are Claude's numbers. Under § 13, the search call runs on the
+  active model: its token part scales like the step constants, and the
+  $0.007 fee does not (§ 13.3).
+- When more search calls are in the ledger, the median and highest are
+  read again and replace these, with the date.
+
+### 14.2 The ceiling (`supabase/functions/ten-model-proxy/core.ts`)
+
+- The search term is one request, $0.007, not 5 × $0.004: 64,000 × $2/M
+  + 8,192 × $10/M + $0.007 = $0.128 + $0.08192 + $0.007 = **$0.21692,
+  about $0.22** (§ 9.5 had $0.22992).
+- The ceiling drops by $0.013. It is still the meter's fallback charge
+  and the 10× bound. § 13's separate finding (a cache write on a regional
+  host puts Claude's real worst case above this ceiling) is untouched and
+  still open for the owner. With this section, its numbers are $0.273112
+  for Claude and $0.043288 for DeepSeek.
+- `MAX_WEB_RESULTS` stays 5. Past 10 results, each extra one costs $0.001
+  and the search term becomes $0.007 + (n − 10) × $0.001. A comment at
+  the constant says so.
+
+### 14.3 Not taken
+
+- **Pricing a search at the fee alone ($0.007):** it would still
+  undercount about five times (above).
+- **Reading the price from `GET /api/v1/models`** (§ 4's first plan): the
+  plugin fee is not in that list, and the token part depends on how much
+  the model writes.
+- **Cutting the search call's cost**, for example a small `max_tokens` on
+  the search request, since the tool keeps only the annotations. This
+  could save most of the ~$0.028 token part, but it changes the call and
+  needs a live check that annotations still arrive. It is its own change,
+  not this one.
+
+### 14.4 Test plan
+
+- **(i) Estimate, no measured steps:** `{ steps: 0, webSearches: 1 }` →
+  low 0.035, high 0.047; `{ steps: 2, webSearches: 3 }` → low
+  2 × 0.0019 + 3 × 0.035 = 0.1088, high 2 × 0.0025 + 3 × 0.047 = 0.146.
+- **(ii) Estimate, measured steps:** the search part is the same
+  (`webSearches` × 0.035 / × 0.047).
+- **(iii) Spend fallback:** a `web_search` seam that returns no `usd` adds
+  0.047 to the turn's spend; one that returns `usd` adds exactly that.
+- **(iv) Seam:** `createWebSearch` returns `defaultUsd` when the stream
+  has no `usage.cost`, and the real deps pass 0.047.
+- **(v) Ceiling:** `CEILING_USD` = 64,000 × 2e-6 + 8,192 × 1e-5 + 0.007 =
+  0.21692 (1e-9); a meter with no readable cost records 0.21692. Every
+  0.22992 assertion is updated (`core.test.ts`, `handler.test.ts`,
+  `tests/functions/*.test.ts`).
+- **(vi) No stale price:** no `0.004` search price and no
+  `CEILING_SEARCH_USD_PER_RESULT` remain in `packages/`, `apps/web/src/`
+  or `supabase/functions/`.
 
 ---
 
@@ -1757,7 +1894,8 @@ spike replaced (owner, 2026-09-23).
   - one ledger row per call has `usd` equal to `total_cost` from
     `GET /api/v1/generation?id=`;
   - a web-search call's `usage.cost` matches the change in the key's
-    credits (if not, the proxy adds the listed plugin price);
+    credits (if not, the proxy adds the listed plugin price). Settled
+    2026-09-24 from the ledger: it includes the $0.007 fee (§ 14);
   - there is a turn-2 cache read through the proxy;
   - streaming works end to end from the Vercel build.
 
@@ -1819,3 +1957,8 @@ spike replaced (owner, 2026-09-23).
   allows Claude Sonnet 5 and DeepSeek V4.1 Flash; `VITE_COACH_MODEL` picks
   one, unset means Claude, a bad value refuses to start. The ceiling and
   the turn-1 estimate are per model; Claude's request body is unchanged.
+- Fix round 2 of § 10–12 (lead rulings, 09-24): § 9.4 skips an assistant
+  message made only of `data-gate-status` parts, so § 11.6's
+  reconciliation message can't hide a stop; each reconciliation message
+  gets a unique id; § 12.3 (i) uses 22 reads so the trim really fires;
+  the § 11.3/§ 12.1 stub is one shared implementation.

@@ -1,8 +1,8 @@
 // § 4 — estimate_cost is computed by code:
 //   lowUsd/highUsd = steps * the median/highest cost per step so far in
-//   this chat (on turn 1, a dated constant), plus web searches at the
-//   listed plugin price; balanceUsd = deps.balance(); needsGate =
-//   highUsd > spendGateUsd.
+//   this chat (on turn 1, a dated constant), plus webSearches * the
+//   median/highest measured cost of one search call (§ 14);
+//   balanceUsd = deps.balance(); needsGate = highUsd > spendGateUsd.
 
 /**
  * step 4's measured per-step cost (dated 2026-09-23, from
@@ -12,11 +12,15 @@
  */
 export const DEFAULT_STEP_COST_MEDIAN_USD = 0.0019;
 export const DEFAULT_STEP_COST_MAX_USD = 0.0025;
-/** OpenRouter's `web` plugin — no published flat per-call price at
- *  authoring time; treated as a dated placeholder alongside the step
- *  costs above until the real price list (`GET /api/v1/models`, § 4) is
- *  wired into the entry point. Flagged in the coder hand-back. */
-export const DEFAULT_WEB_SEARCH_COST_USD = 0.004;
+/** § 14 (dated 2026-09-24): one web_search is one proxy call, billed as
+ *  Exa's flat $0.007 per request (up to 10 results; the proxy caps at 5)
+ *  PLUS that call's own model tokens — the results read in and the
+ *  answer written out. Measured over the ledger's 24 search calls:
+ *  median $0.0347, highest $0.0468 (the fee alone is about a fifth),
+ *  rounded up. The highest is also the spend fallback when a search
+ *  reports no cost, so a missing cost never undercounts. */
+export const DEFAULT_WEB_SEARCH_COST_MEDIAN_USD = 0.035;
+export const DEFAULT_WEB_SEARCH_COST_MAX_USD = 0.047;
 
 export interface StepCostSample {
   usd: number;
@@ -50,9 +54,8 @@ export function computeCostEstimate(input: CostEstimateInput): CostEstimateResul
     max = sorted[sorted.length - 1];
     method = "measured (this chat's own steps so far)";
   }
-  const webCost = input.webSearches * DEFAULT_WEB_SEARCH_COST_USD;
-  const lowUsd = round(input.steps * median + webCost);
-  const highUsd = round(input.steps * max + webCost);
+  const lowUsd = round(input.steps * median + input.webSearches * DEFAULT_WEB_SEARCH_COST_MEDIAN_USD);
+  const highUsd = round(input.steps * max + input.webSearches * DEFAULT_WEB_SEARCH_COST_MAX_USD);
   return { lowUsd, highUsd, method };
 }
 

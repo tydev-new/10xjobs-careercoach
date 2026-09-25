@@ -5,7 +5,7 @@ import { CardBuilder } from "../cards.ts";
 import { buildGateLine, openGateForChat, roundUpCents, textHashOf } from "../gate.ts";
 import {
   computeCostEstimate,
-  DEFAULT_WEB_SEARCH_COST_USD,
+  DEFAULT_WEB_SEARCH_COST_MAX_USD,
   needsGate as isOverGate,
   type StepCostSample,
 } from "../estimate-cost.ts";
@@ -316,8 +316,9 @@ async function webSearchTool(deps: Deps, ctx: ToolContext, input: WebSearchInput
   const seamOutput = await deps.webSearch({ ...input, maxResults });
   // H2 (fix round 1): web_search's own cost counts toward the turn's
   // spend, same as check_language's — the seam MAY report it; a dated
-  // last-resort default (labelled) stands in when it doesn't.
-  const usd = (seamOutput as any).usd ?? DEFAULT_WEB_SEARCH_COST_USD;
+  // last-resort default (labelled) stands in when it doesn't — the
+  // highest measured search call (§ 14), never an undercount.
+  const usd = (seamOutput as any).usd ?? DEFAULT_WEB_SEARCH_COST_MAX_USD;
   ctx.turnState.spentSoFarUsd += usd;
   return { results: seamOutput.results.slice(0, MAX_WEB_SEARCH_RESULTS) };
 }

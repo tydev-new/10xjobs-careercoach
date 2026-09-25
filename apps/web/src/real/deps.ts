@@ -11,7 +11,7 @@
 // used only for fetch_job's board API calls (§ 4).
 import { createCoach } from "../../../../packages/agent/src/index.ts";
 import type { Deps } from "../../../../packages/agent/src/types.ts";
-import { DEFAULT_WEB_SEARCH_COST_USD } from "../../../../packages/agent/src/estimate-cost.ts";
+import { DEFAULT_WEB_SEARCH_COST_MAX_USD } from "../../../../packages/agent/src/estimate-cost.ts";
 import { createBalanceFn } from "../backend/balance.ts";
 import { createSupabaseGate } from "../backend/gate.ts";
 import { createCoachModel } from "../backend/model.ts";
@@ -56,7 +56,7 @@ export function buildRealDeps(opts: RealDepsOptions): Deps {
   const webSearch = createWebSearch({
     proxyUrl: opts.env.modelProxyUrl,
     getAccessToken: opts.accessToken,
-    defaultUsd: DEFAULT_WEB_SEARCH_COST_USD,
+    defaultUsd: DEFAULT_WEB_SEARCH_COST_MAX_USD,
   });
   const scripts = createRealScriptRunner();
 

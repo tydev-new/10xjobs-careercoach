@@ -1,0 +1,34 @@
+{
+  "$schema_notes": "fixture, mirrors design/library/pairings.json's shape.",
+  "pairings": [
+    {
+      "id": "chat-fraunces-inter",
+      "use": "chat-ui",
+      "heading_font": "Fraunces",
+      "heading_weight": 600,
+      "body_font": "Inter",
+      "body_weight": 400,
+      "mono_font": "JetBrains Mono",
+      "mono_weight": 400,
+      "rationale": "warm serif display over a neutral workhorse body, with mono for code."
+    },
+    {
+      "id": "doc-fraunces-inter",
+      "use": "document-resume",
+      "heading_font": "Fraunces",
+      "heading_weight": 400,
+      "body_font": "Inter",
+      "body_weight": 400,
+      "mono_font": null,
+      "rationale": "restrained resume pairing, no mono needed."
+    },
+    {
+      "id": "marketing-inter-inter",
+      "use": "marketing-sign-in",
+      "heading_font": "Inter",
+      "heading_weight": 700,
+      "body_font": "Inter",
+      "body_weight": 400
+    }
+  ]
+}

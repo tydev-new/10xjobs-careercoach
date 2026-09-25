@@ -1,0 +1,30 @@
+{
+  "$schema_notes": "fixture, mirrors design/library/fonts.json's shape.",
+  "fonts": [
+    {
+      "name": "Inter",
+      "fontsource": "@fontsource-variable/inter",
+      "category": "ui-sans",
+      "license": "OFL-1.1",
+      "weights": [400, 500, 600, 700],
+      "variable": true,
+      "description": "A neutral UI sans.",
+      "avoid_for": "Display headlines."
+    },
+    {
+      "name": "Fraunces",
+      "fontsource": "@fontsource-variable/fraunces",
+      "category": "document-serif",
+      "license": "OFL-1.1",
+      "weights": [300, 400, 600],
+      "variable": true,
+      "description": "A warm display serif.",
+      "avoid_for": "Dense UI chrome."
+    },
+    {
+      "name": "JetBrains Mono",
+      "category": "monospace",
+      "license": "OFL-1.1"
+    }
+  ]
+}

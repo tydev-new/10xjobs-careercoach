@@ -495,9 +495,9 @@ dt("N1: a down ten_balance_for fails closed with 503 model_error, never throws",
 
 dt("N3/§ 9.5 (amended 2026-09-24): the ceiling is computed from the formula (64k in + 8,192 out + one search)", async () => {
   await Promise.resolve(); // pure check; dt() expects an async fn
-  const formula = (64_000 * 2) / 1e6 + (8_192 * 10) / 1e6 + 5 * 0.004;
+  const formula = (64_000 * 2) / 1e6 + (8_192 * 10) / 1e6 + 0.007; // § 14: one search, per request
   assertAlmostEquals(CEILING_USD, formula, 1e-9);
-  assert(CEILING_USD >= 0.22 && CEILING_USD < 0.24, `CEILING_USD ${CEILING_USD} should read "about $0.23"`);
+  assert(CEILING_USD >= 0.21 && CEILING_USD < 0.23, `CEILING_USD ${CEILING_USD} should read "about $0.22"`);
 });
 
 dt("§ 9.6 (amended 2026-09-24): the ledger row carries finish_reason off the metered stream's own last chunk", async () => {

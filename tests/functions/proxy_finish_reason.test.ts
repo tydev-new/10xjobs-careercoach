@@ -1,6 +1,7 @@
 // Tester-owned: docs/design-web-agent.md § 9.5 (the cap and its ceiling)
 // and § 9.6 (recording why each call ended) — § 9.8 items (v) and (vi),
-// amended 2026-09-24 (0d8588a; § 9.6 deadline rule amended at 7c1b1be). Written from the spec.
+// amended 2026-09-24 (0d8588a; § 9.6 deadline rule amended at 7c1b1be;
+// the ceiling's search term amended by § 14 at b4332f9). Written from the spec.
 //
 // Every case runs the DEPLOYED entry (index.ts, via the harness) against
 // the tester's mock Supabase, which refuses an unknown column (PGRST204) and
@@ -17,7 +18,7 @@ import { handleRequest, type ProxyDeps } from "../../supabase/functions/ten-mode
 import { balanceFor, betaSpendToday, envFromDeno, insertLedgerCall, isMember, verifyUser } from "../../supabase/functions/_shared/supabase.ts";
 import { baseBody, callRows, harness, member, preq, PROD_ORIGIN, sse, t, type Harness } from "./_harness.ts";
 
-const FORMULA = 64_000 * 2e-6 + 8_192 * 1e-5 + 5 * 0.004; // § 9.5, = 0.22992
+const FORMULA = 64_000 * 2e-6 + 8_192 * 1e-5 + 0.007; // § 9.5 + § 14 (one search, $0.007 per request), = 0.21692
 
 const line = (o: unknown) => `data: ${JSON.stringify(o)}`;
 const content = (id: string, text: string, finish: unknown = null, extra: Record<string, unknown> = {}) =>
@@ -55,9 +56,9 @@ function assertRowWithKey(rows: any[], inserts: any[], want: string | null, labe
 
 // ------------------------------------------------------------------ (v)
 
-t("(v) MAX_TOKENS_CAP is 8,192 and CEILING_USD = 64,000×2e-6 + 8,192×1e-5 + 5×0.004 = 0.22992", async () => {
+t("(v) MAX_TOKENS_CAP is 8,192 and CEILING_USD = 64,000×2e-6 + 8,192×1e-5 + 0.007 = 0.21692 (§ 9.8 (v) as amended by § 14)", async () => {
   assertEquals(MAX_TOKENS_CAP, 8192);
-  assertAlmostEquals(CEILING_USD, 0.22992, 1e-12);
+  assertAlmostEquals(CEILING_USD, 0.21692, 1e-12);
   assertAlmostEquals(CEILING_USD, FORMULA, 1e-12);
 });
 
@@ -79,10 +80,10 @@ t("(v) clamp through the deployed proxy: 8,192 stays; 8,193, absent and garbage 
   assertEquals(out, { "8192": 8192, "8193": 8192, absent: 8192, "garbage-string": 8192, "garbage-object": 8192, "NaN-as-null": 8192 });
 });
 
-t("(v) a meter with no readable cost records the § 9.5 ceiling, $0.22992", async () => {
+t("(v) a meter with no readable cost records the § 9.5/§ 14 ceiling, $0.21692", async () => {
   const { rows } = await meter([content("gen-nocost", "hi", "stop"), "data: [DONE]"]);
   assertEquals(rows.length, 1);
-  assertAlmostEquals(rows[0].usd, 0.22992, 1e-6);
+  assertAlmostEquals(rows[0].usd, 0.21692, 1e-6);
 });
 
 // ------------------------------------------------------------------ (vi) parse

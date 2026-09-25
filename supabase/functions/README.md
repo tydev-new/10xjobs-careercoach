@@ -7,7 +7,9 @@ Sonnet 5 and DeepSeek V4.1 Flash, each with its own per-call ceiling), § 14
 `ten-paypal`, `ten-paypal-webhook`, § 17.4's amendment to
 `ten-delete-account`, and § 17.10, "Only Ten's own orders" — fix round 2's
 lead ruling on the independent tester's finding F1, the signed `invoice_id`
-and the payee check). Built and tested **locally only** (Deno, mocked
+and the payee check; fix round 3 — owner-approved, § 17.3's zero-fee
+allowance and 15 s timeouts on every PayPal call). Built and tested
+**locally only** (Deno, mocked
 OpenRouter/PayPal and mocked Supabase — see "Tests" below). **Not deployed
 by this change.** The owner runs the commands below when ready; nothing
 here calls the live OpenRouter key, a live PayPal account, or a production
@@ -21,7 +23,7 @@ supabase/functions/
   _shared/
     cors.ts            allowed-origin list + CORS headers (ten-model-proxy, ten-paypal; NOT the webhook, § 17.1)
     supabase.ts         thin fetch client: Auth, PostgREST RPC/table, Storage API
-    paypal.ts            thin PayPal REST client: OAuth token, Orders v2, Payments v2 capture, webhook verify (§ 17)
+    paypal.ts            thin PayPal REST client: OAuth token, Orders v2, Payments v2 capture, webhook verify (§ 17); every call carries a 15 s AbortSignal.timeout (fix round 3)
     paypal-packs.ts       pure: the server-side pack table ($10/$20/$40), the ten:<uid> custom_id shape, breakdownIsSane (§ 17.1/17.3, F4/F5/F6/F9)
     paypal-invoice.ts      pure: § 17.10's signed invoice_id — buildInvoiceId, the ONE shared checkTenOrder (custom_id, amount, payee, HMAC tag)
     test-support.ts     TEST ONLY — local stub OpenRouter + local stub Supabase + local stub PayPal
@@ -55,15 +57,16 @@ is testable with `deno test` and no network to a real project. Only
 deno test --allow-net supabase/functions/
 ```
 
-Current result (§ 17.10 "Only Ten's own orders", fix round 2, run 2026-09-25):
+Current result (fix round 3 — R2-1's zero-fee fix, PayPal call timeouts —
+run 2026-09-25):
 
 ```
 running 6 tests from ./supabase/functions/_shared/paypal-invoice.test.ts
 ... (6 passed)
 running 6 tests from ./supabase/functions/_shared/paypal-packs.test.ts
 ... (6 passed)
-running 11 tests from ./supabase/functions/_shared/paypal.test.ts
-... (11 passed)
+running 17 tests from ./supabase/functions/_shared/paypal.test.ts
+... (17 passed)
 running 12 tests from ./supabase/functions/ten-delete-account/handler.test.ts
 ... (12 passed)
 running 49 tests from ./supabase/functions/ten-model-proxy/core.test.ts
@@ -77,7 +80,7 @@ running 24 tests from ./supabase/functions/ten-paypal/handler.test.ts
 running 28 tests from ./supabase/functions/ten-paypal-webhook/handler.test.ts
 ... (28 passed)
 
-ok | 188 passed | 0 failed
+ok | 194 passed | 0 failed
 ```
 
 The new coverage (§ 17.8/§ 17.10's test plan, the parts this build owns —
@@ -97,9 +100,20 @@ all credit the SAME `paypal:<captureId>` row exactly once; `ORDER_NOT_APPROVED`
 unknown capture-call answer → 503 `unconfirmed` (§ 17.10 — never
 `"declined"`); `DECLINED`/`FAILED` → `"declined"`; a breakdown that doesn't
 add up (non-USD on any one of gross/fee/net, off by a cent, not two
-decimals, not `> 0`) → no row, an `ALERT` log line, `503
-paid_not_credited`; the outgoing create-order body never mentions
-vault/saved/agreement/plan/shipping. The webhook: a missing signature
+decimals, gross or net not `> 0`) → no row, an `ALERT` log line, `503
+paid_not_credited` — but a genuine **zero fee** (gross 10.00, fee 0.00, net
+10.00: R2-1, fix round 3) IS credited, never refused as "insane" (§ 17.3
+only requires `fee_usd >= 0`; the independent tester's own
+`tests/functions/paypal_r2.test.ts` pins this); the outgoing create-order
+body never mentions vault/saved/agreement/plan/shipping. Every PayPal call
+(OAuth, create/get/capture order, get capture, verify-webhook-signature)
+carries a 15 s `AbortSignal.timeout` (fix round 3, owner-approved): a
+timed-out capture is the SAME "unconfirmed" outcome as any other transport
+failure, never `"declined"`; a timed-out verify-webhook-signature or a
+timed-out order/capture read in the webhook both 503 (PayPal retries) —
+`_shared/paypal.test.ts` proves each of the six calls actually times out
+against a mock that never answers, using a short `PayPalConfig.timeoutMs`
+override so the tests themselves stay fast. The webhook: a missing signature
 header (any of the five) → 401, verify never called (F8); a bad signature
 → 401; the verify call failing OR `TEN_PAYPAL_WEBHOOK_ID` unset → 503, no
 row, no PayPal HTTP call for the unset case; a non-capture event type, a
@@ -365,9 +379,13 @@ capturing again; `ORDER_NOT_APPROVED` → `{ status: "window_closed" }`
 any OTHER capture-call error (5xx, timeout, unrecognized) → `503
 unconfirmed`, NEVER `"declined"` — PayPal may already have captured the
 money and just failed to answer (§ 17.10 "Errors"; the webhook is the
-backup either way). A `COMPLETED` capture with a breakdown that checks out
-(gross/fee/net all present, USD, exactly two decimals, each `> 0`, net =
-gross − fee in whole cents, gross a known pack amount — `breakdownIsSane`)
+backup either way). A timed-out capture call (fix round 3: every PayPal
+call carries a 15 s `AbortSignal.timeout`) is folded into this SAME
+`unconfirmed` outcome, not a separate case. A `COMPLETED` capture with a
+breakdown that checks out (gross/fee/net all present, USD, exactly two
+decimals, gross and net `> 0`, fee `>= 0` — R2-1, fix round 3: a genuine
+zero fee is sane, not refused — net = gross − fee in whole cents, gross a
+known pack amount — `breakdownIsSane`)
 credits ONE `ten_usage_ledger` `'credit'` row, `request_id
 'paypal:<captureId>'` (unique — a replay or a race with the webhook credits
 once), `usd` = PayPal's own `net_amount`, `gross_usd`/`fee_usd` from
@@ -435,3 +453,27 @@ compare is constant-time; `T`'s age is never checked (a pending payment can
 clear days later); rotating `TEN_PAYPAL_CLIENT_SECRET` breaks the tags of
 payments not yet credited — rotate when none is pending, or credit those by
 hand.
+
+### Fix round 3 (owner-approved, 2026-09-25)
+
+1. **R2-1** (independent tester's finding): `breakdownIsSane`
+   (`_shared/paypal-packs.ts`) wrongly refused a genuine `fee_usd = 0`
+   capture — § 17.3 only ever required `fee_usd >= 0`, and § 17.10 only
+   requires `net == gross - fee`; nothing requires a POSITIVE fee. Fixed:
+   gross and net must still be `> 0`, but fee may be exactly `0.00` and is
+   credited. Pinned by the independent tester's
+   `tests/functions/paypal_r2.test.ts` ("a $0 fee that adds up ... is
+   credited") and this build's own `_shared/paypal-packs.test.ts`.
+2. **Timeouts**: every fetch in `_shared/paypal.ts` (the OAuth token call
+   included) now carries `AbortSignal.timeout(15_000)` via a new
+   `PayPalConfig.timeoutMs` field (defaults to 15 s in production; tests
+   override it to a few ms against a mock that never answers, so the
+   suite stays fast). A timed-out `captureOrder` throws exactly like any
+   other transport failure, so `ten-paypal/handler.ts` already maps it to
+   `503 unconfirmed` — never `"declined"` — with no handler-side code
+   change needed; a timed-out `verifyWebhookSignature` already returns
+   `{ ok: false }` (its own try/catch), which the webhook already maps to
+   `503`; a timed-out order/capture read in the webhook already lands in
+   its existing "any OTHER failure → 503" branch (no `.status` on an
+   abort error, so it never matches the `404`-only "ignored" case). See
+   `_shared/paypal.test.ts`'s six new timeout tests.

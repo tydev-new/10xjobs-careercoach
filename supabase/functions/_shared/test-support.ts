@@ -413,6 +413,13 @@ export interface MockPaypalState {
    *  every route below; the OAuth token endpoint is still reachable so a
    *  test can target exactly one downstream call. */
   fail: Record<string, number>;
+  /** path-substring -> never respond at all (fix round 3, owner-approved
+   *  timeouts): the mock server holds the connection open forever, so a
+   *  test can prove `_shared/paypal.ts`'s own `AbortSignal.timeout(...)`
+   *  is what ends the call, not a mocked error response. Pair with a
+   *  short `PayPalConfig.timeoutMs` in the test's own config — never the
+   *  real 15 s default — so these tests stay fast. */
+  hang: Record<string, boolean>;
   /** Controls POST /v1/notifications/verify-webhook-signature:
    *  "SUCCESS"/"FAILURE" answer 200 with that verification_status;
    *  "unavailable" answers 500 (the call itself failing, § 17.1 step 5). */
@@ -438,6 +445,7 @@ export function freshPaypalState(overrides: Partial<MockPaypalState> = {}): Mock
     captureRequestIdsSeen: [],
     oauthFails: false,
     fail: {},
+    hang: {},
     verifyWebhookOutcome: "SUCCESS",
     verifyWebhookRequests: [],
     defaultMerchantId: MOCK_TEN_MERCHANT_ID,
@@ -516,6 +524,21 @@ function buildCaptureFor(order: MockPaypalOrder): MockPaypalCapture {
 export async function startMockPaypal(state: MockPaypalState): Promise<MockServer> {
   return await serve(async (req) => {
     const url = new URL(req.url);
+    for (const [k, on] of Object.entries(state.hang)) {
+      if (on && url.pathname.includes(k)) {
+        // Return a Response whose BODY never finishes, same shape as
+        // startMockOpenRouter's own `hang` option above — the handler's
+        // own promise resolves right away (so a graceful server.shutdown()
+        // in a test's `finally` never blocks on this), but nothing is ever
+        // written to the stream, so the CALLER's own AbortSignal.timeout
+        // (fix round 3) is what ends the call, not the mock. Awaiting
+        // `new Promise(() => {})` here directly (before returning a
+        // Response at all) would instead hang the handler's own promise
+        // and deadlock `server.shutdown()` — this must stay a stream.
+        const stream = new ReadableStream<Uint8Array>({ start() {} });
+        return new Response(stream, { status: 200 });
+      }
+    }
     for (const [k, status] of Object.entries(state.fail)) {
       if (url.pathname.includes(k)) return Response.json({ name: "INTERNAL_SERVICE_ERROR" }, { status });
     }

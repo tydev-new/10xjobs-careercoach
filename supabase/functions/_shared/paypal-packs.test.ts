@@ -54,7 +54,7 @@ Deno.test("packForAmount: the reverse of packAmountUsd", () => {
 
 const OK = { grossUsd: "10.00", feeUsd: "0.84", netUsd: "9.16", currencyCode: "USD" };
 
-Deno.test("F4: breakdownIsSane — net = gross - fee in whole cents, each positive, two decimals, gross a pack, all USD", () => {
+Deno.test("F4/R2-1 (fix round 3): breakdownIsSane — net = gross - fee in whole cents, gross/net POSITIVE, fee >= 0 (§ 17.3), two decimals, gross a pack, all USD", () => {
   assert(breakdownIsSane(OK));
   assertFalse(breakdownIsSane({ ...OK, netUsd: "9.17" }), "net off by a cent");
   assertFalse(breakdownIsSane({ ...OK, currencyCode: "EUR" }), "not USD");
@@ -63,7 +63,19 @@ Deno.test("F4: breakdownIsSane — net = gross - fee in whole cents, each positi
   assertFalse(breakdownIsSane({ ...OK, feeUsd: null }), "missing fee");
   assertFalse(breakdownIsSane({ ...OK, netUsd: null }), "missing net");
   assertFalse(breakdownIsSane({ ...OK, feeUsd: "0" }), "not exactly two decimals");
-  assertFalse(breakdownIsSane({ ...OK, feeUsd: "0.00", netUsd: "10.00" }), "a zero fee is not > 0 (F4: each value > 0)");
-  assertFalse(breakdownIsSane({ ...OK, grossUsd: "0.00", feeUsd: "-0.84", netUsd: "0.84" }), "a negative fee");
+  // R2-1 (fix round 3): the independent tester's finding — § 17.3 allows
+  // `fee_usd >= 0` and § 17.10 only requires `net == gross - fee`; a
+  // genuine $0-fee capture (gross 10.00, fee 0.00, net 10.00) must be
+  // CREDITED, not refused as "insane". This was the opposite assertion
+  // before the fix (asserted False); flipped here to match the corrected
+  // behavior, verified against the migration's own check in
+  // tests/sql/r8-paypal.mjs and the independent tester's
+  // tests/functions/paypal_r2.test.ts.
+  assert(breakdownIsSane({ ...OK, feeUsd: "0.00", netUsd: "10.00" }), "a zero fee IS sane (§ 17.3: fee_usd >= 0)");
+  assertFalse(breakdownIsSane({ ...OK, grossUsd: "0.00", feeUsd: "-0.84", netUsd: "0.84" }), "a negative fee (and a zero gross)");
+  // A negative fee alone (gross/net still valid) — isolates the `fee < 0`
+  // branch from the "zero gross" branch the case above also trips.
+  assertFalse(breakdownIsSane({ grossUsd: "10.00", feeUsd: "-0.84", netUsd: "10.84", currencyCode: "USD" }), "a negative fee, gross/net otherwise fine");
   assertFalse(breakdownIsSane({ ...OK, netUsd: "0.00", grossUsd: "0.84", feeUsd: "0.84" }), "a zero net is not > 0");
+  assertFalse(breakdownIsSane({ ...OK, grossUsd: "0.00", feeUsd: "0.00", netUsd: "0.00" }), "a zero gross is not > 0, even with a zero fee");
 });

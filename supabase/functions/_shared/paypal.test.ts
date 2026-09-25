@@ -14,10 +14,10 @@ import {
 } from "./paypal.ts";
 import { freshPaypalState, startMockPaypal, type MockPaypalState, type MockServer } from "./test-support.ts";
 
-async function harness(): Promise<{ paypal: MockServer; state: MockPaypalState; config: PayPalConfig; stop(): Promise<void> }> {
+async function harness(opts: { timeoutMs?: number } = {}): Promise<{ paypal: MockServer; state: MockPaypalState; config: PayPalConfig; stop(): Promise<void> }> {
   const state = freshPaypalState();
   const paypal = await startMockPaypal(state);
-  const config: PayPalConfig = { apiBase: paypal.url, clientId: "cid", clientSecret: "secret" };
+  const config: PayPalConfig = { apiBase: paypal.url, clientId: "cid", clientSecret: "secret", timeoutMs: opts.timeoutMs };
   return { paypal, state, config, stop: () => paypal.stop() };
 }
 
@@ -212,6 +212,90 @@ Deno.test("verifyWebhookSignature: the call itself failing -> ok:false, never th
     h.state.verifyWebhookOutcome = "unavailable";
     const token = await getAccessToken(h.config);
     const outcome = await verifyWebhookSignature(h.config, token, "wh-1", HEADERS, {});
+    assertEquals(outcome, { ok: false });
+  } finally {
+    await h.stop();
+  }
+});
+
+// ------------------------------------------------------- timeouts (fix round 3) ---
+// Owner-approved: every fetch here carries an AbortSignal.timeout (15 s in
+// production, PayPalConfig.timeoutMs below). A mock endpoint that NEVER
+// answers (state.hang) proves the timeout itself is what ends the call —
+// the config's timeoutMs is set to a few ms so these stay fast, never the
+// real 15 s default.
+const SHORT_TIMEOUT_MS = 30;
+
+Deno.test("getAccessToken: a timed-out OAuth call throws (never hangs)", async () => {
+  const h = await harness({ timeoutMs: SHORT_TIMEOUT_MS });
+  try {
+    h.state.hang["/v1/oauth2/token"] = true;
+    await assertRejects(() => getAccessToken(h.config));
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("createOrder: a timed-out call throws (never hangs)", async () => {
+  const h = await harness();
+  try {
+    const token = await getAccessToken(h.config);
+    h.state.hang["/v2/checkout/orders"] = true;
+    // Only createOrder itself gets the short timeout — getAccessToken
+    // above already succeeded on the un-hung default config.
+    const shortConfig: PayPalConfig = { ...h.config, timeoutMs: SHORT_TIMEOUT_MS };
+    await assertRejects(() => createOrder(shortConfig, token, { amountUsd: "10.00", customId: "ten:u1", invoiceId: "i1", description: "d" }));
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("getOrder: a timed-out call throws (never hangs) — capture-order's pre-read and the webhook's payee re-fetch both rely on this", async () => {
+  const h = await harness();
+  try {
+    const token = await getAccessToken(h.config);
+    const { orderId } = await createOrder(h.config, token, { amountUsd: "10.00", customId: "ten:u1", invoiceId: "i1", description: "d" });
+    h.state.hang["/v2/checkout/orders/"] = true;
+    const shortConfig: PayPalConfig = { ...h.config, timeoutMs: SHORT_TIMEOUT_MS };
+    await assertRejects(() => getOrder(shortConfig, token, orderId));
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("captureOrder: a timed-out capture call throws — the caller (handler.ts) already maps ANY throw here to 503 unconfirmed, never 'declined'", async () => {
+  const h = await harness();
+  try {
+    const token = await getAccessToken(h.config);
+    const { orderId } = await createOrder(h.config, token, { amountUsd: "10.00", customId: "ten:u1", invoiceId: "i1", description: "d" });
+    h.state.hang["/capture"] = true;
+    const shortConfig: PayPalConfig = { ...h.config, timeoutMs: SHORT_TIMEOUT_MS };
+    await assertRejects(() => captureOrder(shortConfig, token, orderId, "req-timeout"));
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("getCapture: a timed-out re-fetch throws (never hangs) — the webhook's own capture re-fetch relies on this", async () => {
+  const h = await harness();
+  try {
+    h.state.captures["cap-x"] = { id: "cap-x", customId: "ten:u1", currencyCode: "USD", status: "COMPLETED", grossUsd: "10.00", feeUsd: "0.84", netUsd: "9.16" };
+    const token = await getAccessToken(h.config);
+    h.state.hang["/v2/payments/captures/"] = true;
+    const shortConfig: PayPalConfig = { ...h.config, timeoutMs: SHORT_TIMEOUT_MS };
+    await assertRejects(() => getCapture(shortConfig, token, "cap-x"));
+  } finally {
+    await h.stop();
+  }
+});
+
+Deno.test("verifyWebhookSignature: a timed-out verify call -> ok:false (never throws), same as any other transport failure -> the caller's own 503 so PayPal retries", async () => {
+  const h = await harness();
+  try {
+    const token = await getAccessToken(h.config);
+    h.state.hang["/v1/notifications/verify-webhook-signature"] = true;
+    const shortConfig: PayPalConfig = { ...h.config, timeoutMs: SHORT_TIMEOUT_MS };
+    const outcome = await verifyWebhookSignature(shortConfig, token, "wh-1", HEADERS, {});
     assertEquals(outcome, { ok: false });
   } finally {
     await h.stop();

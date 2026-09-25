@@ -78,39 +78,46 @@ export interface BreakdownLike {
   currencyCode: string;
 }
 
-// F4 (fix round 2): a positive, exactly-two-decimal-place USD string —
-// "10.00" but not "10", "10.0", "10.001" or a negative/zero value. Values
-// coming from `_shared/paypal.ts`'s `captureInfoFrom` are already `null`
-// unless each breakdown LINE's own `currency_code` was independently "USD"
-// (F5) — this only re-checks shape and sign, never re-derives currency.
-const TWO_DECIMAL_POSITIVE = /^\d+\.\d{2}$/;
+// F4 (fix round 2), fixed round 3 (R2-1): an exactly-two-decimal-place USD
+// string — "10.00" but not "10", "10.0", "10.001" or negative — allowing
+// "0.00" too, since only gross/net are required POSITIVE below (fee may
+// legitimately be zero, e.g. a promotional no-fee capture). Values coming
+// from `_shared/paypal.ts`'s `captureInfoFrom` are already `null` unless
+// each breakdown LINE's own `currency_code` was independently "USD" (F5)
+// — this only re-checks shape and sign, never re-derives currency.
+const TWO_DECIMAL_NONNEGATIVE = /^\d+\.\d{2}$/;
 
 function centsOf(v: string): number {
   return Math.round(Number(v) * 100);
 }
 
-/** F4 (fix round 2): true only when gross/fee/net are each present, a
- * positive two-decimal USD string, on a known pack's gross amount, with
- * net = gross − fee EXACTLY (computed in integer cents, never float —
- * mirrors the migration's own `ten_usage_ledger_paypal_breakdown` check,
- * so a capture that would violate the DB constraint is caught here first,
- * before the insert, with its own ALERT log line rather than a raw 400
- * bubbling up as "paid_not_credited" with no diagnosis). */
+/** F4 (fix round 2), fixed round 3 (R2-1 — an actual `fee_usd = 0` capture
+ * was wrongly refused as insane): true only when gross/fee/net are each
+ * present, a two-decimal USD string, gross and net POSITIVE (fee may be
+ * exactly zero — § 17.3: "fee_usd >= 0"), gross on a known pack's amount,
+ * with net = gross − fee EXACTLY (computed in integer cents, never float —
+ * this now actually mirrors the migration's own
+ * `ten_usage_ledger_paypal_breakdown` check, `fee_usd >= 0 and usd > 0 and
+ * usd = gross_usd - fee_usd`, so a capture that would violate the DB
+ * constraint is caught here first, before the insert, with its own ALERT
+ * log line rather than a raw 400 bubbling up as "paid_not_credited" with
+ * no diagnosis — and a capture the DB WOULD accept is no longer refused
+ * here first). */
 export function breakdownIsSane<T extends BreakdownLike>(
   b: T,
 ): b is T & { grossUsd: string; feeUsd: string; netUsd: string } {
   if (typeof b.grossUsd !== "string" || typeof b.feeUsd !== "string" || typeof b.netUsd !== "string") return false;
   if (
-    !TWO_DECIMAL_POSITIVE.test(b.grossUsd) ||
-    !TWO_DECIMAL_POSITIVE.test(b.feeUsd) ||
-    !TWO_DECIMAL_POSITIVE.test(b.netUsd)
+    !TWO_DECIMAL_NONNEGATIVE.test(b.grossUsd) ||
+    !TWO_DECIMAL_NONNEGATIVE.test(b.feeUsd) ||
+    !TWO_DECIMAL_NONNEGATIVE.test(b.netUsd)
   ) {
     return false;
   }
   const gross = centsOf(b.grossUsd);
   const fee = centsOf(b.feeUsd);
   const net = centsOf(b.netUsd);
-  if (gross <= 0 || fee <= 0 || net <= 0) return false;
+  if (gross <= 0 || fee < 0 || net <= 0) return false;
   if (gross - fee !== net) return false;
   return isPackAmount(b.grossUsd, b.currencyCode);
 }

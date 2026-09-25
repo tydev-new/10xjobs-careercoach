@@ -25,6 +25,19 @@ export interface PayPalConfig {
   apiBase: string;
   clientId: string;
   clientSecret: string;
+  /** Fix round 3 (owner-approved timeouts): every PayPal call below
+   *  (OAuth included) carries this as an `AbortSignal.timeout(...)`, so a
+   *  PayPal host that never answers can't hang an Edge Function
+   *  invocation forever. Defaults to 15 000 ms in production (index.ts
+   *  never sets this); tests override it to a few ms so a
+   *  never-answers-at-all mock stays fast. */
+  timeoutMs?: number;
+}
+
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+function timeoutSignal(config: PayPalConfig): AbortSignal {
+  return AbortSignal.timeout(config.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 }
 
 /** POST /v1/oauth2/token (client_credentials). Throws on any failure — the
@@ -41,6 +54,7 @@ export async function getAccessToken(
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: "grant_type=client_credentials",
+    signal: timeoutSignal(config),
   });
   if (!res.ok) {
     await res.body?.cancel().catch(() => {});
@@ -91,6 +105,7 @@ export async function createOrder(
         },
       ],
     }),
+    signal: timeoutSignal(config),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -202,6 +217,7 @@ export async function getOrder(
   const res = await fetchImpl(`${config.apiBase}/v2/checkout/orders/${encodeURIComponent(orderId)}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: timeoutSignal(config),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -262,6 +278,7 @@ export async function captureOrder(
       "PayPal-Request-Id": requestId,
     },
     body: "{}",
+    signal: timeoutSignal(config),
   });
   const body = await res.json().catch(() => undefined);
   if (res.status === 200 || res.status === 201) {
@@ -290,6 +307,7 @@ export async function getCapture(
   const res = await fetchImpl(`${config.apiBase}/v2/payments/captures/${encodeURIComponent(captureId)}`, {
     method: "GET",
     headers: { Authorization: `Bearer ${accessToken}` },
+    signal: timeoutSignal(config),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -342,6 +360,7 @@ export async function verifyWebhookSignature(
         webhook_id: webhookId,
         webhook_event: event,
       }),
+      signal: timeoutSignal(config),
     });
     if (!res.ok) {
       await res.body?.cancel().catch(() => {});

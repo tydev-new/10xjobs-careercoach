@@ -107,12 +107,21 @@ export interface CaptureInfo {
   captureId: string;
   status: string; // "COMPLETED" | "PENDING" | "DECLINED" | ...
   customId: string;
+  /** The capture's OWN `amount.value` (not the breakdown's gross_amount —
+   *  § 17.10's shared check reads this field, the same one an order's
+   *  `amountValue` is, so one function can check either resource). */
+  amountValue: string;
   currencyCode: string;
-  /** § 17.1 step 2/F1 (fix round 2) — the SAME invoice_id create-order set
-   *  on the order; captures inherit their order's own invoice_id. Read here
-   *  so capture-order/the webhook can re-verify F1's HMAC tag from the
-   *  resource itself, before ever crediting. */
+  /** § 17.1 step 2/§ 17.10 (fix round 2) — the SAME invoice_id create-order
+   *  set on the order; captures inherit their order's own invoice_id. Read
+   *  here so capture-order/the webhook can re-verify § 17.10's HMAC tag
+   *  from the resource itself, before ever crediting. */
   invoiceId: string;
+  /** `supplementary_data.related_ids.order_id` — the order this capture
+   *  came from. The webhook (fix round 2, the payee closure of § 17.10's
+   *  "Open for the lead") reads this order to apply the same payee check
+   *  capture-order applies on the order it already had. */
+  orderId: string;
   /** PayPal's own decimal strings from `seller_receivable_breakdown`, or
    *  `null` when the breakdown isn't there yet (e.g. status PENDING —
    *  § 17.1 step 4: "no fee breakdown until it clears") OR when that
@@ -149,8 +158,10 @@ function captureInfoFrom(capture: any): CaptureInfo {
     captureId: String(capture.id ?? ""),
     status: String(capture.status ?? ""),
     customId: String(capture.custom_id ?? ""),
+    amountValue: String(capture.amount?.value ?? ""),
     currencyCode: String(capture.amount?.currency_code ?? ""),
     invoiceId: String(capture.invoice_id ?? ""),
+    orderId: String(capture.supplementary_data?.related_ids?.order_id ?? ""),
     grossUsd: usdStringValue(breakdown?.gross_amount),
     feeUsd: usdStringValue(breakdown?.paypal_fee),
     netUsd: usdStringValue(breakdown?.net_amount),
@@ -163,16 +174,25 @@ export interface OrderInfo {
   customId: string;
   amountValue: string;
   currencyCode: string;
-  /** § 17.1 step 2/F1 — the invoice_id create-order set on this order;
-   *  capture-order re-verifies F1's HMAC tag against it before capturing. */
+  /** § 17.1 step 2/§ 17.10 — the invoice_id create-order set on this order;
+   *  capture-order re-verifies § 17.10's HMAC tag against it before capturing. */
   invoiceId: string;
+  /** `purchase_units[0].payee.merchant_id` — § 17.10's payee closure: the
+   *  check also requires this to be Ten's own `TEN_PAYPAL_MERCHANT_ID`, so
+   *  a member can't mint a valid tag through create-order and then build
+   *  their own order (same invoice_id/custom_id/amount) naming another
+   *  merchant as payee. `""` when PayPal's response carries none. */
+  payeeMerchantId: string;
   /** Present once the order has been captured — read here so
    *  ORDER_ALREADY_CAPTURED can be resolved with one more GET, not a
    *  second capture call (§ 17.1 step 4). */
   capture?: CaptureInfo;
 }
 
-/** GET /v2/checkout/orders/{id}. Throws on any failure. */
+/** GET /v2/checkout/orders/{id}. Throws on any failure; the thrown Error
+ * carries a `status` property (F7/§ 17.10, fix round 2), same as
+ * `getCapture` below, so the webhook's own order-behind-a-capture re-fetch
+ * (the payee check) can tell a 404 from every other failure the same way. */
 export async function getOrder(
   config: PayPalConfig,
   accessToken: string,
@@ -185,7 +205,9 @@ export async function getOrder(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`paypal get order failed: ${res.status} ${text}`);
+    const err = new Error(`paypal get order failed: ${res.status} ${text}`);
+    Object.assign(err, { status: res.status });
+    throw err;
   }
   const body = await res.json();
   return {
@@ -195,6 +217,7 @@ export async function getOrder(
     amountValue: String(body?.purchase_units?.[0]?.amount?.value ?? ""),
     currencyCode: String(body?.purchase_units?.[0]?.amount?.currency_code ?? ""),
     invoiceId: String(body?.purchase_units?.[0]?.invoice_id ?? ""),
+    payeeMerchantId: String(body?.purchase_units?.[0]?.payee?.merchant_id ?? ""),
     capture: extractCaptureFromOrderBody(body),
   };
 }

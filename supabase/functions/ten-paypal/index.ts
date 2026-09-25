@@ -5,7 +5,7 @@
 
 import { handleRequest, type PaypalDeps } from "./handler.ts";
 import { captureOrder, createOrder, getAccessToken, getOrder, type PayPalConfig } from "../_shared/paypal.ts";
-import { buildInvoiceId, verifyInvoiceId } from "../_shared/paypal-invoice.ts";
+import { buildInvoiceId, checkTenOrder } from "../_shared/paypal-invoice.ts";
 import { envFromDeno, insertLedgerCredit, isMember, verifyUser } from "../_shared/supabase.ts";
 
 const env = envFromDeno((name) => Deno.env.get(name));
@@ -26,6 +26,13 @@ if (!ALLOWED_API_BASES.includes(paypalConfig.apiBase)) {
 if (!paypalConfig.clientId || !paypalConfig.clientSecret) {
   throw new Error("ten-paypal: TEN_PAYPAL_CLIENT_ID/TEN_PAYPAL_CLIENT_SECRET must both be set");
 }
+// § 17.10's payee closure (lead ruling, 2026-09-25): a non-secret setting,
+// read like the others. "The setting unset -> refuse, never skip: ...
+// answer 503 before calling PayPal" — a per-REQUEST refusal in
+// handler.ts (`deps.merchantConfigured`), not a boot-time crash: the
+// function still starts (and stays up for the OTHER Edge Functions on the
+// same project) even if the owner hasn't set this yet.
+const merchantId = Deno.env.get("TEN_PAYPAL_MERCHANT_ID") ?? "";
 
 const deps: PaypalDeps = {
   verifyUser: (token) => verifyUser(env, token),
@@ -43,10 +50,12 @@ const deps: PaypalDeps = {
     return captureOrder(paypalConfig, accessToken, orderId, requestId);
   },
   insertLedgerCredit: (row) => insertLedgerCredit(env, row),
-  // F1 (fix round 2): the client secret never leaves this closure — handler.ts
-  // only ever sees these two functions, never the raw string.
+  // § 17.10 (fix round 2): the client secret and the merchant id never
+  // leave this closure — handler.ts only ever sees these two functions,
+  // never the raw values.
   signInvoiceId: (uid, pack, amountUsd) => buildInvoiceId(paypalConfig.clientSecret, uid, pack, amountUsd),
-  verifyInvoiceId: (invoiceId, uid, pack, amountUsd) => verifyInvoiceId(paypalConfig.clientSecret, invoiceId, uid, pack, amountUsd),
+  checkTenOrder: (input) => checkTenOrder(paypalConfig.clientSecret, merchantId, input),
+  merchantConfigured: merchantId.length > 0,
   log: { warn: (e) => console.warn(e), error: (e) => console.error(e) },
 };
 

@@ -61,27 +61,32 @@ alter table public.ten_usage_ledger
   add column gross_usd numeric(12,2),
   add column fee_usd numeric(12,2);
 
--- § 17.3's check, word for word: "gross_usd and fee_usd are set exactly
--- when request_id starts with 'paypal:', and then kind = 'credit',
+-- § 17.3's check, word for word (fixed round 2, F9 — a genuine TWO-WAY
+-- check, not just "a paypal: row without gross/fee is refused"): "a
+-- paypal: row without gross_usd and fee_usd is refused, AND SO IS EITHER
+-- COLUMN ON ANY OTHER ROW; a paypal: row also needs kind = 'credit',
 -- fee_usd >= 0, usd > 0, usd = gross_usd - fee_usd, so a breakdown that
 -- doesn't add up is refused." A `paypal-refund:` row (kind 'refund', §
--- 17.5) is deliberately OUTSIDE this constraint's "starts with paypal:"
--- test below — it uses a different prefix, `paypal-refund:`, so it never
--- has to carry a breakdown.
+-- 17.5) does NOT start with 'paypal:' (it starts with the different,
+-- longer prefix `paypal-refund:`), so it is bound by the SAME "gross/fee
+-- must be null" side of this check as any other non-paypal: row — it may
+-- never carry a breakdown either.
+--
+-- Written with `coalesce(... like ..., false)` throughout, not a bare
+-- `request_id like 'paypal:%'`: Postgres's three-valued logic makes a bare
+-- `NULL like 'paypal:%'` evaluate to NULL, and a CHECK constraint only
+-- REJECTS an explicit FALSE — a NULL result is silently treated as passing.
+-- A row with `request_id is null` would then slip a stray gross_usd/fee_usd
+-- straight past a check written with the bare comparison; wrapping it in
+-- `coalesce(..., false)` forces that case to an explicit FALSE so the "set
+-- EXACTLY when paypal:" reverse direction is actually enforced.
 alter table public.ten_usage_ledger
   add constraint ten_usage_ledger_paypal_breakdown check (
-    (
-      request_id like 'paypal:%'
-      and gross_usd is not null
-      and fee_usd is not null
-      and kind = 'credit'
-      and fee_usd >= 0
-      and usd > 0
-      and usd = gross_usd - fee_usd
-    )
-    or (
-      request_id is null
-      or request_id not like 'paypal:%'
+    coalesce(request_id like 'paypal:%', false) = (gross_usd is not null)
+    and coalesce(request_id like 'paypal:%', false) = (fee_usd is not null)
+    and (
+      not coalesce(request_id like 'paypal:%', false)
+      or (kind = 'credit' and fee_usd >= 0 and usd > 0 and usd = gross_usd - fee_usd)
     )
   );
 

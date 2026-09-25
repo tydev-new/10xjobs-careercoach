@@ -118,6 +118,12 @@ export interface MockSupabaseState {
   deletedRows: Record<string, string[]>; // table -> deleted user ids (for assertions)
   anonKey: string;
   serviceRoleKey: string;
+  /** Consumed one at a time by the NEXT `ten_usage_ledger` POST (§ 17.8
+   *  test "a failed credit write"): "fail" answers 503, nothing written;
+   *  "commit-then-fail" writes the row but still answers 503 (a lost ack —
+   *  a retry then sees its own row as a 409 duplicate). Unset/empty means
+   *  every insert just succeeds normally. */
+  ledgerInsertPlan: Array<"fail" | "commit-then-fail">;
 }
 
 export function freshState(overrides: Partial<MockSupabaseState> = {}): MockSupabaseState {
@@ -134,6 +140,7 @@ export function freshState(overrides: Partial<MockSupabaseState> = {}): MockSupa
     deletedRows: {},
     anonKey: "test-anon-key",
     serviceRoleKey: "test-service-role-key",
+    ledgerInsertPlan: [],
     ...overrides,
   };
 }
@@ -196,6 +203,10 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
     // string (PostgREST casts text to numeric), same as the real column.
     if (url.pathname === "/rest/v1/ten_usage_ledger" && req.method === "POST") {
       if (token !== state.serviceRoleKey) return new Response("forbidden", { status: 403 });
+      const step = state.ledgerInsertPlan.shift();
+      if (step === "fail") {
+        return new Response(JSON.stringify({ code: "XX000", message: "injected: ledger insert failed, nothing written" }), { status: 503 });
+      }
       const row = await req.json().catch(() => ({}));
       const rid = row?.request_id as string | undefined;
       if (rid && state.ledgerRequestIds.has(rid)) {
@@ -208,12 +219,22 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
       if (usd === null || usd < 0) {
         return new Response(JSON.stringify({ code: "23514", message: "ten_usage_ledger_usd" }), { status: 400 });
       }
-      // The 20260925000000 migration's ten_usage_ledger_paypal_breakdown check.
-      if (typeof rid === "string" && rid.startsWith("paypal:")) {
+      // The 20260925000000 migration's ten_usage_ledger_paypal_breakdown
+      // check (F9, fix round 2 — a genuine TWO-WAY check): gross_usd/fee_usd
+      // set exactly when request_id starts with 'paypal:'; a non-paypal:
+      // row (a `paypal-refund:` row included) carrying either is refused
+      // just as a paypal: row missing either is.
+      {
+        const isPaypalRow = typeof rid === "string" && rid.startsWith("paypal:");
         const gross = parseMoney(row.gross_usd);
         const fee = parseMoney(row.fee_usd);
+        const grossSet = row.gross_usd !== undefined && row.gross_usd !== null;
+        const feeSet = row.fee_usd !== undefined && row.fee_usd !== null;
         const addsUp = gross !== null && fee !== null && Math.abs(usd - (gross - fee)) < 1e-9;
-        if (gross === null || fee === null || row.kind !== "credit" || fee < 0 || !(usd > 0) || !addsUp) {
+        const bad = isPaypalRow
+          ? gross === null || fee === null || row.kind !== "credit" || fee < 0 || !(usd > 0) || !addsUp
+          : grossSet || feeSet;
+        if (bad) {
           return new Response(JSON.stringify({ code: "23514", message: "ten_usage_ledger_paypal_breakdown" }), { status: 400 });
         }
       }
@@ -226,6 +247,9 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
       }
       if (rid) state.ledgerRequestIds.add(rid);
       state.ledgerInserts.push(row);
+      if (step === "commit-then-fail") {
+        return new Response(JSON.stringify({ code: "XX000", message: "injected: committed, response lost" }), { status: 503 });
+      }
       return new Response(null, { status: 201 });
     }
 
@@ -333,11 +357,20 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
 export interface MockPaypalCapture {
   id: string;
   customId: string;
+  /** The capture's OWN top-level `amount.value` (§ 17.10's shared check
+   *  reads this, not the breakdown's gross_amount — they usually agree,
+   *  but a test can set them apart to prove the check reads the right one). */
+  amountValue?: string;
   currencyCode: string;
   status: string; // "COMPLETED" | "PENDING" | "DECLINED"
   grossUsd?: string;
   feeUsd?: string;
   netUsd?: string;
+  /** § 17.10 — inherited from the order's own invoice_id at capture time. */
+  invoiceId?: string;
+  /** § 17.10's payee closure — `supplementary_data.related_ids.order_id`,
+   *  so the webhook can read the order behind this capture. */
+  orderId?: string;
 }
 
 export interface MockPaypalOrder {
@@ -348,6 +381,11 @@ export interface MockPaypalOrder {
   /** false => capture-order answers ORDER_NOT_APPROVED (§ 17.2: "Ten can
    *  capture only an order the payer approved"). */
   approved: boolean;
+  /** § 17.10 — the invoice_id create-order (or a test, for a planted
+   *  order) set; captures inherit it. */
+  invoiceId?: string;
+  /** § 17.10's payee closure — `purchase_units[0].payee.merchant_id`. */
+  payeeMerchantId?: string;
   /** Set once captured — a second capture-order call on the same order
    *  then answers ORDER_ALREADY_CAPTURED (§ 17.1 step 4). */
   capture?: MockPaypalCapture;
@@ -370,12 +408,26 @@ export interface MockPaypalState {
   createOrderRequests: Array<Record<string, unknown>>;
   captureRequestIdsSeen: string[];
   oauthFails: boolean;
+  /** path-substring -> status: inject a PayPal failure (§ 17.10 "Errors" —
+   *  a capture call answering 5xx/timeout/unknown error). Checked before
+   *  every route below; the OAuth token endpoint is still reachable so a
+   *  test can target exactly one downstream call. */
+  fail: Record<string, number>;
   /** Controls POST /v1/notifications/verify-webhook-signature:
    *  "SUCCESS"/"FAILURE" answer 200 with that verification_status;
    *  "unavailable" answers 500 (the call itself failing, § 17.1 step 5). */
   verifyWebhookOutcome: "SUCCESS" | "FAILURE" | "unavailable";
   verifyWebhookRequests: Array<Record<string, unknown>>;
+  /** § 17.10's payee closure: real PayPal auto-assigns `payee` to the
+   *  authenticated merchant account when create-order's own request never
+   *  names one (which Ten's own create-order never does) — this is that
+   *  account, so a legitimately-created order passes the payee check by
+   *  default. A test plants a different one via `ppPlantOrder`'s own
+   *  `payeeMerchantId` to model a foreign payee. */
+  defaultMerchantId: string;
 }
+
+export const MOCK_TEN_MERCHANT_ID = "TEN-MERCHANT-1";
 
 export function freshPaypalState(overrides: Partial<MockPaypalState> = {}): MockPaypalState {
   return {
@@ -385,8 +437,10 @@ export function freshPaypalState(overrides: Partial<MockPaypalState> = {}): Mock
     createOrderRequests: [],
     captureRequestIdsSeen: [],
     oauthFails: false,
+    fail: {},
     verifyWebhookOutcome: "SUCCESS",
     verifyWebhookRequests: [],
+    defaultMerchantId: MOCK_TEN_MERCHANT_ID,
     ...overrides,
   };
 }
@@ -396,7 +450,9 @@ function paypalCaptureJson(c: MockPaypalCapture): Record<string, unknown> {
     id: c.id,
     status: c.status,
     custom_id: c.customId,
-    amount: { currency_code: c.currencyCode, value: c.grossUsd ?? "0.00" },
+    amount: { currency_code: c.currencyCode, value: c.amountValue ?? c.grossUsd ?? "0.00" },
+    invoice_id: c.invoiceId,
+    supplementary_data: c.orderId ? { related_ids: { order_id: c.orderId } } : undefined,
     seller_receivable_breakdown:
       c.grossUsd !== undefined && c.feeUsd !== undefined && c.netUsd !== undefined
         ? {
@@ -416,6 +472,8 @@ function paypalOrderJson(o: MockPaypalOrder): Record<string, unknown> {
       {
         custom_id: o.customId,
         amount: { value: o.amountValue, currency_code: o.currencyCode },
+        invoice_id: o.invoiceId,
+        payee: o.payeeMerchantId !== undefined ? { merchant_id: o.payeeMerchantId } : undefined,
         ...(o.capture ? { payments: { captures: [paypalCaptureJson(o.capture)] } } : {}),
       },
     ],
@@ -427,7 +485,9 @@ function paypalOrderJson(o: MockPaypalOrder): Record<string, unknown> {
  *  the mock's own convenience default when a test doesn't override it. A
  *  non-COMPLETED override status (PENDING/DECLINED) carries no breakdown by
  *  default, matching real PayPal (§ 17.1 step 4: "no fee breakdown until it
- *  clears"), unless the test explicitly sets one anyway. */
+ *  clears"), unless the test explicitly sets one anyway. Inherits the
+ *  order's own invoice_id/id (§ 17.10 — a capture's invoice_id and
+ *  supplementary_data.related_ids.order_id come from the order it captured). */
 function buildCaptureFor(order: MockPaypalOrder): MockPaypalCapture {
   const status = order.captureOverride?.status ?? "COMPLETED";
   const completed = status === "COMPLETED";
@@ -442,17 +502,23 @@ function buildCaptureFor(order: MockPaypalOrder): MockPaypalCapture {
   return {
     id: order.captureOverride?.id ?? `cap-${order.id}`,
     customId: order.captureOverride?.customId ?? order.customId,
+    amountValue: order.captureOverride?.amountValue !== undefined ? order.captureOverride.amountValue : order.amountValue,
     currencyCode: order.captureOverride?.currencyCode ?? order.currencyCode,
     status,
     grossUsd,
     feeUsd,
     netUsd,
+    invoiceId: order.captureOverride?.invoiceId !== undefined ? order.captureOverride.invoiceId : order.invoiceId,
+    orderId: order.captureOverride?.orderId !== undefined ? order.captureOverride.orderId : order.id,
   };
 }
 
 export async function startMockPaypal(state: MockPaypalState): Promise<MockServer> {
   return await serve(async (req) => {
     const url = new URL(req.url);
+    for (const [k, status] of Object.entries(state.fail)) {
+      if (url.pathname.includes(k)) return Response.json({ name: "INTERNAL_SERVICE_ERROR" }, { status });
+    }
 
     if (url.pathname === "/v1/oauth2/token" && req.method === "POST") {
       if (state.oauthFails) return new Response("oauth failed", { status: 500 });
@@ -469,6 +535,8 @@ export async function startMockPaypal(state: MockPaypalState): Promise<MockServe
         customId: String(pu.custom_id ?? ""),
         amountValue: String(pu.amount?.value ?? ""),
         currencyCode: String(pu.amount?.currency_code ?? ""),
+        invoiceId: typeof pu.invoice_id === "string" ? pu.invoice_id : undefined,
+        payeeMerchantId: typeof pu.payee?.merchant_id === "string" ? pu.payee.merchant_id : state.defaultMerchantId,
         approved: true, // a test flips this to false to simulate ORDER_NOT_APPROVED
       };
       return new Response(JSON.stringify({ id }), { status: 201 });

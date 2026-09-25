@@ -11,8 +11,9 @@
 // CORS") — a browser could never read this function's response anyway, and
 // adding CORS headers would only be misleading about who this is for.
 
-import { breakdownIsSane, customIdFor, packForAmount, uidFromCustomId } from "../_shared/paypal-packs.ts";
-import type { CaptureInfo, WebhookHeaders } from "../_shared/paypal.ts";
+import { customIdFor, uidFromCustomId, breakdownIsSane } from "../_shared/paypal-packs.ts";
+import type { CaptureInfo, OrderInfo, WebhookHeaders } from "../_shared/paypal.ts";
+import type { TenOrderCheckResult } from "../_shared/paypal-invoice.ts";
 import type { LedgerCreditRow } from "../_shared/supabase.ts";
 
 // § 17.1 step 5: "Checks, in order: POST, ≤ 64 KB, JSON."
@@ -29,15 +30,31 @@ export interface WebhookDeps {
   ): Promise<{ ok: true; verified: boolean } | { ok: false }>;
   isMemberByUid(uid: string): Promise<boolean>;
   /** Rejects with an Error carrying `status` (F7, fix round 2): a 404
-   *  (`status === 404`) means PayPal has no such capture at all — handled
-   *  distinctly from every other failure, which stays a 503 so PayPal
-   *  retries. */
+   *  (`status === 404`) means PayPal has no such capture/order at all —
+   *  handled distinctly from every other failure, which stays a 503 so
+   *  PayPal retries. Used for both `getCapture` and `getOrder` below. */
   getCapture(captureId: string): Promise<CaptureInfo>;
+  /** § 17.10's payee closure (fix round 2): the order behind the re-fetched
+   *  capture (`capture.orderId`), read so the SAME payee check capture-
+   *  order applies on the order it already had can be applied here too. */
+  getOrder(orderId: string): Promise<OrderInfo>;
   insertLedgerCredit(row: LedgerCreditRow): Promise<void>;
-  /** F1 (fix round 2): re-verifies create-order's own HMAC binding (uid +
-   *  pack + amount) from the re-fetched capture's own invoice_id, before
-   *  ever crediting. Never throws. */
-  verifyInvoiceId(invoiceId: string, uid: string, pack: string, amountUsd: string): Promise<boolean>;
+  /** § 17.10's ONE shared check — customId shape, amount-is-a-pack, the
+   *  payee's merchant_id, and the invoice_id's HMAC tag, all re-verified
+   *  (constant time) from the capture + the order behind it, before ever
+   *  crediting. Never throws. */
+  checkTenOrder(input: {
+    customId: string;
+    invoiceId: string;
+    amountValue: string;
+    currencyCode: string;
+    payeeMerchantId: string;
+  }): Promise<TenOrderCheckResult>;
+  /** § 17.10 (lead ruling, 2026-09-25): whether TEN_PAYPAL_MERCHANT_ID is
+   *  set. Unset -> refuse, never skip the payee check: 503, so PayPal
+   *  retries until it's set (never a boot-time crash — the other Edge
+   *  Functions on the same project keep working). */
+  merchantConfigured: boolean;
   log?: { warn(e: unknown): void; error?(e: unknown): void };
 }
 
@@ -141,6 +158,17 @@ export async function handleRequest(req: Request, deps: WebhookDeps): Promise<Re
       return json(401, { error: "bad_signature" });
     }
 
+    // § 17.10: "the setting unset -> refuse, never skip: ... the webhook
+    // 503, so PayPal retries until it is set." Checked once the signature
+    // itself is good (a bad/missing signature is a different, unrelated
+    // failure and still answers 401 above), before any of the event
+    // filters below — so a missing merchant id can never silently pass an
+    // event through unchecked.
+    if (!deps.merchantConfigured) {
+      deps.log?.warn({ msg: "ten-paypal-webhook: TEN_PAYPAL_MERCHANT_ID not set — refusing" });
+      return json(503, { error: "config_unavailable" });
+    }
+
     // § 17.1 step 5 filters — each just 200 "ignored" to the caller (PayPal
     // must not be told WHY, and must never be retried for these): "another
     // event type -> 200; resource.custom_id not exactly ten:<uuid> -> 200
@@ -208,22 +236,50 @@ export async function handleRequest(req: Request, deps: WebhookDeps): Promise<Re
       });
       return json(200, { status: "ignored" });
     }
+    // § 17.10's payee closure (fix round 2): read the order behind this
+    // capture so the same payee check capture-order applies can be applied
+    // here too — a capture carries `supplementary_data.related_ids.order_id`
+    // per PayPal's published spec, but no `payee` field of its own.
+    if (!capture.orderId) {
+      deps.log?.warn({ msg: "ten-paypal-webhook: ALERT re-fetched capture carries no order_id — can't verify payee", captureId });
+      return json(200, { status: "ignored" });
+    }
+    let order: OrderInfo;
+    try {
+      order = await deps.getOrder(capture.orderId);
+    } catch (e) {
+      // Same F7 posture as the capture re-fetch: a 404 (no such order) is
+      // ignored, not retried; every other failure stays a 503.
+      const status = (e as { status?: unknown })?.status;
+      if (status === 404) {
+        deps.log?.warn({ msg: "ten-paypal-webhook: order re-fetch 404 — unknown order", orderId: capture.orderId });
+        return json(200, { status: "ignored" });
+      }
+      deps.log?.warn({ msg: "ten-paypal-webhook: order re-fetch failed", err: String(e), orderId: capture.orderId });
+      return json(503, { error: "order_unavailable" });
+    }
+
+    // § 17.10's ONE shared check — the same one capture-order runs on the
+    // order it read, run here on the capture + the order behind it.
+    const check = await deps.checkTenOrder({
+      customId: capture.customId,
+      invoiceId: capture.invoiceId,
+      amountValue: capture.amountValue,
+      currencyCode: capture.currencyCode,
+      payeeMerchantId: order.payeeMerchantId,
+    });
+    if (!check.ok) {
+      deps.log?.warn({ msg: "ten-paypal-webhook: ALERT § 17.10 check failed — not Ten's own order", captureId });
+      return json(200, { status: "ignored" });
+    }
+
     if (!breakdownIsSane(capture)) {
       alertBreakdownMismatch(deps, capture);
       return json(200, { status: "ignored" });
     }
-    // F1 (fix round 2, lead ruling): re-verify create-order's own HMAC
-    // binding from the re-fetched capture's OWN invoice_id before crediting
-    // — a forged/foreign capture whose custom_id merely happens to read
-    // ten:<uid> has no way to carry a tag that verifies.
-    const pack = packForAmount(capture.grossUsd);
-    if (!pack || !(await deps.verifyInvoiceId(capture.invoiceId, uid, pack, capture.grossUsd))) {
-      deps.log?.warn({ msg: "ten-paypal-webhook: ALERT invoice tag failed to verify — not Ten's own order", captureId });
-      return json(200, { status: "ignored" });
-    }
 
     const row: LedgerCreditRow = {
-      user_id: uid,
+      user_id: check.uid,
       kind: "credit",
       request_id: `paypal:${capture.captureId}`,
       usd: capture.netUsd,

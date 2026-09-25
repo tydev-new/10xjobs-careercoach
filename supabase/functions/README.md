@@ -4,8 +4,10 @@ Contract: `docs/design-web-agent.md` § 8, amended by § 13 ("the site's
 model is a setting" — the proxy now allows exactly two models, Claude
 Sonnet 5 and DeepSeek V4.1 Flash, each with its own per-call ceiling), § 14
 (web search's own per-request price), and § 17 (buying credit with PayPal —
-`ten-paypal`, `ten-paypal-webhook`, and § 17.4's amendment to
-`ten-delete-account`). Built and tested **locally only** (Deno, mocked
+`ten-paypal`, `ten-paypal-webhook`, § 17.4's amendment to
+`ten-delete-account`, and § 17.10, "Only Ten's own orders" — fix round 2's
+lead ruling on the independent tester's finding F1, the signed `invoice_id`
+and the payee check). Built and tested **locally only** (Deno, mocked
 OpenRouter/PayPal and mocked Supabase — see "Tests" below). **Not deployed
 by this change.** The owner runs the commands below when ready; nothing
 here calls the live OpenRouter key, a live PayPal account, or a production
@@ -20,7 +22,8 @@ supabase/functions/
     cors.ts            allowed-origin list + CORS headers (ten-model-proxy, ten-paypal; NOT the webhook, § 17.1)
     supabase.ts         thin fetch client: Auth, PostgREST RPC/table, Storage API
     paypal.ts            thin PayPal REST client: OAuth token, Orders v2, Payments v2 capture, webhook verify (§ 17)
-    paypal-packs.ts       pure: the server-side pack table ($10/$20/$40), the ten:<uid> custom_id shape (§ 17.1/17.3)
+    paypal-packs.ts       pure: the server-side pack table ($10/$20/$40), the ten:<uid> custom_id shape, breakdownIsSane (§ 17.1/17.3, F4/F5/F6/F9)
+    paypal-invoice.ts      pure: § 17.10's signed invoice_id — buildInvoiceId, the ONE shared checkTenOrder (custom_id, amount, payee, HMAC tag)
     test-support.ts     TEST ONLY — local stub OpenRouter + local stub Supabase + local stub PayPal
   ten-model-proxy/
     core.ts              pure: the request-field allowlist, path match, SSE usage parser
@@ -33,11 +36,11 @@ supabase/functions/
   ten-paypal/
     core.ts               pure: path match, PayPal-Request-Id shape; re-exports paypal-packs.ts
     handler.ts             handleRequest(req, deps, env) — create-order + capture-order (§ 17.1 steps 2, 4)
-    index.ts               Deno.serve bootstrap; refuses to start on a bad TEN_PAYPAL_API_BASE or missing client id/secret
+    index.ts               Deno.serve bootstrap; refuses to start on a bad TEN_PAYPAL_API_BASE or missing client id/secret; TEN_PAYPAL_MERCHANT_ID may be unset at boot (every request then 503s, § 17.10)
     core.test.ts / handler.test.ts
   ten-paypal-webhook/
     handler.ts             handleRequest(req, deps) — PAYMENT.CAPTURE.COMPLETED backup delivery (§ 17.1 step 5)
-    index.ts               Deno.serve bootstrap; TEN_PAYPAL_WEBHOOK_ID may be unset at boot (see "Deploy" below)
+    index.ts               Deno.serve bootstrap; TEN_PAYPAL_WEBHOOK_ID and TEN_PAYPAL_MERCHANT_ID may both be unset at boot (see "Deploy" below)
     handler.test.ts
 ```
 
@@ -52,11 +55,13 @@ is testable with `deno test` and no network to a real project. Only
 deno test --allow-net supabase/functions/
 ```
 
-Current result (§ 17 "buying credit with PayPal", run 2026-09-25):
+Current result (§ 17.10 "Only Ten's own orders", fix round 2, run 2026-09-25):
 
 ```
-running 4 tests from ./supabase/functions/_shared/paypal-packs.test.ts
-... (4 passed)
+running 6 tests from ./supabase/functions/_shared/paypal-invoice.test.ts
+... (6 passed)
+running 6 tests from ./supabase/functions/_shared/paypal-packs.test.ts
+... (6 passed)
 running 11 tests from ./supabase/functions/_shared/paypal.test.ts
 ... (11 passed)
 running 12 tests from ./supabase/functions/ten-delete-account/handler.test.ts
@@ -67,34 +72,46 @@ running 50 tests from ./supabase/functions/ten-model-proxy/handler.test.ts
 ... (50 passed)
 running 2 tests from ./supabase/functions/ten-paypal/core.test.ts
 ... (2 passed)
-running 18 tests from ./supabase/functions/ten-paypal/handler.test.ts
-... (18 passed)
-running 18 tests from ./supabase/functions/ten-paypal-webhook/handler.test.ts
-... (18 passed)
+running 24 tests from ./supabase/functions/ten-paypal/handler.test.ts
+... (24 passed)
+running 28 tests from ./supabase/functions/ten-paypal-webhook/handler.test.ts
+... (28 passed)
 
-ok | 164 passed | 0 failed
+ok | 188 passed | 0 failed
 ```
 
-The new coverage (§ 17.8's test plan, the parts this build owns — `tests/sql`
-and the SQL-only checks are the independent tester's, not this suite):
-create-order's 401/403/400 and that the amount always comes from the
-server's pack table, whatever the body also adds; capture-order refuses
-another user's order, an older-app (bare-UUID) order, and a non-pack
-amount, all with NO capture call; a fresh capture, `ORDER_ALREADY_CAPTURED`
-(re-reads the order's own capture), and a replay all credit the SAME
-`paypal:<captureId>` row exactly once; `ORDER_NOT_APPROVED` →
-`window_closed`, no row; `PENDING` → `"pending"`, no row; a breakdown that
-doesn't add up (non-USD, no `net_amount`) → no row, an alert, `503
+The new coverage (§ 17.8/§ 17.10's test plan, the parts this build owns —
+`tests/sql` and the SQL-only checks are the independent tester's, not this
+suite): create-order's 401/403/400, the amount always from the server's
+pack table, and § 17.10's exact `invoice_id` shape (`ten-<8hex>-<10digit>
+-<16hex>-<32hex>`, a hand-computed test vector against the documented
+algorithm); capture-order runs § 17.10's ONE shared check (custom_id shape,
+amount-is-a-pack, the payee's `merchant_id`, the HMAC tag) before ever
+capturing — a lookalike/forged/foreign custom_id, a non-pack amount, a
+foreign payee, or a bad/missing/reused/cross-secret tag all → 403
+`not_ten_order`, no capture call; a genuinely Ten-created order that
+belongs to someone else → 403 `not_your_order`; a fresh capture,
+`ORDER_ALREADY_CAPTURED` (re-reads the order's own capture), and a replay
+all credit the SAME `paypal:<captureId>` row exactly once; `ORDER_NOT_APPROVED`
+→ `window_closed`, no row; `PENDING` → `"pending"`, no row; a 5xx/timeout/
+unknown capture-call answer → 503 `unconfirmed` (§ 17.10 — never
+`"declined"`); `DECLINED`/`FAILED` → `"declined"`; a breakdown that doesn't
+add up (non-USD on any one of gross/fee/net, off by a cent, not two
+decimals, not `> 0`) → no row, an `ALERT` log line, `503
 paid_not_credited`; the outgoing create-order body never mentions
-vault/saved/agreement/plan/shipping. The webhook: a bad/missing signature
+vault/saved/agreement/plan/shipping. The webhook: a missing signature
+header (any of the five) → 401, verify never called (F8); a bad signature
 → 401; the verify call failing OR `TEN_PAYPAL_WEBHOOK_ID` unset → 503, no
 row, no PayPal HTTP call for the unset case; a non-capture event type, a
-non-`ten:` `custom_id`, a non-member `ten:` uid, and a re-fetched capture
-that doesn't match the event (custom_id, status, breakdown) all → 200
-"ignored" (the non-member case also logs an alert, "refund by hand");
-valid + member + re-fetched COMPLETED capture → credited once, replayed 3×
-or raced against capture-order's own insert stays at one row; no CORS
-header on any webhook response.
+non-`ten:` `custom_id` (an uppercase UUID or trailing space included, F6),
+a non-member `ten:` uid, an unknown capture (re-fetch 404 → 200 + a log
+line, F7; any other re-fetch failure → 503), a re-fetched capture that
+doesn't match the event, a foreign payee on the order behind the capture,
+or a tag that doesn't verify all → 200 "ignored" (with an `ALERT`/log line
+where named); valid + member + re-fetched COMPLETED capture + the payee
+check on the order behind it → credited once, replayed 3× or raced against
+capture-order's own insert stays at one row; no CORS header on any webhook
+response.
 
 `deno check supabase/functions/**/*.ts` and `deno lint supabase/functions/`
 are also clean.
@@ -135,15 +152,30 @@ supabase secrets set TEN_OPENROUTER_API_KEY=<the existing OpenRouter key, shared
 supabase secrets set TEN_APP_ORIGIN=<the production Vercel origin, e.g. https://ten.example.com> \
   --project-ref ivunfotoggdxbjouumdk
 
-# Secrets ten-paypal and ten-paypal-webhook need (§ 17.6, never printed, never
-# committed — both functions refuse to start unless TEN_PAYPAL_API_BASE is
-# exactly one of PayPal's two real hosts, and unless the client id/secret
-# are both set; TEN_PAYPAL_WEBHOOK_ID is the one exception, see § 17.7 below):
+# Secrets ten-paypal and ten-paypal-webhook need (§ 17.6/§ 17.10, never
+# printed, never committed — both functions refuse to START unless
+# TEN_PAYPAL_API_BASE is exactly one of PayPal's two real hosts and the
+# client id/secret are set. TEN_PAYPAL_MERCHANT_ID and TEN_PAYPAL_WEBHOOK_ID
+# are the two exceptions: both functions still START without them, but
+# every REQUEST then answers 503 until they're set (§ 17.10 / § 17.7
+# below) — never a boot-time crash, so a missing one of these two doesn't
+# take the whole function down for everyone):
 supabase secrets set TEN_PAYPAL_CLIENT_ID=<the older app's PayPal REST app client id> \
   TEN_PAYPAL_CLIENT_SECRET=<its secret> \
   TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com \
+  TEN_PAYPAL_MERCHANT_ID=<copied from PayPal, see the checklist below> \
   --project-ref ivunfotoggdxbjouumdk
 ```
+
+`TEN_PAYPAL_MERCHANT_ID` (§ 17.10, fix round 2) is NOT a secret — it's the
+account id PayPal itself shows on any of its own screens or API responses
+— but it's read the same way (`supabase secrets set`) since Supabase
+Edge Functions have no separate "config var" store. It closes the residual
+§ 17.10 itself flagged ("Open for the lead"): without it, a member could
+mint a valid `invoice_id` tag through create-order, then build their own
+order in the browser with that same tag/custom_id/amount but another
+account as payee — the payee check refuses that even though the tag alone
+would have verified.
 
 `ten-delete-account` needs no extra secret beyond the auto-injected three —
 it never calls OpenRouter or PayPal and never needs the app origin beyond
@@ -210,25 +242,31 @@ runs any of this):
    payments sit `PENDING`); unique invoice ids stays on.
 3. Apply `20260925000000_ten_paypal_credit.sql`; `NOTIFY pgrst, 'reload
    schema';`.
-4. `supabase secrets set TEN_PAYPAL_CLIENT_ID=… TEN_PAYPAL_CLIENT_SECRET=…
-   TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com --project-ref
-   ivunfotoggdxbjouumdk`.
-5. `supabase functions deploy ten-delete-account`, then `ten-paypal`, then
+4. Copy the merchant/account id PayPal itself shows for the older app's
+   business account (PayPal → Account Settings → Business information, or
+   the sandbox business account's own dashboard) — this is
+   `TEN_PAYPAL_MERCHANT_ID`, § 17.10's payee closure.
+5. `supabase secrets set TEN_PAYPAL_CLIENT_ID=… TEN_PAYPAL_CLIENT_SECRET=…
+   TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com
+   TEN_PAYPAL_MERCHANT_ID=… --project-ref ivunfotoggdxbjouumdk`.
+6. `supabase functions deploy ten-delete-account`, then `ten-paypal`, then
    `ten-paypal-webhook --no-verify-jwt` (same project ref) — this order
    matters (§ 17.4: delete must stop touching ledger rows before a
    purchase can land).
-6. developer.paypal.com → the shared app → Webhooks → Add:
+7. developer.paypal.com → the shared app → Webhooks → Add:
    `https://ivunfotoggdxbjouumdk.supabase.co/functions/v1/ten-paypal-webhook`,
    "Payment capture completed" only. Copy the Webhook ID PayPal shows,
    `supabase secrets set TEN_PAYPAL_WEBHOOK_ID=<it> --project-ref
    ivunfotoggdxbjouumdk`, then redeploy `ten-paypal-webhook
    --no-verify-jwt`. Until the id is set, it answers 503 to every delivery
    (by design — see `ten-paypal-webhook/index.ts`'s own comment: this
-   function DOES start without the id, unlike a missing client id/secret
-   or a bad API base, which refuse to start at all).
-7. Vercel: `VITE_PAYPAL_CLIENT_ID`, then deploy the site
+   function DOES start without the webhook id or the merchant id, unlike a
+   missing client id/secret or a bad API base, which refuse to START at
+   all; a missing merchant id, like a missing webhook id, still answers
+   every REQUEST 503, § 17.10).
+8. Vercel: `VITE_PAYPAL_CLIENT_ID`, then deploy the site
    (`apps/web/README.md`).
-8. Buy $10: one `paypal:` row, `usd` = net, the chip up by net, the webhook
+9. Buy $10: one `paypal:` row, `usd` = net, the chip up by net, the webhook
    delivery 200 with no second row. Live: refund it by hand (§ 17.5).
 
 **Refund contact:** `support@10xjobs.co` (owner, 2026-09-25; shown in
@@ -242,7 +280,7 @@ supabase functions delete ten-delete-account --project-ref ivunfotoggdxbjouumdk
 supabase functions delete ten-paypal --project-ref ivunfotoggdxbjouumdk
 supabase functions delete ten-paypal-webhook --project-ref ivunfotoggdxbjouumdk
 supabase secrets unset TEN_OPENROUTER_API_KEY TEN_APP_ORIGIN --project-ref ivunfotoggdxbjouumdk
-supabase secrets unset TEN_PAYPAL_CLIENT_ID TEN_PAYPAL_CLIENT_SECRET TEN_PAYPAL_API_BASE TEN_PAYPAL_WEBHOOK_ID \
+supabase secrets unset TEN_PAYPAL_CLIENT_ID TEN_PAYPAL_CLIENT_SECRET TEN_PAYPAL_API_BASE TEN_PAYPAL_WEBHOOK_ID TEN_PAYPAL_MERCHANT_ID \
   --project-ref ivunfotoggdxbjouumdk
 ```
 
@@ -313,49 +351,87 @@ checked before routing). **`create-order`**: the pack id (`"10"|"20"|"40"`)
 is the only field read from the body — the amount always comes from the
 server's own table (`ten-paypal/core.ts`'s `PACKS`, re-exported from
 `_shared/paypal-packs.ts`), never the client; creates a PayPal Orders v2
-order, `custom_id: "ten:<uid>"`, a fresh `invoice_id`, no vault/saved
-method/agreement/plan/shipping field. Unknown pack → 400. **`capture-order`**:
-reads the order FIRST — refuses (403) unless `custom_id` is `ten:<caller>`,
-refuses (400) unless the amount is a known pack in USD — before ever
-capturing anything. Captures with `PayPal-Request-Id:
+order, `custom_id: "ten:<uid>"`, a SIGNED `invoice_id` (§ 17.10 below), no
+vault/saved method/agreement/plan/shipping field. Unknown pack → 400.
+**`capture-order`**: reads the order FIRST and runs § 17.10's ONE shared
+check on it (custom_id shape, amount-is-a-pack, the payee's `merchant_id`,
+the invoice_id's HMAC tag) — invalid → 403 `not_ten_order`, no capture
+call; a valid Ten order that isn't the caller's own → 403 `not_your_order`
+— before ever capturing anything. Captures with `PayPal-Request-Id:
 ten-capture-<orderId>` (PayPal's own idempotency, kept ~6h);
 `ORDER_ALREADY_CAPTURED` re-reads the order's own capture instead of
 capturing again; `ORDER_NOT_APPROVED` → `{ status: "window_closed" }`
-(no money moved — the payer never confirmed in PayPal's window, § 17.2).
-A `COMPLETED` capture with a breakdown that checks out (USD, a known pack
-amount) credits ONE `ten_usage_ledger` `'credit'` row, `request_id
+(no money moved — the payer never confirmed in PayPal's window, § 17.2);
+any OTHER capture-call error (5xx, timeout, unrecognized) → `503
+unconfirmed`, NEVER `"declined"` — PayPal may already have captured the
+money and just failed to answer (§ 17.10 "Errors"; the webhook is the
+backup either way). A `COMPLETED` capture with a breakdown that checks out
+(gross/fee/net all present, USD, exactly two decimals, each `> 0`, net =
+gross − fee in whole cents, gross a known pack amount — `breakdownIsSane`)
+credits ONE `ten_usage_ledger` `'credit'` row, `request_id
 'paypal:<captureId>'` (unique — a replay or a race with the webhook credits
 once), `usd` = PayPal's own `net_amount`, `gross_usd`/`fee_usd` from
 `seller_receivable_breakdown` — all passed through as PayPal's own decimal
 strings, never parsed to a float (`_shared/paypal.ts`'s file header). A
-`PENDING` capture credits nothing yet (`{ status: "pending" }`); anything
-else is `{ status: "declined" }`; a breakdown that doesn't check out, or a
-failed ledger write, is `503 paid_not_credited` with an alert logged (no
-key or content in it). CORS is the same allowlist as `ten-model-proxy`.
+`PENDING` capture credits nothing yet (`{ status: "pending" }`);
+`DECLINED`/`FAILED` is `{ status: "declined" }`; a breakdown that doesn't
+check out is `503 paid_not_credited` with an `ALERT` log line (no key or
+content in it); so is a failed ledger write. CORS is the same allowlist as
+`ten-model-proxy`.
 
 **`ten-paypal-webhook`** — `POST` only, **no CORS, no JWT verification**
 (deployed `--no-verify-jwt`: PayPal calls this directly, never a signed-in
 browser). The backup path for `PAYMENT.CAPTURE.COMPLETED` (§ 17.1 step 5),
 for a capture that cleared after the tab closed or a capture-order write
 that failed. In order: `POST` only (else 404) → body ≤ 64 KB (else 413) →
-valid JSON (else 400) → **PayPal's own signature**, `POST
-/v1/notifications/verify-webhook-signature` with the five `paypal-*`
-headers, the raw event, and `TEN_PAYPAL_WEBHOOK_ID` — anything but
+valid JSON (else 400) → **any of the five `paypal-*` signature headers
+missing** → 401, PayPal's verify endpoint never even called (a missing
+header has nothing for it to check) → **PayPal's own signature**, `POST
+/v1/notifications/verify-webhook-signature` with the five headers, the
+parsed event, re-serialized, and `TEN_PAYPAL_WEBHOOK_ID` — anything but
 `SUCCESS` → 401, no credit; the call itself failing OR the secret being
 unset → 503 (so PayPal retries; this function deliberately DOES start with
 `TEN_PAYPAL_WEBHOOK_ID` unset, since the id can only be obtained AFTER this
-function is deployed and registered with PayPal, § 17.7 step 6) → then,
+function is deployed and registered with PayPal, § 17.7 step 7) → then,
 only once signed: another event type, a `custom_id` that isn't exactly
-`ten:<uuid>` (the older app's bare-UUID payments), or a `ten:<uid>` for a
+`ten:` + a LOWERCASE UUID (an uppercase UUID, trailing space, the older
+app's bare-UUID payments all refused the same way), or a `ten:<uid>` for a
 non-member all → `200 { status: "ignored" }` (the non-member case also logs
 an alert — "refund by hand", since PayPal already took the payer's money) →
 **still re-fetches** `GET /v2/payments/captures/{id}` with Ten's OWN keys
-(failure → 503) — the signature proves PayPal sent the event, the re-fetch
-proves the capture, never the event body's own attacker-influenced fields;
-the re-fetched capture must show the SAME `custom_id`, `COMPLETED`, and a
-USD pack breakdown, else 200 + an alert, no row → credits the ledger the
-same way `ten-paypal`'s capture-order does (same `paypal:<captureId>` key,
-so either one landing first makes the other a no-op); a failed credit write
-→ 503. `TEN_PAYPAL_API_BASE`/`TEN_PAYPAL_CLIENT_ID`/`TEN_PAYPAL_CLIENT_SECRET`
-are required at boot (same refusal as `ten-paypal`) — only
-`TEN_PAYPAL_WEBHOOK_ID` is allowed to start unset.
+(a 404 → 200 + a log line, never retried; any OTHER failure → 503) — the
+signature proves PayPal sent the event, the re-fetch proves the capture,
+never the event body's own attacker-influenced fields; the re-fetched
+capture must show the SAME `custom_id` and `COMPLETED`, else 200 + an
+alert, no row → reads the ORDER BEHIND the capture
+(`supplementary_data.related_ids.order_id`, a 404 → 200 + a log line, any
+other failure → 503) and runs § 17.10's SAME shared check (custom_id,
+amount-is-a-pack, the order's own payee `merchant_id`, the tag) — invalid
+→ 200 + an `ALERT`, no row — then `breakdownIsSane` on the capture, same
+as `ten-paypal` — invalid → 200 + an `ALERT`, no row → credits the ledger
+the same way `ten-paypal`'s capture-order does (same `paypal:<captureId>`
+key, so either one landing first makes the other a no-op); a failed credit
+write → 503. `TEN_PAYPAL_API_BASE`/`TEN_PAYPAL_CLIENT_ID`/
+`TEN_PAYPAL_CLIENT_SECRET` are all required to START (same refusal as
+`ten-paypal`); `TEN_PAYPAL_WEBHOOK_ID` and `TEN_PAYPAL_MERCHANT_ID` are
+both allowed to start unset, but every request then answers 503 (never
+skipped, § 17.10) until each is set.
+
+### § 17.10 — "Only Ten's own orders" (fix round 2, lead ruling on F1)
+
+`_shared/paypal-invoice.ts` owns the signed `invoice_id`
+(`ten-<U>-<T>-<N>-<H>`, 73 characters — see the file's own header for the
+exact HMAC construction) and the ONE shared `checkTenOrder` both Edge
+Functions call before ever crediting anything. Without it, an order a
+browser creates DIRECTLY against PayPal's own API (never through
+create-order) could still be captured and credited as long as its
+`custom_id` happened to read exactly `ten:<a real member's uid>` — the
+independent tester's own "SPEC GAP" finding. `checkTenOrder` also verifies
+the order's `payee.merchant_id` is Ten's own `TEN_PAYPAL_MERCHANT_ID`,
+closing a narrower residual § 17.10 itself named: a member minting a valid
+tag through create-order, then building their own order in the browser
+with that same tag/custom_id/amount but another account as payee. The tag
+compare is constant-time; `T`'s age is never checked (a pending payment can
+clear days later); rotating `TEN_PAYPAL_CLIENT_SECRET` breaks the tags of
+payments not yet credited — rotate when none is pending, or credit those by
+hand.

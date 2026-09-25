@@ -145,11 +145,12 @@
   <h2>Payments go through PayPal</h2>
   <p>
     Buying credit happens in PayPal's own window: you pay there, not in
-    Ten. Ten never sees your card number or your PayPal login — PayPal
-    only ever gives Ten an internal account id for the payment. Ten keeps
-    the amount, PayPal's fee, and PayPal's own transaction id; nothing
-    else about the payment. These records survive deleting your beta
-    data, the same way your credit does.
+    Ten. Ten never sees your card number or your PayPal login. Ten sends
+    PayPal an internal account id for the payment — PayPal gets that
+    internal account id, nothing more about you. Ten keeps the amount,
+    PayPal's fee, and PayPal's own transaction id; nothing else about the
+    payment. These records survive deleting your beta data, the same way
+    your credit does.
   </p>
 
   <h2>Which model is running, right now</h2>

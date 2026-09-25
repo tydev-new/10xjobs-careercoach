@@ -259,6 +259,45 @@ test("handback: a backticked path with :line is checked; a backticked URL is sti
   assert.match(url.out, /Checked 0 referenced path/);
 });
 
+// ---- round-2 fix (0065c2d): adversarial cases for the "slash before the first space" guard
+
+test("handback (adversarial): `cd docs && cat never.md` is a command, never one bogus spaced path", () => {
+  const r = hb("Then `cd docs && cat never.md` to read it.");
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Checked 0 referenced path/, "no slash+extension word, so nothing to check — and no 'cd docs && …' path invented");
+});
+
+test('handback (adversarial): "see docs/a b/c.md" (prose before a spaced path) never passes silently when the file is missing', () => {
+  const r = hb('The note says "see docs/never a b/c.md".');
+  assert.equal(r.code, 1, `a missing file must not pass: ${r.out}`);
+});
+
+test("handback (adversarial): a backticked command with a URL checks the output path and ignores the URL", () => {
+  const r = hb("Fetched with `curl https://example.com/docs/a.md -o out/never-fetched.md`.");
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.out, /out\/never-fetched\.md/);
+  assert.ok(!/example\.com/.test(r.out), "the URL is not a path");
+  // (a URL with a RAW space is not a valid URL — %20 is — so it isn't tested; noted as a NIT)
+  const bare = hb("Source: `https://example.com/docs/a%20b/c.md#part` and `http://x.io/a/b.png:12`.");
+  assert.match(bare.out, /Checked 0 referenced path/, `backticked URLs (with a path, %20, #fragment, :N) are ignored: ${bare.out}`);
+});
+
+test("handback (adversarial): quoted Windows-style paths are ignored, never crash or turn into a repo path", () => {
+  const r = hb('Saved to "C:\\Users\\me\\Documents\\notes.md" and "C:/Users/me/notes.md".');
+  assert.equal(r.code, 0, `${r.out}${r.err}`);
+  assert.match(r.out, /Checked 0 referenced path/);
+});
+
+test("handback (adversarial): #fragment then :line, and a quoted spaced absolute path with :line", () => {
+  assert.equal(hb("See docs/PROCESS.md#the-ritual:12.").code, 0);
+  assert.equal(hb("See docs/never-written.md#frag:12.").code, 1);
+  const dir = path.join(tmp, "spaced again");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, "x y.md"), "x");
+  assert.equal(hb(`See \`${path.join(dir, "x y.md")}:40\`.`).code, 0, "an existing spaced path with :line passes");
+  assert.equal(hb(`See "${path.join(dir, "z w.md")}:40".`).code, 1, "a missing one fails");
+});
+
 // =============================================================== capture.mjs
 
 function pngInfo(file) {

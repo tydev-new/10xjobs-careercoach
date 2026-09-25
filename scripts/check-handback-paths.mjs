@@ -15,6 +15,15 @@
 //   - private design-refs paths         10xjobs-design-refs/grok/hero.png
 //     resolved against --private-root, else $DESIGN_REFS_ROOT, else this
 //     repo's own parent directory (never a hard-coded home path here).
+//   - any of the above cited with a trailing :N or :N-M line reference
+//     (the hand-back report format) — the line ref is stripped before
+//     checking, e.g. apps/web/src/x.tsx:433, /abs/coach.ts:272
+//   - any of the above as a Markdown link target — [text](path/to/file.md)
+//   - any of the above wrapped in backticks or double quotes as a single
+//     token, spaces allowed — `has space/real file.md`, "docs/my notes.md"
+//     (single quotes are deliberately NOT a delimiter: an ordinary
+//     contraction like "don't" pairs unpredictably and would swallow
+//     prose as a false path candidate)
 //
 // URLs (http/https/mailto) and code-looking tokens (no slash, or a slash
 // with no trailing extension — division, "and/or", SCREAMING_CASE, a bare
@@ -33,9 +42,25 @@ const PRIVATE_PREFIX = "10xjobs-design-refs/";
 
 const LEADING_TRIM = /^[`'"(\[{*_<>]+/;
 const TRAILING_TRIM = /[`'"()[\]{}.,;:!?*_<>]+$/;
+// A trailing "report format" line reference — :433 or :20-24 — stripped
+// before a path is checked, not treated as part of the path itself.
+const LINE_REF = /:\d+(?:-\d+)?$/;
+// Whole-token delimiters: content between a matching pair is one
+// candidate, internal spaces preserved. Deliberately backtick + double
+// quote only (see the file-header note on single quotes).
+const BACKTICK_RE = /`([^`]+)`/g;
+const DOUBLE_QUOTE_RE = /"([^"]+)"/g;
+// Markdown link target: [text](target) — "]" sits hard against "(" with
+// no whitespace to split on, so this is pulled out by regex, not by the
+// whitespace tokenizer below.
+const MD_LINK_RE = /\]\(([^)]+)\)/g;
 
 function cleanToken(tok) {
   return tok.replace(LEADING_TRIM, "").replace(TRAILING_TRIM, "");
+}
+
+function stripLineRef(tok) {
+  return tok.replace(LINE_REF, "");
 }
 
 function isUrlLike(tok) {
@@ -44,7 +69,9 @@ function isUrlLike(tok) {
 
 /**
  * Classify a single cleaned token as a candidate path, or return null if
- * it's a URL / code-looking token / not path-shaped.
+ * it's a URL / code-looking token / not path-shaped. A space is allowed
+ * in the shape checks below — never present in a plain whitespace-split
+ * token, but a real part of a backtick/quote-delimited candidate.
  */
 export function classify(tok) {
   if (!tok) return null;
@@ -57,7 +84,7 @@ export function classify(tok) {
   if (tok.startsWith("/")) {
     // Require a second slash so a lone "/" or something like "/etc" (no
     // further structure) doesn't get treated as a path reference.
-    if (tok.length > 1 && tok.slice(1).includes("/") && /^[A-Za-z0-9_.\-/]+$/.test(tok)) {
+    if (tok.length > 1 && tok.slice(1).includes("/") && /^[A-Za-z0-9_.\-/ ]+$/.test(tok)) {
       return { kind: "absolute", raw: tok };
     }
     return null;
@@ -67,19 +94,49 @@ export function classify(tok) {
   if (lastSlash === -1) return null; // no slash: division-like, SCREAMING_CASE, bare code
   const afterSlash = tok.slice(lastSlash + 1);
   if (!/\.[A-Za-z0-9]+$/.test(afterSlash)) return null; // slash but no extension: "and/or", "N/A"
-  if (!/^[A-Za-z0-9_.\-/]+$/.test(tok)) return null; // leftover punctuation: not a clean path
+  if (!/^[A-Za-z0-9_.\-/ ]+$/.test(tok)) return null; // leftover punctuation: not a clean path
   return { kind: "repo", raw: tok };
+}
+
+/**
+ * Pull out backtick- and double-quote-delimited spans as whole candidates
+ * (spaces preserved), and return the text with those spans blanked out —
+ * so the plain whitespace tokenizer below never also sees, and mis-splits,
+ * the same spaced path into bogus fragments.
+ */
+function extractQuotedSpans(text) {
+  const spans = [];
+  for (const re of [BACKTICK_RE, DOUBLE_QUOTE_RE]) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text))) spans.push(m[1]);
+  }
+  const remaining = text.replace(BACKTICK_RE, " ").replace(DOUBLE_QUOTE_RE, " ");
+  return { spans, remaining };
 }
 
 /** Extract an ordered, de-duplicated list of classified path candidates from free text. */
 export function extractPaths(text) {
-  // Strip whole URLs first so a URL's own /path/segments never get
+  const { spans: quotedSpans, remaining: withoutQuoted } = extractQuotedSpans(text);
+
+  // Strip whole URLs so a URL's own /path/segments never get
   // mis-tokenized as a separate path reference.
-  const withoutUrls = text.replace(/\bhttps?:\/\/\S+/gi, " ").replace(/\bmailto:\S+/gi, " ");
+  const withoutUrls = withoutQuoted.replace(/\bhttps?:\/\/\S+/gi, " ").replace(/\bmailto:\S+/gi, " ");
+
+  const mdLinkTargets = [];
+  MD_LINK_RE.lastIndex = 0;
+  let m;
+  while ((m = MD_LINK_RE.exec(withoutUrls))) {
+    const target = m[1].trim().split(/\s+/)[0];
+    if (target) mdLinkTargets.push(target);
+  }
+
+  const rawCandidates = [...quotedSpans, ...mdLinkTargets, ...withoutUrls.split(/\s+/)];
+
   const seen = new Set();
   const out = [];
-  for (const rawTok of withoutUrls.split(/\s+/)) {
-    const cleaned = cleanToken(rawTok);
+  for (const rawTok of rawCandidates) {
+    const cleaned = stripLineRef(cleanToken(rawTok));
     const c = classify(cleaned);
     if (!c) continue;
     if (seen.has(c.raw)) continue;

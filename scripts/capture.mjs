@@ -2,7 +2,9 @@
 // capture.mjs — render a URL or a local HTML file to PNG with Playwright
 // Chromium, at one or more widths. The only script of the three allowed
 // to make network calls (loading a live URL); a local file target never
-// touches the network.
+// touches the network — enforced, not just claimed: every non-file://
+// request (e.g. a remote <img> the local page happens to reference) is
+// aborted via Playwright routing before it leaves the machine.
 //
 // Uses apps/web's own installed Playwright (no separate dependency here):
 // resolution is rooted at apps/web/package.json, so `npm install` in
@@ -132,6 +134,7 @@ async function main() {
   const outDir = path.resolve(values.out);
   mkdirSync(outDir, { recursive: true });
 
+  const isLocalTarget = targetUrl.startsWith("file://");
   const base = baseNameFor(targetUrl);
   const chromium = await loadChromium();
   const browser = await chromium.launch();
@@ -143,6 +146,16 @@ async function main() {
         colorScheme,
       });
       try {
+        if (isLocalTarget) {
+          // A local file target never touches the network — abort
+          // anything that isn't itself a file:// request (a remote <img>,
+          // font, or script the local page happens to reference).
+          await context.route("**/*", (route) => {
+            const reqUrl = route.request().url();
+            if (reqUrl.startsWith("file://")) return route.continue();
+            return route.abort();
+          });
+        }
         const page = await context.newPage();
         await page.goto(targetUrl, { waitUntil: "load" });
         const filePath = path.join(outDir, outputFileName(base, width, colorScheme));

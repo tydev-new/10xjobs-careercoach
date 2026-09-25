@@ -223,6 +223,42 @@ test("handback: a path with a space (quoted or backticked) is checked, not silen
   assert.equal(bad.code, 1, `missing spaced paths must fail: ${bad.out}`);
 });
 
+// ---- round-1 fix (cc2a15c) edge cases: quoted spans are whole candidates now
+
+test("handback: a missing script named inside a backticked COMMAND is still reported", () => {
+  const r = hb("Run `node scripts/never-written-tool.mjs --seed 7` to reproduce.");
+  assert.equal(r.code, 1, `the command's missing script must fail: ${r.out}`);
+  assert.match(r.out, /scripts\/never-written-tool\.mjs/);
+});
+
+test("handback: an existing script inside a backticked command passes, and is reported by its own path", () => {
+  const r = hb("Run `node scripts/design-sample.mjs --seed 7` and `python3 tests/run.py`.");
+  assert.equal(r.code, 0, r.out);
+  assert.match(r.out, /Checked 2 referenced path\(s\); 0 missing\./, r.out);
+});
+
+test("handback: a double-quoted sentence naming a path checks that path — no miss, no false alarm", () => {
+  const miss = hb('The coder said "I wrote docs/never-written-notes.md and more".');
+  assert.equal(miss.code, 1, `a missing path inside a quoted sentence must fail: ${miss.out}`);
+  const ok = hb('The coder said "Updated docs/PROCESS.md."');
+  assert.equal(ok.code, 0, `an existing path inside a quoted sentence must pass: ${ok.out}`);
+});
+
+test("handback: a Markdown link target with a #anchor is checked by its file", () => {
+  const miss = hb("See [notes](docs/never-written.md#section).");
+  assert.equal(miss.code, 1, miss.out);
+  const ok = hb("See [process](docs/PROCESS.md#the-ritual-in-order).");
+  assert.equal(ok.code, 0, ok.out);
+});
+
+test("handback: a backticked path with :line is checked; a backticked URL is still ignored", () => {
+  assert.equal(hb("See `docs/never-written.md:12`.").code, 1);
+  assert.equal(hb("See `docs/PROCESS.md:12`.").code, 0);
+  const url = hb("See `https://example.com/docs/missing.md`.");
+  assert.equal(url.code, 0, url.out);
+  assert.match(url.out, /Checked 0 referenced path/);
+});
+
 // =============================================================== capture.mjs
 
 function pngInfo(file) {
@@ -289,10 +325,10 @@ test("capture: renders a local HTML file at each --width, --dark/--light as aske
   networkHits = hits;
 });
 
-// Not in the brief — capture.mjs's OWN header says "a local file target never
-// touches the network". Measured: a local page's remote <img> is fetched on
-// every render. Reported (NIT: the comment overclaims); kept as a TODO.
+// capture.mjs's own header: "a local file target never touches the network".
+// Round 1 found a local page's remote <img> fetched on every render; fixed
+// in cc2a15c (non-file:// requests aborted for local targets).
 let networkHits = [];
-test("capture: a local file target never touches the network (the script's own header claim)", { todo: "NIT: capture.mjs's header overclaims — nothing blocks a local page's remote requests" }, () => {
+test("capture: a local file target never touches the network (a remote <img> in the page is never fetched)", () => {
   assert.deepEqual(networkHits, [], `a local file target made network requests: ${JSON.stringify(networkHits)}`);
 });

@@ -9,6 +9,17 @@ reads it and tells you what's next.
 Install: [`INSTALL.md`](INSTALL.md). Then, in a folder you choose:
 *"I need a job."*
 
+## Start here (contributors)
+
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how the pieces fit,
+  with diagrams: one coaching turn, the money path, the data, deploys.
+- [`docs/TEAM.md`](docs/TEAM.md): the agent team, the loop every change
+  goes through, and where a human contributor fits in.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): setup in five commands, tests,
+  and what a good pull request looks like.
+- [`SECURITY.md`](SECURITY.md): keys, personal data, and how to report a
+  vulnerability privately.
+
 ## How it works
 
 Unified skills, one workspace. Each skill owns a few files; the coach owns
@@ -70,6 +81,7 @@ CASES=all TRIALS=2 tests/always-on/run_t8.sh <tag>     # one conduct suite
 
 ## Contributing
 
-Read `CLAUDE.md` and `docs/PROCESS.md` first. A change to a skill is a
-design gate, an independent review, and a measurement — the ritual is
-the product. MIT licensed.
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md), then `CLAUDE.md` and
+[`docs/PROCESS.md`](docs/PROCESS.md). A change to a skill is a design
+gate, an independent review, and a measurement — the ritual is the
+product. MIT licensed.

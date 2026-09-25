@@ -4,6 +4,8 @@ Read in this order.
 
 | File | What it is |
 |---|---|
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | newcomer's map of the system, with diagrams (start here) |
+| [`TEAM.md`](TEAM.md) | the agent team, its loop, and how a human contributor fits in |
 | [`../PRINCIPLES.md`](../PRINCIPLES.md) | the top of the precedence chain |
 | [`design-cowork-coaching-goals.md`](design-cowork-coaching-goals.md) | the four goals every rule traces to |
 | [`design-cowork-coaching.md`](design-cowork-coaching.md) | the working design: stages, loops, gates, checking |

@@ -37,10 +37,15 @@ winner ad hoc.
    greps. *(Receipt 2026-08-15: the apply fix-pass shipped a corrupted
    file and two dangling sentences; the fixer's verification missed all
    three, the reviewer's caught all three.)*
-6. **Dogfood on the founder's real data — live-first.** The live run is
-   the acceptance test AND the design input for what the harness should
-   bait. *(Receipt: the S002 "most left"→"about half" catch; the pitch
-   anti-pattern catch; every t6/t7 case came from a live lesson.)*
+6. **Live run first — on a fixture persona.** Before the harness, run
+   the change live in a fresh test workspace (or a fresh test account on
+   the web app) seeded with an invented persona. The live run is the
+   acceptance test AND the design input for what the harness should
+   bait. Only the owner runs it on real data, in their own workspace or
+   account; what they learn comes back as a numbers-only receipt, and
+   real data never enters the repo. *(Receipt: the S002 "most
+   left"→"about half" catch; the pitch anti-pattern catch; every t6/t7
+   case came from a live lesson.)*
 7. **Conduct harness (tN) after the live run.** Planted workspaces, ~3
    cases per failure mode, Sonnet runner + Opus judge; the judge sees
    the written files, the skill text, and a deterministic check output;
@@ -53,8 +58,8 @@ winner ad hoc.
    (described vs produced behavior).
 9. **Memory + transcripts.** Durable lessons → the repo (docs, commit
    messages, this file) — never only in an agent's session memory.
-   Session transcripts archive OUTSIDE the repo (they carry the
-   founder's personal data).
+   Session transcripts archive OUTSIDE the repo (they can carry personal
+   data: a candidate's, or the owner's from a real-data run).
 
 ## The non-negotiables (earned the hard way)
 

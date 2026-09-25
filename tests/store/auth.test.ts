@@ -80,7 +80,24 @@ test("U4 magic link and sign-up pass the given redirectTo as emailRedirectTo; pa
   ]);
 });
 
-test("U5 no source under apps/web/src reads a Site URL, and every email-sending auth call passes a redirect", () => {
+// U5, narrowed by the lead's ruling (2026-09-25): C § 16.1 specifies
+// `updateUser({ password })` and `updateUser({ password, nonce })` as a
+// same-tab password change that SENDS NO LINK, so they deliberately carry
+// no redirect. The rule stays strict for every call that sends a link:
+// signInWithOtp, signUp, resetPasswordForEmail, signInWithOAuth, and
+// updateUser only when its attributes change the email.
+const LINK_CALLS = /\.(signInWithOtp|signUp|resetPasswordForEmail|signInWithOAuth|updateUser)\(([^)]*)\)/g;
+function redirectOffenders(file: string, s: string): string[] {
+  const out: string[] = [];
+  for (const m of s.matchAll(LINK_CALLS)) {
+    // a password-only updateUser sends no link (C § 16.1)
+    if (m[1] === "updateUser" && !/\bemail\b/.test(m[2])) continue;
+    if (!/RedirectTo|redirectTo/.test(m[2] + s.slice(m.index!, m.index! + 200))) out.push(`${file}: ${m[0]}`);
+  }
+  return out;
+}
+
+test("U5 no source under apps/web/src reads a Site URL, and every auth call that sends a link passes a redirect (updateUser only when it changes the email)", () => {
   const files: string[] = [];
   const walk = (d: string) => {
     for (const n of readdirSync(d)) {
@@ -91,14 +108,39 @@ test("U5 no source under apps/web/src reads a Site URL, and every email-sending 
   };
   walk(path.join(WEB, "src"));
   const offenders: string[] = [];
+  const linkSites: string[] = [];
   for (const f of files) {
     const s = readFileSync(f, "utf8");
     if (/SITE_URL/.test(s.replaceAll("VITE_SITE_URL", ""))) offenders.push(`${f}: reads a non-VITE SITE_URL`);
-    for (const m of s.matchAll(/\.(signInWithOtp|signUp|resetPasswordForEmail|signInWithOAuth|updateUser)\(([^)]*)\)/g)) {
-      if (!/RedirectTo|redirectTo/.test(m[2] + s.slice(m.index!, m.index! + 200))) offenders.push(`${f}: ${m[0]}`);
-    }
+    for (const m of s.matchAll(LINK_CALLS)) if (m[1] !== "updateUser") linkSites.push(m[1]);
+    offenders.push(...redirectOffenders(f, s));
   }
   assert.deepEqual(offenders, []);
+  // the rule is not vacuous: each link-sending call has a real call site
+  for (const fn of ["signInWithOtp", "signUp", "resetPasswordForEmail"]) assert.ok(linkSites.includes(fn), `no call site found for ${fn}`);
+});
+
+test("U5b the narrowed rule still flags a link-sending call with no redirect and an email-changing updateUser; a password-only updateUser passes", () => {
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.resetPasswordForEmail(email);"), ["x.ts: .resetPasswordForEmail(email)"]);
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.signInWithOtp({ email });"), ["x.ts: .signInWithOtp({ email })"]);
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.signUp({ email, password });"), ["x.ts: .signUp({ email, password })"]);
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.updateUser({ email: next });"), ["x.ts: .updateUser({ email: next })"]);
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.updateUser({ email: next }, { emailRedirectTo: site });"), []);
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.updateUser({ password });"), []);
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.updateUser({ password, nonce });"), []);
+  assert.deepEqual(redirectOffenders("x.ts", "await c.auth.updateUser(nonce === undefined ? { password } : { password, nonce });"), []);
+});
+
+test("U8 resetPasswordForEmail is called with (email, { redirectTo: VITE_SITE_URL }) (C § 16.1 'Forgot', § 8)", async () => {
+  const mod = await loadAuthWithEnv({ VITE_SITE_URL: "https://ten.example.app" });
+  const seen: unknown[] = [];
+  const fake = {
+    auth: { resetPasswordForEmail: async (email: string, opts: unknown) => (seen.push([email, opts]), { error: null }) },
+    rpc: async () => ({ data: null, error: null }),
+  } as unknown as AuthClientLike;
+  const r = await mod.requestPasswordReset(fake, "a@example.com", mod.siteRedirectUrl());
+  assert.equal(r.ok, true);
+  assert.deepEqual(seen, [["a@example.com", { redirectTo: "https://ten.example.app" }]]);
 });
 
 test("U6 checkMembership calls exactly ten_is_member() with no arguments, true only on a literal true, throws on error", async () => {

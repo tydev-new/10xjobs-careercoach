@@ -27,10 +27,10 @@ Entry bar: a new line needs a measurement receipt. It grew from ~300 to
 467 words only by measured rules, and that is the whole budget story.
 Latest: +91 words, § How you talk, docs/design-plain-replies.md (owner
 ruling 2026-09-26) — plain-words-to-the-candidate is an always-on rule
-because the leaking replies come from skills that load AFTER it (apply,
-evaluate), so the guard has to already be live; measured profile turn
-2,971 → 3,066 words (`tests/agent/loading.test.ts`), inside the ~3,300
-cap.
+because coach isn't loaded on the turns that leak (apply, evaluate), so
+the guard has to already be live before either loads; measured profile
+turn 2,971 → 3,066 words (`tests/agent/loading.test.ts`), inside the
+~3,300 cap.
 
 ## Tier 1 — always on: the router (794 words)
 
@@ -42,7 +42,8 @@ This is why a phrase that appears in no description is a phrase the
 system cannot route — the offer trigger was missing from every skill
 until it was added by hand.
 
-**Always-on total: 1,465 words.**
+**Always-on total: 1,774 words** (Tier 0's 980 + Tier 1's 794 —
+recomputed after the plain-replies Tier 0 growth; was 1,465).
 
 ---
 

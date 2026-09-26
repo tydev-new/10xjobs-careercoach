@@ -1,0 +1,3 @@
+That row is shown-but-unnamed until you confirm it, per § 2 of the coverage table.
+It's still in To Review, and the round scored 6/7 held, so I'm handing it to you as a DECISION.
+Open estimate_cost.py to see the math behind the spend gate.

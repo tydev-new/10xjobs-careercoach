@@ -16,11 +16,17 @@ domain depth — that is track A's lens.
 ## Level
 - Senior IC [source: intake]
 
-## Locations
+## Geo
 - SF Bay Area or remote (US) [source: intake]
 
-## Pay floor
-- TODO — not yet discussed
+## Compensation
+- Floor: $150k base [source: intake]
 
 ## Dealbreakers
-- TODO — not yet discussed
+- No on-call rotation [source: intake]
+
+## Target companies
+- None yet — no watchlist started
+
+## Retired
+(none)

@@ -1,6 +1,6 @@
 # ALEX CHEN
 
-Oakland, CA | alex.chen.data@gmail.com | 510.555.0142
+Oakland, CA | alex.chen.demo@example.com | 510.555.0142
 linkedin.com/in/alexchendata
 
 ## Summary

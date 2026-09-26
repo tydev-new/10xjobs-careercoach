@@ -1,5 +1,5 @@
-Résumé is 109 words (render_resume). Both files pass check_materials's mechanical checks, 0 fail and 0 warn each — the language check hasn't run yet, so I can't say the wording itself is clean, only that the structure is.
-Tell me if you want me to keep looking for more Track A roles — one search pass takes about that long.
-That row is shown-but-unnamed until you confirm it, per § 2 of the coverage table.
-It's still in To Review, and the round scored 6/7 held, so I'm handing it to you as a DECISION.
-Open estimate_cost.py to see the math behind the spend gate.
+HARD	Résumé is 109 words (render_resume). Both files pass check_materials's mechanical checks, 0 fail and 0 warn each — the language check hasn't run yet …
+REVIEW	Strong Fit, recorded in jobs.md.
+REVIEW	That's what's queued in plan.md
+HARD	… more Track A roles …
+REVIEW	so the gate above is still pending

@@ -335,8 +335,13 @@ from the live run. That is why the web side needs no JavaScript copy.
 
 **Proved by** `tests/test_scan_voice.py` (run by `tests/run.py`):
 
-- every line of `tests/fixtures/voice/before.txt` (today's voice, § 1)
-  gets at least one HARD hit;
+- every line of `tests/fixtures/voice/before.txt` (the five § 1 quotes,
+  verbatim, each tagged with its expected class) gets a hit of that
+  class — HARD or REVIEW, since § 1's file-name and "gate" quotes are
+  REVIEW by this section's own classes (lead amendment, 2026-09-26,
+  from the build's review);
+- every line of `tests/fixtures/voice/hard-coverage.txt` (one line per
+  HARD pattern) gets at least one HARD hit;
 - every line of `after.txt` (the target copy) gets none;
 - English that shares a word with a label gets no HARD hit: "on track",
   "a strong fit for this team", "at this stage", "the decision to
@@ -569,7 +574,12 @@ skills.** The tool-part → plain-words table extends the one lookup
 that already exists: `TOOL_LABELS` in `packages/agent/src/helpers.ts`,
 which `statusOf` uses for hover text (`design-web-ui.md` § 1.3). The
 second naming function, `displayName` in
-`apps/web/src/components/ToolRun.tsx:20`, folds into it. The designer's
+`apps/web/src/components/ToolRun.tsx:20`, folds into it in the separate
+`design-web-ui.md` § 3 amendment, not in this build: `TOOL_LABELS` is
+present progressive ("running a checker") and the collapsed line is
+past tense, so one table needs a tense split first, and
+`tests/web/e2e.mjs:86-91` finds the toggle by today's names (lead
+amendment, 2026-09-26, from the build's review). The designer's
 rows must not become a second table (rule 12). The shape:
 
 - it is keyed by tool name, and for `bash` by the script's file name;
@@ -601,15 +611,15 @@ architect, as a separate task. The designer's other UI rulings (the
 - [ ] `proposal_block` strings, Python + JS, parity green (§ 2, item 2)
 - [ ] `t6-track-assignment/expected.md` (§ 2, item 5)
 - [ ] `t13-ceiling/expected.md:10,28` and `judge_t13.sh:28` (§ 2, item 6)
-- [ ] `scan_voice.py`, `before.txt` / `after.txt`, `test_scan_voice.py`,
+- [ ] `scan_voice.py`, `before.txt` / `hard-coverage.txt` / `after.txt`, `test_scan_voice.py`,
       fixture scan test (§ 3)
 - [ ] `dump_tools.py --results`, in both copies (`tests/always-on/`,
       `kit/harness/`); `judge_voice.sh` (§ 4)
 - [ ] `t21-plain-report`: case dir with its captured real check output,
       its own runner, and a row in the cases table of
       `tests/always-on/README.md` (§ 4)
-- [ ] fixtures + scripted-text sweep; verdict-card suffix removed;
-      `ToolRun.tsx:20` `displayName` folded into `TOOL_LABELS` (§ 5)
+- [ ] fixtures + scripted-text sweep; verdict-card suffix removed (§ 5);
+      the `displayName` fold moves to the § 3 amendment task
 - [ ] the spend-gate `label` (`packages/agent/src/tools/index.ts:427`)
       is candidate-visible text: the live run's scan reads it (§ 4)
 - [ ] receipts row; `loading-map.md` regenerated; `docs/README.md` row

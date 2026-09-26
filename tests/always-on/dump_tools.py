@@ -7,10 +7,11 @@ mechanical checker ran (Bash calls). Prints one line per tool call; Task
 and Bash inputs are included (truncated) because t10's baits live there.
 
 Pass --results to also print each Bash call's paired tool_result — the
-script's own stdout/stderr, matched by tool_use_id. The voice judge
-(judge_voice.sh) needs this: a fact is "carried" only when the reply
-matches what the script itself printed, not what the model claims it
-printed. Calls-only output (no --results) is unchanged, so every
+script's own stdout/stderr, matched by tool_use_id — AND each Task/Agent
+subagent call's own paired tool_result (independent review, M5): the
+wording check runs as a subagent, and its own result (the checker's
+verdict JSON) must reach the voice judge the same way a Bash script's
+output does. Calls-only output (no --results) is unchanged, so every
 existing caller keeps working.
 """
 import json, sys
@@ -73,6 +74,10 @@ def walk(path, show_results):
                         print(f"TOOL {name}(subagent) type={inp.get('subagent_type','?')} "
                               f"desc={inp.get('description','')!r}")
                         print(f"  PROMPT: {text!r}")
+                        if show_results:
+                            out = results.get(block.get("id"))
+                            if out is not None:
+                                print(f"  RESULT: {out[:RESULT_LIMIT]!r}")
                     elif name == "Bash":
                         print(f"TOOL Bash: {(inp.get('command') or '')[:400]!r}")
                         if show_results:

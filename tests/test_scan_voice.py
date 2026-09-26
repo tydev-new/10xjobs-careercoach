@@ -2,10 +2,14 @@
 """Regression tests for tests/always-on/scan_voice.py.
 
 docs/design-plain-replies.md § 3, "Proved by": every line of before.txt
-(today's voice) gets at least one HARD hit, every line of after.txt (the
-plain target copy) gets none, English that shares a word with a label
-gets no HARD hit, and a candidate's own tokens get no HARD hit — proving
-the --candidate input actually matters.
+(today's voice, § 1's five quotes verbatim) matches its own tagged
+class — HARD where the leak is mechanically obvious, REVIEW where §3
+itself says a file name or "gate" needs a judge's reading, never
+neither. hard-coverage.txt separately proves every listed HARD pattern
+fires at least once. Every line of after.txt (the plain target copy)
+gets no HARD hit. English that shares a word with a label gets no HARD
+hit, and a candidate's own tokens get no HARD hit — proving the
+--candidate input actually matters.
 
     python3 tests/test_scan_voice.py
 """
@@ -23,12 +27,44 @@ def _lines(path):
         return [line.rstrip("\n") for line in f if line.strip()]
 
 
+def _tagged_lines(path):
+    """(expected_class, text) pairs from a "CLASS\\ttext" tagged fixture."""
+    out = []
+    for line in _lines(path):
+        cls, text = line.split("\t", 1)
+        out.append((cls, text))
+    return out
+
+
 def _hard(hits):
     return [h for h in hits if h.cls == sv.HARD]
 
 
-def test_every_before_line_gets_a_hard_hit():
-    for line in _lines(os.path.join(FIXTURES, "before.txt")):
+def test_before_lines_match_their_tagged_class():
+    # The five design § 1 quotes, verbatim, each tagged with the class
+    # scan_voice.py's own ruleset assigns it. Two are REVIEW, not HARD:
+    # a workspace file name (jobs.md, plan.md) used as the subject of a
+    # sentence, and "gate", are both mechanically indistinguishable from
+    # a legitimate pointer/plain word — design § 3 leaves those to the
+    # judge, so a HARD assertion on them would be a false claim about
+    # the spec, not a stricter test.
+    for expected_cls, line in _tagged_lines(os.path.join(FIXTURES, "before.txt")):
+        hits = sv.scan_text(line, set(), "reply")
+        classes = {h.cls for h in hits}
+        if expected_cls == "HARD":
+            assert "HARD" in classes, f"expected a HARD hit: {line!r}"
+        else:
+            assert expected_cls == "REVIEW", expected_cls
+            assert "HARD" not in classes, (
+                f"unexpected HARD hit(s) {[(h.cls, h.match) for h in hits]} in {line!r}")
+            assert "REVIEW" in classes, f"expected a REVIEW hit: {line!r}"
+
+
+def test_every_hard_coverage_line_gets_a_hard_hit():
+    # One line per HARD pattern not already exercised by before.txt's two
+    # HARD quotes (mechanical checks/language check, Track A): *.py,
+    # shown-but-unnamed, §, To Review, N/M held, DECISION in capitals.
+    for line in _lines(os.path.join(FIXTURES, "hard-coverage.txt")):
         hits = sv.scan_text(line, set(), "reply")
         assert _hard(hits), f"expected a HARD hit, got none: {line!r}"
 

@@ -27,7 +27,7 @@
         { "type": "tool-bash", "toolCallId": "call-3", "state": "output-available",
           "input": { "command": "python3 profile/scripts/check_files.py --workspace ." },
           "output": { "stdout": "\n1 file(s) checked against 11 schema(s); 0 failure(s).", "stderr": "", "exitCode": 0, "changed": [] } },
-        { "type": "text", "text": "Got it — I pulled your experience into base-resume.md. Before I can tailor anything, I need your target roles, a budget, and a goal date. Got a few minutes now?" }
+        { "type": "text", "text": "Got it — I've read your résumé and saved your experience as your base résumé. Before I tailor anything, I need three things: the roles you're aiming for, how much time you can give this each day, and when you'd like an offer by. Got a few minutes now?" }
       ]
     },
     {
@@ -51,7 +51,7 @@
         { "type": "tool-bash", "toolCallId": "call-6", "state": "output-available",
           "input": { "command": "python3 profile/scripts/check_files.py --workspace ." },
           "output": { "stdout": "\n3 file(s) checked against 11 schema(s); 0 failure(s).", "stderr": "", "exitCode": 0, "changed": [] } },
-        { "type": "text", "text": "Saved. Goal: offer by Nov 30, budget: 45 min/day. Paste a job posting whenever you've got one, or I can start finding roles for you." }
+        { "type": "text", "text": "Saved. Goal: an offer by Nov 30, with 45 minutes a day. Paste a job posting whenever you've got one, or I can start finding roles for you." }
       ]
     },
     {
@@ -96,7 +96,7 @@
           "track": "A",
           "reason": "8 years of B2B SaaS platform PM experience matches the core ask; partner-API story lines up with their stated ecosystem priority"
         } } },
-        { "type": "text", "text": "Strong Fit. It's on your job list now. Want me to tailor a resume and cover letter for this one?" }
+        { "type": "text", "text": "It's a Strong Fit, and it's on your job list now. Want me to tailor a résumé and cover letter for this one?" }
       ]
     },
     {
@@ -188,7 +188,7 @@
             { "text": "Tell me if you want me to keep looking for more Senior/Staff PM roles — 2 min — one search pass takes about that long" }
           ]
         } } },
-        { "type": "text", "text": "That's what's queued in your plan — send the letter, submit once you have, and tell me if you want more roles found." }
+        { "type": "text", "text": "That's your plan: send the letter, submit once you have, and tell me if you want more roles found." }
       ]
     }
   ]

@@ -2419,7 +2419,7 @@ The workspace's Home page (`design-web-ui.md` § 5, owner ruling
 2026-09-26) shows `plan.md`'s head lines and its Waiting on you and To do
 sections. Two plan readers exist in the web runtime today: `parsePlanTodo`
 (§ 6.2, To do only) and `waitingRows` in the check_closeout port
-(`packages/checkers/src/check-closeout.mjs:39-62`, Waiting on you only,
+(`packages/checkers/src/check-closeout.mjs:51-72`, Waiting on you only,
 parity-tested against `check_closeout.py`). A third, `apps/workspace-ui`'s
 own `parsePlan` (`apps/workspace-ui/server/workspace-core.mjs:71-95`), is
 **not used**: it invents priorities and due dates (rule 8). A new
@@ -2454,7 +2454,7 @@ export interface PlanBoard {
 - **Board labels** use check_closeout's own test: a line that begins
   with `Waiting on you`, `To do`, `Doing` or `Done`, case-sensitive,
   followed by a word boundary (`WAITING_RE`'s end test,
-  `check-closeout.mjs:39`). So `To do (2)` and `To do:` are labels. The
+  `check-closeout.mjs:49`). So `To do (2)` and `To do:` are labels. The
   first occurrence of each label wins.
 - **Waiting on you's items are `waitingRows(text)`**, unchanged, as its
   `text`, with `ref` = § 6.2's first backticked path in that text.
@@ -2472,6 +2472,8 @@ export interface PlanBoard {
   under a label form its pattern rejects, such as `Waiting on you (1)`),
   so Home says so loudly instead of showing an empty list.
 - It never extracts a why, a time, a priority or a date (§ 6.2, rule 8).
+  (The pages' minutes pill and sum come from § 18.1's two functions, run
+  on its output; `readPlanBoard` itself is unchanged.)
 - **One new import direction.** `packages/agent` imports
   `waitingRows` (`packages/checkers/src/check-closeout.mjs`) and
   `universalNewlines` and `restoreLineSeparators`
@@ -2487,13 +2489,13 @@ export interface PlanBoard {
   `<tmp>/packages/checkers/src`. This is a named, allowed change to a
   tester-owned test; no assertion changes. (Lead ruling, 2026-09-26, fix
   round 3.)
-- **Waits for a script fix.** Stage 3c (`design-web-ui.md` § 5.9) waits
-  for check_closeout's section-end fix: `##\b` never matched a `## `
-  heading, so a Waiting on you block ran on into `## Standing floor` /
-  `## Queue`. The fix (`check_closeout.py:30` and
-  `check-closeout.mjs:39` → `(?=^(?:(?:To do|Doing|Done)\b|#)|\Z)`) is
-  built separately. `readPlanBoard` never clips `waitingRows`' output
-  itself: a second section-end rule would be a second grammar (rule 12).
+- **The script fix it needed: landed, PR #10 (`6470cb6`).**
+  check_closeout's Waiting on you block used to run on into
+  `## Standing floor` / `## Queue`, because `##\b` never matched a `## `
+  heading. It now ends at any `#` line (`WAITING_RE`,
+  `check-closeout.mjs:49`; `waitingRows`, `:51`). `readPlanBoard` never
+  clips `waitingRows`' output itself: a second section-end rule would be
+  a second grammar (rule 12).
 
 **Every behaviour change against today's `parsePlanTodo`**
 (`packages/agent/src/helpers.ts:142-189`), each with its own table case:
@@ -2536,6 +2538,141 @@ here right now" over lines it couldn't read (rule 8).
   each of the four labels; `To do (2)`; a label missing; a file with no
   board; CRLF; and every row of the behaviour-change table above.
 
+### 18.1 Minutes on a plan line (amendment, 2026-09-26; the restore ruling)
+
+The owner's restore ruling (`design-web-ui.md` § 5, 2026-09-26) brings
+back time pills on plan lines and a "<N> of your <M> min a day" sum on
+Home. § 6.2 and § 18 said no plan reader extracts a time. That still
+holds for `parsePlanTodo`, the plan card and `readPlanBoard` itself,
+which stay unchanged. The pages call two small pure functions on what
+`readPlanBoard` returns. They read one field inside an item's text, not
+the plan's structure, so they are not a second grammar of `plan.md`:
+`readPlanBoard` still decides what an item is.
+
+```ts
+// packages/agent, exported beside readPlanBoard
+export function splitPlanMinutes(text: string):
+  { action: string; minutes: number; why?: string } | undefined;
+export function budgetMinutesPerDay(budgetLine: string | undefined): number | undefined;
+```
+
+**`splitPlanMinutes`** reads the form the fixtures use,
+`<action> — <n> min — <why>` (`apps/web/fixtures/mvp-journey.json`, the
+To do lines). Coach's schema says only "each with its why + minutes",
+which names the minutes in no form a page can read, so this is the only
+form read; a line in any other form shows as written. Coach's schema
+adopts this form as a chain fix (`design-web-ui.md` § 5.10, "Chain
+fixes").
+
+- It looks for a space, an em dash (U+2014), a space, a whole number
+  from 1 to 999 written without a leading zero, a space and `min`,
+  followed by a space, an em dash and a space, or by the end of the
+  text: `/ — ([1-9]\d{0,2}) min(?= — |$)/g`.
+- **Exactly one match**, with non-blank text before it: `action` is
+  the text before the match, `minutes` the number, and `why` the text
+  after the following ` — ` (absent when the match ends the text).
+  **No match, or more than one:** `undefined`, and the line shows as
+  written. Two matches would mean choosing one, and the page never
+  chooses.
+- `min` only. `5 mins`, `5 minutes`, `~5 min`, `5-10 min`, a hyphen or
+  en dash in place of the em dash, and a number with no dash before it
+  all return `undefined`. A line is never read more loosely to find a
+  number.
+- **Round trip:** whenever it returns, `action + " — " + minutes + "
+  min" + (why === undefined ? "" : " — " + why) === text`. On the page
+  the two ` — ` separators are replaced by the pill's layout; nothing
+  else in the line is lost (`design-web-ui.md` § 5.3, "The plan
+  item").
+
+**`budgetMinutesPerDay`** reads coach's own head-line form, `Budget: <N
+min/day | N min per session, cadence>` (coach `schema.md:23`), and only
+its per-day half: `/^Budget:\s*([1-9]\d{0,3})\s*min\/day\b/`, case
+sensitive, returns N. The per-session form, any other wording (such as
+`45 min a day`) and an absent line return `undefined`, and Home shows
+no sum.
+
+The sum itself (`design-web-ui.md` § 5.3) is code adding numbers that
+these two functions read (rule 14). It shows only when every To do item
+returns minutes and the budget returns a number.
+
+**Prevents:** a pill or a sum showing a number the line doesn't say
+(rule 8); a second grammar of the plan's structure (rule 12).
+**Proved by:** a table test for `splitPlanMinutes`: the fixture's three
+To do lines; a line ending ` — 10 min`; `5 minutes`; `5-10 min`;
+` - 5 min - `; an en dash; two matches; `0 min`; `05 min`; `1000 min`;
+no minutes; blank text before the match; and the round trip over every
+case that returns. For `budgetMinutesPerDay`: `Budget: 45 min/day`,
+`Budget: 60 min/day floor.` (`tests/always-on/cases/t8-routing/plan.md:3`),
+`Budget: 30 min per session, 3x a week`, `Budget: 45 min a day`,
+`Budget:45min/day`, and `undefined`, expecting in order 45, 60,
+`undefined`, `undefined`, 45 (the pattern allows no space around the
+number) and `undefined`. The four tables § 18 names still pass
+unchanged.
+
+---
+
+## 19. The application file's tables, for the Applications page (amendment, 2026-09-26; the restore ruling)
+
+The Applications detail (`design-web-ui.md` § 5.3) shows the
+application file's coverage rows and its cut list. `proposal_block`'s
+port already reads both tables (`table()`,
+`packages/checkers/src/proposal-block.mjs:18-29`, used at :80-89) and is
+parity-tested against the Python. A second table reader in the web app
+would be a second grammar of one file (rule 12). So the port gains one
+export, and its own `run()` is re-expressed through it.
+
+```js
+// packages/checkers/src/proposal-block.mjs
+export function proposalRows(text) /* → {
+  coverage: string[][] | null, // ## Coverage rows with exactly 4 cells, in file order; null when the header line is absent
+  cuts: string[][] | null,     // ## Selection rows with 7 cells whose in/out cell is `out`, in file order; null when the header line is absent
+  kept: string[][] | null,     // the same, for `in`
+  unreadable: string[][],      // rows under either header with the wrong cell count (4 for Coverage, 7 for Selection), as split
+} */;
+```
+
+- It does exactly what `run()` does today between reading the file and
+  building the output: `text.split("\\|").join("")`, `pySplitlines`,
+  each line trimmed, `table(lines, COVERAGE_HEADER)` and
+  `table(lines, SELECTION_HEADER)`, and the port's own in/out test,
+  `stripChars(r[3].toLowerCase(), "`*_ ")`. `run()` then uses
+  `coverage`, `cuts` and `kept` where it used `cov`, `outs` and `ins`.
+  Every place `run()` reads coverage rows already skips rows that don't
+  have 4 cells, so its output can't change. `run()` ignores
+  `unreadable`; the page shows those rows under `design-web-ui.md` § 5.2
+  rule 6's "Ten couldn't read these lines of <path>:" with the cells
+  joined back by ` | `, so a malformed row is said, not dropped.
+- **An escaped `\|` is removed, not kept.** `run()` deletes every `\|`
+  from the text before splitting (`proposal-block.mjs:75`), so a cell
+  written `a \| b` reads `a  b`. `proposalRows` does the same, and the
+  page shows what it returns.
+- The page passes the text through `universalNewlines` first, as the
+  port's own io does (`packages/checkers/src/io-node.mjs:33`), and puts
+  each returned cell through `restoreLineSeparators` before showing it
+  (as § 18).
+- `packages/agent` doesn't import it. The page imports it from
+  `packages/checkers` with the `// @ts-expect-error - plain .mjs, no
+  type declarations` line (§ 18's posture). `proposal-block.mjs`'s own
+  imports are `path-util.mjs`, `py-text.mjs`, `argx.mjs`,
+  `help-text.mjs` and `traceback.mjs`. **UNVERIFIED:** that none of
+  them touches `window`, `node:*` or the file system at import time; the
+  port's header says it "runs in Node AND in the browser", and 3d's
+  build proves it.
+
+**Prevents:** a coverage list or cut list on the page that differs from
+what `proposal_block` printed in the reply (rules 11, 12).
+**Proved by:** the `proposal_block` parity corpus
+(`packages/checkers/test/parity.mjs:444` onward and
+`tests/checkers-parity/extra.mjs:211` onward) passes **unchanged by this
+change** (a failing case goes back to the architect, never edited to
+pass). `design-plain-replies.md` changes two `proposal_block` output
+strings; whichever of the two changes lands second rebases onto the
+other's corpus. A table test for `proposalRows`: both tables present; a
+missing `## Coverage` header (`coverage === null`); a Selection table
+with no `out` row (`cuts` is `[]`); a row with the wrong cell count (in
+`unreadable`, not in `coverage` or `cuts`); a cell written `a \| b`
+(expected `a  b`); CRLF.
+
 ---
 
 ## Step-1 spikes
@@ -2566,6 +2703,12 @@ spike replaced (owner, 2026-09-23).
 
 ## Decision log
 
+- The restore ruling (owner, 2026-09-26, "approved recommendation for
+  1"; `design-web-ui.md` § 5): pages bring back more of direction C,
+  each piece tied to a file. Two readers follow: § 18.1 (minutes on a
+  plan line, beside an unchanged `readPlanBoard`) and § 19 (one new
+  export of the `proposal_block` port). No store change, no new tool,
+  no change to the gate.
 - Spend is the only web gate; nothing there sends or submits (owner, 09-22).
 - The gate opens from `estimate_cost`: one way in, one tool fewer.
 - Cards are code-built receipts of files (rule 11); the plan card shows lines

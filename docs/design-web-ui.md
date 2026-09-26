@@ -124,6 +124,74 @@ same shell. A recovery link shows § 1.10's "Choose a new password"
 before this check; forgot password and the expired-link line are
 § 1.10 too.
 
+**Amended 2026-09-26 (owner ruling, the restore ruling in § 5).** "Minimal"
+above now means one sign-in form, not a bare page. Beside the form the
+page adds a lead paragraph, three proof points and a product preview.
+Nothing else changes: the rule 1 line, the local link, the shared
+sign-in and the membership check stay as written above.
+
+- **The lead paragraph**, word for word: "Ten runs your search with
+  you: it scores the roles you bring it, tailors your résumé from your
+  own facts, and keeps a short plan of the few things only you can do."
+  The mockup said "it finds and scores roles". "Finds" is cut: the web
+  app loads only profile, evaluate, apply and coach (C § 4, `load_skill`),
+  so no skill in it finds roles yet. "Finds" returns to this paragraph
+  only when a role-finding capability ships in the web app, through its
+  own design (owner, 2026-09-26, in chat: add on-demand web job search
+  before the beta).
+- **The three proof points**, each checked against the skills. The
+  mockup's text is kept where it is true; two phrases are changed, and
+  the owner confirms the changed wording before stage 3f ships (§ 5.9).
+  1. **"A verdict on every role, with the reasons."** "Paste a posting.
+     Ten researches the company, scores the fit out of 100, and says why
+     in plain words." True in the web app: a role enters `jobs.md` there
+     only through `record_verdict`, whose `--verdict` is required
+     (`record_verdict.py:36`); a pasted posting gets the full evaluation,
+     which writes the company brief (evaluate's schema); the score is
+     bounded 0–100 (`record_verdict.py:46`). One caveat stays with it:
+     `--score` is optional (`record_verdict.py:37`), so a row can carry a verdict with no score
+     (Jobs shows no number then, § 5.3).
+  2. **"Tailored from your facts, never inflated."** "Ten picks from what
+     you gave it, never states a claim stronger than that, and shows you
+     what it cut." True: a tailored bullet must be the base résumé's own
+     sentence unless it is a declared, approved rewording, and
+     `check_materials` FAILs any other (apply's schema, `## Reworded`);
+     the cut list is `proposal_block`'s output, shown in the reply.
+  3. **Changed: "No big run without your yes."** The mockup's "Nothing
+     spent without your yes" overclaims: every turn spends credit, and a
+     turn may spend up to `spendGateUsd` with no yes (C § 4,
+     "Allowance"; promise 5 says the cost is shown "before any big
+     run"). Body: "Bigger jobs show a cost range first, and only your
+     typed yes starts them. In this app, you send and submit, not Ten."
+     The mockup's "Ten never sends or submits as you" is changed too:
+     it is true of this app (no send or submit tool, C § 4) and of
+     outreach ("The candidate sends everything", outreach `SKILL.md:10`),
+     but local apply submits a filled form on the candidate's explicit
+     word (apply `SKILL.md:57`), so "never" is not a product-wide truth.
+- **The product preview** is a static picture of Home built from
+  invented sample data: the Home page's own view component (§ 5.3),
+  rendered from its own props file, `apps/web/fixtures/signin-preview.json`,
+  never on anyone's files. That file is not `workspace-pages.json` (§ 5.7),
+  whose job is edge cases; it holds one ordinary, invented search: the
+  props Home's view takes, plus the invented `files` and `messages` they
+  come from (§ 4's shape). A test runs Home's real readers over those
+  files and messages and checks the result equals the props, so the
+  preview can't show what the readers wouldn't. Its text goes through
+  Stage 4's string review and `design-plain-replies.md` § 3's fixture
+  scan, like every fixture. It is marked `inert`, hidden from
+  assistive tech with one text alternative ("A preview of Ten's Home
+  page, with sample data"), and carries a visible caption "Sample
+  data". Because it is Home's own view, it can't show a feature Home
+  doesn't have. The designer places it (§ 5.6); on the phone the sign-in
+  form comes first in reading order.
+  *Prevents:* a signed-out page reading a store or showing a real
+  person's data; a preview that advertises what the product doesn't do
+  (rule 8). *Proved by:* an e2e run of the sign-in page on a spy store
+  and a spy transport (zero calls); the preview's text equals Home's
+  view rendered on `signin-preview.json`'s props, and those props equal
+  Home's readers run over its files; a bundle test finds the three proof
+  points and the lead paragraph word for word (stage 4).
+
 ### 1.5 Empty / first-run state
 
 Static UI copy, not a `UIMessage` sent to or from the model (nothing
@@ -384,6 +452,12 @@ instead. **Copy:** render each `text` as written, in file order, never
 reordered or summarized. The 2–4 count (`PRINCIPLES.md` rule 6) is
 coach's own rule to hold when it writes `plan.md`, not something this
 card enforces or checks.
+*Restore ruling (2026-09-26, § 5):* this card is unchanged. The pages
+(not the card) show a minutes pill, using one strict form read by C
+§ 18.1; only the two separators are replaced, and nothing else in the
+line is lost. The "wrong
+number" risk above is why that form is strict and a line in any other
+form shows as written (§ 5.3, "The plan item").
 
 ### 2.3 `document`
 
@@ -611,12 +685,67 @@ the record and its view can't disagree. `PRINCIPLES.md` rule 12's
 2026-09-26 note says what makes a page safe under "one of everything":
 it reads the file each time it shows it and keeps no copy.
 
+**The restore ruling (owner, 2026-09-26, in chat: "approved
+recommendation for 1").** The first cut of this section dropped much of
+direction C's mockup. The owner asked for the workspace to look like the
+mockup they picked, and approved the lead's list of what comes back:
+Ten's last reply on Home, an Active application card, time pills and a
+minutes sum on plan lines, detail views on Jobs and Applications, counts
+on the rail, "Verified / Unknown" tags on company facts, and a fuller
+sign-in page. Every restored piece is tied to the file it reads; pages
+still never write or send; the gate is still typed-yes only; nothing is
+invented (rule 8). **The one agreed exception to the mockup:** Home has
+no reply field. "Continue with Ten" opens Talk to Ten, where the
+composer is. Where a restored piece had no file behind it, or would
+say more than its file, it is cut or changed, and the place says why:
+
+- "Verified / Unknown" tags: **not shown as tags.** Evaluate tiers every
+  company claim (Verified / General knowledge / Unknown; evaluate
+  `references/patterns.md:179-182`, `references/eval.md:35-37`). The Jobs
+  detail shows those words wherever the brief wrote them, because each
+  section is shown word for word. Evaluate's schema gives a tier no
+  written form a page can read, so a tag would be the page guessing which
+  words are a tier (rule 8). Tags can come back the way the minutes pill
+  did, once evaluate's schema declares a form (§ 5.10, owner question 4).
+- The Found → Decided → Applying → Interview → Offer step names:
+  **the steps use `jobs.md`'s own stage words.** "Applying" would call a
+  submitted application unfinished, because a row moves to Applied only
+  after a confirmed submit (apply's schema, `jobs.md` bullet; apply
+  `SKILL.md:58`) (§ 5.3, "The stage steps").
+- "Format checks passed" and word counts on documents: **not shown on
+  pages.** They come from script output in the conversation, and no
+  file holds them (§ 5.3, Applications).
+- Two sign-in proof-point phrases: **changed** (§ 1.4).
+
 ### 5.1 The frame
 
 - **The rail** holds the five places, in the order above, plus the
   brand mark. It shows only to a signed-in member after setup (C § 11.6).
   Sign-in, not-a-member (§ 1.6), recovery (§ 1.10) and the setup error
   screen have no rail.
+- **Rail counts** (restore ruling). Three rail items carry a plain
+  number; Home and Talk to Ten carry none. Each is a count that code
+  reads, the same number the page itself shows:
+  - **Jobs:** the rows `load()` returns that are not dismissed, which is
+    the sum of Home's five stage counts. Never `jobs.md`'s own bold
+    `Active:` line (a second source for one number, § 5.3 Home).
+  - **Applications:** the entries `groupApplications` returns for
+    `store.list("applications")`, unlinked entries included, which is
+    the number of entries the Applications page lists.
+  - **Documents:** the files the Documents page lists: `store.list()`
+    minus `leads.md`.
+
+  A count shows only when it is above 0. The rail reads when the frame
+  first shows after setup and again when a turn ends, under § 5.2 rules
+  1 and 4. A failed read shows no number on that item, never a 0 or an
+  old number; the page itself shows the loud error (§ 5.2 rule 6). The
+  number is plain text, never a badge, and never amber or red (rule 8;
+  amber means needs-you only, § 5.6). Still no "In progress" entry and no
+  summary line (§ 5.6). The phone's tab bar carries no counts (§ 5.5).
+  *Prevents:* a rail number that disagrees with its page (rule 12).
+  *Proved by:* on the § 5.7 fixture, each rail number equals the count
+  its page shows; a table test for 0 (no number) and for a failing
+  `read` (no number, and the page shows its error).
 - **The header** moves from Talk to Ten to the frame, so it shows on
   every page: the avatar and its five states (§ 1.3), the balance chip
   (§ 1.1, § 1.11), the `⋯` menu (§ 1.7, § 1.10, § 1.11). Its behaviour
@@ -678,6 +807,12 @@ Each rule names what it prevents and the test that proves it.
    can't protect it (`jobs.md`'s own header says "change it via chat").
    *Proved by:* an e2e run through every page and every control on a
    spy store whose `write` and `upload` throw; zero calls.
+   *Restore ruling:* Home also reads the conversation, for Ten's last
+   reply (§ 5.3). Pages and the rail receive only `messages` and
+   `status` as props, never the `useChat` object. The rail's counts
+   (§ 5.1) follow this rule too. The same e2e run spies on every
+   function `useChat` returns; zero calls from any page or from the
+   rail.
 2. **Pages never send.** No page control sends a message or starts a
    turn. A turn spends the candidate's credit (promise 5), so only
    their own send in the composer starts one. A page may only open Talk
@@ -694,6 +829,16 @@ Each rule names what it prevents and the test that proves it.
    by a judgment. *Prevents:* a page saying more than its file.
    *Proved by:* table tests that render each fixture page and compare
    its text with the reader's output, string for string.
+   *Restore ruling:* besides counts and dates, exactly these computed
+   things are allowed, each with its own test in § 5.3 or C § 18.1:
+   splitting a plan line at its minutes into action, minutes and why
+   (the two separators become the pill's layout; nothing else in the
+   line is lost, C § 18.1); the To do minutes sum; the
+   280-character cut of Ten's last reply, marked with "…"; and static
+   label tables keyed by a file's exact words (§ 2.1's tier names, and
+   § 5.3's coverage-status and section labels). Choosing the plan lines
+   whose path matches an application's file ("Next, from you", § 5.3)
+   is selection by an exact match, not a computed next step.
 4. **Fresh reads, no copy.** A page reads its files when it's shown and
    again when a turn ends while it's showing. Nothing is kept in
    `localStorage`, `sessionStorage` or IndexedDB. While a turn is
@@ -703,6 +848,11 @@ Each rule names what it prevents and the test that proves it.
    `plan.md` while Home is showing: Home shows the new lines at turn
    end, with no reload; a grep finds no browser storage call in the
    page code.
+   *Restore ruling:* this covers a detail view's files too (a Jobs row's
+   analysis and company files, an application's notes file): read when
+   the row or entry is chosen and again when a turn ends while it shows.
+   Ten's last reply is derived from the frame's `messages` each time
+   Home renders; nothing is kept.
 5. **A card is a receipt; a page is now.** A card in the conversation
    shows its file as it was when the card was built (C § 6.2). A page
    shows the file as it is. They may differ, and neither is wrong.
@@ -742,38 +892,133 @@ store change. § 5.9 flags the stages that add or change a reader.
 
 #### Home: the state of the search
 
-**Shows**, top to bottom:
+**Shows**, top to bottom (restore ruling: the order follows the mockup;
+the designer sets the columns, § 5.6):
 
 - **The goal.** The `Goal:` line and the `Budget:` line from the head
   of `plan.md`, each as written, when present.
-- **Waiting on you**, then **To do**, from `plan.md § Board`: each
-  line as written, in file order, each with a chip for its first
-  backticked path (it opens the viewer). Waiting on you comes first
-  because coach's schema makes it the attention index (open questions
-  and gated decisions). If a section is absent, or has no items and no
-  unreadable lines, it reads "Nothing here right now." The 2–4 count is coach's rule to hold
-  when it writes the file; this page never enforces or checks it (as
-  § 2.2).
 - **The pipeline in numbers.** One count per active stage in the
   order `jobs.md` uses (To Review, Interested, Applied, Interviewing,
   Offer), then the dismissed count. A stage with no roles shows 0.
   These are the numbers promise 2 says change week to week. The page
   shows only today's numbers: no arrows, deltas, percentages or praise
   (rule 8). Each count opens Jobs at that stage.
-- **Continue with Ten**, which opens Talk to Ten with no draft.
+- **Ten's last reply** (restore ruling), with **Continue with Ten**,
+  which opens Talk to Ten with no draft. There is no reply field on
+  Home: the composer exists only in Talk to Ten (the owner's one
+  agreed exception to the mockup).
+  - *Where it comes from:* the frame's `messages`, the one conversation
+    `useChat` holds. That array is what C § 11 saves and restores (C
+    § 11.3, § 11.6), so it is "the saved conversation" without a second
+    read. Home never reads `ten_conversations` itself: a second read
+    would be a copy that lags by a turn (rule 12).
+  - *Which reply:* the latest `assistant` message that has at least one
+    text part holding more than whitespace, when no `user` message comes
+    after it. An assistant message with no text part is skipped: C
+    § 11.6's `gate-reconcile-…` message, which a load places last, is
+    data parts only.
+  - *When it is not shown:* no message qualifies; a `user` message comes
+    after the latest reply (the candidate's last message has no answer,
+    so an older reply would read as current); the message holds a
+    `data-error` part (§ 2.7), because its text can stop mid-work and
+    the error shows in Talk to Ten; the chat status is `error` (the
+    turn ended in a failure Talk to Ten shows); or a turn is running
+    (chat status `submitted` or `streaming`), when § 5.2 rule 4's working
+    line shows in its place. Continue with Ten shows in every case.
+  - *The quote:* that message's last text part holding more than
+    whitespace, with leading and trailing whitespace removed. If it is
+    longer than 280 code points, it is cut at the last whitespace at or
+    before the 280th code point; if there is no whitespace in the first
+    280, it is cut at the 280th code point. Either way "…" is added.
+    Nothing else changes: it is shown as Talk to Ten shows a text part
+    (plain text, `Transcript.tsx`), under the label "Ten · last reply".
+  - *Accepted risk:* a cut can drop a caveat that comes later in a long
+    reply (such as "the wording check hasn't run"). Accepted because
+    the "…" marks the cut and Continue with Ten shows the whole reply one
+    click away; the alternative, choosing which sentences to keep, would
+    be the page summarizing (§ 5.2 rule 3).
+  - *The activity line:* Home uses one exported function that returns
+    the whole collapsed line Talk to Ten shows, prefix included, over
+    `groupParts`' groups (`Transcript.tsx:35`, exported): one line per
+    tool group in the message, in order. Home adds no words of its own.
+    No tool parts, no line. When the § 3 amendment that
+    `design-plain-replies.md` § 5 names lands (the one label table
+    becomes `TOOL_LABELS` in `packages/agent/src/helpers.ts`;
+    `ToolRun.tsx:20` `displayName` folds into it), both places change
+    together.
+  - *Prevents:* a quote Ten never said; an old reply shown as the answer
+    to a newer message; a second copy of the conversation. *Proved by:*
+    a table test over message arrays: a plain reply; a reply over 280
+    code points (the shown text minus "…" is a prefix of the part and
+    ends before whitespace); 300 code points with no whitespace (the
+    first 280 and "…"); a last text part that is only whitespace (the
+    one before it is quoted); the reconcile message last; a `user`
+    message last; a `data-error` part; no text part; status `error`;
+    each running status. An e2e case: a mock turn ends while Home shows, and the
+    quote becomes the new reply with no reload.
+- **Waiting on you**, then **To do**, from `plan.md § Board`: each
+  line in file order, each with a chip for its first backticked path
+  (it opens the viewer), each shown through **the plan item** (below):
+  word for word, with a minutes pill when the line carries minutes in
+  C § 18.1's form. Waiting on you comes first because coach's schema
+  makes it the attention index (open questions and gated decisions).
+  If a section is absent, or has no items and no unreadable lines, it
+  reads "Nothing here right now." The 2–4 count is coach's rule to
+  hold when it writes the file; this page never enforces or checks it
+  (as § 2.2).
+  - **The minutes sum** (restore ruling) sits in To do's header and
+    reads "<N> of your <M> min a day". It shows only when all of these
+    hold: To do has at least one item and no unreadable lines; every To
+    do item carries minutes (C § 18.1); and `budgetLine` gives minutes
+    per day (C § 18.1). N is the sum of the To do items' minutes; M is
+    the budget's. In any other case nothing shows there: no partial
+    sum, no "about", no estimate. Waiting on you's minutes are never
+    summed: coach's schema sizes only To do to the budget ("each with
+    its why + minutes, fitting the budget").
+  - *Prevents:* a sum that quietly leaves out an item with no minutes,
+    and so reads smaller than the real work; a per-session budget shown
+    as "a day". *Proved by:* table tests: every item with minutes; one
+    item without (no sum); a `Budget:` line per session (no sum);
+    `Budget: 60 min/day floor.` (sums); N greater than M (shown as is,
+    no warning style).
+- **Active application** (restore ruling), when there is one.
+  - *Which one:* among the Applications page's entries (below) that link
+    to a `jobs.md` row that is not dismissed, the first in that page's
+    order (newest change first). This is the page's fixed sort key, not
+    a judgment. None: the card isn't shown. More than one: the card
+    shows the first, and its header adds "The most recently changed of
+    N" with a link to Applications.
+  - *Shows:* `Company — Title` and Location from the row, as written;
+    the tier label (§ 2.1's table) and the score when the row has one;
+    **the stage steps** (below) from the row; the row's Seen and Updated
+    dates, date part as written, each with its own label ("Seen",
+    "Updated"); the entry's files as chips that open the viewer; and
+    **Next, from you**, described under Applications. An "Open" link
+    opens Applications with this entry chosen.
+  - *Prevents:* the mockup's summary "send the cover letter, then
+    submit", which is a computed next step (rule 8). *Proved by:* on the
+    fixture, the card's role is the first linked live entry, its lines
+    equal the plan lines whose `ref` matches, and a fixture with two
+    live entries shows "The most recently changed of 2".
 
-**Reads:** `plan.md` and `jobs.md`.
+**Reads:** `plan.md`, `jobs.md`, `store.list("applications")`, and the
+frame's `messages` and chat status.
 **Parsed by:** `readPlanBoard` (a new export of `packages/agent`, C
 § 18: the one reader behind both this page and `parsePlanTodo`; its
-Waiting on you items are check_closeout's own `waitingRows`, reused), and
-the `jobs_md` port's `load()` (`packages/checkers/src/jobs-md.mjs`, the
+Waiting on you items are check_closeout's own `waitingRows`, reused);
+`splitPlanMinutes` and `budgetMinutesPerDay` (**new**, C § 18.1); the
+`jobs_md` port's `load()` (`packages/checkers/src/jobs-md.mjs`, the
 parity-tested port of `jobs_md.py`), through the read-only store
-adapter described under Jobs. Counts are rows by stage, counted by code
-(rule 14). The page never reads `jobs.md`'s own bold `Active:` line,
-which would be a second source for one number.
+adapter described under Jobs; and `groupApplications` (Applications).
+Counts are rows by stage, counted by code (rule 14). The page never
+reads `jobs.md`'s own bold `Active:` line, which would be a second
+source for one number. The last reply needs no parser.
 **Empty** (the two files have no items and no unreadable lines between
 them, which includes neither file existing): "Nothing here yet. Ten writes your plan and your
-pipeline as you work together." and Continue with Ten.
+pipeline as you work together." and Continue with Ten. Ten's last
+reply still shows above it when one qualifies. **Home's view is a pure
+component** that takes what the readers return as props, so sign-in's
+preview (§ 1.4) renders the same view on the fixture.
 
 #### Talk to Ten: the conversation
 
@@ -803,9 +1048,79 @@ Row controls: **Open analysis** opens the row's `JD` file (`jd_file`)
 in the viewer; with none, the row reads "No analysis file linked" (C
 § 6.2's own wording). **Ask Ten about this** (§ 5.4).
 
-**Reads:** `jobs.md`.
+**The role's detail** (restore ruling). Choosing a row shows its detail
+beside the list (the designer places it, § 5.6; on the phone the detail
+replaces the list, with a back control). When Jobs opens, the first row
+in page order is chosen, or the first row of the stage a Home count
+opened; with no rows there is no detail. The detail shows, top to
+bottom, only the parts whose source exists:
+
+1. **The header:** `Company — Title` and Location, then the date part of
+   Seen, Updated and Evaluated, each as written with its own label.
+2. **The verdict:** the tier label (§ 2.1's table), the Score as
+   "<n>/100" when the row has one (no Score, no number: `--score` is
+   optional, `record_verdict.py:37`), Reason word for word with the
+   quick-scan badge, Dealbreakers ("none" when absent, § 2.1), and
+   Track. All from the `jobs.md` row, never from the analysis file's own
+   `## Verdict:` heading: the row is the script-written record and a
+   re-verdict replaces it, while the file's heading can be older (one
+   place per fact, rule 12).
+3. **The posting link:** the row's URL under § 5.2 rule 7. The posting's
+   text (`jd-inbox/`) is not shown; the ruling names the link only.
+4. **From the analysis file** (the row's `JD` field, as an exact path):
+   - **"What they're asking for"**: the section whose heading starts
+     `Competency extraction` (evaluate's schema: the top competencies,
+     in priority order).
+   - **"How you fit"**: the section whose heading starts
+     `Fit assessment`. The rest of the heading, such as `(Track A
+     lens)`, is shown as written after the label.
+5. **From the company file** (the row's `Company file` field, as an
+   exact path, never guessed from the company name):
+   - **"About <Company>"**: the section whose heading starts `Snapshot`
+     (stage, size, funding, dated signals, the sources consulted).
+   - **"Culture and hiring signals"**: the section whose heading starts
+     `Culture & hiring signals`. It holds the schema's "what I could NOT
+     find" line, so the candidate sees what research didn't cover next
+     to what it did.
+
+   **"Verified / Unknown" are not shown as tags.** Evaluate tiers every
+   company claim (Verified / General knowledge / Unknown; evaluate
+   `references/patterns.md:179-182`, `references/eval.md:35-37`), and
+   these sections show those words wherever the brief wrote them,
+   because each section is shown word for word. Evaluate's schema gives
+   a tier no written form a page can read, so a tag would be the page
+   guessing which words are a tier (rule 8). Tags can come back the way
+   the minutes pill did, once evaluate's schema declares a form (§ 5.10,
+   owner question 4).
+6. **Controls:** Open analysis (as on the row); **Open company notes**
+   when the row has a `Company file`; **Open application** when an
+   Applications entry links to this row (it opens Applications with that
+   entry chosen); **Ask Ten about this** (§ 5.4).
+
+Each section body goes through `MarkdownView`, word for word (§ 5.2
+rule 8). Evaluate's quick-scan tier writes neither file (evaluate
+`SKILL.md:49`), so a row with no `JD` or no `Company file` is normal:
+those parts are left out, and the row's own "No analysis file linked"
+line stays. A field that names a file which doesn't exist shows one
+line in that part's place, "<path> isn't in your workspace.", because a
+link that points nowhere is said, not hidden. A file that exists but has
+none of the named headings shows none of them; its Open control is
+still there. Any other read failure shows § 5.2 rule 6's error, with
+Retry, in that file's place only.
+*Prevents:* a page that restates the analysis; a company link guessed
+from a name; a tag that claims verification no file records. *Proved
+by:* on the fixture, each shown section's text equals that section in
+the file, string for string; a quick-scan row shows no analysis or
+company parts; a table test for a missing file, a failing read and a
+file with none of the headings.
+
+**Reads:** `jobs.md`; for the chosen row, its `JD` file and `Company
+file`.
 **Parsed by:** `load(io, "")` from `packages/checkers/src/jobs-md.mjs`,
-unchanged. The only new code is a read-only `io` adapter over the store
+unchanged, and, for the detail, `splitSections` (**new**, "Pieces the
+pages share", below).
+The store adapter is the only other new code: a read-only `io` adapter
+over the store
 (`apps/web/src/workspace/store-io.ts`): `exists(p)` is true when
 `read(p)` succeeds and false on `resource_missing` (any other error is
 thrown, so § 5.2 rule 6 can show it); `readFile(p)` returns the text;
@@ -834,8 +1149,64 @@ entry has:
 Entries are ordered newest change first, by the latest `updatedAt` among
 the entry's files (`FileInfo`, C § 2). **Ask Ten about this** (§ 5.4).
 
+**The application's detail** (restore ruling). Choosing an entry shows
+its detail, placed as Jobs' is. When Applications opens, the first entry
+in page order is chosen, or the entry that Home's card or a Jobs detail
+opened. The detail shows only the parts whose source exists:
+
+1. **The header:** the role label; from a linked row, the tier label and
+   the score when it has one, and **Role details**, which opens Jobs with
+   that row chosen. An unlinked entry shows "Not linked to a role in
+   your pipeline." and then only its files (part 3).
+2. **Where it stands:** **the stage steps** (below) from the linked row.
+   A dismissed row shows "Dismissed" and its note, as the entry does.
+3. **Its files**, as on the entry, each opening the viewer. **No "Format
+   checks passed" badge and no word count:** both come from script
+   output in the conversation (`check_materials` and `render_resume`
+   stdout, C § 6.2), and no file holds them. The conversation's cards
+   already show them, dated by their turn (§ 5.2 rule 5).
+4. **Next, from you:** the plan items, Waiting on you and then To do,
+   in file order, whose `ref` (C § 18: the first backticked path) is one
+   of this entry's file paths or the linked row's `JD` path. Each is
+   shown through the plan item (below). No match: the part is left
+   out. These are `plan.md`'s own lines, chosen by an exact path match;
+   the page never writes a next step of its own (§ 5.2 rule 3).
+5. **"What the posting asks for, and your evidence":** the notes file's
+   `## Coverage` rows, from `proposalRows` (C § 19). Each row shows its
+   requirement and evidence word for word and its status through a
+   static label table: `have` → "Covered", `shown-but-unnamed` →
+   "Shown, not named", `gap` → "Gap"; any other value as written. The
+   decision column is shown word for word (`open`, `answered`,
+   `skipped`). It stays because the plan holds only one "gap interview
+   open" line for the whole application while any row is `open` (apply
+   `references/schema.md:111-114`), and hiding the column would hide
+   which gaps were `skipped`.
+6. **"What Ten cut, weakest fit first":** the Selection table's `out`
+   rows, from `proposalRows` (C § 19), in file order (apply's schema:
+   written weakest-first for this posting). Each shows its role, the
+   whole bullet and its why, word for word. These are the same rows
+   `proposal_block` printed in the reply.
+
+The **notes file** is the entry's `<key>.md` or `<key>-application.md`
+(see "Parsed by"). An entry with both shows neither's tables and says
+so in one line: "This role has two notes files, <a> and <b>, so this
+page shows neither's tables." Choosing one would be a guess. A table
+whose header is absent, or that has no rows, is left out. Rows under
+either header with the wrong cell count (`proposalRows`' `unreadable`)
+show under § 5.2 rule 6's "Ten couldn't read these lines of <path>:",
+cells joined by ` | `, never dropped. A read failure shows § 5.2 rule
+6's error in parts 5 and 6 only.
+*Prevents:* checker results shown with no file behind them; a
+coverage or cut list that differs from what `proposal_block` printed; a
+computed next step (rule 8). *Proved by:* on the fixture, the coverage
+rows and cut rows equal `proposalRows`' output field by field, and
+"Next, from you" equals the plan items whose `ref` matches; a table test
+for an entry with both notes files, a notes file with no `## Coverage`,
+a row with the wrong cell count (shown as unreadable), and an unlinked
+entry.
+
 **Reads:** `store.list("applications")`, and `jobs.md` through the same
-`load()`.
+`load()`; for the chosen entry, its notes file and `plan.md`.
 **Parsed by:** a new pure function, `groupApplications(paths)`
 (`apps/web/src/workspace/applications.ts`). It reads **file names
 only**, never file contents. The key is the name with the first
@@ -852,6 +1223,9 @@ page reads either). The **link** to `jobs.md` is exact: the row whose
 `JD` field is `jd-analysis/<key>.md`. Both file names come from the
 same `company_key` + `title_key` (apply and evaluate schemas), so an
 exact match is the only honest join.
+For the detail, `readPlanBoard` and `splitPlanMinutes` (C § 18, § 18.1)
+and `proposalRows` (C § 19, a **changed** reader: one new export of the
+parity-tested `proposal_block` port).
 **Empty:** "No applications yet. When you decide to apply for a role,
 Ten drafts the materials and they show here."
 
@@ -880,15 +1254,105 @@ about this** (§ 5.4).
 **Empty** (the list is empty): "No files yet. Drop your résumé into the
 conversation to start."
 
+#### Pieces the pages share (restore ruling)
+
+**The plan item.** One component shows a plan item wherever a page
+shows one (Home's two lists, "Next, from you" on Home's card and on an
+application). It takes the item's `text` and `ref` from `readPlanBoard`
+and runs `splitPlanMinutes` (C § 18.1) on the text:
+
+- **The line carries minutes:** it shows the action, a pill "<n> min",
+  and the why under it, when there is one. The action and the why are
+  the line's own text and the pill holds its own minutes; the two ` — `
+  separators are replaced by the layout, and nothing else in the line
+  is lost (C § 18.1's round-trip test).
+  Backticked paths inside the action stay as written.
+- **No minutes, or not in C § 18.1's form:** the line as written, with
+  no pill. A line is never given minutes it doesn't carry, and a pill
+  is never estimated.
+- The chip for `ref` opens the viewer, as before.
+
+The conversation's plan card (§ 2.2) is **unchanged**: it is a receipt
+built from `parsePlanTodo` and still shows each line word for word with
+no split (C § 6.2). Pages and the card may look different for the same
+line; § 5.2 rule 5 already allows that.
+
+**The stage steps.** Five steps in `STAGES` order
+(`packages/checkers/src/jobs-md.mjs:27`), each labelled with
+`jobs.md`'s own stage words: **To Review, Interested, Applied,
+Interviewing, Offer**. These are the same words the Jobs groups and
+Home's counts use, so one stage has one name everywhere (rule 18).
+
+- The row's stage is the current step (`aria-current="step"`). Only
+  the current step is marked; every other step is drawn the same,
+  before or after it.
+- **No check marks and no dates on steps.** `jobs.md` records a row's
+  current stage, not the stages it passed through or when: a row can
+  enter at Interviewing directly (coach `patterns.md:71`), and `Updated`
+  changes on any edit, a re-verdict included (`record_verdict.py:67`,
+  `update_job.py:37`). So a step never claims "done on <date>". The
+  row's Seen and Updated dates show beside the steps with their own
+  labels (Home's card; the Jobs detail's header).
+- A dismissed row gets no steps.
+- **Not taken from the mockup:** the names Found, Decided, Applying and
+  Interview. "Applying" would call a submitted application unfinished:
+  a row moves to Applied only after a confirmed submit (apply's schema,
+  the `jobs.md` bullet; apply `SKILL.md:58`). A role whose materials are
+  ready but not sent still sits at To Review or Interested, and the
+  steps say so. The other three renames would give one stage two names.
+  Owner question 3 in § 5.10 asks whether to keep this.
+*Prevents:* a step that says more than the row records (rule 8).
+*Proved by:* a table test over each stage and a dismissed row: exactly
+one current step, every other step drawn alike, no check mark, no date
+inside the steps.
+
+**`splitSections(md)`** (**new**, `apps/web/src/workspace/sections.ts`).
+The Jobs detail uses it to show named parts of evaluate's two prose
+files. Evaluate's schema says "no script parses this file — every
+consumer reads it as prose"; this function doesn't parse the prose
+either. It only finds where each `## ` section starts and ends, and
+each body is still shown whole, through `MarkdownView`.
+
+```ts
+export function splitSections(md: string): { heading: string; body: string }[];
+export function pickSection(
+  sections: { heading: string; body: string }[],
+  prefix: string,
+): { heading: string; body: string } | undefined;
+```
+
+- Line endings go through `universalNewlines` first and every returned
+  string through `restoreLineSeparators` (`packages/checkers/src/py-text.mjs`),
+  as `readPlanBoard` does (C § 18).
+- A section starts at a line that begins `## ` (two `#` and a space).
+  Its `heading` is the rest of that line, trimmed. Its `body` is every
+  line after it, word for word, up to the next line that begins `## `
+  or `# `, or the end of the file. `### ` lines stay inside the body.
+  Lines before the first `## ` belong to no section.
+- `pickSection` returns the first section whose heading starts with
+  `prefix`, case-sensitive, or nothing.
+- **Known limit:** a `## ` line inside a fenced code block still starts
+  a section. Evaluate's schema puts no fenced blocks in either file.
+- **Not reused, and why:** `headings()` in
+  `packages/checkers/src/check-files.mjs:334` returns heading names only,
+  never bodies; `MarkdownView` renders blocks but exposes no sections.
+  Neither can be reused without changing it.
+*Prevents:* a second markdown renderer; a page that rewords an
+analysis. *Proved by:* a table test: a file with all of evaluate's
+headings; a `### ` inside a section; `## Fit assessment (Track A
+lens)` found by the prefix `Fit assessment`; a heading that's absent;
+CRLF; a file with no `## ` line; a `# ` line ending a section.
+
 ### 5.4 How the conversation and the pages link
 
 - **Into the viewer.** A chip or card `ref` in the conversation opens
   the side panel, as today (§ 1.1). A file on any page opens the same
   viewer (§ 5.2 rule 8).
-- **Continue with Ten** (Home) opens Talk to Ten, composer focused, no
-  draft.
-- **Ask Ten about this** (a Jobs row, an Applications entry, a Documents
-  file) opens Talk to Ten and puts a draft in the composer: `About
+- **Continue with Ten** (Home, beside Ten's last reply) opens Talk to
+  Ten, composer focused, no draft. Home has no reply field (restore
+  ruling).
+- **Ask Ten about this** (a Jobs row or its detail, an Applications
+  entry or its detail, a Documents file) opens Talk to Ten and puts a draft in the composer: `About
   <label>: `, where `<label>` is `Company — Title` for a role, or the
   path for a file. The draft is one line, capped at 120 characters (a
   longer label is cut to fit). The draft goes in **only when the composer is
@@ -901,50 +1365,919 @@ conversation to start."
   with `About `. *Proved by:* `matchGateReply(draft, "typed") ===
   "none"` for every draft form, including a role whose company is
   literally "yes".
-- **Pages to pages.** A Home count opens Jobs at that stage. Nothing
-  else links page to page in this step.
+- **Pages to pages.** A Home count opens Jobs at that stage, with its
+  first row chosen. Restore ruling: Home's Active application "Open"
+  opens Applications with that entry chosen; a Jobs detail's "Open
+  application" opens Applications with the linked entry chosen; an
+  application's "Role details" opens Jobs with the linked row chosen.
+  Every one of these follows an exact link (the `JD` join, § 5.3),
+  changes only which page and item show (app state, § 5.1), and never
+  sends or writes (§ 5.2 rules 1 and 2). Nothing else links page to
+  page in this step. *Proved by:* one e2e case per link on the fixture,
+  on the spy store and spy transport.
 
-### 5.5 Phone (placeholder until the designer's pick)
+### 5.5 Phone (filled 2026-09-26 from direction C)
 
-The designer's round-2 direction picks how the rail works at 375px (a
-bottom bar, a menu, or something else). Whatever it picks must hold
-these, and the tester checks them at exactly 375px:
+The pattern, at a frame width of 760px or less (the container query in
+§ 5.6, "Breakpoint"). The tester checks it at exactly 375px.
 
-- every place is reachable from any page in at most two taps;
-- the header (avatar, balance chip, `⋯`) shows on every page;
-- no horizontal scroll; tap targets ≥ 44px (§ 1.2);
-- the composer is never covered by the navigation, including with the
-  keyboard up (`design-web-ui-refresh.md`, "Phone / keyboard-up");
-- the viewer is a full-screen sheet with a back arrow (§ 1.2).
+- **The rail becomes a five-tab bar** at the bottom of the frame. Order,
+  left to right: **Home · Jobs · Ten · Applications · Documents**. Ten
+  (Talk to Ten) sits in the centre, because the composer is the one
+  place to type. This reorders § 5.1's rail order for the phone only;
+  the rail keeps § 5.1's order. Each place is **one tap** from any page.
+  - Tab: a column 48px high with the icon (20px, margin 5px 0) over the
+    label (`--type-tab`, 11px/1, weight 500). Rest: `--fg-subtle`.
+    Current: `--fg`, with `aria-current="page"`.
+  - The Ten tab replaces its icon with a tile 44×30px, radius 10px:
+    `--hero` fill with a `--lime` icon at rest; `--lime` fill with an
+    `--on-lime` icon when current. Its label reads "Ten".
+  - The needs-your-yes marker on the phone is an 8px `--amber` dot at
+    the Ten tile's top-right corner (`top: 4px; right: calc(50% - 26px)`),
+    with a 2px `--bg` ring and visually hidden text "Needs your yes".
+    No count and no alert styling (§ 5.6, chain rules).
+  - The bar is `display: grid; grid-template-columns: repeat(5, 1fr)`,
+    padding `6px 4px calc(8px + env(safe-area-inset-bottom))`, `--bg`
+    fill, and a 1px `--border` top rule. It is a row of the frame's
+    grid, **never `position: fixed`**, so it can't cover anything.
+- **The header shows on every page**, 54px high:
+  - the page title (`--type-header` at 16px) on the left;
+  - on the right, Ten's avatar (§ 1.3) and the balance chip. The chip
+    shows the amount only, and a tap opens Buy credit (§ 1.11). The
+    `⋯` menu button sits last. Each has a 44×44px hit area.
+  - No wordmark on the phone.
+- **The viewer is a full-screen sheet** (§ 1.2). It covers the page and
+  header area below the status bar, `z-index: 30`, with a back arrow
+  (44×44px, `arrow-left`) at the top left. It enters with a 320ms
+  `translateY(24px)` plus fade under `prefers-reduced-motion:
+  no-preference`; otherwise it appears at once. Back, or the Escape
+  key, closes it and returns focus to the row or chip that opened it.
+- **Keyboard up.**
+  - `index.html`'s viewport meta becomes `width=device-width,
+    initial-scale=1, viewport-fit=cover,
+    interactive-widget=resizes-content`.
+  - The frame sizes to `height: 100vh; height: 100dvh;` (fallback line
+    first, as `.app-shell` does today).
+  - The composer stays in normal flow at the foot of Talk to Ten's page,
+    never fixed.
+  - While the composer has focus at 760px or less, the tab bar is
+    hidden: `.frame:has(.composer:focus-within) .tabbar { display: none; }`.
+    Nothing then sits between the composer and the keyboard. The bar
+    returns on blur.
+  - iOS Safari ignores `interactive-widget`. There the browser scrolls
+    the focused composer into view, and with the bar hidden nothing
+    covers it.
+- **No horizontal scroll.** Home's pipeline counts become a 3 × 2 grid
+  on the phone (see Home in § 5.6). Every list is one column. A long
+  path or URL wraps with `overflow-wrap: anywhere`.
+- **Tap targets ≥ 44px.** At 760px or less:
+  - every button, icon button, menu item, rail tab and row control gets
+    `min-height: 44px`;
+  - icon buttons are 44×44px.
+- **The rest of the phone layout.**
+  - Home's two plan cards stack.
+  - Jobs, Applications and Documents are the list alone. A file opens
+    the sheet above.
+  - The account menu (`⋯`) opens under the header, spanning the width
+    with 8px side margins.
 
-### 5.6 Visual spec: SLOT for the designer's chosen direction
+### 5.6 Visual spec: direction C (filled 2026-09-26)
 
-> **Slot, not yet filled.** The designer is producing direction C
-> (round 2) in `design/directions/2026-09-26-r2/` on another branch. On
-> the owner's pick, this subsection gets: the token table (color, type,
-> space, radius, elevation, motion), the fonts and their fallback
-> stacks, the one icon set and its license, the brand mark, the rail's
-> look and its item states (rest, hover, current, focus-visible, the
-> needs-you marker), the page layouts (list plus viewer), the empty-
-> state look, the phone navigation pattern (§ 5.5), and each
-> component's states (rest, hover, focus-visible, disabled, loading,
-> error).
+**Source.** Direction C, round 2:
+`design/directions/2026-09-26-r2/direction-c-home.html`, on branch
+`worktree-agent-a7b2db3c5da9cc5ae` at commit `99c4ef9`. The owner
+picked it on 2026-09-26. **Where the mockup and § 1–§ 5 disagree, this
+subsection follows § 1–§ 5.** "Where this differs from the mockup" at
+the end lists each case.
 
-Whatever fills the slot must already agree with the chain, or it goes
-back to the owner:
+**Stages.** Stage 1 (§ 5.9) takes the tokens, fonts, icons, brand mark
+and component states below and applies them to today's screens. Items
+marked **(Stage 2)** are layout: the rail, the frame header, the tab
+bar, the page layouts and the conversation's message layout. They land
+with the frame, not in Stage 1.
 
-- **Light only.** The 2026-09-24 ruling at the top of this doc stands;
-  the owner confirmed on 2026-09-26 that light is the production
-  default and dark is optional later (§ 5.10, Q1). Dark tokens may exist
-  dormant, as today.
-- One accent. Amber is only for `needs-you` (§ 1.3). No alert-styled
-  count badges (`design-references.md`, Huntr and Teal; rule 8).
-- A rail summary line, if the design keeps one, uses words the files
-  support. Round 1's "3 things queued this week" says more than
-  `plan.md` does, since To do items carry no week. Say "3 to-dos".
-- Tokens are CSS custom properties in `apps/web/src/styles.css`. No UI
-  framework or CSS build step is added; the round-1 README recommends
-  the same, and rule 18 makes deletion the default.
+#### Chain rules this spec keeps
+
+These must agree with the chain, or the spec goes back to the owner:
+
+- **Light only.** The 2026-09-24 ruling at the top of this doc stands.
+  The owner confirmed on 2026-09-26 that light is the production default
+  and dark is optional later (§ 5.10, Q1). The dark values below stay
+  dormant under `[data-theme="dark"]`, as today.
+- **One accent: lime `#C8F03C`.** Every other hue is a status color.
+  - Lime is a fill only, never text on a light ground (it is 1.4:1
+    against white). Its whole use list is:
+    1. the brand mark's "0";
+    2. the Continue with Ten button;
+    3. the phone's Ten tab;
+    4. the selected amount in Buy credit (`--lime-soft`);
+    5. the toast's check icon;
+    6. the sign-in headline's underline. This is the owner's "one bold
+       touch" (2026-09-26).
+  - Amber is only for needs-you (§ 1.3). No alert-styled count badges
+    (`design-references.md`, Huntr and Teal; rule 8).
+- **No rail summary line.** The rail shows the five places and nothing
+  else: no counts, no "In progress", no to-do line. Home carries the
+  numbers. Deletion is the default (rule 18). If a summary is ever
+  added, it says "3 to-dos", never "this week".
+  **To restore (restore ruling, § 5):** the counts come back on Jobs,
+  Applications and Documents, defined in § 5.1 ("Rail counts"). "No
+  'In progress'" and "no to-do line" still hold. The designer specs the
+  count's style: plain text, never a badge, never amber or red.
+- **Tokens are CSS custom properties** in `apps/web/src/styles.css`'s
+  token block. No UI framework, no CSS build step. Stage 1's exit grep
+  finds no hex, `rgb(` or `rgba(` outside that block. The favicon file
+  is an asset, not a stylesheet.
+
+#### Fonts
+
+All four are self-hosted through `@fontsource` and imported in
+`apps/web/src/main.tsx`, as today. They are never loaded from Google or
+any font CDN at runtime.
+
+| Token | Family (weights) | Package | Fallback stack (in the token) |
+|---|---|---|---|
+| `--font-display` | Bricolage Grotesque Variable (500–700) | `@fontsource-variable/bricolage-grotesque` **5.3.0**, new, OFL-1.1 | `ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif` |
+| `--font-sans` | Inter Variable (400–700) | `@fontsource-variable/inter`, kept | `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif` |
+| `--font-serif` | Source Serif 4 Variable (400–600) | `@fontsource-variable/source-serif-4`, kept | `Georgia, "Times New Roman", serif` |
+| `--font-mono` | JetBrains Mono (400, 500) | `@fontsource/jetbrains-mono`, kept (400.css, 500.css) | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` |
+
+- **Removed:** `@fontsource-variable/fraunces`, from `package.json` and
+  from `main.tsx`. Bricolage takes every job Fraunces did.
+- **Bricolage** is for:
+  - the wordmark;
+  - Home's goal line and pipeline counts;
+  - a verdict's score;
+  - dialog titles;
+  - the gate card's action title;
+  - empty-state first sentences;
+  - the sign-in headline.
+
+  Nowhere else.
+- **Inter** is for all other UI and prose.
+- **Source Serif 4** is only for résumé and cover-letter `.md` in the
+  viewer (`.side-panel-body--document`, as today).
+- **JetBrains Mono** is only for:
+  - file paths in the viewer's meta row;
+  - the literal tool input and output in an expanded activity row;
+  - the `yes` key cap in the gate card.
+
+#### The token block
+
+Stage 1 pastes this block over today's token block in `styles.css`.
+
+Old names that go:
+
+- `--accent`, `--accent-soft`, `--on-accent` map to `--primary` for
+  buttons, links, selected states and the old sign-in logo color. A use
+  that meant "the brand color" becomes `--lime` only if it is on the use
+  list above.
+- `--code-bg` becomes `--bg-sunken`.
+- `--text-*`, `--leading-*` and `--weight-*` become the `--type-*`
+  shorthands.
+- `--duration-enter` becomes `--duration-base`.
+- `--duration-slow` is re-used: it is now the 320ms slide duration.
+- `--radius` stays as an alias of `--radius-md`.
+
+Values are the same in both themes where only one is given.
+
+```css
+:root {
+  color-scheme: light;
+  /* ground and surfaces */
+  --bg: #FFFFFF;            /* header, lists, conversation */
+  --bg-canvas: #F7F8FA;     /* Home, the viewer's canvas */
+  --bg-rail: #F4F5F7;
+  --bg-panel: #FFFFFF;      /* cards, composer, dialog, menu, current rail item */
+  --bg-sunken: #F7F8FA;     /* activity pill, gate line, raw tool output, code */
+  --bg-muted: #EEF0F3;      /* segmented track, skeleton, disabled button */
+  --bg-hover: #EEF0F3;
+  --bg-press: #E4E7EB;
+  --paper: #FFFFFF;         /* the document page; stays white in dark, it is what prints */
+  --ink: #16181D;           /* text on --paper */
+  --border: #E4E6EB;
+  --border-strong: #D0D4DB;
+  --border-input: #8A9099;  /* text-field edge, 3.2:1 on white (WCAG 1.4.11) */
+  /* text */
+  --fg: #0A0A0B;
+  --fg-muted: #4A4F57;
+  --fg-subtle: #656A73;     /* 5.4:1 on white, 4.8:1 on --bg-muted */
+  /* actions */
+  --primary: #0A0A0B;
+  --primary-hover: #25272B;
+  --primary-press: #000000;
+  --on-primary: #FFFFFF;
+  --lime: #C8F03C;
+  --lime-hover: #B9E22A;
+  --lime-press: #A9D11C;
+  --on-lime: #0A0A0B;
+  --lime-soft: #F1FAD3;
+  --lime-ink: #3D5700;
+  --hero: #0B0C0E;          /* the Continue with Ten band, the mark's tile, the toast */
+  --on-hero: #F4F5F7;
+  --on-hero-muted: #A3A8B0;
+  --focus: #0A0A0B;
+  --focus-halo: rgba(10, 10, 11, 0.12);
+  /* status (a category, never urgency) */
+  --green: #157F3C;  --green-soft: #E9F6EE;  --green-border: #BFE3CB;
+  --amber: #9A5B07;  --amber-soft: #FFF6E6;  --amber-border: #F0D29C;  /* needs-you only */
+  --red: #B42318;    --red-soft: #FEF3F2;    --red-border: #F5C7C1;
+  --scrim: rgba(10, 10, 11, 0.34);
+  /* type families: the table above */
+  --font-display: "Bricolage Grotesque Variable", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-sans: "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-serif: "Source Serif 4 Variable", Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* type scale: font shorthand, then tracking */
+  --type-display: 600 60px/62px var(--font-display);   --track-display: -0.035em;
+  --type-page: 600 28px/34px var(--font-display);      --track-page: -0.025em;
+  --type-number: 600 30px/32px var(--font-display);    --track-number: -0.03em;
+  --type-dialog: 600 22px/28px var(--font-display);    --track-dialog: -0.02em;
+  --type-empty: 600 20px/26px var(--font-display);     --track-empty: -0.02em;
+  --type-gate: 600 17px/24px var(--font-display);      --track-gate: -0.015em;
+  --type-wordmark: 700 21px/1 var(--font-display);     --track-wordmark: -0.03em;
+  --type-header: 600 17px/24px var(--font-sans);       --track-header: -0.01em;
+  --type-card-title: 600 15px/22px var(--font-sans);
+  --type-body: 400 15.5px/26px var(--font-sans);       /* Ten's prose, your turns */
+  --type-body-sm: 400 14.5px/22px var(--font-sans);    /* card bodies, rows, dialog text */
+  --type-ui: 500 14px/20px var(--font-sans);           /* rail items, menu items, row titles */
+  --type-button: 600 14px/1 var(--font-sans);
+  --type-meta: 400 13px/18px var(--font-sans);
+  --type-small: 500 12.5px/17px var(--font-sans);      /* pills, chips, activity line */
+  --type-tab: 500 11px/1 var(--font-sans);
+  --type-mono: 400 12px/17px var(--font-mono);
+  --type-doc: 400 16px/1.55 var(--font-serif);
+  /* space (4px base) */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-16: 64px;
+  /* layout */
+  --rail-w: 248px; --header-h: 60px; --panel-w: 460px; --thread-max: 760px; --page-max: 1040px;
+  /* radius */
+  --radius-xs: 6px; --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-xl: 20px;
+  --radius-full: 999px; --radius: var(--radius-md);
+  /* elevation: e0 is a 1px --border hairline, no token */
+  --shadow-1: 0 1px 2px rgba(16, 18, 22, 0.05), 0 0 0 1px rgba(16, 18, 22, 0.07);
+  --shadow-2: 0 2px 4px -1px rgba(16, 18, 22, 0.06), 0 10px 24px -8px rgba(16, 18, 22, 0.12), 0 0 0 1px rgba(16, 18, 22, 0.07);
+  --shadow-3: 0 28px 64px -16px rgba(16, 18, 22, 0.26), 0 8px 20px -8px rgba(16, 18, 22, 0.12), 0 0 0 1px rgba(16, 18, 22, 0.08);
+  /* motion */
+  --duration-fast: 120ms;   /* hover, press */
+  --duration-base: 200ms;   /* chevrons, dialog pop, card entrance */
+  --duration-slow: 320ms;   /* viewer slide, toast rise */
+  --duration-spin: 900ms;
+  --duration-pulse: 1600ms;
+  --duration-shimmer: 1800ms;
+  --duration-done: 2000ms;  /* the avatar's done ring fading out */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+[data-theme="dark"] {       /* dormant: never reached by the real app */
+  color-scheme: dark;
+  --bg: #0E0F11; --bg-canvas: #111215; --bg-rail: #131417; --bg-panel: #17181B;
+  --bg-sunken: #1C1D21; --bg-muted: #23252A; --bg-hover: #1F2125; --bg-press: #26282D;
+  --border: #26282D; --border-strong: #353840; --border-input: #6E737C;
+  --fg: #F2F3F5; --fg-muted: #A3A8B0; --fg-subtle: #8A9099;
+  --primary: #F2F3F5; --primary-hover: #D9DBDF; --primary-press: #FFFFFF; --on-primary: #0A0A0B;
+  --lime-hover: #D4F65C; --lime-press: #B9E22A; --lime-soft: #222A0C; --lime-ink: #D7F57A;
+  --hero: #1A1C20;
+  --focus: #F2F3F5; --focus-halo: rgba(242, 243, 245, 0.18);
+  --green: #4ADE80;  --green-soft: #12301C;  --green-border: #1F5131;
+  --amber: #F5B454;  --amber-soft: #33260F;  --amber-border: #664A18;
+  --red: #F97066;    --red-soft: #3A1714;    --red-border: #6E2A24;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.07);
+  --shadow-2: 0 10px 24px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --shadow-3: 0 28px 64px -16px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+```
+
+**Contrast.** Computed, not eyeballed. Every text/ground pair used
+below is at least 4.5:1:
+
+| Pair | Ratio |
+|---|---|
+| `--fg-subtle` on `--bg-muted` (the weakest) | 4.76 |
+| `--green` on `--green-soft` | 4.57 |
+| `--amber` on `--amber-soft` | 5.05 |
+| `--red` on `--red-soft` | 6.05 |
+| `--lime-ink` on `--lime-soft` | 7.56 |
+| `--on-hero-muted` on `--hero` | 8.19 |
+| `--on-lime` on `--lime` | 15.1 |
+
+Stage 1's tester recomputes all of them.
+
+**Type on the phone** (760px or less):
+
+- `--type-display` becomes `600 42px/44px`;
+- `--type-page` becomes `600 22px/28px`;
+- `--type-number` becomes `600 24px/26px`;
+- `--type-header` becomes `600 16px/22px`.
+
+**Numbers** (scores, counts, money) use `font-variant-numeric:
+tabular-nums`.
+
+#### Focus, motion, breakpoint, stacking
+
+- **Focus ring**, on every control:
+  - `outline: 2px solid var(--focus); outline-offset: 2px;` on
+    `:focus-visible` only, with the element's own radius.
+  - On the `--hero` band the ring is `--on-hero`.
+  - Text fields: `border-color: var(--fg); box-shadow: 0 0 0 3px
+    var(--focus-halo);`.
+  - The ring is ink, not a second hue, because of the one accent.
+- **Motion.**
+  - Color, background and shadow transitions on hover and press run
+    `--duration-fast var(--ease-standard)` always, since nothing moves.
+  - Every `transform`, every keyframe animation and every size change
+    sits inside `@media (prefers-reduced-motion: no-preference)`:
+    spinner, shimmer, streaming caret, pulses, viewer slide, dialog pop,
+    toast rise, card entrance and skeleton pulse.
+  - Outside that query each element shows its still end state:
+    - the spinner becomes a static `loader-circle`;
+    - the shimmer becomes plain `--fg-muted` text;
+    - the caret becomes a solid block;
+    - the rings described under "Ten's avatar" hold still.
+  - Card entrance: opacity 0 → 1 with `translateY(4px)` → 0, over
+    `--duration-base var(--ease-out)`. The card is already complete
+    when it enters (§ 1.1).
+- **Breakpoint.** The frame root is a size container: `.frame {
+  container: frame / inline-size; }`. The phone pattern (§ 5.5) is
+  `@container frame (max-width: 760px)`. Between 761px and 1100px the
+  pinned viewer turns into a drawer, `@container frame (max-width:
+  1100px)`: it overlays from the right at `min(var(--panel-w), 100%)`,
+  with `--shadow-3`, a close ✕ and `z-index: 30`. Media queries are for
+  the sign-in screen only, which has no frame.
+- **Stacking**, the only `z-index` values:
+  - 30: viewer drawer and phone sheet;
+  - 40: `⋯` menu;
+  - 50: dialog scrim (Buy credit, delete confirmation, set password);
+  - 60: toast.
+
+  The rail, header and tab bar are grid rows and columns with no
+  `z-index`. Escape closes the top-most first: dialog, then menu, then
+  sheet.
+
+#### Icons
+
+Lucide, version **1.48.0**, ISC license.
+
+- **How they ship.** The path data is copied once from the
+  `lucide-static@1.48.0` package into one local module,
+  `apps/web/src/icons.tsx`, with Lucide's ISC notice at the top. No
+  icon package is added as a dependency, and no icon is fetched from a
+  CDN.
+- **How each icon renders.** `<Icon name size />` returns
+  `<svg viewBox="0 0 24 24" width={size} height={size} fill="none"
+  stroke="currentColor" stroke-width="1.75" stroke-linecap="round"
+  stroke-linejoin="round" aria-hidden="true">`. Sizes are 13, 14, 15,
+  16, 17, 18 or 20px, as each component names. A control whose only
+  content is an icon carries an `aria-label`.
+- **One icon per meaning:**
+
+| Icon | Meaning |
+|---|---|
+| `house` | Home |
+| `message-square` | Talk to Ten |
+| `briefcase` | Jobs, a role |
+| `layers` | Applications |
+| `files` | Documents |
+| `wallet` | credit, a cost |
+| `ellipsis` | the `⋯` menu |
+| `file-text` | a file or document |
+| `panel-right` | opens in the viewer |
+| `x` | close |
+| `arrow-left` | back |
+| `arrow-right` | continue |
+| `chevron-right` | expand, or a row that opens |
+| `chevron-down` | a closed group |
+| `circle-check` | done or passed |
+| `circle-dot` | not run |
+| `loader-circle` | working |
+| `hourglass` | needs your yes |
+| `circle-alert` | error |
+| `list-todo` | To do, plan |
+| `user` | Waiting on you |
+| `paperclip` | attach |
+| `link` | a job link |
+| `arrow-up` | send |
+| `square` | stop |
+| `printer` | print |
+| `copy` | copy text |
+| `external-link` | a web link (§ 5.2 rule 7) |
+| `corner-down-left` | type `yes` |
+| `wallet` in the menu | Buy credit |
+| `folder-down` | export workspace |
+| `key-round` | set a new password |
+| `trash-2` | delete my beta data |
+| `log-out` | sign out |
+| `mail` | email link |
+| `lock` | the sign-in trust line |
+| `check` | inline pass |
+
+- **Activity rows** (the future § 3 table, `design-plain-replies.md`
+  § 5) use:
+
+| Icon | Step |
+|---|---|
+| `book-open` | read |
+| `pencil-line` | write |
+| `file-pen` | wrote a document |
+| `globe` | opened a posting |
+| `search` | web search |
+| `file-search` | fit analysis |
+| `building-2` | company notes |
+| `scissors` | what was cut |
+| `target` | targets |
+
+No emoji. No sparkle icon.
+
+#### The brand mark
+
+A rounded tile holding a "1" bar and an oval "0": Ten, read as the
+numeral.
+
+- **The mark (inline in the app).** The fills are tokens, so the dark
+  theme follows:
+
+```html
+<svg class="mark" width="28" height="28" viewBox="0 0 32 32" role="img" aria-label="Ten">
+  <rect width="32" height="32" rx="9" fill="var(--hero)"/>
+  <rect x="7" y="8.5" width="3.6" height="15" rx="1.8" fill="var(--on-hero)"/>
+  <ellipse cx="19.4" cy="16" rx="4.6" ry="5.7" fill="none" stroke="var(--lime)" stroke-width="3.6"/>
+</svg>
+```
+
+- **Sizes.** 28px in the rail, the header avatar and the conversation.
+  30px on sign-in. 24px on the Continue with Ten band. On the `--hero`
+  band the tile inverts: fill `var(--on-hero)`, "1" `var(--hero)`, "0"
+  `var(--hero)`.
+- **The wordmark.** The mark, a 9px gap, then live text "Ten" in
+  `--type-wordmark` with `--track-wordmark`, color `--fg`. It is text,
+  not outlined, so it takes the self-hosted font.
+- **The favicon.** A new file, `apps/web/public/favicon.svg`, linked
+  from `index.html` as `<link rel="icon" type="image/svg+xml"
+  href="/favicon.svg">`. It uses heavier strokes so it reads at 16px:
+
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0A0A0B"/><rect x="6.5" y="8" width="4.4" height="16" rx="2.2" fill="#FFFFFF"/><ellipse cx="19.6" cy="16" rx="4.4" ry="5.8" fill="none" stroke="#C8F03C" stroke-width="4.4"/></svg>
+```
+
+#### Component states
+
+Every control has these five states:
+
+- **rest**;
+- **hover**;
+- **pressed** (`:active`);
+- **focus-visible**: the ring above;
+- **disabled**: `--bg-muted` fill, `--fg-subtle` text, no shadow,
+  `cursor: not-allowed`.
+
+The sections below name only what differs.
+
+**Buttons.** Base style for all variants:
+
+- radius `--radius-sm`, `--type-button`, icon 16px with an 8px gap;
+- sizes: sm 32px high with 0 11px padding at 13px; md 38px high with
+  0 14px padding; lg 46px high with 0 18px padding at 15px and radius
+  10px.
+
+| Variant | Rest | Hover | Pressed |
+|---|---|---|---|
+| **pri** | `--primary` fill, `--on-primary` text | `--primary-hover` | `--primary-press` |
+| **lime** (Continue with Ten only) | `--lime` fill, `--on-lime` text | `--lime-hover` | `--lime-press` |
+| **sec** | `--bg-panel` fill, `--fg` text, `inset 0 0 0 1px var(--border-strong)` | `--bg-hover` | `--bg-press` |
+| **ghost** | transparent, `--fg-muted` text | `--bg-hover`, `--fg` | `--bg-press` |
+
+- **Loading** holds the width (min-width set to the rendered width)
+  and keeps the label. A 16px spinning `loader-circle` takes the icon
+  slot, with `aria-busy="true"`. A button never changes size or label
+  while loading.
+- **Icon button:** 34×34px, radius `--radius-sm`, `--fg-muted`. Hover:
+  `--bg-hover` and `--fg`. Pressed: `--bg-press`.
+
+**Rail item (Stage 2).**
+
+- Rail: `--rail-w` wide, `--bg-rail` fill, a 1px `--border` right
+  rule, padding 14px 10px 10px. The wordmark row has padding 4px 8px
+  16px. Items stack with a 2px gap.
+- Item: 36px high, padding 0 10px, radius `--radius-sm`, icon 18px with
+  a 10px gap, `--type-ui`, `white-space: nowrap`.
+
+| State | Look |
+|---|---|
+| Rest | `--fg-muted` text, `--fg-subtle` icon |
+| Hover | `--bg-hover`, `--fg` text |
+| Pressed | `--bg-press` |
+| Current | `--bg-panel`, `--fg` text and icon, `--shadow-1`, `aria-current="page"` |
+
+- **The needs-your-yes marker** (§ 5.1) sits on Talk to Ten with
+  `margin-left: auto`:
+  - a pill 20px high, padding 0 7px, radius full, `--amber-soft` fill,
+    `--amber` text, `0 0 0 1px var(--amber-border)`;
+  - text 11px/1 at weight 600: the words "Needs your yes" after a 6px
+    `--amber` dot;
+  - the dot pulses (opacity 1 → 0.5, `--duration-pulse`) under
+    `no-preference`.
+
+**Frame header (Stage 2).**
+
+- `--header-h` high, `--bg` fill, a 1px `--border` bottom rule, padding
+  0 20px 0 28px.
+- The page title in `--type-header` on the left. On the right, with
+  12px gaps: Ten's avatar, the balance chip, and the `⋯` icon button.
+
+**Ten's avatar** (§ 1.3, in the header):
+
+- The 28px mark. A ring drawn as a `::after` 3px outside the tile,
+  radius 11px, 2px wide, carries the state.
+- Rings by state:
+
+| State | Ring | Motion (`no-preference` only) | Reduced motion |
+|---|---|---|---|
+| **idle** | none | none | none |
+| **thinking** | `--border-strong` | opacity pulse, `--duration-pulse` | static |
+| **working** | a `--fg` arc (conic) | rotates in `--duration-spin`, linear | a static `--fg-muted` ring, dashed |
+| **needs-you** | `--amber` | opacity pulse, `--duration-pulse` | static |
+| **done** | `--green` | fades to none over `--duration-done` | none |
+
+- Hover and the accessible name stay § 1.3's text.
+- No visible state word sits beside the avatar.
+
+**Balance chip.**
+
+- 34px high, radius full, padding 0 4px 0 12px, `--bg-panel` fill,
+  `0 0 0 1px var(--border)`, `--type-ui` in `--fg-muted`.
+- `wallet` icon (16px), then the amount in `--fg` at weight 600,
+  tabular.
+- Inside it, a nested pri button, 26px high, radius full, padding 0
+  11px, 12.5px at weight 600, labelled "Buy credit" (§ 1.11).
+- At `$0.00` (§ 1.1) the chip takes `--amber-soft`, `--amber` and
+  `--amber-border`: a fact, not an alarm. It is never red.
+
+**The `⋯` menu.**
+
+- 260px wide, radius 14px, padding 6px, `--bg-panel`, `--shadow-3`.
+  Anchored right under its button, 6px below.
+- Items: 36px high, padding 0 10px, radius `--radius-sm`, `--type-ui`,
+  16px `--fg-muted` icons. Hover: `--bg-hover`.
+- Items are § 1's, in § 1's order. A 1px `--border` divider sits before
+  "Delete my beta data", which is `--red` text and icon.
+
+**Composer** (Talk to Ten only).
+
+- `--bg-panel` fill, radius `--radius-lg`, `--shadow-2`, padding 12px
+  12px 10px 16px.
+- The input is `--type-body` at 15.5px/24px, with the placeholder in
+  `--fg-subtle`.
+- The row below holds the attach icon button, then a "link" sm pill,
+  then the send button at the far right. The pill: 32px high, radius
+  full, `inset 0 0 0 1px var(--border)`, `--type-small`.
+- **Send:** 34×34px, radius 10px, pri colors. Empty input: disabled.
+  While a turn runs it becomes **Stop** (`square` icon, 13px), same
+  size and place.
+- **Focus-within:** `0 0 0 1.5px var(--fg)` plus `--shadow-2`.
+- **Gate pending:** `0 0 0 2px var(--amber-border)` plus `--shadow-2`.
+  This is the only amber on the composer.
+- The `/` skill picker still opens on `/` (§ 1.1). It has no visible
+  "/skills" label.
+
+**Activity line** (the collapsed "ran …" line, § 3). This is its look
+only. Its words change only by the § 3 amendment that
+`design-plain-replies.md` § 5 names.
+
+- **Collapsed:**
+  - a pill 30px high, padding 0 10px 0 8px, radius full, `--bg-sunken`
+    fill, `0 0 0 1px var(--border)`, `--type-small` in `--fg-muted`;
+  - a 15px leading icon: `circle-check` in `--green` when done;
+  - the step count in `--fg-subtle`, then `chevron-right`, which turns
+    90° over `--duration-base` when open.
+- **Hover:** `--bg-hover`, `--fg`.
+- **Live** (a tool part not yet done):
+  - `--bg-panel` fill, `0 0 0 1px var(--border-strong)`, `--fg` text;
+  - a spinning `loader-circle`;
+  - the label shimmers, a gradient clip over `--duration-shimmer`,
+    under `no-preference`;
+  - it lists only finished steps and the running one.
+- **Expanded:**
+  - rows sit under a 1.5px `--border` left rule, indented 14px;
+  - each row is 13.5px/19px with a 16px `--fg-subtle` icon;
+  - the literal input and output use `--type-mono` at 11.5px, on
+    `--bg-sunken`, radius `--radius-xs`, padding 6px 8px,
+    `overflow-wrap: anywhere` (rule 11).
+
+**Document row and chip** (a card's `ref`, and every file row on a
+page):
+
+- Padding 10px 12px, radius `--radius-md`, `--bg-panel`, `--shadow-1`.
+- A 34×40px icon tile (radius 6px, `--bg-sunken`, `inset 0 0 0 1px
+  var(--border)`, `file-text` 17px in `--fg-muted`).
+- The name in `--type-ui` at weight 600, one line with an ellipsis.
+- The meta line in `--type-small` at weight 400, `--fg-muted`. The
+  automatic-checks result shows as `check` 13px plus the words in
+  `--green`. "Wording check not run" stays `--fg-muted` (§ 2.4).
+- A trailing `panel-right` 16px in `--fg-subtle`.
+
+| State | Look |
+|---|---|
+| Hover | `--shadow-2` |
+| Pressed | `scale(0.995)`, under `no-preference` |
+| Open in the viewer | `0 0 0 2px var(--fg)` plus `--shadow-1` |
+
+**Cards** (§ 2):
+
+- **Base:** `--bg-panel`, radius `--radius-lg`, `--shadow-1`, padding
+  16px 18px, max-width 600px in the thread. Title in
+  `--type-card-title`, body in `--type-body-sm` and `--fg-muted`.
+- **Verdict:**
+  - a 36px initial tile (radius 10px, `--hero` fill, `--on-hero` text,
+    Bricolage 700 at 15px) holding the first letter of `company`;
+  - the title and a `company · location` meta line;
+  - the score in `--type-number` with "/100" in `--type-meta` and
+    `--fg-subtle`, right-aligned (the scripts write 0–100,
+    `record_verdict.py:46`);
+  - the tier pill, then the reason.
+- **Tier pills:** 24px high, radius full, padding 0 9px 0 8px, 12.5px/1
+  at weight 600. The words carry the meaning; color only marks the
+  category.
+
+| Tier | Fill | Text | Extra |
+|---|---|---|---|
+| Strong Fit | `--green-soft` | `--green` | `check` 13px |
+| Investable Stretch | `--bg-panel` | `--fg` | `0 0 0 1px var(--border-strong)` |
+| Long-Shot Stretch | `--bg-sunken` | `--fg-muted` | `0 0 0 1px var(--border)` |
+| Weak Fit | `--bg-muted` | `--fg-muted` | — |
+| Quick scan (badge) | `--bg-muted` | `--fg-muted` | — |
+
+- **Plan lines** (the § 2.2 card and Home's lists):
+  - each row is padding 12px 18px with a 1px `--border` top rule;
+  - an 18px decorative ring (1.5px `--border-strong`, `aria-hidden`);
+  - the line as written in `--type-body-sm` at weight 500;
+  - under it, the path chip, 28px high, radius `--radius-sm`, `0 0 0
+    1px var(--border)`, `--type-small`, with `file-text` 14px.
+- **Checker:** pass shows `circle-check` in `--green`. FAIL is "styled
+  distinct, not alarm-red" (§ 2.4): `--bg-sunken`, `0 0 0 1px
+  var(--border-strong)`, `circle-dot` in `--fg`.
+- **Cost:** a 34px `wallet` tile, the action in `--type-ui`, the
+  balance in `--type-meta`, and the range right-aligned at 15px/20px,
+  weight 600, tabular.
+- **Gate** (§ 2.5):
+  - `0 0 0 1px var(--amber-border)` plus `--shadow-2`;
+  - a header band in `--amber-soft` and `--amber` with `hourglass`;
+  - the action title in `--type-gate`;
+  - the gate text as its lines;
+  - the gate line in a block of `--bg-sunken`, `0 0 0 1px
+    var(--border)`, 14.5px/21px at weight 600;
+  - the instruction row with `corner-down-left` and a `yes` key cap:
+    22px high, `--type-mono` at weight 600, `inset 0 0 0 1px
+    var(--border-strong), inset 0 -2px 0 var(--border-strong)`.
+  - Approved: the band turns `--green-soft` / `--green` with
+    `circle-check`, and the shadow drops to `--shadow-1`. There is no
+    button, ever.
+- **Error** (§ 2.7):
+  - `--red-soft` fill, `0 0 0 1px var(--red-border)`, radius
+    `--radius-md`, padding 14px 16px;
+  - `circle-alert` 18px in `--red`;
+  - `message` as sent, in `--type-body-sm` and `--fg`;
+  - no button (§ 1.11).
+
+**Messages (Stage 2).**
+
+- The thread is `--thread-max` wide, centred.
+- Each turn is a 32px avatar column plus the content, with 26px
+  between turns.
+- Ten's avatar is the 28px mark. Yours is a 28px circle, `--bg-muted`,
+  holding `user` 15px in `--fg-muted`. Above each turn, the name ("Ten"
+  or "You") in `--type-ui` at weight 600.
+- Prose is `--type-body`.
+
+**Toast.**
+
+- Bottom centre, 28px from the bottom (84px on the phone, above the
+  tab bar). `--hero` fill, `--on-hero` text, radius 12px, padding 10px
+  12px 10px 14px, `--type-ui`, `--shadow-3`.
+- `circle-check` 18px in `--lime`, then an `x` dismiss.
+- `role="status"`. It rises over `--duration-slow` and leaves after 4 s.
+- Its only use: the credited line of § 1.11.
+
+**Dialog** (Buy credit, § 1.11; delete, § 1.7; password, § 1.10):
+
+- `--scrim` over the frame. The box is `min(460px, 100% - 32px)` wide,
+  radius 18px, padding 22px 24px 20px, `--bg-panel`, `--shadow-3`.
+- Title in `--type-dialog`, a ✕ icon button, body in `--type-body-sm`
+  and `--fg-muted`.
+- It enters with a pop, `translateY(8px) scale(0.98)` → none over
+  `--duration-base`.
+- Focus is trapped while open and returns to the opener.
+- **Buy credit's amounts:** three 54px buttons, radius 12px, 20px
+  Bricolage at weight 600.
+
+| State | Look |
+|---|---|
+| Rest | `inset 0 0 0 1px var(--border-strong)` |
+| Hover | `--bg-hover` |
+| Selected | `inset 0 0 0 2px var(--fg)`, `--lime-soft` fill |
+
+- PayPal's buttons render as PayPal's SDK draws them.
+
+**Skeleton.**
+
+- `--bg-muted` blocks, radius 6px, sized to the final content so
+  nothing shifts.
+- They pulse in opacity 1 → 0.55 over 1400ms under `no-preference`.
+- A page list loading shows three 64px row skeletons. The viewer
+  loading shows a paper with five text-line blocks.
+
+**Empty state** (every "Empty" in § 5.3).
+
+- It sits centred in its pane:
+  - a 56px tile (radius 16px, `--bg-panel`, `--shadow-1`) holding the
+    page's rail icon at 26px, stroke 1.5, in `--fg-muted`;
+  - then the first sentence of § 5.3's empty text in `--type-empty`,
+    with the rest in `--type-body-sm` and `--fg-muted`, max 380px wide.
+    Same words; only the type differs.
+  - then one button: Home's "Continue with Ten" (lime lg). The other
+    pages get a sec md "Talk to Ten", which only opens Talk to Ten
+    (§ 5.2 rule 2).
+- **Unreadable file** (§ 5.2 rule 6) uses the error card's shape in
+  neutral colors: `--bg-panel`, `0 0 0 1px var(--border-strong)`, and
+  `circle-alert` in `--red`, followed by a Retry sec sm button.
+- **The working line** (§ 5.2 rule 4): a pill with `--bg-sunken`,
+  `--type-small`, `--fg-muted`, and a spinning `loader-circle`, above
+  the page content.
+
+#### Page layouts (Stage 2)
+
+- **Frame.**
+  - Desktop: `grid-template-columns: var(--rail-w) minmax(0, 1fr)`.
+    The page area is `grid-template-rows: var(--header-h) minmax(0, 1fr)`.
+  - Phone: § 5.5.
+  - Every grid child that holds text gets `min-width: 0`.
+- **The viewer**, on Talk to Ten, Jobs, Applications and Documents:
+  - a pinned right column, `--panel-w` wide, as § 1.1's side panel is
+    today, with "Nothing open yet." when empty;
+  - on Home it appears only while a file is open, with a ✕;
+  - it follows § 5.2 rule 8.
+  - The panel: `--bg-canvas`, a 1px `--border` left rule, and a header
+    in `--bg` holding the file name in `--type-ui` at weight 600 and the
+    path in `--type-mono` at 11.5px in `--fg-subtle`.
+  - Résumé and letter `.md` render on a paper: `--paper` fill,
+    `--ink` text, radius 4px, `--shadow-2`, padding 30px 32px 36px, max
+    640px, in `--type-doc`. Other `.md` files sit on a `--bg-panel`
+    card (radius `--radius-md`, `--shadow-1`, padding 20px 24px) in
+    `--type-body-sm`. The `.html` iframe sits on the paper.
+- **Home.** `--bg-canvas`, with a content column `--page-max` wide,
+  padding 28px 36px 56px (16px on the phone). Top to bottom, per
+  § 5.3:
+  1. The `Goal:` line as written, in `--type-page`. Under it the
+     `Budget:` line as written, in `--type-body-sm` and `--fg-muted`.
+  2. **Waiting on you** (`user` icon) and **To do** (`list-todo`), side
+     by side in a two-column grid with a 16px gap, stacked on the
+     phone. Each is a card with plan lines.
+  3. **The pipeline:** one card holding six cells: To Review,
+     Interested, Applied, Interviewing, Offer, Dismissed.
+     - Each cell is a button, padding 14px 18px 16px, divided by 1px
+       `--border`, with a 2px divider before Dismissed.
+     - The label is in `--type-small` and `--fg-muted`, the count in
+       `--type-number`. A 0 is `--fg-subtle`.
+     - Hover: `--bg-hover`. On the phone the cells form a 3 × 2 grid.
+  4. **Continue with Ten:**
+     - a band in `--hero`, radius `--radius-lg`, `--shadow-2`, padding
+       20px 22px;
+     - on the left, the inverted 24px mark and "Talk to Ten" in
+       `--type-card-title` and `--on-hero`;
+     - on the right, the lime lg button with `arrow-right`. On the
+       phone the button runs full width under the label.
+- **Jobs.** The list pane is `--bg-canvas`, with its inner column max
+  760px and padding 24px 28px.
+  - Stage groups: a heading in `--type-small` at weight 600,
+    `--fg-muted`, plus the count in `--fg-subtle`, with 24px above
+    each group.
+  - Dismissed is a closed `<details>` with a `chevron-down`.
+  - A row is a card (padding 14px 16px, 10px apart) holding:
+    - the 36px initial tile;
+    - `Company — Title` in `--type-card-title`;
+    - a meta line in `--type-meta`: Location · Track · the date part of
+      Seen and Updated, as written (`2026-09-22`, not reformatted);
+    - the tier pill and the score in `--type-number` at 20px,
+      right-aligned;
+    - Reason and Dealbreakers in `--type-body-sm`;
+    - the URL, under rule 7, with `external-link` 13px;
+    - the controls "Open analysis" (sec sm) and "Ask Ten about this"
+      (ghost sm).
+- **Applications.** The same list pane.
+  - An entry is a card holding the initial tile, the role label in
+    `--type-card-title`, and the stage pill: 24px, radius full,
+    `--bg-sunken`, `0 0 0 1px var(--border)`, `--type-small` in
+    `--fg-muted`, holding `jobs.md`'s stage words.
+  - With no linked row, the entry shows "Not linked to a role in your
+    pipeline." in `--type-meta`.
+  - Then its files as document rows, then "Ask Ten about this" (ghost
+    sm).
+- **Documents.** The same list pane.
+  - Group headings in `--type-card-title` with the count in
+    `--fg-subtle`.
+  - Rows are 44px minimum: `file-text` 16px, the path in `--type-ui`
+    with the folder prefix in `--fg-subtle`, and the date part at the
+    right in `--type-meta`, tabular.
+  - Rows are divided by 1px `--border` inside one card per group.
+- **To restore (restore ruling, § 5): the designer specs these from
+  the mockup, against § 5.3 as amended.** The text above stays until
+  then.
+  - **Home:** the mockup's order (goal, pipeline strip, then two
+    columns). The left column holds Ten's last reply in the `--hero`
+    band (the quote, the activity line, Continue with Ten; **no reply
+    field**), then Waiting on you and To do with minutes pills and the
+    "<N> of your <M> min a day" aside on To do. The right column holds
+    the Active application card: tier pill, the stage steps, file chips
+    and "Next, from you". The pipeline cells stay `jobs.md`'s six, with
+    no "now" highlight.
+  - **Jobs and Applications:** the mockup's list-plus-detail layout
+    (`.md` split, detail with `.dhead`, `.verdict-band` and `.sect`
+    cards), holding only § 5.3's parts. The one viewer (§ 5.2 rule 8)
+    opens from a detail's controls; the designer says where it sits
+    beside list and detail on desktop, and on the phone (a sheet, § 5.5).
+  - **The stage steps:** the mockup's `.stepper` shape with `jobs.md`'s
+    stage words, a current step, every other step drawn alike, and no
+    check marks or dates (§ 5.3,
+    "Pieces the pages share").
+  - **The plan item:** the mockup's `.pt` / `.pw` / `.mins` shape, used
+    only when C § 18.1 splits the line; otherwise one line as written.
+  - **Coverage table and cut list:** the mockup's `table.cover` and
+    `ol.cuts`, with the status words from § 5.3.
+  - **Not restored:** Verified / Unknown tags, "Format checks passed"
+    badges, word counts, and paper thumbnails on pages.
+
+#### Sign-in (§ 1.4)
+
+- **Layout** (no rail): the wordmark at the top left. The rule 1 line
+  as the headline in `--type-display`, with the lime underline on
+  "actually want." drawn as `background: linear-gradient(transparent
+  62%, var(--lime) 62%, var(--lime) 92%, transparent 92%)`.
+- **Sign-in card:** 420px, radius 18px, padding 24px, `--shadow-3`.
+  - Fields are 44px high, radius 10px, with a 1px `--border-input`
+    edge.
+  - "Email me a sign-in link" is pri lg, full width.
+  - "Use a password instead" is a text link.
+  - Then the trust line in `--type-small` with `lock`.
+  - Then "Prefer local? Run it from your terminal" (§ 1.4).
+- **Not in § 1.4.** The mockup also has a lead paragraph, three proof
+  points and a product preview. None of these is in § 1.4. They wait
+  for an owner-approved § 1.4 amendment and are not built from this
+  spec.
+  **To restore (restore ruling, § 5):** § 1.4 is now amended. The
+  designer specs the lead paragraph, the three proof points (§ 1.4's
+  wording, not the mockup's where they differ) and the preview
+  (Home's own view on `signin-preview.json`'s props, `inert`,
+  captioned "Sample data";
+  on the phone the form comes first).
+
+#### Where this differs from the mockup (§ 1–§ 5 win)
+
+*(Rewritten for the restore ruling, § 5, fix round 1.)*
+
+- **Home follows § 5.3.** It keeps the mockup's last reply, Active
+  application card, time pills and minutes sum. It drops the reply field
+  on the hero: the composer exists only in Talk to Ten (the owner's one
+  agreed exception). The pipeline cells are `jobs.md`'s stages (To
+  Review … Offer, Dismissed), not the mockup's Found / Decided /
+  Applying, and no cell is highlighted as "now". Home's plan cards are
+  titled **Waiting on you** and **To do** (§ 5.3), not "This week's
+  plan".
+- **Plan lines** show as written, except a line in C § 18.1's strict
+  minutes form, which shows as action, pill and why (§ 5.3, "The plan
+  item"). The conversation's plan card never splits (§ 2.2).
+- **The header is § 5.1's**, with Ten's state avatar, the balance chip
+  and `⋯`. The mockup's initials avatar and the account block at the
+  foot of the rail are gone, because the `⋯` menu is the account menu.
+  The rail marker reads **"Needs your yes"** (§ 5.1), not the mockup's
+  "Needs you".
+- **The rail** has counts on Jobs, Applications and Documents (§ 5.1),
+  but no "In progress" entry and no summary line.
+- **Jobs and Applications** have the mockup's list-plus-detail, holding
+  only § 5.3's parts. Gone:
+  - "Verified" / "Unknown" tags: the tier words show only where the
+    company brief wrote them, word for word (§ 5.3, Jobs);
+  - "Format checks passed" badges and word counts on pages (§ 5.3,
+    Applications);
+  - the step names Found, Decided, Applying and Interview: the steps
+    use `jobs.md`'s words, with no check marks or dates (§ 5.3, "The
+    stage steps").
+- **Documents** is a list plus the one viewer. Its paper thumbnails are
+  gone: they would need a read per file just to draw.
+
+  Dates show as written (`2026-09-22`), not reformatted to "Sep 22".
+- **Talk to Ten** has no "Acme · Staff PM" context chip. It would be a
+  UI claim about what the conversation is about. The side panel stays
+  pinned, as § 1.1 has it, rather than opening only on demand.
+- **Check names follow `design-plain-replies.md`:** "the automatic
+  checks" and "the wording check", not the mockup's "format checks".
+  The verdict card shows no "Your target" line; that suffix is removed
+  in the plain-replies change.
+- **Tier colors.** Investable Stretch loses the mockup's blue, and the
+  focus ring loses its blue. Both would be a second accent.
+- **The phone** keeps the mockup's tab bar, but the pipeline strip is a
+  3 × 2 grid instead of a sideways scroll (§ 5.5, no horizontal
+  scroll). The tab bar also hides while typing.
 
 ### 5.7 Fixtures for the pages
 
@@ -961,6 +2294,24 @@ Waiting on you and To do; an `applications/` folder with one role using
 URL and unreadable-section cases are unit-test inputs, not fixture
 files, so no fixture holds a hand-edited script-written file.
 `empty-first-run.json` proves every empty state.
+
+**Added by the restore ruling (§ 5).** The same fixture also holds:
+`jobs.md` rows whose `JD` and `Company file` fields point at a
+`jd-analysis/<key>.md` and a `company/<slug>.md` written in evaluate's
+schema shapes (these two are model-written prose, so they are written
+by hand), plus one row whose `JD` names a file that isn't there; an
+application notes file with `## Coverage` (all three statuses) and
+`## Selection` (at least two `out` rows), whose output
+`proposal_block` produces cleanly when run in the `mktemp -d`
+workspace; a second live application, so Home's card says "The most
+recently changed of 2"; `plan.md` To do lines in C § 18.1's minutes
+form, one line without minutes, a `Budget: <N> min/day` line, and a
+Waiting on you or To do line whose backticked path is an application
+file; and a `messages` array (§ 4's shape: the conversation, invented)
+whose last assistant message has a text part over 280 characters and
+tool parts. Every name, company and fact is invented. Sign-in's preview
+does **not** use this fixture: it has its own, `signin-preview.json`
+(§ 1.4), one ordinary invented search rather than edge cases.
 
 ### 5.8 Out of scope for this step
 
@@ -1038,21 +2389,72 @@ first):
   count; § 5.2 rule 7's URL table. *Tester checks:* compare the page
   with `load()` over the fixture, field by field; the adapter's
   `exists` on a missing read and on a failing read.
+  *Restore ruling adds the detail:* **READER (new): `splitSections`**
+  (§ 5.3, "Pieces the pages share"), web-only, reading only where `## `
+  sections start and end. *Exit adds:* `splitSections`' table test; the
+  detail's sections equal the fixture files' sections string for
+  string; a quick-scan row shows no analysis or company parts; the
+  missing-file line and a failing read; no tag element for a claim
+  tier anywhere in Jobs (tier words appear only inside a section's
+  text, as written).
 - **3c Home. READER (change):** `readPlanBoard` in `packages/agent`
-  (C § 18), with `parsePlanTodo` re-expressed through it. **Waits for**
-  check_closeout's section-end fix (C § 18, "Waits for a script fix"),
-  built separately. *Exit:*
+  (C § 18), with `parsePlanTodo` re-expressed through it. *Exit:*
   the four existing tables C § 18 names pass **unchanged** (a failing
   old case goes back to the architect; it is never edited to pass); C
   § 18's `waitingRows` parity test and its new table; Home's
   counts equal `load()`'s rows by stage; § 5.2 rules 4, 5 and 6.
+  *Restore ruling adds* Ten's last reply and the minutes: **READER
+  (new): `splitPlanMinutes` and `budgetMinutesPerDay`** (C § 18.1, in
+  `packages/agent` beside `readPlanBoard`, which itself stays
+  unchanged); the plan item component; one exported function that
+  returns Talk to Ten's whole collapsed tool line, prefix included, with
+  `groupParts` (`Transcript.tsx:35`) exported, and no copy; Home's view
+  made a pure component (§ 5.3), which 3f's preview needs. The last
+  reply needs no parser. *Exit adds:* C § 18.1's table and round-trip
+  tests; § 5.3's last-reply table test and its e2e case; the
+  minutes-sum table; § 5.2 rule 1's check that pages and the rail
+  receive only `messages` and `status`, with a spy on every function
+  `useChat` returns.
 - **3d Applications. READER (new):** `groupApplications` and the exact
   `JD` join. *Exit:* a table test over both name forms, the `.html`,
   an unknown suffix and an unmatched key; the page's roles, stages and
   "Not linked" line match the fixture.
+  *Restore ruling adds the detail:* **READER (change): `proposalRows`**,
+  one new export of the parity-tested `proposal_block` port, with the
+  port's `run()` re-expressed through it (C § 19); plus the stage-steps
+  component (§ 5.3) and "Next, from you" (the exact `ref` match over
+  `readPlanBoard`'s items). *Exit adds:* the `proposal_block` parity
+  corpus passes **unchanged** (a failing case goes back to the
+  architect); C § 19's table test; the coverage and cut rows equal
+  `proposalRows`' output on the fixture; the two-notes-files line; the
+  stage-steps table (no check marks, no dates).
+- **3e Home's Active application card and the rail counts** (after
+  3a–3d). No new
+  reader: it combines `load()`, `groupApplications`, `readPlanBoard`
+  and 3d's stage steps and "Next, from you". *Exit:* § 5.3's Active
+  application tests (the first linked live entry, "The most recently
+  changed of 2"); § 5.1's rail counts equal their pages' counts on the
+  fixture, no number at 0, no number on a failing read; § 5.4's
+  page-to-page links, one e2e case each, on the spy store and spy
+  transport.
+- **3f Sign-in.** No reader. The lead paragraph, the three proof
+  points and the preview (§ 1.4, amended). **Waits for** the owner's
+  yes on § 1.4's two changed phrases (§ 5.10, owner question 1).
+  *Exit:* § 1.4's proofs: zero store and transport calls on the sign-in
+  page; the preview's props equal Home's readers run over
+  `signin-preview.json`'s files and messages; the preview's fixture text
+  passes Stage 4's review; no capability the web app lacks; the preview
+  is `inert` and captioned; at 375px the form comes before the preview
+  in reading order.
 
 **Stage 4: Copy and voice.** It starts with the architect writing the
 Documents label table into § 5.3; the coder copies it word for word.
+The restore ruling's new strings are in it too: § 1.4's lead paragraph
+and proof points, and § 5.1 and § 5.3's new labels and lines ("Ten ·
+last reply", "<N> of your <M> min a day", "Active application",
+"The most recently changed of N", "Next, from you", the detail
+section labels, the coverage-status table, "<path> isn't in your
+workspace.", the two-notes-files line, "Sample data").
 Every page line, label and empty state
 written here and in § 5.3's label table, word for word in the code.
 *Exit:* an independent reviewer (not the author) checks every string
@@ -1075,6 +2477,7 @@ brought up to date.
 | A3 | Markdown stays the right record at this size | `jobs.md` past a few hundred rows (goals doc, goal 3's named escape hatch) |
 | A4 | Nobody needs to edit from a page | two independent asks to edit a file from a page (rule 17) |
 | A5 | The pages carry the state, so the candidate stops asking for it | in two weeks of the owner's use, asks like "what's in my pipeline" or "what's on my list" still happen |
+| A6 | Coach writes To do lines in C § 18.1's minutes form often enough for the pills and the sum to show | on the owner's live run, fewer than half the To do lines carry a pill (a count, numbers only), or the minutes sum shows on none of the owner's plan versions in the run. Then the chain fix below hasn't taken hold; the answer is coach's writing, never a looser parse |
 
 **Resolved (owner, 2026-09-26, in chat; relayed by the lead):**
 
@@ -1086,8 +2489,8 @@ brought up to date.
   goal post (`plan-portable-skills-and-web-agent.md`, "Goal post - Beta
   on Vercel")? **Answer: before.**
 
-**Chain fixes for the coder** (found in review; separate from the
-stages, each through its own review):
+**Chain fixes** (found in review; separate from the stages, each
+through its own review; skill changes go through PROCESS):
 
 - apply's application-file name: `skills/apply/SKILL.md:16` says
   `<key>-application.md`, `skills/apply/references/schema.md` says
@@ -1096,4 +2499,39 @@ stages, each through its own review):
   `tests/web/helpers.test.ts:110-111` (tester-owned: the tester edits
   it) repeat the false claim that `apps/workspace-ui`'s `parsePlan` maps
   from `parsePlanTodo` (corrected in C § 6.2).
-- check_closeout's section-end fix (C § 18), which stage 3c waits for.
+- **Coach's minutes form** (restore ruling; pending the owner's yes, Q2). Coach's schema says only
+  "each with its why + minutes" (`skills/coach/references/schema.md`,
+  To do), which names the minutes in no form a page can read. The one
+  form C § 18.1 reads is `<action> — <n> min — <why>`. Coach's schema
+  adopts that form for To do lines, with a check in `check_closeout` at
+  WARN: the rule is born of a spec, not an incident, so it stays a WARN
+  until an incident promotes it, as apply's table checks do (apply
+  `references/schema.md`, "WARN until an incident promotes it"). This is a skill
+  change and goes through `docs/PROCESS.md`'s ritual. It lands before
+  Stage 5's acceptance run, so A6 measures the real writer.
+
+**Open for the owner (restore ruling, 2026-09-26):**
+
+1. **Two sign-in phrases changed** (§ 1.4): "Nothing spent without your
+   yes" → "No big run without your yes", and "Ten never sends or
+   submits as you" → "In this app, you send and submit, not Ten". The
+   lead paragraph drops "finds". Stage 3f waits for a yes on this
+   wording.
+2. **Approve the coach minutes-form chain fix** (above, "Chain fixes"):
+   coach's schema adopts `<action> — <n> min — <why>` for To do lines,
+   checked at WARN. Until it lands, a live plan line may carry minutes
+   in another form and show no pill: safe, but possibly sparse (A6).
+3. **The stage steps use `jobs.md`'s words**, not the mockup's Found,
+   Decided, Applying, Interview (§ 5.3, "The stage steps"). "Applying"
+   is refused as untrue for a submitted role. The other three renames
+   are refused only because they give one stage two names; the owner
+   may overrule those three.
+4. **Claim tiers on company facts.** Evaluate tiers every company claim
+   (Verified / General knowledge / Unknown; evaluate
+   `references/patterns.md:179-182`, `references/eval.md:35-37`), but its
+   schema gives a tier no written form a page can read. Either adopt a
+   form in evaluate's schema (a skill change, through `docs/PROCESS.md`'s
+   ritual) and then show tags through a strict reader like C § 18.1's,
+   showing a tag only where the form matches; or keep the tier words as
+   the brief wrote them, inside each section, as the Jobs detail does
+   now.

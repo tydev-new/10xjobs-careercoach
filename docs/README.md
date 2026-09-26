@@ -14,7 +14,7 @@ Read in this order.
 | [`plan-cross-host-workspace-interface.md`](plan-cross-host-workspace-interface.md) | implementation order with OpenClaw and cloud WebUI integration last |
 | [`plan-portable-skills-and-web-agent.md`](plan-portable-skills-and-web-agent.md) | portable skills, measured simplification, and the web agent MVP steps |
 | [`design-web-agent.md`](design-web-agent.md) | the web MVP's contracts: agent package, store, gate, tools, checker ports, transport, loading, model proxy and balance |
-| [`design-web-ui.md`](design-web-ui.md) | the web MVP's screen, cards, and fixture conversations |
+| [`design-web-ui.md`](design-web-ui.md) | the web app's screens (the workspace and its one conversation), cards, and fixture conversations |
 | [`old-app-paypal-ten-prefix.md`](old-app-paypal-ten-prefix.md) | a patch for the older app, owner-applied before Ten's first PayPal payment (web agent § 17.6) |
 | [`skill-shape.md`](skill-shape.md) | the five-file shape every skill follows, and how to convert one |
 | [`PROCESS.md`](PROCESS.md) | the ritual for changing anything |

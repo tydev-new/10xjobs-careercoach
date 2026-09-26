@@ -36,7 +36,7 @@ Written in plain language on purpose: if something can't be explained in this st
 
 **11. Believe the file, not the narration.** Everything produced is a file (or a database row) that can be checked. The system trusts what's actually there — never what any component, including the model, *says* it did. Learned the hard way on 2026-07-17, when work the model described did not match what had actually been saved; now it's the architecture.
 
-**12. One of everything.** One board, one plan, one set of files, one conversation, one place per fact. Duplicate representations (like shadow JSON caches or parallel history files) will eventually disagree — so they aren't built, and when found, they're deleted.
+**12. One of everything.** One board, one plan, one set of files, one conversation, one place per fact. Duplicate representations (like shadow JSON caches or parallel history files) will eventually disagree — so they aren't built, and when found, they're deleted. A page that shows a file reads the file each time it shows it and keeps no copy. (Amended 2026-09-26, owner ruling: the web app shows your files on read-only pages beside the one conversation, so the numbers promise 2 watches stay in view — a call made on the owner's own reaction, not usage data; `docs/design-web-ui.md` § 5.)
 
 **13. Every rule is derivable or earned.** A behavior must either follow from Part 1, or carry the receipt of the real incident that earned it. Rules with neither get deleted. When we simplify by deleting a rule the model should be able to derive, we test that it really does handle the cases the deleted rule spelled out — and running our own job searches on the product is that test.
 

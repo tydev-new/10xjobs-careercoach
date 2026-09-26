@@ -34,6 +34,7 @@ skill.
 | The letter's word band is WARN, not FAIL | earned-FAIL bar: spec-born, never fired |
 | Quoting the JD's bar in a bolded opener is exempt from the year-count rule | 2026-08-03 — a tailored résumé failed for echoing the employer's own stated bar |
 | No arrow glyphs | 2026-08-16 — candidate-caught; glyphs garble in ATS parsers |
+| ASCII arrow chains (`->`, `=>`, `<-`, `<=>`) are a FAIL | **None — a named exception to the earned-FAIL bar** (goals § 2), set by owner ruling 6 of 2026-09-25 (`design-apply-three-lens.md` § 4). The harm: a reader sees an arrow as notes, not a sentence. The glyph row above does not carry over — a 7-bit arrow does not garble in a parser. It stays an exception until an incident earns it or the owner lowers it to WARN |
 | Two opening sections is a FAIL | 2026-08-01 — a résumé shipped with a Summary AND a parallel highlights band |
 | Case ≤50 words | 2026-08-01 — a 133-word case against a 7–11s scan budget |
 | PDF: never hand-parse streams; use a real extractor | 2026-07-15 — stream-grep reported 0 chars on a perfectly readable file |

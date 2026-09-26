@@ -24,12 +24,14 @@ catch either. Exit 0 = clean, 1 = at least one FAIL.
 import argparse, os, re, sys
 
 ARROW_GLYPHS = re.compile(r"[→⇒▸►◄←↔]")
-# Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): the
-# same failure class as ARROW_GLYPHS, extended to ASCII arrow chains — the
-# same pattern and exemptions as apply/scripts/check_materials.py, scoped
-# here to the drafts. No JS port: there is no parity item for this script.
+# Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): ASCII
+# arrow chains — the same pattern and exemptions as
+# apply/scripts/check_materials.py, scoped here to the drafts. A named
+# exception to the earned-FAIL bar (goals § 2): no incident behind it,
+# row in docs/receipts.md § apply. No JS port: there is no parity item
+# for this script.
 ASCII_ARROWS = re.compile(r"<=+>|<-+>?|-+>|=+>")
-EXEMPT_SPANS = re.compile(r"```.*?```|<!--.*?-->|`[^`\n]*`|https?://\S+", re.S)
+EXEMPT_SPANS = re.compile(r"```.*?```|~~~.*?~~~|<!--.*?-->|``[^\n]*?``|`[^`\n]*`|https?://\S+", re.S)
 YEAR_COUNT = re.compile(r"\b\d{2}\+?\s*(?:\+\s*)?years\b", re.I)
 CONNECT_CHAR_LIMIT = 300      # eval.md § Channel limits: connection request
 THANKYOU_WORD_LIMIT = 120     # eval.md § Channel limits: thank-you note
@@ -103,7 +105,9 @@ def main():
             res.append(("FAIL", f'draft {i}: arrow glyph "{m.group(0)}" — write it in words'))
         m = ASCII_ARROWS.search(EXEMPT_SPANS.sub(" ", d))
         if m:
-            res.append(("FAIL", f'draft {i}: arrow chain "{m.group(0)}" — write it in words'))
+            res.append(("FAIL", f'draft {i}: arrow chain "{m.group(0)}" — write it in words '
+                                '("from 80% to under 1%"); a reader sees an arrow as notes, '
+                                'not a sentence'))
         # Quoting the JD's own bar is not the candidate's age tag (the sibling
         # checker's earned 2026-08-03 exemption, quote-span analogue here).
         unquoted = re.sub(r'["\u201c][^"\u201d]*["\u201d]', "", d)

@@ -119,7 +119,7 @@ def main():
         f = fails(run(RESUME_TWO_SECTIONS, "resume", ws))
         cases.append(("two opening sections caught", any("two opening sections" in m for m in f)))
         # 2. the 133-word case against a 7-11s scan budget
-        cases.append(("over-long case caught", any("case is" in m for m in f)))
+        cases.append(("over-long case caught", any("Summary opens with" in m for m in f)))
         # 3. a correct résumé passes
         cases.append(("clean résumé passes", not fails(run(RESUME_CLEAN, "resume", ws))))
         # 4. informal salutation
@@ -244,7 +244,7 @@ def test_ascii_arrow_chain_fails_each_form():
     for form in ("->", "-->", "<-", "<->", "=>", "==>", "<=>"):
         text = _letter(f"Growth went 80{form}90 this quarter, every week, without exception at all.")
         f = fails(cm.check_letter(text))
-        assert any("arrow/scaffolding chain" in m for m in f), (form, f)
+        assert any("arrow chain" in m for m in f), (form, f)
 
 
 def test_ascii_arrow_exempt_spans_pass():
@@ -256,7 +256,7 @@ def test_ascii_arrow_exempt_spans_pass():
     ]
     for text in exempt:
         f = fails(cm.check_letter(text))
-        assert not any("arrow/scaffolding chain" in m for m in f), (text, f)
+        assert not any("arrow chain" in m for m in f), (text, f)
 
 
 def test_ascii_le_ge_do_not_fail():
@@ -274,4 +274,4 @@ def test_bullets_only_summary_passes_case_budget():
         "## Experience\n\nPlatform Lead — Northwind Labs.\n"
     )
     f = fails(cm.check_resume(resume))
-    assert not any("case is" in m for m in f), f
+    assert not any("Summary opens with" in m for m in f), f

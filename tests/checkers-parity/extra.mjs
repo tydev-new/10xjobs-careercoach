@@ -126,6 +126,16 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "cm-ascii-arrow-exempt-inline-code", files: { "letter.md": letter("The old macro was `a->b` in the legacy build script, never shipped externally.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
   add({ s, id: "cm-ascii-arrow-exempt-fence", files: { "letter.md": letter("```\na->b\n```\n\nExplained the diagram above to the whole panel, calmly and clearly.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
   add({ s, id: "cm-ascii-arrow-exempt-comment", files: { "letter.md": letter("<!-- a->b -->\n\nReviewed the whole draft twice before sending, carefully and calmly.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+
+  // Round 2 additions (docs/design-apply-three-lens.md § 4/§ 9 item 8):
+  // the tilde fence and double-backtick branches (round 1's known false
+  // FAILs, now fixed), plus the two accepted limits that stay a known
+  // false FAIL by design.
+  add({ s, id: "cm-r2-arrow-exempt-tilde-fence", files: { "letter.md": letter("~~~\na->b\n~~~\n\nExplained the diagram above to the whole panel, calmly and clearly.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-r2-arrow-exempt-double-backtick", files: { "letter.md": letter("Documented ``a->b`` in the internal wiki only, never in customer docs.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-r2-arrow-double-backtick-then-text-still-scanned", files: { "letter.md": letter("Documented ``a->b`` here, then separately wrote c=>d in the same paragraph today.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-r2-arrow-accepted-four-space-indent", files: { "letter.md": letter("    a->b\n\nThat indented line above is plain prose in this document, not code.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
+  add({ s, id: "cm-r2-arrow-accepted-schemeless-url", files: { "letter.md": letter("See example.com/a->b for the writeup, thanks for reading it all today.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
   add({ s, id: "cm-ascii-le-ge-no-finding", files: { "letter.md": letter("Latency stayed <=5ms and throughput >=99% the whole quarter without incident.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
   add({ s, id: "cm-unicode-and-ascii-arrows-unicode-first", files: { "letter.md": letter("We cut cost 80%→<1%, then kept it flat at 80->90 the rest of the year, steadily.") }, args: ["--workspace", ".", "--letter", "letter.md"] });
   add({ s, id: "cm-accented-text-beside-ascii-arrow", files: { "letter.md": letter("Latence baissée café->café à Montréal, chaque trimestre sans faute aucune fois.") }, args: ["--workspace", ".", "--letter", "letter.md"] });

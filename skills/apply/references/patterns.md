@@ -16,7 +16,7 @@ reaches it fastest, earned over the 2026-08 rounds.
 1. **Read before drafting**: this file through § The page target, the
    audit in `../../profile/references/eval.md § The résumé audit`, and
    the reader craft in `../../profile/references/patterns.md § The three
-   readers`. Candidate-voiced prose (the Summary's case, the letter)
+   readers`. Candidate-voiced prose (the Summary, the letter)
    reads `../../profile/references/candidate-voice.md` with `voice.md`.
 2. **Write the standard, then the audit block.** `## Standard` in the
    application file: the JD's top requirements in their order, the
@@ -84,9 +84,8 @@ unchanged sections come straight from the base.
    - **No horizontal rules (`---`, `***`, `___`)**: Banned across all candidate-facing documents (résumé, cover letter, outreach messages, pitch). In ATS parsers, plain-text clipboards, and PDF renderers, horizontal rules inject unmanaged vertical margins, break page-budget calculations, or get misinterpreted as document termination / signature markers.
    - **No ASCII box-art or raw HTML tags (`<hr>`, `<br>`, `<div>`)**: Structural hierarchy is expressed exclusively through semantic markdown headings (`#`, `##`, `###`) and clean paragraphs. The destination engine (PDF printer, ATS portal, email client) owns visual decoration.
    - **No decorative emojis** in professional artifacts (résumé, cover letter, executive outreach).
-3. **`## Summary` — the single opening section, always 4–7 short
-   bullets.** Bullet 1 is the mandate sentence (§ The Summary). Never a
-   paragraph, and never a second list ("Core Expertise", "Highlights")
+3. **`## Summary` — the single opening section; its shape is § The
+   Summary.** Never a second list ("Core Expertise", "Highlights")
    that re-says it.
 4. **`## Professional Experience` / `## Experience`**: 2–4 roles in
    reverse chronological order, current first — tailoring reorders
@@ -107,9 +106,9 @@ base.
 
 - **Top third wins**: header, Summary, and the first role's opening
   bullets prove this mandate; patents and older roles stay below.
-- **No search jargon**: candidate-facing text never uses the search's
-  own words; the language checker's `search_jargon` rule holds the
-  list.
+- **No search jargon**: a document sent to an employer or a contact
+  never carries Ten's own labels (a verdict tier, a track name, a round
+  count); the language checker's `search_jargon` rule holds the list.
 - **No arrows**: write it in words ("from six months to one month");
   `check_materials.py` and `check_messages.py` FAIL arrow glyphs and
   ASCII arrow chains.
@@ -122,18 +121,25 @@ only three places the posting's words can enter (with the Skills line
 and bolded openers); it states the function and level the titles do not
 ("Field CTO" applying to Head of Engineering otherwise gets guessed).
 
-**Always 4–7 short bullets** — a recruiter scans bullets; a paragraph
-is a wall. **Bullet 1 is the mandate sentence**: function and level,
-stated as the outcome this seat exists to deliver, never an echo of the
-posting's title. Each later bullet is one proof with its number, the
+**Always 4–7 short bullets, never a paragraph** — a recruiter scans
+bullets; a paragraph is a wall. **Bullet 1 is the mandate sentence**:
+function and level, stated as the outcome this seat exists to
+deliver, never an echo of the posting's title. Each later bullet is one proof with its number, the
 posting's hardest screen first. The PDF shows them as a list.
+
+**The base résumé's Summary has the same shape.** With no posting,
+bullet 1's mandate is the target in `criteria.md § Targets`, and the
+proofs lead with what that target's postings screen for hardest.
+Tailoring then reorders and swaps the base's bullets instead of
+rewriting a paragraph.
 
 **When over-qualification or a doubted hard screen is the real risk**,
 bullets 2–7 take the requirement-checklist form: the posting's
 phrasing, evidence after the colon, each bullet's evidence proving the
 opener's EXACT claim. A JD's "N+ years of X" is answered with THEIR
 number ("8+: yes —") proven by recent evidence — meet the bar, don't
-triple it.
+triple it. This form answers one posting, so the base résumé never
+takes it.
 
 ### Rewording for the JD's vocabulary
 

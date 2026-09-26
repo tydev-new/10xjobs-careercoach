@@ -55,7 +55,7 @@ Anything not yet true is written into its file as `TODO:` and resurfaces when it
 
 ### Base résumé — improvement rounds (the loop)
 
-**Runs when** they ask to improve the base résumé with no specific job in mind. ("Tailor for X" routes to `apply`.) Read the base resolution ladder (`references/schema.md`), the audit (`references/eval.md`), and reader craft (`references/patterns.md`).
+**Runs when** they ask to improve the base résumé with no specific job in mind. ("Tailor for X" routes to `apply`.) Read the base resolution ladder (`references/schema.md`), the audit (`references/eval.md`), reader craft (`references/patterns.md`), and the Summary's shape (`../apply/references/patterns.md § The Summary`).
 
 - **Standard:** `base-resume-brief.md § FIXED` (sourced from `criteria.md` targets, top competencies across postings, and `base-resume.md § Claim rules`).
 - **Each round:** Re-read brief in full. Apply changes reshape-only to `base-resume.md`. **Budget:** 2–3 rounds, said up front.

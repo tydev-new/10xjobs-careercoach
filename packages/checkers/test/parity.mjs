@@ -223,6 +223,39 @@ function addCase(c) {
     setup: (ws) => writeFiles(ws, { "letter.md": letter("<!-- a->b -->\n\nReviewed the whole draft twice before sending, carefully and calmly.") }),
     args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
   });
+  // Round 2 (docs/design-apply-three-lens.md § 4/§ 9 item 8): the tilde
+  // fence and the double-backtick span, both fixed known limits from the
+  // round 1 review.
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-tilde-fence",
+    covers: "round 2: the tilde-fence exempt span",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("~~~\na->b\n~~~\n\nExplained the diagram above to the whole panel, calmly and clearly.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-double-backtick",
+    covers: "round 2: the double-backtick span (round 1's false FAIL, fixed)",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Documented ``a->b`` in the internal wiki only, never in customer docs.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-double-backtick-then-text-still-scanned",
+    covers: "round 2: text after a double-backtick span is still scanned",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Documented ``a->b`` here, then separately wrote c=>d in the same paragraph today.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-accepted-four-space-indent",
+    covers: "known limit (accepted): four-space indented code false-FAILs",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("    a->b\n\nThat indented line above is plain prose in this document, not code.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-accepted-schemeless-url",
+    covers: "known limit (accepted): a scheme-less URL false-FAILs",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("See example.com/a->b for the writeup, thanks for reading it all today.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
   addCase({
     script, bin, name: "ascii-le-ge-no-finding",
     covers: "test_ascii_le_ge_do_not_fail",

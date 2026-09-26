@@ -54,8 +54,7 @@ outreach-plan summary.
   twice gets one row: `| <lens> | VOID — <why> | — |`; an empty table
   says `VOID` and why. A lens at Revise or Fail with no row naming what
   to change is VOID. A candidate's waiver is the outcome `discarded —
-  candidate waived in chat <date>` (a form the checker already
-  accepts).
+  candidate waived in chat <date>`.
 - `## Fields` — every field the form collects, bucketed Standard /
   Screening / Essays; each with its value, or `NEEDS CANDIDATE`, or
   `predicted` when the field set came from a form you could not open

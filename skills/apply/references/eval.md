@@ -7,7 +7,8 @@ tell they are met, and who checks.
 
 - **Structure and counts → the scripts.**
   `scripts/check_materials.py` — the mechanical floor for the
-  résumé and letter: case length · salutation register · one opening
+  résumé and letter: Summary prose over 50 words before its bullets ·
+  salutation register · one opening
   section · standard section names · no aggregate year counts (quoting
   the JD's bar in a bolded opener is exempt) · no arrow glyphs or ASCII
   arrow chains (`->`, `=>`, `<-`, `<=>`; code, comments, and URLs
@@ -53,17 +54,11 @@ passed; both outputs are shown.
 | Recruiter | the top third in the first seconds (profile's 7–11): level, current titles, location and work authorization, scope, mandate, chronology | a confusing title stack; wrong seniority; a Summary that is a paragraph, not bullets; symbol chains the checker cannot see ("A > B > C"); broken chronology |
 | Hiring manager | a credible story for this mandate; proof bullets that map to the posting's outcomes; a claims-free bridge where needed | a generic paste; a claim above the base; a fake title; no mandate match |
 
-Each lens returns a verdict with a one-line why, then its `lens · finding`
-rows. **Fail**: a Fail-if holds. **Revise**: none holds, but a finding must
-be fixed first. **Pass**: neither. `§ Who checks what` points here. The
-existing form stands: every finding `fixed` or `discarded — why`, an empty
-table VOID, and the `## Panel` lens names (`ats`, `recruiter`, `hiring
-manager`) unchanged.
-
-Arrows and search jargon leave the lens lists: they now have
-one-right-answer or written-rule owners — `check_materials.py` for
-arrows, the language checker's `search_jargon` rule for jargon — and
-rule 14 puts them there, not in a second judge.
+Each lens returns a verdict with a one-line why, then its `lens ·
+finding` rows. **Fail**: a Fail-if holds. **Revise**: none holds, but
+a finding must be fixed first. **Pass**: neither. Every finding ends
+`fixed` or `discarded — why`; an empty table is VOID. In `## Panel`
+the lenses are named `ats`, `recruiter`, and `hiring manager`.
 
 ## The destination, judged
 
@@ -80,12 +75,13 @@ deliverable.
 - **The standard was written before the draft** (`## Standard`), the
   audit came before the documents, and the page count was measured
   against the target the candidate gave, not discovered.
-- **The round was scored as a count** — `N/M held; unmet: …` in
-  `## Rounds`, the earlier rows read first; the exit said M/M, budget,
-  or the ceiling.
-- **The panel was three subagents**, each fed the SOURCE documents (raw
-  JD, decode, company brief), never the author's summary; one
-  incorporation round; the checker re-ran (t10-verbatim-panel).
+- **The round was scored as a count** — `N/M held; unmet: …` and the
+  three lens verdicts in `## Rounds`, the earlier rows read first;
+  the exit said M/M with every lens at Pass, budget, or the ceiling.
+- **The panel was three subagents, one per lens**, each fed the
+  SOURCE documents (raw JD, decode, company brief), never the
+  author's summary; one incorporation round; the checker re-ran; the
+  lenses short of Pass re-checked once (t10-verbatim-panel).
 - **A draft story's claim was never treated as the candidate's**
   (t10-storybank-default): proposed and waited, exactly as a new fact.
 - **Nothing submitted without the captured confirmation**, and nothing

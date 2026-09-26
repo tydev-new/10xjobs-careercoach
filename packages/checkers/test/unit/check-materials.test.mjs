@@ -81,7 +81,7 @@ test("two opening sections caught (the real defect, 2026-08-01)", () => {
   assert.ok(fails(checkResume(RESUME_TWO_SECTIONS)).some((m) => m.includes("two opening sections")));
 });
 test("over-long case caught (133-word case vs the 7-11s scan budget)", () => {
-  assert.ok(fails(checkResume(RESUME_TWO_SECTIONS)).some((m) => m.includes("case is")));
+  assert.ok(fails(checkResume(RESUME_TWO_SECTIONS)).some((m) => m.includes("Summary opens with")));
 });
 test("clean résumé passes", () => {
   assert.deepEqual(fails(checkResume(RESUME_CLEAN)), []);

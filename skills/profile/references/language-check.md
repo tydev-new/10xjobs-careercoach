@@ -59,19 +59,34 @@ candidate file, so it is always checkable.
 5. **`watch_form`** — when `pitch.md § Messages rubric` is provided, a
    ⚠ WATCH form must not lead a draft or appear in one, in any wording.
    *Severity: fix-before-delivery.*
-6. **`search_jargon`** — the search's own working words must not
-   appear in a candidate-facing document, in any wording:
-   - evaluate's verdict labels and fit scores ("investable stretch",
-     "long shot", "82/100");
-   - track, lane, stage, source-tier, scout, and lead labels ("Track
-     B", "To Review");
-   - the application file's words: coverage statuses
-     ("shown-but-unnamed"), round counts ("6/7 held"), audit tiers
-     ("ATS-Ready"), lens verdicts ("recruiter Revise"), "band call",
-     "spine role", "mandate sentence", "DECISION".
+6. **`search_jargon`** — Ten's own labels, used as labels, must not
+   appear in a document that goes to an employer or a contact: the
+   tailored résumé, the cover letter, application answers, and
+   outreach drafts. A story file is the candidate's own record and is
+   never sent, so this rule has no row for it. The labels, in the
+   forms that count:
+   - evaluate's verdict tiers written as tiers — "Strong Fit",
+     "Investable Stretch", "Long-Shot Stretch", "Weak Fit" in title
+     case or beside a score — and a fit score beside a tier or the
+     word fit ("Strong Fit — 82/100", "fit 82/100");
+   - search's track name, "Track B";
+   - the pipeline stage "To Review";
+   - the application file's labels: a round count ("6/7 held"), a
+     lens verdict — a lens name, then Pass, Revise, or Fail
+     ("recruiter Revise") — an audit tier ("ATS-Ready"), and
+     "DECISION" in capitals;
+   - terms Ten coined, which have no everyday meaning, in any
+     capitalization: "investable stretch", "long-shot stretch",
+     "shown-but-unnamed", "band call", "spine role", "mandate
+     sentence".
 
-   The echo exemption applies: the posting's own word, quoted, is not
-   jargon. *Severity: fix-before-delivery.*
+   Ordinary English is never this rule's flag, even when it shares a
+   word with a label: "a strong fit for this team", "at this stage",
+   "on track", "leads a team of 12", "my lane", "the decision to
+   migrate", and a metric such as "scored 96/100 in the customer
+   survey" all pass. When a word could be either, it is English —
+   pass it. The echo exemption applies: the posting's own word,
+   quoted, is not jargon. *Severity: fix-before-delivery.*
 
 ## What is not a violation
 

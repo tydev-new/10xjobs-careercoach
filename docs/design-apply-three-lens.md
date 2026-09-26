@@ -225,7 +225,7 @@ one home.
 >      "Investable Stretch", "Long-Shot Stretch", "Weak Fit" in title
 >      case or beside a score — and a fit score beside a tier or the
 >      word fit ("Strong Fit — 82/100", "fit 82/100");
->    - a track name: "Track A", "Track B";
+>    - search's track name, "Track B";
 >    - the pipeline stage "To Review";
 >    - the application file's labels: a round count ("6/7 held"), a
 >      lens verdict — a lens name, then Pass, Revise, or Fail

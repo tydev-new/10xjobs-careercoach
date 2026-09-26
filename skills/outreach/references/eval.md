@@ -7,15 +7,16 @@ reached, and who checks.
 
 - **Structure and counts → `scripts/check_messages.py`** — the
   mechanical floor on the drafts in a contacts file: aggregate year
-  counts, arrow glyphs, draft scoping, channel length notes, the
+  counts, arrow glyphs and ASCII arrow chains (code, comments, and URLs
+  exempt), draft scoping, channel length notes, the
   rubric-PINNED state (a PROPOSED rubric is a WARN — pinning is a state
   check, not a language read). `../../profile/scripts/check_files.py`
   checks the manifest at session close.
 - **Language against written rules → an INDEPENDENT checker-subagent**
   on `../../profile/references/language-check.md` with the drafts,
   `voice.md`, `base-resume.md § Claim rules`, and `pitch.md`'s rubric —
-  never-say, WATCH-tier struck forms, and any rewording of either
-  (t15; #29).
+  never-say, WATCH-tier struck forms, any rewording of either
+  (t15; #29), and `search_jargon` — Ten's own labels in a draft.
 - **Everything semantic → you, at the moment**: whether a hook is the
   recipient's own, whether the ask is small, whether it sounds like the
   candidate.

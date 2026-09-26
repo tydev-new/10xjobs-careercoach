@@ -6,7 +6,7 @@
 // comments, and message text so a diff against the Python original stays
 // readable, and so the parity test's byte-for-byte comparison has a chance.
 import { join, basename } from "./path-util.mjs";
-import { pySplit, normSpace, pyListRepr, pySplitlines, restoreLineSeparators, cpSlice, pyStrip, PY_S, PY_B_START, PY_B_END } from "./py-text.mjs";
+import { pySplit, normSpace, pyListRepr, pySplitlines, restoreLineSeparators, cpSlice, pyStrip, PY_S, PY_NOT_S, PY_B_START, PY_B_END } from "./py-text.mjs";
 import { parseFlags, argError, argHelp } from "./argx.mjs";
 import { HELP } from "./help-text.mjs";
 import { crashToTraceback } from "./traceback.mjs";
@@ -21,7 +21,7 @@ const STANDARD_SECTIONS = new Set([
   "independent ai projects", "projects",
 ]);
 
-const CASE_MAX_WORDS = 50;
+const SUMMARY_PROSE_MAX_WORDS = 50;
 const LETTER_MIN_WORDS = 250;
 const LETTER_MAX_WORDS = 400;
 const LETTER_MAX_BLOCKS = 6;
@@ -29,15 +29,20 @@ const LETTER_MAX_BLOCKS = 6;
 const YEAR_COUNT = /\b\d{2}\+?\s*(?:\+\s*)?years\b/i;
 const INFORMAL_SALUTATION = new RegExp(`^${PY_S}*(hello|hi|hey|greetings)\\b[^,]*[—,-]?${PY_S}*$`, "i");
 const ARROW_GLYPHS = /[→⇒▸►◄←↔]/;
-// Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): the
-// same failure class, extended to ASCII arrow chains — catches "->",
-// "-->", "<-", "<->", "=>", "==>", "<=>"; never matches "<=", ">=", "<",
-// or ">" alone. Same source text as check_materials.py's ASCII_ARROWS.
+// Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): ASCII
+// arrow chains — catches "->", "-->", "<-", "<->", "=>", "==>", "<=>";
+// never matches "<=", ">=", "<", or ">" alone. A named exception to the
+// earned-FAIL bar (goals § 2): no incident behind it, row in
+// docs/receipts.md § apply. Same source text as check_materials.py's
+// ASCII_ARROWS.
 const ASCII_ARROWS = /<=+>|<-+>?|-+>|=+>/;
-// Exempt spans (replaced with one space before scanning): fenced code
-// blocks, HTML comments, one-line inline code, and URLs — a single
-// alternation ([\s\S] stands in for Python's re.S dot).
-const ARROW_EXEMPT_SPANS = /```[\s\S]*?```|<!--[\s\S]*?-->|`[^`\n]*`|https?:\/\/\S+/g;
+// Exempt spans (replaced with one space before scanning): backtick and
+// tilde fences, HTML comments, double- and single-backtick inline code
+// (one line — the double-backtick branch must come before the
+// single-backtick one), and URLs ([\s\S] stands in for Python's re.S
+// dot; the URL's \S is built from PY_NOT_S — never a bare JS \S, which
+// differs from Python's on U+001C–U+001F, U+0085, and U+FEFF).
+const ARROW_EXEMPT_SPANS = new RegExp("```[\\s\\S]*?```|~~~[\\s\\S]*?~~~|<!--[\\s\\S]*?-->|``[^\\n]*?``|`[^`\\n]*`|https?://" + PY_NOT_S + "+", "g");
 const FILLER = /\b(passionate|motivated|fast-paced environments?|outside the box)\b/i;
 const CLAIM_NUMBER = /\d+(?:\.\d+)?\s*%|\b\d+(?:\.\d+)?x\b/g;
 
@@ -99,7 +104,7 @@ export function checkResume(text, baseText = null, appText = null) {
   for (const n of nums) counts.set(n, (counts.get(n) || 0) + 1);
   const dupes = [...new Set(nums.filter((n) => counts.get(n) > 1).map((n) => n.trim()))].sort();
   if (dupes.length) {
-    add("WARN", `claim number repeated inside the Summary: ${pyListRepr(dupes)} — the case carries the strongest number once; a repeat carries next-best evidence instead (labels make a defended repeat legitimate)`);
+    add("WARN", `claim number repeated inside the Summary: ${pyListRepr(dupes)} — the Summary carries each number once; a repeat carries next-best evidence instead (labels make a defended repeat legitimate)`);
   }
 
   const edu = section(text, "education");
@@ -138,8 +143,8 @@ export function checkResume(text, baseText = null, appText = null) {
     let prose = pySplitlines(caseText).filter((ln) => ln.trim() && !["#", "-", "*", ">"].some((c) => ln.startsWith(c)));
     prose = prose.filter((ln) => !/^[*_].*[*_]$/.test(ln.trim()));
     const words = prose.reduce((sum, ln) => sum + pySplit(ln).length, 0);
-    if (words > CASE_MAX_WORDS) {
-      add("FAIL", `case is ${words} words (max ${CASE_MAX_WORDS}) — the summary obeys the scan budget: a recruiter reads 7-11s in an F-pattern and prose past ~2 lines is invisible`);
+    if (words > SUMMARY_PROSE_MAX_WORDS) {
+      add("FAIL", `Summary opens with ${words} words of prose (max ${SUMMARY_PROSE_MAX_WORDS}) — the Summary is bullets (apply's patterns.md § The Summary); a recruiter reads 7-11s in an F-pattern and prose past ~2 lines is invisible`);
     }
   }
 
@@ -177,7 +182,7 @@ function shared(text, add) {
   }
   m = text.replace(ARROW_EXEMPT_SPANS, " ").match(ASCII_ARROWS);
   if (m) {
-    add("FAIL", `arrow/scaffolding chain "${m[0]}" — write transitions in words ("from 80% to under 1%"); symbol arrows garble in ATS parsers`);
+    add("FAIL", `arrow chain "${m[0]}" — write it in words ("from 80% to under 1%"); a reader sees an arrow as notes, not a sentence`);
   }
   m = text.match(FILLER);
   if (m) {

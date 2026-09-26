@@ -58,8 +58,8 @@ STANDARD_SECTIONS = {
 }
 
 # profile/references/patterns.md § The three readers: recruiter scan is 7-11
-# ~2 lines is invisible to the first reader, so the case gets a hard budget.
-CASE_MAX_WORDS = 50
+# ~2 lines is invisible to the first reader, so Summary prose gets a hard budget.
+SUMMARY_PROSE_MAX_WORDS = 50
 LETTER_MIN_WORDS, LETTER_MAX_WORDS = 250, 400  # patterns.md § Cover letter
 LETTER_MAX_BLOCKS = 6   # salutation + hook + 2-3 body + why-us + close
 
@@ -71,14 +71,18 @@ INFORMAL_SALUTATION = re.compile(r"^\s*(hello|hi|hey|greetings)\b[^,]*[—,-]?\s
 # patterns.md assembly table: arrows garble in ATS parsers and read as audit
 # scaffolding that leaked into the document (candidate-caught 2026-08-16).
 ARROW_GLYPHS = re.compile(r"[→⇒▸►◄←↔]")
-# Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): the same
-# failure class, extended to ASCII arrow chains — catches "->", "-->", "<-",
-# "<->", "=>", "==>", "<=>"; never matches "<=", ">=", "<", or ">" alone.
+# Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): ASCII
+# arrow chains — catches "->", "-->", "<-", "<->", "=>", "==>", "<=>"; never
+# matches "<=", ">=", "<", or ">" alone. A named exception to the
+# earned-FAIL bar (goals § 2): no incident behind it, row in
+# docs/receipts.md § apply.
 ASCII_ARROWS = re.compile(r"<=+>|<-+>?|-+>|=+>")
-# Exempt spans (replaced with one space before scanning): fenced code
-# blocks, HTML comments, one-line inline code, and URLs — a single
-# alternation so the same source text ports byte-identical to the JS side.
-ARROW_EXEMPT_SPANS = re.compile(r"```.*?```|<!--.*?-->|`[^`\n]*`|https?://\S+", re.S)
+# Exempt spans (replaced with one space before scanning): backtick and
+# tilde fences, HTML comments, double- and single-backtick inline code
+# (one line — the double-backtick branch must come before the
+# single-backtick one), and URLs — a single alternation so the same
+# source text ports byte-identical to the JS side.
+ARROW_EXEMPT_SPANS = re.compile(r"```.*?```|~~~.*?~~~|<!--.*?-->|``[^\n]*?``|`[^`\n]*`|https?://\S+", re.S)
 # patterns.md § Shape: banned filler — generic strings, so no second-source issue.
 FILLER = re.compile(r"\b(passionate|motivated|fast-paced environments?|outside the box)\b", re.I)
 # Numeric tokens that carry claims (percents/multipliers) — years excluded by shape.
@@ -150,8 +154,8 @@ def check_resume(text, base_text=None, app_text=None):
     nums = CLAIM_NUMBER.findall(summ)
     dupes = sorted({n.strip() for n in nums if nums.count(n) > 1})
     if dupes:
-        add(("WARN", f"claim number repeated inside the Summary: {dupes} — the case "
-                     "carries the strongest number once; a repeat carries next-best evidence "
+        add(("WARN", f"claim number repeated inside the Summary: {dupes} — the Summary "
+                     "carries each number once; a repeat carries next-best evidence "
                      "instead (labels make a defended repeat legitimate)"))
 
     # patterns.md § Shape: dates hygiene — grad years and per-role 1990s dates
@@ -185,20 +189,20 @@ def check_resume(text, base_text=None, app_text=None):
                          "standard names ('Professional Experience', not 'Where I've "
                          "Made Impact'); put the ambition in a subtitle line instead"))
 
-    # The case: prose between the opening heading and the first checklist bullet.
+    # Summary prose: text between the opening heading and the first checklist bullet.
     m = re.search(r"^##\s+.*$", text, re.M)
     if m and opener_like:
         after = text[m.end():]
         case = after.split("\n- ")[0]
         prose = [ln for ln in case.splitlines()
                  if ln.strip() and not ln.startswith(("#", "-", "*", ">"))]
-        # a bolded/italic positioning line is a subtitle, not case prose
+        # a bolded/italic positioning line is a subtitle, not Summary prose
         prose = [ln for ln in prose if not re.fullmatch(r"[*_].*[*_]", ln.strip())]
         words = sum(len(ln.split()) for ln in prose)
-        if words > CASE_MAX_WORDS:
-            add(("FAIL", f"case is {words} words (max {CASE_MAX_WORDS}) — the summary obeys "
-                         "the scan budget: a recruiter reads 7-11s in an F-pattern and "
-                         "prose past ~2 lines is invisible"))
+        if words > SUMMARY_PROSE_MAX_WORDS:
+            add(("FAIL", f"Summary opens with {words} words of prose (max {SUMMARY_PROSE_MAX_WORDS}) — "
+                         "the Summary is bullets (apply's patterns.md § The Summary); a recruiter "
+                         "reads 7-11s in an F-pattern and prose past ~2 lines is invisible"))
 
     _shared(text, add)
     return res
@@ -240,8 +244,8 @@ def _shared(text, add):
                      '("from 80% to under 1%"); glyphs garble in ATS parsers'))
     m = ASCII_ARROWS.search(ARROW_EXEMPT_SPANS.sub(" ", text))
     if m:
-        add(("FAIL", f'arrow/scaffolding chain "{m.group(0)}" — write transitions in words '
-                     '("from 80% to under 1%"); symbol arrows garble in ATS parsers'))
+        add(("FAIL", f'arrow chain "{m.group(0)}" — write it in words '
+                     '("from 80% to under 1%"); a reader sees an arrow as notes, not a sentence'))
     m = FILLER.search(text)
     if m:
         add(("FAIL", f'banned filler "{m.group(0)}" — patterns.md § Shape'))

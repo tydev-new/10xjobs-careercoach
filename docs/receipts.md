@@ -36,7 +36,7 @@ skill.
 | No arrow glyphs | 2026-08-16 — candidate-caught; glyphs garble in ATS parsers |
 | ASCII arrow chains (`->`, `=>`, `<-`, `<=>`) are a FAIL | **None — a named exception to the earned-FAIL bar** (goals § 2), set by owner ruling 6 of 2026-09-25 (`design-apply-three-lens.md` § 4). The harm: a reader sees an arrow as notes, not a sentence. The glyph row above does not carry over — a 7-bit arrow does not garble in a parser. It stays an exception until an incident earns it or the owner lowers it to WARN |
 | Two opening sections is a FAIL | 2026-08-01 — a résumé shipped with a Summary AND a parallel highlights band |
-| Case ≤50 words | 2026-08-01 — a 133-word case against a 7–11s scan budget |
+| Summary prose ≤50 words before its bullets (once called the case) | 2026-08-01 — a 133-word case against a 7–11s scan budget |
 | PDF: never hand-parse streams; use a real extractor | 2026-07-15 — stream-grep reported 0 chars on a perfectly readable file |
 | PDF: no embedded fonts; watch the ~100KB upload limit | measured — ~8KB uploads fine, 121KB fails; italics alone cost one font subset (2026-08-19) |
 | Blanket assent is not a yes on a specific new bullet | 2026-08-16 — the Medtronic-negotiation bullet; candidate rejected it after "use it wherever it helps"; baited in t10 |

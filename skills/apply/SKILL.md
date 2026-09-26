@@ -14,7 +14,7 @@ A submitted application the candidate is proud of. **An application ships THREE 
 | Tailored résumé is reshape-only from base, with ATS PDF measured against page target | `applications/<key>-resume.md` + PDF |
 | Cover letter argues one clear thesis in candidate's voice | `applications/<key>-cover-letter.md` |
 | Decisions disclosed beside delivered doc (cuts, placed words, gaps) | `applications/<key>-application.md` · chat |
-| Deterministic checks and multi-persona review pass before delivery | reply outcomes, never narration |
+| Deterministic checks pass, and all three panel lenses Pass or are waived in chat, before the package is called ready | reply outcomes, never narration |
 | Nothing submitted without explicit candidate go and captured confirmation | `## Submission` · `jobs.md` at Applied |
 | Outreach plan exists with findable leads or honest "none findable" | `## Outreach plan` · `contacts/<company>.md` |
 
@@ -32,8 +32,8 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 **Runs when** the candidate asks to tailor a résumé, letter, or "materials" for a specific role.
 
 - **Standard:** The `## Standard` bullets in the application file (`references/schema.md`).
-- **Budget:** Two self-passes; one review incorporation round, which re-checks only the lenses short of Pass, once.
-- **Each round:** Read `## Standard` and earlier `## Rounds` rows first. Reshape-only from `base-resume.md` (selection, order, depth — never invented facts). Run checks and multi-persona review panel (`references/eval.md`). Score round as `N/M held` count and append row to `## Rounds`.
+- **Budget:** Two self-passes; one review incorporation round, which re-checks only the lenses short of Pass, once. Said up front.
+- **Each round:** Read `## Standard` and earlier `## Rounds` rows first. Reshape-only from `base-resume.md` (selection, order, depth — never invented facts). Run the checks and the three-lens panel (`references/eval.md § The panel — three lenses`). Score round as `N/M held` count and append row to `## Rounds`.
 - **Obligations:**
   1. *Facts need a yes:* Voluntarily surfaced facts go to `storybank.md`, not directly into a résumé without an explicit yes.
   2. *Deliver & Disclose:* Present the deliverable beside the proposal block (`scripts/proposal_block.py` list of cuts and placed words with easy reversal).

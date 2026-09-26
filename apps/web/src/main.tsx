@@ -6,11 +6,10 @@ import { MissingEnvError, readEnv } from "./backend/env.ts";
 import { RealApp } from "./real/RealApp";
 import { DevScreenPreview, devPreviewKind } from "./dev-preview";
 import { realTheme } from "./theme.ts";
-// Four openly licensed (SIL OFL) families, bundled via @fontsource —
-// never an external font CDN (design-web-ui-refresh.md's token table).
-// v2: Fraunces is the characterful heading/display face; Inter stays the
-// body/UI face (the brief excludes Inter only as the DISPLAY choice).
-import "@fontsource-variable/fraunces";
+// Four openly licensed (OFL-1.1) families, bundled via @fontsource — never
+// an external font CDN (docs/design-web-ui.md § 5.6's font table). Direction
+// C: Bricolage Grotesque is the display face; Inter stays the body/UI face.
+import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/source-serif-4";
 import "@fontsource/jetbrains-mono/400.css";

@@ -3,6 +3,10 @@
 // part's literal input and output/errorText, word for word — never a
 // restated description.
 import { useState, type ReactElement } from "react";
+// No icons.tsx import here on purpose: tests/web/cut-off-ui.test.ts renders
+// this file through a standalone require-based harness that only resolves
+// "react" — a second relative import would break it (tester-owned harness,
+// not this stage's to change). The caret stays a plain glyph, retokenized.
 
 export interface ToolPartLike {
   type: string; // "tool-<name>"

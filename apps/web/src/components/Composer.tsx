@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type ReactElement } from "react";
+import { Icon } from "../icons.tsx";
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
@@ -85,10 +86,11 @@ export function Composer({
           type="button"
           className="composer-attach"
           aria-label="Attach"
+          aria-busy={attaching || undefined}
           disabled={!onAttach || attaching}
           onClick={() => fileInputRef.current?.click()}
         >
-          {attaching ? "…" : "+"}
+          <Icon name={attaching ? "loaderCircle" : "paperclip"} size={16} className={attaching ? "spin" : undefined} />
         </button>
         <textarea
           className="composer-input"

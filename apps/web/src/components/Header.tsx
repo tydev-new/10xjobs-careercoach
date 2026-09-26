@@ -1,5 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { Avatar } from "./Avatar";
+import { BrandMark } from "./BrandMark";
+import { Icon } from "../icons.tsx";
 import { formatBalanceUsd } from "../format.ts";
 import type { CoachModel } from "../backend/coach-model.ts";
 import type { FixtureEntry } from "../fixtures";
@@ -104,7 +106,7 @@ export function Header(props: HeaderProps): ReactElement {
       <div className="app-header-left">
         <Avatar status={status} />
         <span className="app-header-title">
-          Ten <span className="app-header-status">· {STATE_LABEL[status.state]}</span>
+          <BrandMark size={20} /> Ten <span className="app-header-status">· {STATE_LABEL[status.state]}</span>
         </span>
         {status.action ? <span className="app-header-action">{status.action}</span> : null}
       </div>
@@ -143,10 +145,12 @@ export function Header(props: HeaderProps): ReactElement {
             target (rule 8, no untrue UI). */}
         {onBuyCredit ? (
           <button type="button" className="balance-chip balance-chip--button" onClick={onBuyCredit}>
+            <Icon name="wallet" size={16} />
             {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
           </button>
         ) : (
           <span className="balance-chip">
+            <Icon name="wallet" size={16} />
             {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
           </span>
         )}
@@ -157,7 +161,7 @@ export function Header(props: HeaderProps): ReactElement {
             aria-label="Menu"
             onClick={() => setMenuOpen((v) => !v)}
           >
-            ⋯
+            <Icon name="ellipsis" size={16} />
           </button>
           {menuOpen ? (
             <div className="menu-panel" role="menu">

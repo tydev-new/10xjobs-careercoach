@@ -152,6 +152,142 @@ function addCase(c) {
     args: (ws) => ["--workspace", ws, "--resume", join(ws, "resume.md")],
   });
 
+  // ---- owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4):
+  // ASCII arrow chains, the same failure class as the Unicode glyphs above.
+  function letter(body) {
+    return "# Cover letter\n\nDear Hiring Manager,\n\n" + body + "\n\nAlex Chen\n";
+  }
+  addCase({
+    script, bin, name: "ascii-arrow-form-arrow",
+    covers: "test_ascii_arrow_chain_fails_each_form",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Growth went 80->90 this quarter, every week, without exception at all.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-form-long-arrow",
+    covers: "test_ascii_arrow_chain_fails_each_form", // + the 5 other arrow-form cases below
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Growth went 80-->90 this quarter, every week, without exception at all.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-form-back-arrow",
+    covers: "test_ascii_arrow_chain_fails_each_form",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Growth went 80<-90 this quarter, every week, without exception at all.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-form-double-arrow",
+    covers: "test_ascii_arrow_chain_fails_each_form",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Growth went 80<->90 this quarter, every week, without exception at all.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-form-fat-arrow",
+    covers: "test_ascii_arrow_chain_fails_each_form",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Growth went 80=>90 this quarter, every week, without exception at all.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-form-long-fat-arrow",
+    covers: "test_ascii_arrow_chain_fails_each_form",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Growth went 80==>90 this quarter, every week, without exception at all.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-form-bidi-fat-arrow",
+    covers: "test_ascii_arrow_chain_fails_each_form",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Growth went 80<=>90 this quarter, every week, without exception at all.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-url",
+    covers: "test_ascii_arrow_exempt_spans_pass",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("See https://example.com/a->b for the writeup, thanks for reading it all today.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-inline-code",
+    covers: "test_ascii_arrow_exempt_spans_pass", // + exempt-fence, exempt-comment below
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("The old macro was `a->b` in the legacy build script, never shipped externally.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-fence",
+    covers: "test_ascii_arrow_exempt_spans_pass",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("```\na->b\n```\n\nExplained the diagram above to the whole panel, calmly and clearly.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-comment",
+    covers: "test_ascii_arrow_exempt_spans_pass",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("<!-- a->b -->\n\nReviewed the whole draft twice before sending, carefully and calmly.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  // Round 2 (docs/design-apply-three-lens.md § 4/§ 9 item 8): the tilde
+  // fence and the double-backtick span, both fixed known limits from the
+  // round 1 review.
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-tilde-fence",
+    covers: "round 2: the tilde-fence exempt span",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("~~~\na->b\n~~~\n\nExplained the diagram above to the whole panel, calmly and clearly.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-exempt-double-backtick",
+    covers: "round 2: the double-backtick span (round 1's false FAIL, fixed)",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Documented ``a->b`` in the internal wiki only, never in customer docs.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-double-backtick-then-text-still-scanned",
+    covers: "round 2: text after a double-backtick span is still scanned",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Documented ``a->b`` here, then separately wrote c=>d in the same paragraph today.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-accepted-four-space-indent",
+    covers: "known limit (accepted): four-space indented code false-FAILs",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("    a->b\n\nThat indented line above is plain prose in this document, not code.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-arrow-accepted-schemeless-url",
+    covers: "known limit (accepted): a scheme-less URL false-FAILs",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("See example.com/a->b for the writeup, thanks for reading it all today.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "ascii-le-ge-no-finding",
+    covers: "test_ascii_le_ge_do_not_fail",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Latency stayed <=5ms and throughput >=99% the whole quarter without incident.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "unicode-and-ascii-arrows-both-fail-unicode-first",
+    covers: "owner ruling 6 corpus: a document carrying both Unicode and ASCII arrows FAILs twice, Unicode first",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("We cut cost 80%→<1%, then kept it flat at 80->90 the rest of the year, steadily.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "accented-text-beside-ascii-arrow",
+    covers: "owner ruling 6 corpus: accented text beside an ASCII arrow chain",
+    setup: (ws) => writeFiles(ws, { "letter.md": letter("Latence baissée café->café à Montréal, chaque trimestre sans faute aucune fois.") }),
+    args: (ws) => ["--workspace", ws, "--letter", join(ws, "letter.md")],
+  });
+  addCase({
+    script, bin, name: "bullets-only-summary-passes-case-budget",
+    covers: "test_bullets_only_summary_passes_case_budget",
+    setup: (ws) =>
+      writeFiles(ws, {
+        "resume.md":
+          "# Alex Chen\n\n## Summary\n\n- Platform engineering leader delivering reliability at scale.\n" +
+          "- Cut incident response time from 4 hours to 40 minutes.\n" +
+          "- Built the on-call rotation from zero to a 6-person bench.\n\n" +
+          "## Experience\n\nPlatform Lead — Northwind Labs.\n",
+      }),
+    args: (ws) => ["--workspace", ws, "--resume", join(ws, "resume.md")],
+  });
+
   const BASE_RW =
     "# Alex Chen\n\n## Professional Experience\n\n### Meridian Health — Senior Data Analyst\n**2022 - Present**\n\n" +
     "- Wrote and maintained SQL pipelines in Postgres over claims data, feeding the finance team.\n" +

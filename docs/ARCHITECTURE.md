@@ -46,7 +46,8 @@ are in [`design-web-ui.md`](design-web-ui.md). Everything answers to
 
 - **Proxy:** our server function between the browser and the model
   provider. It holds the model key.
-- **Ledger:** the one table that records money: credits in, calls out.
+- **Ledger:** the one table that records money: credits in (starter and
+  paid), calls and refunds out.
 - **Allowance:** how much one turn may spend without asking: $1.00, or
   the amount of a spend gate the candidate just approved.
 - **RLS (row-level security):** Postgres rules that decide which rows
@@ -211,6 +212,11 @@ flowchart TD
   ran out of time.
 - **The balance is derived, never stored:** credits minus calls, from the
   ledger (rule 12).
+- **Buying credit adds to it** (C § 17). A member pays in PayPal's own
+  window; `ten-paypal` credits what arrived after PayPal's fee, one row
+  per payment, and `ten-paypal-webhook` is the backup when the browser
+  never hears back. Only orders Ten created and signed are credited
+  (C § 17.10). Buying never approves or raises a spend (rule 7).
 
 ## 4. The data model
 
@@ -221,6 +227,7 @@ flowchart TD
   Browser["Member's browser"]
   Delete["ten-delete-account<br/>(service role)"]
   Proxy["ten-model-proxy<br/>(service role)"]
+  Pay["ten-paypal, ten-paypal-webhook<br/>(service role)"]
   Owner["Owner"]
   subgraph Beta["The member's beta data"]
     subgraph Rows["Rows"]
@@ -234,14 +241,14 @@ flowchart TD
   Browser -->|ten_ functions| Rows
   Browser -->|"Storage API upload,<br/>RLS insert policy"| Bucket
   Delete -->|removes all of it| Beta
-  Delete -->|credit rows only| Ledger
   Proxy -->|call rows| Ledger
-  Owner -->|credit rows| Ledger
+  Pay -->|paid credit rows| Ledger
+  Owner -->|starter credit, refund rows| Ledger
 ```
 
 | What | Holds | Written by |
 |---|---|---|
-| `ten_usage_ledger` | credits and calls: tokens, dollars, model, `finish_reason` | the proxy (calls); the owner (credits) |
+| `ten_usage_ledger` | credits, refunds and calls: tokens, dollars, model, `finish_reason`; for a payment, gross and fee | the proxy (calls); `ten-paypal` and `ten-paypal-webhook` (paid credits); the owner (starter credits, refunds) |
 | `ten_gate_log` | each spend gate and its status | the member's browser, via `ten_gate_open`, `ten_gate_decide`, `ten_gate_expire_other_chats` |
 | `ten_ws_files` | workspace text files (`.md .txt .json .html`) | the member, via `ten_ws_write`, which refuses a stale version |
 | `ten_conversations` | one saved conversation per user | the member, via `ten_conversation_save`, same stale-version rule |
@@ -255,6 +262,7 @@ flowchart LR
   Data -->|own rows only, RLS| Member["The member"]
   Data -->|everything, skips RLS| Admin["Owner and server functions<br/>(service role)"]
   Data -->|only what a call carries| Model["OpenRouter and the model host<br/>(no-data-kept hosts only)"]
+  Data -->|only a purchase| PayPal["PayPal"]
 ```
 
 - **The member** reads only their own rows (RLS, with membership checked).
@@ -267,11 +275,16 @@ flowchart LR
   proxy forces the filter that sends calls only to hosts that keep no
   data and don't train on it. The candidate-facing list of hosts is the
   [privacy page](../apps/web/public/privacy.html) (C § 13.6).
+- **PayPal** sees only a purchase: the amount, an internal account id
+  (`ten:<uid>`) and Ten's signed invoice id. The payer's own PayPal
+  details stay with PayPal; Ten keeps the amount, fee and PayPal's
+  transaction id (C § 17.3, § 17.6).
 - **The gate log is a record, not proof;** the candidate's browser writes
   it. Spending is stopped by the proxy (C § 3).
-- **Delete** removes the member's files, gates, conversation and credit
-  rows. It keeps the shared sign-in and the call rows, which hold amounts
-  only, no content (C § 8).
+- **Delete** removes the member's files, gates and conversation. It
+  keeps the shared sign-in and every ledger row (credits, refunds,
+  calls), which hold amounts only, no content, so paid credit is never
+  lost (C § 17.4).
 - **The bucket has restrictive "pin" policies,** so a policy added later
   by anyone cannot open it to other users (C § 8).
 - **Schema:** [`supabase/migrations/`](../supabase/migrations/), in date
@@ -303,6 +316,9 @@ Vercel setting is baked in at build time, so it needs a fresh site
 deploy. Each change's contract states its own order, and it can differ:
 § 13's contract requires site first, then proxy, then the setting,
 because the new proxy refuses requests the old site sends (C § 13.2).
+§ 17 (buying credit): the older app's patch, the migration,
+`ten-delete-account`, `ten-paypal`, `ten-paypal-webhook` and its id, then
+the site (C § 17.7).
 
 **The site deploy is a script,**
 [`apps/web/scripts/deploy-prod.sh`](../apps/web/scripts/deploy-prod.sh).

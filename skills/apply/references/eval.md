@@ -7,10 +7,12 @@ tell they are met, and who checks.
 
 - **Structure and counts → the scripts.**
   `scripts/check_materials.py` — the mechanical floor for the
-  résumé and letter: case length · salutation register · one opening
+  résumé and letter: Summary prose over 50 words before its bullets ·
+  salutation register · one opening
   section · standard section names · no aggregate year counts (quoting
-  the JD's bar in a bolded opener is exempt) · no arrow or scaffolding
-  glyphs · banned filler · repeated Summary numbers · graduation years
+  the JD's bar in a bolded opener is exempt) · no arrow glyphs or ASCII
+  arrow chains (`->`, `=>`, `<-`, `<=>`; code, comments, and URLs
+  exempt) · banned filler · repeated Summary numbers · graduation years
   and stale per-role dates · duplicated Summary/Experience sentences ·
   every Experience bullet verbatim from the base except the declared
   `## Reworded` pairs. The letter's length bounds are advisory WARNs
@@ -24,15 +26,14 @@ tell they are met, and who checks.
 - **Language against written rules → an INDEPENDENT checker-subagent**,
   spawned on `../../profile/references/language-check.md` with the
   documents and their rule sources (`voice.md`, `base-resume.md § Claim
-  rules`). It owns never-say, struck forms, confirm-tier hazards, and
+  rules`). It owns never-say, struck forms, confirm-tier hazards,
   `reworded_scope` — the rewording that adds a noun, department, tool,
-  or strength the base lacks. It catches paraphrases exact-match never
-  could (t15: 10/10 vs the parser's 5/10).
-- **Everything semantic → you, at the moment**, and the persona panel
-  at delivery: the band call, whether the Summary answers "what role
-  and why this one", whether a letter argues or lists. The panel's
-  verdict form: a findings table, every row `fixed` or `discarded —
-  why`; the bar is no undischarged finding; an empty table is VOID.
+  or strength the base lacks — and `search_jargon`. It catches
+  paraphrases exact-match never could (t15: 10/10 vs the parser's 5/10).
+- **Everything semantic → you, at the moment**, and the panel at
+  delivery (`## The panel — three lenses`, below): the band call,
+  whether the Summary answers "what role and why this one", whether a
+  letter argues or lists.
 
 **What belongs here vs in `patterns.md`**: a line here produces a
 verdict and names who produces it. The assembly table's Do/Never rows
@@ -44,6 +45,20 @@ Results reach the candidate as outcomes: every FAIL and every
 fix-before-delivery flag is fixed before delivery; a WARN or
 defend-or-qualify flag is actively defended in the reply, never silently
 passed; both outputs are shown.
+
+## The panel — three lenses
+
+| Lens | Looks at | Fail if |
+|---|---|---|
+| ATS | this posting's must-have terms in natural prose; parseable titles and skills; no decorative layout; the PDF's text extracts; a light Skills line | a core term missing; a garbled parse; stuffed terms |
+| Recruiter | the top third in the first seconds (profile's 7–11): level, current titles, location and work authorization, scope, mandate, chronology | a confusing title stack; wrong seniority; a Summary that is a paragraph, not bullets; symbol chains the checker cannot see ("A > B > C"); broken chronology |
+| Hiring manager | a credible story for this mandate; proof bullets that map to the posting's outcomes; a claims-free bridge where needed | a generic paste; a claim above the base; a fake title; no mandate match |
+
+Each lens returns a verdict with a one-line why, then its `lens ·
+finding` rows. **Fail**: a Fail-if holds. **Revise**: none holds, but
+a finding must be fixed first. **Pass**: neither. Every finding ends
+`fixed` or `discarded — why`; an empty table is VOID. In `## Panel`
+the lenses are named `ats`, `recruiter`, and `hiring manager`.
 
 ## The destination, judged
 
@@ -60,12 +75,13 @@ deliverable.
 - **The standard was written before the draft** (`## Standard`), the
   audit came before the documents, and the page count was measured
   against the target the candidate gave, not discovered.
-- **The round was scored as a count** — `N/M held; unmet: …` in
-  `## Rounds`, the earlier rows read first; the exit said M/M, budget,
-  or the ceiling.
-- **The panel was three subagents**, each fed the SOURCE documents (raw
-  JD, decode, company brief), never the author's summary; one
-  incorporation round; the checker re-ran (t10-verbatim-panel).
+- **The round was scored as a count** — `N/M held; unmet: …` and the
+  three lens verdicts in `## Rounds`, the earlier rows read first;
+  the exit said M/M with every lens at Pass, budget, or the ceiling.
+- **The panel was three subagents, one per lens**, each fed the
+  SOURCE documents (raw JD, decode, company brief), never the
+  author's summary; one incorporation round; the checker re-ran; the
+  lenses short of Pass re-checked once (t10-verbatim-panel).
 - **A draft story's claim was never treated as the candidate's**
   (t10-storybank-default): proposed and waited, exactly as a new fact.
 - **Nothing submitted without the captured confirmation**, and nothing

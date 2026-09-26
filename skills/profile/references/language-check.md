@@ -31,6 +31,9 @@ authority here. The checker's taste is not a rule.
 - `voice.md § Never-say list`
 - for outreach drafts, `pitch.md § Messages rubric` — the ⚠ WATCH forms
 
+One rule, `search_jargon`, takes its list from this file, not from a
+candidate file, so it is always checkable.
+
 ## The rules
 
 1. **`struck_form`** — a never-form from § Claim rules must not appear in
@@ -56,6 +59,34 @@ authority here. The checker's taste is not a rule.
 5. **`watch_form`** — when `pitch.md § Messages rubric` is provided, a
    ⚠ WATCH form must not lead a draft or appear in one, in any wording.
    *Severity: fix-before-delivery.*
+6. **`search_jargon`** — Ten's own labels, used as labels, must not
+   appear in a document that goes to an employer or a contact: the
+   tailored résumé, the cover letter, application answers, and
+   outreach drafts. A story file is the candidate's own record and is
+   never sent, so this rule has no row for it. The labels, in the
+   forms that count:
+   - evaluate's verdict tiers written as tiers — "Strong Fit",
+     "Investable Stretch", "Long-Shot Stretch", "Weak Fit" in title
+     case or beside a score — and a fit score beside a tier or the
+     word fit ("Strong Fit — 82/100", "fit 82/100");
+   - search's track name, "Track B";
+   - the pipeline stage "To Review";
+   - the application file's labels: a round count ("6/7 held"), a
+     lens verdict — a lens name, then Pass, Revise, or Fail
+     ("recruiter Revise") — an audit tier ("ATS-Ready"), and
+     "DECISION" in capitals;
+   - terms Ten coined, which have no everyday meaning, in any
+     capitalization: "investable stretch", "long-shot stretch",
+     "shown-but-unnamed", "band call", "spine role", "mandate
+     sentence".
+
+   Ordinary English is never this rule's flag, even when it shares a
+   word with a label: "a strong fit for this team", "at this stage",
+   "on track", "leads a team of 12", "my lane", "the decision to
+   migrate", and a metric such as "scored 96/100 in the customer
+   survey" all pass. When a word could be either, it is English —
+   pass it. The echo exemption applies: the posting's own word,
+   quoted, is not jargon. *Severity: fix-before-delivery.*
 
 ## What is not a violation
 
@@ -85,7 +116,7 @@ a rule, and never guess what the list would have said.
 Return only a JSON object. No fences, no prose before or after.
 
 {"rules": [
-  {"rule": "struck_form|never_say|confirm_qualifier|reworded_scope|watch_form",
+  {"rule": "struck_form|never_say|confirm_qualifier|reworded_scope|watch_form|search_jargon",
    "file": "<document name as given>",
    "verdict": "pass|flag",
    "severity": "fix-before-delivery|defend-or-qualify",

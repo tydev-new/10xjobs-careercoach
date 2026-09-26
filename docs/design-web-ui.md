@@ -155,20 +155,20 @@ app to say; this section fixes only where and how it's shown.
 
 The `⋯` menu's one irreversible action. C § 3 keeps the term "gate"
 for the spend gate alone, but rule 7 names *any* action that's
-identity-bearing or irreversible, and this one forfeits money and
-erases records — so it renders in the same shape, the candidate's
+identity-bearing or irreversible, and this one erases records — so it renders in the same shape, the candidate's
 typed `yes` standing in for a button the same way it does at a spend
 gate (§ 2.5):
 
 1. **The complete thing** — named, not summarized: "your workspace
-   files, your conversation, your gate log, and your credit" (C § 8:
+   files, your conversation, and your gate log" (C § 8:
    `ten_ws_files` and the Storage bucket, `ten_conversations` (C § 11.7,
-   amended 2026-09-24), `ten_gate_log`, the `credit` ledger rows; the
-   `call` rows are kept).
-2. **The one plain sentence** — C § 8's own wording, word for word:
+   amended 2026-09-24), `ten_gate_log`; every ledger row is kept,
+   C § 17.4, amended 2026-09-25).
+2. **The one plain sentence**, word for word (C § 17.4 amends C § 8's):
    "This deletes your Ten beta data. Your sign-in stays because it's
-   shared with the older app. Unused credit is forfeited. Your usage
-   records, which show only amounts spent and no content, are kept."
+   shared with the older app. Your credit stays, and so do your payment
+   and usage records, which show only amounts and no content." It ships
+   only after `ten-delete-account` keeps every ledger row.
 3. **The candidate's typed yes** — the same composer, the same rule as
    the spend gate: no button fires it, only an exact typed `yes`.
 4. **The report-back** — once `ten-delete-account` returns, one line
@@ -323,17 +323,15 @@ dialog; Close or Esc shuts it. The refund contact is
 - Declined: "PayPal declined this payment. No money moved."
 - Window closed: "No payment was made."
 - Create-order failed: "Couldn't start a payment. No money moved."
-- Not credited, or no answer from capture: "Ten couldn't confirm the credit
+- `paid_not_credited`, `unconfirmed`, or no answer (C § 17.10): "Ten
+  couldn't confirm the credit
   yet. If PayPal took your payment, it's added automatically, usually
   within minutes. If not by tomorrow, email support@10xjobs.co with PayPal's
   receipt."
 
 Replaced, after the function change (C § 17.4): `over_balance` reads "Your
-credit is used up. You can buy more from your balance at the top." § 1.7's
-list is "your workspace files, your conversation, and your gate log", and
-its sentence: "This deletes your Ten beta data. Your sign-in stays because
-it's shared with the older app. Your credit stays, and so do your payment
-and usage records, which show only amounts and no content."
+credit is used up. You can buy more from your balance at the top." The
+delete copy is in § 1.7 (amended 2026-09-25).
 
 ## 2. The card catalog
 

@@ -44,9 +44,9 @@ until it was added by hand.
 
 | Skill | description | SKILL.md |
 |---|---|---|
-| profile | 82w | 1,499w |
+| profile | 82w | 1,506w |
 | storybank | 60w | 691w |
-| apply | 72w | 843w |
+| apply | 72w | 922w |
 | search | 67w | 559w |
 | coach | 95w | 882w |
 | evaluate | 61w | 567w |
@@ -54,7 +54,10 @@ until it was added by hand.
 | interview | 85w | 932w |
 | outreach | 69w | 704w |
 
-7,171 words total, **one of which loads at a time.** A SKILL.md holds
+7,257 words total (round 2, docs/design-apply-three-lens.md § 9 item
+12: apply +79w for the three-lens exit and the budget's "said up
+front"; profile +7w for the base-résumé Summary pointer), **one of
+which loads at a time.** A SKILL.md holds
 the destination (what must be true when the work is done), the files the
 skill owns, its modes, and the guardrails that fire only inside its
 work.
@@ -63,17 +66,19 @@ Soft target ~700 words. All eleven are over it — the loops inlined into the or
 
 ## Tier 3 — references, on demand
 
-Loaded only when a mode calls for them. 34,442 words across 36 files,
-and the largest single skill fully loaded — profile, body plus every
-reference — is 7,065 words.
+Loaded only when a mode calls for them. 35,265 words across 36 files
+(round 2, docs/design-apply-three-lens.md § 9 item 12: apply +634w for
+the panel verdicts, the rewritten § The Summary and the ASCII-arrow
+exemptions; profile +690w for rule 6's bounded rewrite and the three
+Summary pointers; outreach −82w for its rewired eval.md).
 
 | Skill | refs | words | Skill | refs | words |
 |---|---|---|---|---|---|
-| apply | 3 | 4,383w | storybank | 3 | 2,733w |
-| profile | 5 | 3,865w | positioning | 3 | 2,250w |
+| apply | 3 | 5,017w | storybank | 3 | 2,733w |
+| profile | 5 | 4,555w | positioning | 3 | 2,250w |
 | coach | 4 | 4,372w | evaluate | 3 | 2,428w |
 | prep | 3 | 4,117w | learn | 3 | 1,460w |
-| outreach | 3 | 2,662w | search | 3 | 2,142w |
+| outreach | 3 | 2,580w | search | 3 | 2,142w |
 | practice | 3 | 3,787w | | | |
 
 ## Tier 4 — scripts, never loaded

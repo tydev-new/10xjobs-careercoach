@@ -56,9 +56,10 @@ audits against the candidate's target band and skips them.
 1. **ATS** → ATS-Ready / Risky / Broken. Structure, headings,
    extractability. **[JD]** the keyword-gap map: each posting term →
    present? where? action (add / reorder / rewrite).
-2. **Recruiter** → Strong / Moderate / Weak. First-seconds story, case
-   budget, level legibility, scope escalation across roles, whether the
-   red flags are visible.
+2. **Recruiter** → Strong / Moderate / Weak. First-seconds story, the
+   Summary's shape (`../../apply/references/patterns.md § The
+   Summary`), level legibility, scope escalation across roles, whether
+   the red flags are visible.
 3. **Hiring manager** → Strong / Moderate / Weak. Would they take the
    call: bullets are accomplishments with numbers (not responsibilities),
    the storybank's best evidence is present, **[JD]** the band call is
@@ -70,8 +71,10 @@ audits against the candidate's target band and skips them.
 
 The tier words — ATS-Ready, Strong, the band call — get used, not
 decorated: they go in the round record's `scored` cell beside the
-`N/M held` count, and `apply` shows them in its audit block before the
-documents. **What belongs here vs in `patterns.md`**: a line here
+`N/M held` count (apply's round record carries its panel verdicts
+instead — `../../apply/references/schema.md`), and `apply` shows them
+in its audit block before the documents. **What belongs here vs in
+`patterns.md`**: a line here
 produces a verdict (a tier, a count, a flag) and names who produces it;
 a line that makes a draft better but produces no verdict is craft and
 lives in patterns.

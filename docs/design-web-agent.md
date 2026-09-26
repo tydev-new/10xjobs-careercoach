@@ -14,7 +14,8 @@ Again 2026-09-25: § 15 (production is owner-only; owner decision).
 Again 2026-09-25: § 16 (setting and resetting a password; owner-reported
 gap; draft for owner approval).
 Again 2026-09-25: § 17 (buying credit with PayPal; approved by the owner,
-2026-09-25, with the answers in § 17.9).
+2026-09-25, with the answers in § 17.9; § 17.10, only Ten's own orders, lead
+ruling 2026-09-25).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -2118,35 +2119,39 @@ hands; the older app retrying Ten's payments for 3 days.
 2. **`POST ten-paypal/create-order`** `{ pack: "10"|"20"|"40" }`: signed in
    (401), member (403), known pack (400). Creates an Orders v2 order,
    `intent: CAPTURE`: the pack's amount from the server's table,
-   `custom_id: "ten:<uid>"`, `invoice_id: "ten-<random uuid>"` (PayPal wants
+   `custom_id: "ten:<uid>"`, `invoice_id` signed as in § 17.10 (PayPal wants
    it unique), `description: "Ten credit $10"`, no shipping address. No
    vault, saved method, agreement or plan. Returns `{ orderId }`.
 3. The payer confirms in PayPal's window.
 4. **`POST ten-paypal/capture-order`** `{ orderId }`: signed in, member.
-   Reads the order first: unless `custom_id` is `ten:<caller>` (403) and the
-   amount a pack in USD (400), nothing is captured. Captures with
+   Reads the order first: unless it passes § 17.10's check (403
+   `not_ten_order`) and its uid is the caller's (403), nothing is captured. Captures with
    `PayPal-Request-Id: ten-capture-<orderId>` (kept 6 hours: a retry returns
    the same capture); `ORDER_ALREADY_CAPTURED` → read the order's capture.
    `COMPLETED` → credit (§ 17.3), `{ status: "credited", grossUsd, feeUsd,
    creditedUsd }`; `PENDING` → `"pending"` (no fee breakdown until it
-   clears); else `"declined"`. A failed credit write → 503
+   clears); `DECLINED` or `FAILED` → `"declined"`; any other error → 503
+   `"unconfirmed"` (§ 17.10). A failed credit write → 503
    `"paid_not_credited"`.
 5. **`ten-paypal-webhook`, the backup. Decision: Ten registers its own URL
    on the shared app, event `PAYMENT.CAPTURE.COMPLETED` only.** Without it,
    a pending payment that clears later, or a failed credit write after the
    tab closed, stays uncredited until the user complains. PayPal posts to
    every subscribed URL and retries a non-2xx up to 25 times over 3 days.
-   Checks, in order: POST, ≤ 64 KB, JSON. **Then PayPal's signature**
+   Checks, in order: POST, ≤ 64 KB, JSON; a missing `paypal-*` signature
+   header → 401 without calling PayPal. **Then PayPal's signature**
    (owner, 2026-09-25): `POST /v1/notifications/verify-webhook-signature`
    with the five `paypal-*` headers, the event and `TEN_PAYPAL_WEBHOOK_ID`;
    anything but `SUCCESS` → 401, no credit; the call failing, or the secret
    unset → 503, so PayPal retries. Then: another event type → 200;
-   `resource.custom_id` not exactly `ten:<uuid>` → 200 (the older app's);
+   `resource.custom_id` not exactly `ten:` + a lowercase UUID → 200 (the
+   older app's);
    not a member → 200 and an alert ("refund by hand"). **Then, still,
-   re-fetch** `GET /v2/payments/captures/{id}` with Ten's keys (failure →
-   503): the signature proves PayPal sent the event, the re-fetch proves
-   the capture (rule 11). It must show the same `custom_id`, `COMPLETED`, a
-   USD pack, else 200 and an alert; credit (a failed write → 503). Deployed
+   re-fetch** `GET /v2/payments/captures/{id}` with Ten's keys (404 → 200
+   and a log line; other failure → 503): the signature proves PayPal sent
+   the event, the re-fetch proves the capture (rule 11). It must pass
+   § 17.10's check and show the same `custom_id` and `COMPLETED`, else 200
+   and a log line; credit (a failed write → 503). Deployed
    with `verify_jwt = false`; no CORS.
 
 ### 17.2 Buying is not spending (rule 7)
@@ -2176,8 +2181,9 @@ unique, so capture, webhook and replays credit once), `usd` = PayPal's
 `net_amount`, plus new nullable `gross_usd`, `fee_usd` (`numeric(12,2)`).
 PayPal's decimal strings reach Postgres unparsed. The migration adds:
 
-- a check: `gross_usd` and `fee_usd` are set exactly when `request_id`
-  starts with `paypal:`, and then `kind = 'credit'`, `fee_usd >= 0`,
+- a two-way check: a `paypal:` row without `gross_usd` and `fee_usd` is
+  refused, and so is either column on any other row; a `paypal:` row
+  also needs `kind = 'credit'`, `fee_usd >= 0`,
   `usd > 0`, `usd = gross_usd - fee_usd`, so a breakdown that doesn't add up
   is refused;
 - the kind `refund` (§ 17.5). `ten_balance_for` already subtracts every
@@ -2208,12 +2214,14 @@ request.
 ### 17.6 Secrets, sandbox, the older app, privacy
 
 Function secrets, owner-set (§ 15): `TEN_PAYPAL_CLIENT_ID`,
-`TEN_PAYPAL_CLIENT_SECRET`, `TEN_PAYPAL_API_BASE`, `TEN_PAYPAL_WEBHOOK_ID`
-(Supabase secrets are project-wide; the prefix keeps them apart). The functions refuse to start
+`TEN_PAYPAL_CLIENT_SECRET`, `TEN_PAYPAL_API_BASE`, `TEN_PAYPAL_WEBHOOK_ID`,
+and the non-secret `TEN_PAYPAL_MERCHANT_ID` (§ 17.10) (Supabase secrets are
+project-wide; the prefix keeps them apart). The functions refuse to start
 unless the base is `https://api-m.sandbox.paypal.com` or
 `https://api-m.paypal.com`. The browser gets only the public
 `VITE_PAYPAL_CLIENT_ID`. `ten-paypal` uses `_shared/cors.ts`. Sandbox
-first; for live, switch secrets, Vercel value, webhook and its id together.
+first; for live, switch secrets (merchant id included), Vercel value,
+webhook and its id together.
 
 The older app's webhook gets every Ten payment too; today it fails on
 `ten:<uuid>`, answers 500 and is retried for 3 days. Its patch:
@@ -2233,9 +2241,11 @@ records survive a delete.
 2. PayPal: the account takes USD without manual acceptance (else payments
    sit `PENDING`); unique invoice ids stays on.
 3. Apply the migration; `NOTIFY pgrst, 'reload schema';`.
-4. `supabase secrets set TEN_PAYPAL_CLIENT_ID=… TEN_PAYPAL_CLIENT_SECRET=…
-   TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com --project-ref
-   ivunfotoggdxbjouumdk`.
+4. Copy the account's merchant ID from PayPal's account settings (the
+   sandbox business account's for sandbox), then `supabase secrets set
+   TEN_PAYPAL_CLIENT_ID=… TEN_PAYPAL_CLIENT_SECRET=…
+   TEN_PAYPAL_MERCHANT_ID=… TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com
+   --project-ref ivunfotoggdxbjouumdk`.
 5. `supabase functions deploy ten-delete-account`, then `ten-paypal`, then
    `ten-paypal-webhook --no-verify-jwt` (same project ref).
 6. developer.paypal.com → the app → Webhooks → Add:
@@ -2257,7 +2267,8 @@ Supabase; sandbox is the owner's step 8.
    the body adds (`amount`, `custom_id`); `custom_id` is `ten:<caller>`; no
    vault or agreement field.
 2. capture-order on another user's order, an older-app order (bare UUID),
-   a `ten:` order with a non-pack amount: 403, 403, 400; no capture call.
+   a `ten:` order with a non-pack amount: all 403 (the last two
+   `not_ten_order`); no capture call. More in § 17.10.
 3. Parallel captures, capture then webhook, webhook then capture, a webhook
    replayed 3 times, `ORDER_ALREADY_CAPTURED`: one row.
 4. Webhook: a bad or missing signature → 401, no re-fetch, no row; the
@@ -2267,8 +2278,7 @@ Supabase; sandbox is the owner's step 8.
    event's → 200, no row. Valid and `ten:` → re-fetch → one row, replayed
    or not. A PayPal or DB failure: 503.
 5. `PENDING`: no row; the later webhook: one row.
-6. A breakdown that doesn't add up, non-USD, no `net_amount`: no row, an
-   alert.
+6. The breakdown cases: § 17.10.
 7. `tests/sql`: the checks; users can't insert; a refund lowers
    `ten_balance()`, not `ten_beta_spend_today()`; the teardown refuses.
 8. Delete, twice: files, conversation, gates gone; ledger, membership and
@@ -2286,11 +2296,105 @@ Approved with the lead's recommendations:
 - Delete keeps the $5 starter row, so the person stays a member (§ 17.4).
 - Unused paid credit stays usable when the beta ends; refunds on request.
 - Pay Later off; the teardown refuses while paid rows exist.
-- The refund contact is PENDING OWNER: a release blocker for live PayPal
-  only (§ 17.7).
+- The refund contact is `support@10xjobs.co` (owner, 2026-09-25); the
+  release blocker is cleared (§ 17.7).
 - The older app credits gross from its webhook and net from its capture
   route: a known issue, a separate fix for the older app, not part of
   Ten's build (`old-app-paypal-ten-prefix.md`).
+
+### 17.10 Only Ten's own orders (amendment, 2026-09-25; lead ruling)
+
+The independent tester's finding F1: capture checked `custom_id` and the
+amount, never that Ten created the order. The client id is public, so a
+browser can create an order itself, with a `ten:` `custom_id` and possibly
+another payee. Wins over § 17.1–17.8 where they differ.
+
+**Prevents:** crediting an order Ten didn't create; calling a capture or
+webhook failure "declined"; crediting a breakdown that doesn't add up.
+
+**The signed `invoice_id`.** `create-order` sets
+`ten-<U>-<T>-<N>-<H>`, 73 characters (PayPal allows 127), matching
+`^ten-[0-9a-f]{8}-[0-9]{10}-[0-9a-f]{16}-[0-9a-f]{32}$`:
+
+- `U`: the first 8 characters of the caller's uid, for reading PayPal's
+  reports;
+- `T`: Unix time in seconds;
+- `N`: 8 random bytes as 16 lowercase hex characters. It makes the id
+  unique before an order id exists;
+- `H`: the first 32 lowercase hex characters of
+  HMAC-SHA256(`K`, `v1|<uid>|<pack>|<amount>|<T>|<N>`), where `uid` is the
+  full lowercase UUID, `pack` is `10`, `20` or `40`, and `amount` is the
+  exact value string sent to PayPal (`10.00`);
+- `K` = HMAC-SHA256(`TEN_PAYPAL_CLIENT_SECRET`, `ten-invoice-v1`), the raw
+  32 bytes. No new secret.
+
+**The check**, one shared function, run before any credit: by
+`capture-order` on the order it read, and by the webhook on the re-fetched
+capture (a capture carries `invoice_id`, `custom_id` and `amount`, per
+PayPal's published Payments v2 spec). It passes only when `custom_id` is
+exactly `ten:` + a lowercase UUID; the amount is USD and its value string
+equals one pack's exactly, which gives `pack`; `invoice_id` matches the
+pattern; `U` is the uid's first 8 characters; and the recomputed `H`
+equals the given one, compared in constant time. Otherwise `capture-order`
+answers 403 `not_ten_order` and never calls capture; the webhook answers
+200 "ignored" and logs one line (capture id and reason, no payer data).
+`T`'s age is not checked: a pending payment can clear days later.
+Rotating `TEN_PAYPAL_CLIENT_SECRET` breaks the tags of payments not yet
+credited: rotate when none is pending, or credit those by hand.
+
+**Errors and the breakdown.**
+
+- A capture call answering 5xx, timing out, or with any error other than
+  `ORDER_ALREADY_CAPTURED` → 503 `unconfirmed`, shown with "Ten couldn't
+  confirm the credit yet…" (UI § 1.11), never "declined".
+- `gross_amount`, `paypal_fee` and `net_amount` must all be present and in
+  USD, and net = gross − fee, compared in whole cents from the decimal
+  strings. Otherwise: no row and an `ALERT` log line; `capture-order`
+  answers 503 `paid_not_credited`, the webhook 200 (a retry can't fix it;
+  the owner resolves it by hand).
+
+**The payee is Ten's (lead ruling, 2026-09-25).** The tag does not bind
+the payee: a member could mint a tag with `create-order`, then create
+their own order in the browser with that `invoice_id`, `custom_id` and
+amount but another account as payee (PayPal's unique-invoice rule is per
+account). So the check also requires the order's
+`purchase_units[0].payee.merchant_id` to equal `TEN_PAYPAL_MERCHANT_ID`, a
+non-secret setting.
+
+- `capture-order` compares it on the order it reads first; a foreign payee
+  → 403 `not_ten_order`, no capture call.
+- The webhook reads the order behind the re-fetched capture
+  (`supplementary_data.related_ids.order_id`, in PayPal's published
+  Payments v2 capture spec) with `GET /v2/checkout/orders/{id}`: a foreign
+  payee, or a missing order id → 200 "ignored", a log line, no row; the
+  order 404 → the same; another failure → 503.
+- The setting unset → refuse, never skip: `create-order` and
+  `capture-order` answer 503 before calling PayPal; the webhook 503, so
+  PayPal retries until it is set.
+
+**Tests** (added to § 17.8):
+
+1. create-order's `invoice_id` matches the pattern and equals a fixed
+   test vector (known key, uid, pack, `T`, `N`).
+2. capture-order with no `invoice_id`, a random one, another uid's valid
+   tag, another pack's tag, one hex digit changed, or a tag from another
+   secret: 403 `not_ten_order`, no capture call. The webhook, the same six
+   on the re-fetched capture: 200, a log line, no row.
+3. Capture 500, timeout, an unknown error: 503 `unconfirmed`; `DECLINED`
+   or `FAILED`: `declined`.
+4. A non-USD field; a missing fee or net; net off by one cent: no row, an
+   `ALERT`; capture-order 503 `paid_not_credited`, the webhook 200.
+5. Webhook: each signature header missing in turn → 401, verify never
+   called; `custom_id` `TEN:<uuid>`, an uppercase UUID, a trailing space →
+   200 ignored; re-fetch 404 → 200 and a log line; re-fetch 500 → 503.
+6. `tests/sql`: both directions of the two-way check are refused.
+7. Review: the tag compare is a constant-time byte compare.
+8. Payee: a valid tag with a foreign `payee.merchant_id` → capture-order
+   403 `not_ten_order` and no capture call; the webhook 200 ignored and no
+   row. The webhook reads the order named in
+   `supplementary_data.related_ids.order_id`; that id missing or the order
+   404 → 200, no row. `TEN_PAYPAL_MERCHANT_ID` unset → create-order and
+   capture-order 503 with no PayPal call; the webhook 503 and no row.
 
 ---
 
@@ -2400,4 +2504,6 @@ spike replaced (owner, 2026-09-23).
   app's account, credit = PayPal's net, one row per capture keyed
   `paypal:<captureId>`; Ten's own capture webhook as the backup, checked by
   PayPal's signature and then a re-fetch; buying is paying in PayPal's window, never Ten spending
-  (rule 7); delete keeps every ledger row.
+  (rule 7); delete keeps every ledger row. Only Ten's own orders are
+  credited: a signed `invoice_id` and Ten's own payee (`TEN_PAYPAL_MERCHANT_ID`)
+  checked before any credit (§ 17.10, lead rulings on F1, 09-25).

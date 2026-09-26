@@ -39,6 +39,11 @@ const MANIFEST = {
   test_declared_rewording_is_exempt: { parity: "rewording-declared-exempt" },
   test_undeclared_rewording_still_fails: { parity: "rewording-undeclared-fails" },
   test_reworded_block_cannot_self_issue_its_exemption: { parity: "rewording-cannot-self-issue" },
+  // ---- owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): ASCII arrow chains
+  test_ascii_arrow_chain_fails_each_form: { parity: "ascii-arrow-form-arrow" }, // + 6 other arrow-form cases
+  test_ascii_arrow_exempt_spans_pass: { parity: "ascii-arrow-exempt-url" }, // + exempt-inline-code, exempt-fence, exempt-comment
+  test_ascii_le_ge_do_not_fail: { parity: "ascii-le-ge-no-finding" },
+  test_bullets_only_summary_passes_case_budget: { parity: "bullets-only-summary-passes-case-budget" },
 
   // ---- test_check_files.py (unit titles are check-files.test.mjs, in the same order as the Python file)
   test_conforming_profile_passes: { unit: "a conforming profile.md passes", file: "check-files.test.mjs" },

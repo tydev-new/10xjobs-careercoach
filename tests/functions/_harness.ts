@@ -546,6 +546,15 @@ export interface PpState {
   captureGate?: Promise<void>;
   /** path-substring -> a transport failure (the fetch itself rejects, e.g. a timeout) */
   throwOn?: Record<string, string>;
+  /** path-substrings PayPal never answers (held until ppReleaseHangs) */
+  hang?: string[];
+  hangWaiters?: Array<() => void>;
+}
+/** Let every held (hung) PayPal request finish, so no test leaks a pending response. */
+export function ppReleaseHangs(pp: PpState) {
+  for (const w of pp.hangWaiters ?? []) w();
+  pp.hangWaiters = [];
+  pp.hang = [];
 }
 export function newPpState(): PpState {
   return { orders: new Map(), captures: new Map(), hits: [], fail: {}, nextCapture: {}, issued: new Map() };
@@ -649,6 +658,10 @@ export async function paypalHandler(req: Request, pp: PpState): Promise<Response
     body = undefined;
   }
   pp.hits.push({ method: req.method, path: url.pathname, headers: req.headers, body, bodyText });
+  if ((pp.hang ?? []).some((k) => url.pathname.includes(k))) {
+    await new Promise<void>((r) => (pp.hangWaiters ??= []).push(r));
+    return ppErr(504, "LATE_ANSWER_NOBODY_WAITED_FOR");
+  }
   for (const [k, st] of Object.entries(pp.fail)) {
     if (url.pathname.includes(k)) return ppErr(st, "INTERNAL_SERVICE_ERROR");
   }

@@ -16,7 +16,12 @@ import {
 } from "./core.ts";
 
 export const MESSAGES = {
-  overBalance: "Your beta credit is used up. Ask the person who invited you for more.",
+  // design-web-ui.md § 1.11: "Replaced, after the function change (C §
+  // 17.4): over_balance reads 'Your credit is used up. You can buy more
+  // from your balance at the top.'" (was "Your beta credit is used up.
+  // Ask the person who invited you for more." — buying credit, § 17,
+  // replaces "ask the person who invited you" as the next step).
+  overBalance: "Your credit is used up. You can buy more from your balance at the top.",
   ceiling: "The beta has reached today's limit. Try again tomorrow.",
   notMember: "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.",
   modelError: "The model is temporarily unavailable. Try again.",

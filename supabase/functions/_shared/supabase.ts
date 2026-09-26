@@ -166,6 +166,80 @@ export async function insertLedgerCall(
   await res.body?.cancel().catch(() => {});
 }
 
+/** § 17.1 step 5: the webhook has no caller JWT (PayPal calls it directly),
+ * so it cannot use `ten_is_member()` (which reads `auth.uid()` from the
+ * CALLER's own token). This reads the same fact — "does this uid have a
+ * credit row" — directly, service-role only, for an ARBITRARY uid (the one
+ * the webhook's `custom_id` names). Bypasses RLS the same way every other
+ * service-role call in this file does. */
+export async function isMemberByUid(
+  env: SupabaseEnv,
+  uid: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<boolean> {
+  const res = await fetchImpl(
+    `${env.url}/rest/v1/ten_usage_ledger?user_id=eq.${encodeURIComponent(uid)}&kind=eq.credit&select=id&limit=1`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${env.serviceRoleKey}`,
+        apikey: env.serviceRoleKey,
+      },
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`ten_usage_ledger membership-by-uid check failed: ${res.status} ${text}`);
+  }
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+export interface LedgerCreditRow {
+  user_id: string;
+  kind: "credit";
+  // § 17.3: 'paypal:<captureId>' — already unique, so capture, webhook and
+  // replays credit once via the column's own unique constraint.
+  request_id: string;
+  // § 17.3/17.6: PayPal's OWN decimal strings, passed through unparsed —
+  // never a JS float (see _shared/paypal.ts's file header for why).
+  usd: string;
+  gross_usd: string;
+  fee_usd: string;
+}
+
+/** Inserts one `ten_usage_ledger` 'credit' row for a PayPal capture (§ 17.3;
+ * service role). `request_id`'s unique constraint is the one thing that
+ * makes capture-order, the webhook, and any replay of either credit the
+ * SAME capture only once — this function itself does no deduping, it just
+ * surfaces the 409 via the same `duplicate: true` flag `insertLedgerCall`
+ * uses, so callers share one `isDuplicateRequestId` check. */
+export async function insertLedgerCredit(
+  env: SupabaseEnv,
+  row: LedgerCreditRow,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  const res = await fetchImpl(`${env.url}/rest/v1/ten_usage_ledger`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.serviceRoleKey}`,
+      apikey: env.serviceRoleKey,
+      "Content-Type": "application/json",
+      Prefer: "return=minimal",
+    },
+    body: JSON.stringify(row),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const err = new Error(`ten_usage_ledger credit insert failed: ${res.status} ${text}`);
+    if (res.status === 409) {
+      Object.assign(err, { duplicate: true });
+    }
+    throw err;
+  }
+  await res.body?.cancel().catch(() => {});
+}
+
 // Deletes every row the caller owns in `table` (service role), returning
 // the count deleted via `Prefer: count=exact` (a `Content-Range: star/N`
 // shaped response header). Used by ten-delete-account for `ten_ws_files`,

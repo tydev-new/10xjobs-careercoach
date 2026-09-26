@@ -26,6 +26,7 @@ import { exportWorkspace, importWorkspace, WorkspaceImportError, WorkspaceImport
 import { uploadWithClashRenumber } from "../backend/upload-errors.ts";
 import { ConversationError, type ConversationStore } from "../backend/conversation-store.ts";
 import type { AppMessage, DataCardData, FileRead } from "../types.ts";
+import { BuyCreditDialog } from "./BuyCreditDialog";
 import { DeleteBetaDataConfirm } from "./DeleteBetaDataConfirm";
 import { SetPasswordDialog } from "./SetPasswordDialog";
 import { checkConversationStale, CONVERSATION_CHECK_TIMEOUT_MS } from "./conversation-stale-check.ts";
@@ -86,6 +87,16 @@ export interface RealChatShellProps {
   conversationStore?: ConversationStore;
   supabaseUrl: string;
   accessToken: () => Promise<string>;
+  /** design-web-agent.md § 17.1 — VITE_PAYPAL_CLIENT_ID, the PUBLIC client
+   *  id only. Threaded straight to BuyCreditDialog; empty means the
+   *  dialog itself shows "can't start a payment" rather than the chip/menu
+   *  entry points ever being hidden (a member always sees SOME way to try,
+   *  per § 1.11 — a misconfigured client id is an operator error, not a
+   *  reason to hide the feature). Optional/defaults to "" only so a
+   *  caller that predates § 17 (a harness mounting this component
+   *  directly, without PayPal) keeps working unchanged — RealApp.tsx
+   *  always supplies it from env.paypalClientId. */
+  paypalClientId?: string;
   /** design-web-ui.md § 1.10 — the ⋯ menu's "Set a new password" dialog
    *  (updateUser/reauthenticate) and the recovery screen's own save both
    *  go through this same client. */
@@ -118,6 +129,7 @@ export function RealChatShell({
   conversationStore,
   supabaseUrl,
   accessToken,
+  paypalClientId = "",
   authClient,
   userEmail,
   onSignOut,
@@ -220,6 +232,7 @@ export function RealChatShell({
   const [attaching, setAttaching] = useState(false);
   const [attachError, setAttachError] = useState<string | undefined>(undefined);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showBuyCredit, setShowBuyCredit] = useState(false);
   const [showSetPassword, setShowSetPassword] = useState(false);
   const [importError, setImportError] = useState<string | undefined>(undefined);
   // § 10 / ui § 1.8 — a newer deployed build. `sendBlockedOnce` switches the
@@ -467,6 +480,7 @@ export function RealChatShell({
           onExportWorkspace={() => void handleExport()}
           onImportWorkspace={() => importInputRef.current?.click()}
           onDeleteBetaData={() => setShowDeleteConfirm(true)}
+          onBuyCredit={() => setShowBuyCredit(true)}
           onSetPassword={() => setShowSetPassword(true)}
           onSignOut={onSignOut}
           coachModel={coachModel}
@@ -533,6 +547,15 @@ export function RealChatShell({
           accessToken={accessToken}
           onClose={() => setShowDeleteConfirm(false)}
           onDeleted={onDeleted}
+        />
+      ) : null}
+      {showBuyCredit ? (
+        <BuyCreditDialog
+          supabaseUrl={supabaseUrl}
+          accessToken={accessToken}
+          paypalClientId={paypalClientId}
+          onClose={() => setShowBuyCredit(false)}
+          onCredited={refreshBalance}
         />
       ) : null}
       {showSetPassword ? (

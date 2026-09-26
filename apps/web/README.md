@@ -141,7 +141,11 @@ it separately, as above, against a built preview server).
   isn't above zero. The first-run greeting shows only when the **store**
   is empty (`store.list()` returns nothing) *and* no messages exist yet —
   not merely an empty chat on a fixture whose workspace already has files.
-- `src/components/` — Header/Avatar, Transcript, ToolRun (the collapsed
+- `src/components/` — Header/Avatar (§ 17, 2026-09-25: `onBuyCredit` — the
+  balance chip becomes a real `<button>` only when it's given, real mode
+  only; the ⋯ menu gains "Buy credit" the same way, absent outright rather
+  than merely disabled when the prop isn't passed, same posture as every
+  other real-only menu item here), Transcript, ToolRun (the collapsed
   "ran …" line), Cards (verdict/plan/document/checker/cost — verdict
   labels are `eval.md`'s own tier names; the cost card shows
   `estimate_cost`'s numbers via `formatUsd`, never widened or rounded
@@ -166,9 +170,12 @@ it separately, as above, against a built preview server).
   no longer has a `tool-web_search output-error` part or a trailing
   model `text` part after the refusal (the proxy now refuses the next
   call **before** it reaches the model, so nothing composes a reply for
-  that step) and its `data-error.message` is the proxy's real 402 text,
-  "Your beta credit is used up. Ask the person who invited you for
-  more."
+  that step) and its `data-error.message` is the proxy's real 402 text —
+  updated again 2026-09-25 for § 17.4/design-web-ui.md § 1.11's replaced
+  copy, "Your credit is used up. You can buy more from your balance at
+  the top." (was "Your beta credit is used up. Ask the person who invited
+  you for more." — buying credit replaces "ask the person who invited
+  you" as the next step).
 
 ## Known gaps / open questions for the lead
 
@@ -271,9 +278,21 @@ real key):
   name, so it fails exactly like a missing required var — the existing
   config-error screen already names whatever's in `missing`, so a typo'd
   setting can never make the owner think DeepSeek is running when it
-  isn't.
+  isn't. § 17.1 (2026-09-25) adds `paypalClientId` (from
+  `VITE_PAYPAL_CLIENT_ID`) to the SAME `TenEnv`, trimmed but **not** added
+  to the required-vars list — see the env-var table above for why.
 - `delete-account.ts` — calls the `ten-delete-account` Edge Function and
-  returns its summary.
+  returns its summary. § 17.4 (amended 2026-09-25): the summary no longer
+  carries a `creditRows` field at all — the function stops deleting any
+  ledger row, so there's nothing to report there.
+- `paypal.ts` (§ 17.1, 2026-09-25) — calls the `ten-paypal` Edge Function's
+  two endpoints: `createPaypalOrder(opts, pack)` (`POST .../create-order`,
+  body `{ pack }` only — the amount always comes from the server's own
+  table, never sent from here) and `capturePaypalOrder(opts, orderId)`
+  (`POST .../capture-order`). Both throw with the server's own `error.message`
+  on a non-2xx response, same shape as `delete-account.ts`. PayPal's own
+  decimal strings (`grossUsd`/`feeUsd`/`creditedUsd`) pass through as
+  plain strings, never parsed to a float here either.
 - `auth.ts`, `supabase-workspace-store.ts`, `workspace-export.ts` — from
   step 2 (SupabaseWorkspaceStore, export/import, auth); not owned by this
   slice, used as-is. `auth-client-adapter.ts` (this slice) adapts a real
@@ -297,7 +316,15 @@ abortSignal })` already returns the exact `ReadableStream<UIMessageChunk>`
   bundled Tier 0 once, build `Deps`, `createCoach`) → the chat.
 - `RealChatShell.tsx` — the real chat screen: `AgentChatTransport`,
   `SupabaseWorkspaceStore`, `deps.balance()` for the chip, the ⋯ menu's
-  export/import/delete/sign out, the composer's attach → upload wiring.
+  export/import/delete/buy credit/sign out, the composer's attach → upload
+  wiring. § 17 (2026-09-25) adds `showBuyCredit` state and
+  `<BuyCreditDialog>`, wired from both `Header`'s `onBuyCredit` and the
+  chip; `onCredited` is `refreshBalance` itself (the SAME function § 8's
+  own "read at turn end and on window focus" already uses), so a credited
+  purchase refreshes the chip through the one existing path, not a new
+  one. `paypalClientId` is an optional prop (default `""`) so a harness
+  that predates § 17 (`tests/web/version/harness.tsx`, not owned by this
+  slice) keeps mounting this component unchanged.
   Deliberately its OWN file, not a refactor of `ChatShell.tsx` (kept
   unchanged, per the instruction that the mock preview must stay as-is) —
   they share every child component (Header, Transcript, Composer,
@@ -309,7 +336,26 @@ abortSignal })` already returns the exact `ReadableStream<UIMessageChunk>`
   report-back). Its own component, not a reuse of `GateCard` (§ 1.7 marks
   that choice "open for the architect"; C § 3's `GateRequest.kind` is
   `"spend"` only, and this confirmation carries no `gateId` and never
-  touches `ten_gate_log`).
+  touches `ten_gate_log`). § 17.4 (amended 2026-09-25): its copy changed —
+  credit is no longer named among what's erased ("your workspace files,
+  your conversation, and your gate log"), and the one sentence is
+  design-web-ui.md § 1.11's own replacement, word for word.
+- `BuyCreditDialog.tsx` (§ 17, design-web-ui.md § 1.11, 2026-09-25) — the
+  Buy-credit dialog: `$10`/`$20`/`$40` pack buttons, then PayPal's own JS
+  SDK buttons (loaded lazily, ONLY once a pack is picked, via a `<script>`
+  tag built from `VITE_PAYPAL_CLIENT_ID`, `currency=USD&intent=capture
+  &disable-funding=paylater` — § 17.9: "Pay Later off"), wired to
+  `backend/paypal.ts`. Every § 1.11 outcome line (credited/pending/
+  declined/window_closed/create_failed/not_credited) is its own literal
+  string, word for word from the contract — never built from a template
+  that could drift. Members only: mounted by `RealChatShell.tsx` alone,
+  opened only from the balance chip or the ⋯ menu's "Buy credit" line
+  (`Header.tsx`'s new `onBuyCredit` prop) — no card, no chat message, and
+  no bundled skill ever mentions or opens it (§ 17.2's rule-7 conditions).
+  This file freely uses `window`/`document` (the SDK's own `<script>` tag)
+  — it's apps/web UI, not `packages/agent` or a ported checker, which is
+  what the no-window/no-document rule actually covers
+  (`docs/ARCHITECTURE.md`'s system map).
 - `deps.ts` — `buildRealDeps()`: wires every piece above into one `Deps`
   object. `checkLanguage` is left **unset** on purpose — the tool's own
   default (`packages/agent/src/tools/index.ts`) already does "a
@@ -327,10 +373,16 @@ abortSignal })` already returns the exact `ReadableStream<UIMessageChunk>`
 | `VITE_MODEL_PROXY_URL` | no | `<VITE_SUPABASE_URL>/functions/v1/ten-model-proxy` |
 | `VITE_SHOW_MOCK_CONTROLS` | no (Vercel Preview environment only) | unset (production) |
 | `VITE_COACH_MODEL` (§ 13.2) | no | unset/blank -> `anthropic/claude-sonnet-5` (Claude, the measured model). `deepseek/deepseek-v4.1-flash` switches to DeepSeek (testing only, § 13.6 (2)). Any other value fails the build-time config check the same way a missing required var does. |
+| `VITE_PAYPAL_CLIENT_ID` (§ 17.1) | no (but see below) | `""` — the Buy-credit dialog shows "Couldn't start a payment. No money moved." instead of loading the PayPal JS SDK when blank |
 
-Nothing here is secret — the anon key is meant to ship in the client
-bundle (RLS is the actual boundary); no OpenRouter key, no Supabase
-service-role key ever reaches this package.
+Nothing here is secret — the anon key AND `VITE_PAYPAL_CLIENT_ID` are both
+meant to ship in the client bundle (RLS/PayPal's own domain-allowlisting
+are the actual boundaries); no OpenRouter key, no PayPal client SECRET, no
+Supabase service-role key ever reaches this package.
+`VITE_PAYPAL_CLIENT_ID` is deliberately NOT in `readEnv()`'s required-vars
+list (unlike the three Supabase vars) — buying credit is a member-only
+ADDITION (§ 17.2), never load-bearing for the chat itself, so a blank value
+must never fail the whole app's boot; only the dialog itself degrades.
 
 **Switching models (§ 13.2/§ 13.6 (2)):** set or remove `VITE_COACH_MODEL`
 on Vercel (Production), then run `deploy-prod.sh` — it's a setting change
@@ -421,3 +473,39 @@ ls dist/privacy.html                                          # -> present in th
   that doesn't support keyset pagination's `gt.` operator, and a case
   explicitly self-labeled `(known step 5b gap)` in its own test name —
   see the coder's hand-back.
+
+### § 17 (buying credit with PayPal, 2026-09-25) — flagged for the lead
+
+- **`supabase/functions/ten-model-proxy/handler.ts`/`handler.test.ts`**
+  were touched — `MESSAGES.overBalance`, updated to design-web-ui.md §
+  1.11's replaced copy ("Your credit is used up. You can buy more from
+  your balance at the top."), since that's the server text the `over_balance`
+  message this slice was asked to change actually comes from
+  (`ErrorPart`/`coach.ts` pass the proxy's own literal `message` straight
+  through). `ten-model-proxy` itself is not in this slice's named Edge
+  Function scope (only `ten-paypal`/`ten-paypal-webhook`/`ten-delete-account`
+  were) — flagged here for the lead's OK rather than a silent edit.
+- **Root `tests/` files (the independent tester's, not edited here) will
+  now fail** on the OLD `over_balance`/delete-copy text, since both
+  changed under the approved § 17.4/§ 1.11 contract:
+  `tests/e2e-real/e2e.ts` (lines ~840, ~866, ~953, ~955),
+  `tests/web/e2e.mjs` (~190), `tests/web/r4-ui.test.ts` (~67),
+  `tests/functions/proxy_money.test.ts` (~27, its own `OVER_BALANCE`
+  constant).
+- **`docs/design-web-agent.md` § 17.4** also says "When built,
+  `ARCHITECTURE.md` § 3–4 and the functions README follow" — the functions
+  README followed (`supabase/functions/README.md`); `docs/ARCHITECTURE.md`
+  itself was NOT touched (it's outside this slice's named directories) and
+  still describes the pre-§ 17 `ten-delete-account`/ledger shape in its §
+  3–4 tables and system map. Left for the lead.
+- **`supabase/functions/_shared/test-support.ts`** (shared by every
+  function's tests, not owned exclusively by this slice) gained a mock
+  PayPal server (`startMockPaypal`/`freshPaypalState`), a service-role
+  `GET /rest/v1/ten_usage_ledger` membership-by-uid query (for the
+  webhook's own `isMemberByUid`), and the § 17.3 paypal-breakdown check on
+  the mock ledger insert — listed here since it's a shared file, not
+  exclusive to `ten-paypal`/`ten-paypal-webhook`.
+- **`tests/sql`** (the independent tester's own SQL harness, § 17.8 item
+  7) was NOT extended with a case for the new migration
+  (`20260925000000_ten_paypal_credit.sql`) — that's explicitly the
+  independent tester's suite per the contract, not this slice's to write.

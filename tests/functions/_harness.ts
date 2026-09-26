@@ -87,6 +87,12 @@ export interface LedgerRow {
   // § 9.6 (docs/design-web-agent.md, amended 2026-09-24; the
   // 20260924000000 migration): nullable, ≤ 32 chars.
   finish_reason: string | null;
+  // § 17.3 (the 20260925000000 migration): numeric(12,2), set on `paypal:`
+  // rows. Kept here as integer CENTS so the check is exact.
+  gross_cents?: number | null;
+  fee_cents?: number | null;
+  /** usd as exact micro-dollars (numeric(12,6)). */
+  usd_micros?: number;
 }
 export interface SbState {
   authUsers: Set<string>;
@@ -108,6 +114,20 @@ export interface SbState {
 }
 
 const INT4_MAX = 2147483647;
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A JSON number or decimal string -> an exact integer at `scale` decimals
+ * (Postgres numeric(p,scale) rounds half away from zero); null for null/absent. */
+function toScaled(v: unknown, scale: number): number | null | "bad" {
+  if (v === null || v === undefined) return null;
+  const s = typeof v === "number" ? v.toFixed(12) : typeof v === "string" ? v.trim() : "";
+  const m = /^(-)?(\d+)(?:\.(\d*))?$/.exec(s);
+  if (!m) return "bad";
+  const frac = (m[3] ?? "").padEnd(scale + 1, "0");
+  let n = Number(m[2]) * 10 ** scale + Number(frac.slice(0, scale) || "0");
+  if (Number(frac[scale]) >= 5) n += 1;
+  return m[1] ? -n : n;
+}
 
 function pgErr(status: number, code: string, message: string): Response {
   return new Response(JSON.stringify({ code, message, details: null, hint: null }), {
@@ -244,10 +264,25 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
       if (step === "fail") return pgErr(503, "XX000", "injected: ledger insert failed, nothing written");
       const row = json();
       if (!row || typeof row !== "object") return pgErr(400, "PGRST102", "Empty or invalid json");
-      const cols = new Set(["id", "user_id", "kind", "request_id", "model", "tokens_in", "tokens_out", "tokens_cached", "usd", "finish_reason", "created_at"]);
+      const cols = new Set(["id", "user_id", "kind", "request_id", "model", "tokens_in", "tokens_out", "tokens_cached", "usd", "finish_reason", "created_at", "gross_usd", "fee_usd"]);
       for (const k of Object.keys(row)) if (!cols.has(k)) return pgErr(400, "PGRST204", `Could not find the '${k}' column`);
+      if (typeof row.user_id !== "string" || !UUID_RE.test(row.user_id)) return pgErr(400, "22P02", `invalid input syntax for type uuid: "${row.user_id}"`);
       if (!st.authUsers.has(row.user_id)) return pgErr(409, "23503", "violates foreign key constraint");
-      if (row.kind !== "credit" && row.kind !== "call") return pgErr(400, "23514", "ten_usage_ledger_kind");
+      if (row.kind !== "credit" && row.kind !== "call" && row.kind !== "refund") return pgErr(400, "23514", "ten_usage_ledger_kind");
+      // PostgREST passes a JSON string to a numeric column as its text; Postgres parses it exactly.
+      const usdMicros = toScaled(row.usd, 6);
+      if (usdMicros === "bad") return pgErr(400, "22P02", `invalid input syntax for type numeric: "${row.usd}"`);
+      const grossCents = toScaled(row.gross_usd, 2);
+      const feeCents = toScaled(row.fee_usd, 2);
+      if (grossCents === "bad" || feeCents === "bad") return pgErr(400, "22P02", "invalid input syntax for type numeric");
+      if (typeof row.usd === "string") row.usd = Number(row.usd);
+      // § 17.3's check, as the migration enforces it: paypal: rows carry
+      // gross and fee, kind credit, fee >= 0, usd > 0, usd = gross - fee.
+      if (typeof row.request_id === "string" && row.request_id.startsWith("paypal:")) {
+        const okBreakdown = grossCents !== null && feeCents !== null && row.kind === "credit" && feeCents >= 0 &&
+          usdMicros !== null && usdMicros > 0 && usdMicros === (grossCents - feeCents) * 10000;
+        if (!okBreakdown) return pgErr(400, "23514", "violates check constraint ten_usage_ledger_paypal_breakdown");
+      }
       for (const k of ["tokens_in", "tokens_out", "tokens_cached"]) {
         if (!validInt(row[k])) return pgErr(400, "22P02", `invalid input for integer column ${k}: ${row[k]}`);
       }
@@ -272,9 +307,32 @@ async function supabaseHandler(req: Request, st: SbState): Promise<Response> {
         usd: Math.round(row.usd * 1e6) / 1e6,
         finish_reason: row.finish_reason ?? null,
         created_at: st.now(),
+        gross_cents: grossCents,
+        fee_cents: feeCents,
+        usd_micros: usdMicros ?? undefined,
       });
       if (step === "commit-then-fail") return pgErr(503, "XX000", "injected: committed, response lost");
       return new Response(null, { status: 201 });
+    }
+    if (url.pathname === "/rest/v1/ten_usage_ledger" && req.method === "GET") {
+      if (r.role === "anon") return pgErr(401, "42501", "permission denied for table ten_usage_ledger");
+      const filters: Array<[string, string]> = [];
+      let limit = Infinity;
+      for (const [col, expr] of url.searchParams) {
+        if (col === "select" || col === "order") continue;
+        if (col === "limit") {
+          limit = Number(expr);
+          continue;
+        }
+        if (!["id", "user_id", "kind", "request_id"].includes(col)) return pgErr(400, "42703", `column ten_usage_ledger.${col} does not exist`);
+        if (!expr.startsWith("eq.")) return pgErr(400, "PGRST100", `stub supports eq only: ${col}=${expr}`);
+        const v = expr.slice(3);
+        if ((col === "user_id" || col === "id") && !UUID_RE.test(v)) return pgErr(400, "22P02", `invalid input syntax for type uuid: "${v}"`);
+        filters.push([col, v]);
+      }
+      let rows = st.ledger.filter((x) => filters.every(([c, v]) => String((x as any)[c]) === v));
+      if (!svc) rows = rows.filter((x) => x.user_id === r.sub && isMemberIn(st, r.sub!));
+      return Response.json(rows.slice(0, limit).map((x) => ({ id: x.id })));
     }
     const del = url.pathname.match(/^\/rest\/v1\/(ten_ws_files|ten_gate_log|ten_usage_ledger|ten_conversations)$/);
     if (del && req.method === "DELETE") {
@@ -415,6 +473,272 @@ export function okStream(id: string, usage: Record<string, unknown> | null = {
   return chunks;
 }
 
+// ---------------------------------------------------------- PayPal stub ----
+// A loopback model of the PayPal REST calls § 17 names, from PayPal's docs:
+// oauth2 client_credentials; Orders v2 create / get / capture (capture needs
+// an APPROVED order, else 422 ORDER_NOT_APPROVED; a second capture 422
+// ORDER_ALREADY_CAPTURED unless it repeats the same PayPal-Request-Id, which
+// returns the same capture); Payments v2 GET capture; and the webhook
+// signature postback. Fees follow a 3.49% + $0.49 schedule (§ 1.11's example:
+// $10 -> fee $0.84, net $9.16). Nothing in here reaches paypal.com.
+export const PAYPAL_BASE = "https://api-m.sandbox.paypal.com";
+export const PAYPAL_CLIENT_ID = "AcanaryPAYPALclientID-4b1e";
+export const PAYPAL_CLIENT_SECRET = "EcanaryPAYPALsecret-9f3a7c2e1d5b8a6f4c0e2d7b9a1f3c5e";
+export const PAYPAL_WEBHOOK_ID = "8PT597110X687430LKGECATA";
+export const PAYPAL_TOKEN = "A21AAcanaryACCESStoken-77d2e";
+/** § 17.10: Ten's own PayPal account (non-secret). PayPal fills an order's
+ * payee with the caller's account when the order names none, so the stub's
+ * orders default to this payee. */
+export const PAYPAL_MERCHANT_ID = "TENMERCHANT7Q2";
+export const FOREIGN_MERCHANT_ID = "OTHERMERCHANT9";
+
+// ---- § 17.10 signed invoice_id, the tester's own implementation of the spec
+// (checked against a Python HMAC vector in paypal_r2.test.ts).
+const te = new TextEncoder();
+async function hmacRaw(key: Uint8Array, msg: string): Promise<Uint8Array> {
+  const k = await crypto.subtle.importKey("raw", key as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", k, te.encode(msg)));
+}
+const hexOf = (b: Uint8Array) => [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+export async function tagHash(secret: string, uid: string, pack: string, amount: string, t: string, n: string): Promise<string> {
+  const key = await hmacRaw(te.encode(secret), "ten-invoice-v1");
+  return hexOf(await hmacRaw(key, `v1|${uid}|${pack}|${amount}|${t}|${n}`)).slice(0, 32);
+}
+export async function mintTag(
+  uid: string,
+  pack = "10",
+  o: { secret?: string; amount?: string; t?: string; n?: string } = {},
+): Promise<string> {
+  const amount = o.amount ?? `${pack}.00`;
+  const t = o.t ?? String(Math.floor(Date.now() / 1000));
+  const n = o.n ?? hexOf(crypto.getRandomValues(new Uint8Array(8)));
+  return `ten-${uid.slice(0, 8)}-${t}-${n}-${await tagHash(o.secret ?? PAYPAL_CLIENT_SECRET, uid, pack, amount, t, n)}`;
+}
+export const TAG_RE = /^ten-[0-9a-f]{8}-[0-9]{10}-[0-9a-f]{16}-[0-9a-f]{32}$/;
+
+export interface PpCapture {
+  id: string;
+  status: string;
+  amount: { currency_code: string; value: string };
+  custom_id: string;
+  invoice_id: string;
+  seller_receivable_breakdown?: any;
+  [k: string]: unknown;
+}
+export interface PpOrder {
+  id: string;
+  status: string; // CREATED | APPROVED | COMPLETED
+  purchase_units: any[];
+  capture?: PpCapture;
+  requestId?: string;
+}
+export interface PpState {
+  orders: Map<string, PpOrder>;
+  captures: Map<string, PpCapture>;
+  hits: Array<{ method: string; path: string; headers: Headers; body: any; bodyText: string }>;
+  /** path-substring -> status: inject a PayPal failure */
+  fail: Record<string, number>;
+  /** the next capture's status and breakdown override */
+  nextCapture: { status?: string; breakdown?: any | null; currency?: string; customId?: string };
+  /** signatures this stub issued: transmission id -> { sig, event JSON } */
+  issued: Map<string, { sig: string; eventJson: string }>;
+  /** capture calls are held until released (race tests) */
+  captureGate?: Promise<void>;
+  /** path-substring -> a transport failure (the fetch itself rejects, e.g. a timeout) */
+  throwOn?: Record<string, string>;
+  /** path-substrings PayPal never answers (held until ppReleaseHangs) */
+  hang?: string[];
+  hangWaiters?: Array<() => void>;
+}
+/** Let every held (hung) PayPal request finish, so no test leaks a pending response. */
+export function ppReleaseHangs(pp: PpState) {
+  for (const w of pp.hangWaiters ?? []) w();
+  pp.hangWaiters = [];
+  pp.hang = [];
+}
+export function newPpState(): PpState {
+  return { orders: new Map(), captures: new Map(), hits: [], fail: {}, nextCapture: {}, issued: new Map() };
+}
+
+export function feeFor(gross: string): { fee: string; net: string } {
+  const g = Math.round(Number(gross) * 100);
+  const f = Math.round(g * 0.0349 + 49);
+  return { fee: (f / 100).toFixed(2), net: ((g - f) / 100).toFixed(2) };
+}
+export function breakdownFor(gross: string, currency = "USD") {
+  const { fee, net } = feeFor(gross);
+  return {
+    gross_amount: { currency_code: currency, value: gross },
+    paypal_fee: { currency_code: currency, value: fee },
+    net_amount: { currency_code: currency, value: net },
+  };
+}
+const ppId = (prefix: string) => prefix + crypto.randomUUID().replace(/-/g, "").slice(0, 15).toUpperCase();
+
+function ppErr(status: number, name: string, issue?: string): Response {
+  return Response.json(
+    { name, message: name, debug_id: "dbg" + Date.now(), details: issue ? [{ issue, description: issue }] : [] },
+    { status },
+  );
+}
+function orderView(o: PpOrder) {
+  const pu = o.purchase_units.map((u, i) =>
+    i === 0 && o.capture ? { ...u, payments: { captures: [o.capture] } } : u
+  );
+  return { id: o.id, status: o.status, intent: "CAPTURE", purchase_units: pu };
+}
+
+/** Plant an order as if created with Ten's (or the older app's) keys. */
+export function ppPlantOrder(
+  pp: PpState,
+  o: { customId: string; value?: string; currency?: string; status?: string; invoiceId?: string; payee?: string | null },
+): string {
+  const id = ppId("O");
+  pp.orders.set(id, {
+    id,
+    status: o.status ?? "APPROVED",
+    purchase_units: [{
+      reference_id: "default",
+      amount: { currency_code: o.currency ?? "USD", value: o.value ?? "10.00" },
+      custom_id: o.customId,
+      invoice_id: o.invoiceId ?? `inv-${id}`,
+      ...(o.payee === null ? {} : { payee: { merchant_id: o.payee ?? PAYPAL_MERCHANT_ID, email_address: "merchant@example.com" } }),
+    }],
+  });
+  return id;
+}
+/** The payer approves in PayPal's window. */
+export function ppApprove(pp: PpState, orderId: string) {
+  const o = pp.orders.get(orderId);
+  if (!o) throw new Error(`no order ${orderId}`);
+  if (o.status === "CREATED") o.status = "APPROVED";
+}
+/** A capture's status changes on PayPal's side (e.g. PENDING clears). */
+export function ppSetCapture(pp: PpState, captureId: string, patch: Partial<PpCapture>) {
+  const c = pp.captures.get(captureId);
+  if (!c) throw new Error(`no capture ${captureId}`);
+  Object.assign(c, patch);
+}
+
+/** A PAYMENT.CAPTURE.COMPLETED (or other) event + the five paypal-* headers,
+ * signed by this stub so verify-webhook-signature answers SUCCESS for it. */
+export function ppSignedEvent(pp: PpState, resource: any, eventType = "PAYMENT.CAPTURE.COMPLETED"): { event: any; headers: Record<string, string> } {
+  const event = {
+    id: ppId("WH-"),
+    event_version: "1.0",
+    create_time: new Date().toISOString(),
+    resource_type: "capture",
+    resource_version: "2.0",
+    event_type: eventType,
+    summary: "Payment completed",
+    resource,
+  };
+  const tid = crypto.randomUUID();
+  const sig = "sig-" + crypto.randomUUID();
+  pp.issued.set(tid, { sig, eventJson: JSON.stringify(event) });
+  return {
+    event,
+    headers: {
+      "paypal-auth-algo": "SHA256withRSA",
+      "paypal-cert-url": "https://api-m.sandbox.paypal.com/v1/notifications/certs/CERT-360caa42-fca2a594-a5cafa77",
+      "paypal-transmission-id": tid,
+      "paypal-transmission-sig": sig,
+      "paypal-transmission-time": new Date().toISOString(),
+    },
+  };
+}
+
+export async function paypalHandler(req: Request, pp: PpState): Promise<Response> {
+  const url = new URL(req.url);
+  const bodyText = req.method === "GET" ? "" : await req.text();
+  let body: any;
+  try {
+    body = bodyText ? JSON.parse(bodyText) : undefined;
+  } catch {
+    body = undefined;
+  }
+  pp.hits.push({ method: req.method, path: url.pathname, headers: req.headers, body, bodyText });
+  if ((pp.hang ?? []).some((k) => url.pathname.includes(k))) {
+    await new Promise<void>((r) => (pp.hangWaiters ??= []).push(r));
+    return ppErr(504, "LATE_ANSWER_NOBODY_WAITED_FOR");
+  }
+  for (const [k, st] of Object.entries(pp.fail)) {
+    if (url.pathname.includes(k)) return ppErr(st, "INTERNAL_SERVICE_ERROR");
+  }
+  const authz = req.headers.get("authorization") ?? "";
+  if (url.pathname === "/v1/oauth2/token" && req.method === "POST") {
+    if (authz !== `Basic ${btoa(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`)}`) return ppErr(401, "invalid_client");
+    if (bodyText !== "grant_type=client_credentials") return ppErr(400, "unsupported_grant_type");
+    return Response.json({ access_token: PAYPAL_TOKEN, token_type: "Bearer", expires_in: 32400, app_id: "APP-80W284485P519543T" });
+  }
+  if (authz !== `Bearer ${PAYPAL_TOKEN}`) return ppErr(401, "AUTHENTICATION_FAILURE");
+
+  if (url.pathname === "/v2/checkout/orders" && req.method === "POST") {
+    if (!body || body.intent !== "CAPTURE" || !Array.isArray(body.purchase_units)) return ppErr(400, "INVALID_REQUEST");
+    const id = ppId("O");
+    const pus = structuredClone(body.purchase_units);
+    // PayPal names the API caller's account as payee when the request doesn't.
+    for (const u of pus) u.payee ??= { merchant_id: PAYPAL_MERCHANT_ID, email_address: "merchant@example.com" };
+    pp.orders.set(id, { id, status: "CREATED", purchase_units: pus });
+    return Response.json({ id, status: "CREATED", links: [] }, { status: 201 });
+  }
+  let m = url.pathname.match(/^\/v2\/checkout\/orders\/([^/]+)$/);
+  if (m && req.method === "GET") {
+    const o = pp.orders.get(decodeURIComponent(m[1]));
+    if (!o) return ppErr(404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+    return Response.json(orderView(o));
+  }
+  m = url.pathname.match(/^\/v2\/checkout\/orders\/([^/]+)\/capture$/);
+  if (m && req.method === "POST") {
+    if (pp.captureGate) await pp.captureGate;
+    const o = pp.orders.get(decodeURIComponent(m[1]));
+    if (!o) return ppErr(404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+    const rid = req.headers.get("paypal-request-id") ?? undefined;
+    if (o.capture) {
+      if (rid && rid === o.requestId) return Response.json(orderView(o), { status: 201 });
+      return ppErr(422, "UNPROCESSABLE_ENTITY", "ORDER_ALREADY_CAPTURED");
+    }
+    if (o.status !== "APPROVED") return ppErr(422, "UNPROCESSABLE_ENTITY", "ORDER_NOT_APPROVED");
+    const u = o.purchase_units[0];
+    const nc = pp.nextCapture;
+    pp.nextCapture = {};
+    const status = nc.status ?? "COMPLETED";
+    const currency = nc.currency ?? u.amount.currency_code;
+    const cap: PpCapture = {
+      id: ppId("C"),
+      status,
+      amount: { currency_code: currency, value: u.amount.value },
+      custom_id: nc.customId ?? u.custom_id,
+      invoice_id: u.invoice_id,
+      final_capture: true,
+      supplementary_data: { related_ids: { order_id: o.id } },
+    };
+    const bd = nc.breakdown === undefined ? (status === "COMPLETED" ? breakdownFor(u.amount.value, currency) : null) : nc.breakdown;
+    if (bd) cap.seller_receivable_breakdown = bd;
+    if (status === "PENDING") (cap as any).status_details = { reason: "RECEIVING_PREFERENCE_MANDATES_MANUAL_ACTION" };
+    o.capture = cap;
+    o.status = "COMPLETED";
+    o.requestId = rid;
+    pp.captures.set(cap.id, cap);
+    return Response.json(orderView(o), { status: 201 });
+  }
+  m = url.pathname.match(/^\/v2\/payments\/captures\/([^/]+)$/);
+  if (m && req.method === "GET") {
+    const c = pp.captures.get(decodeURIComponent(m[1]));
+    if (!c) return ppErr(404, "RESOURCE_NOT_FOUND", "INVALID_RESOURCE_ID");
+    return Response.json(c);
+  }
+  if (url.pathname === "/v1/notifications/verify-webhook-signature" && req.method === "POST") {
+    const need = ["auth_algo", "cert_url", "transmission_id", "transmission_sig", "transmission_time", "webhook_id", "webhook_event"];
+    if (!body || need.some((k) => body[k] === undefined || body[k] === "")) return ppErr(400, "VALIDATION_ERROR");
+    const iss = pp.issued.get(body.transmission_id);
+    const ok = body.webhook_id === PAYPAL_WEBHOOK_ID && iss !== undefined && iss.sig === body.transmission_sig &&
+      iss.eventJson === JSON.stringify(body.webhook_event);
+    return Response.json({ verification_status: ok ? "SUCCESS" : "FAILURE" });
+  }
+  return ppErr(404, "NOT_FOUND");
+}
+
 // ------------------------------------------------------------- harness ----
 export interface Harness {
   st: SbState;
@@ -423,6 +747,15 @@ export interface Harness {
   setUpstream(s: UpstreamScript): void;
   proxy: (req: Request) => Promise<Response>;
   del: (req: Request) => Promise<Response>;
+  /** § 17: ten-paypal and ten-paypal-webhook, from their real index.ts. */
+  paypal: (req: Request) => Promise<Response>;
+  webhook: (req: Request) => Promise<Response>;
+  /** ten-paypal-webhook loaded with TEN_PAYPAL_WEBHOOK_ID unset. */
+  webhookNoId: (req: Request) => Promise<Response>;
+  /** both loaded with TEN_PAYPAL_MERCHANT_ID unset (§ 17.10). */
+  paypalNoMerchant: (req: Request) => Promise<Response>;
+  webhookNoMerchant: (req: Request) => Promise<Response>;
+  pp: PpState;
   pending: Promise<unknown>[];
   logs: string[];
   anonKey: string;
@@ -468,11 +801,23 @@ async function build(): Promise<Harness> {
   up.unref();
   const upUrl = `http://127.0.0.1:${(up.addr as Deno.NetAddr).port}`;
 
+  const pp = newPpState();
+  const ppSrv = realServe({ port: 0, hostname: "127.0.0.1", onListen: () => {} }, (req) => paypalHandler(req, pp));
+  ppSrv.unref();
+  const ppUrl = `http://127.0.0.1:${(ppSrv.addr as Deno.NetAddr).port}`;
+
   const externalAttempts: string[] = [];
   const guardedFetch: typeof fetch = (input: any, init?: any) => {
     const u = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     if (u.href === "https://openrouter.ai/api/v1/chat/completions") {
       return realFetch(`${upUrl}/api/v1/chat/completions`, init);
+    }
+    if (u.origin === PAYPAL_BASE) {
+      for (const [k, name] of Object.entries(pp.throwOn ?? {})) {
+        if (u.pathname.includes(k)) return Promise.reject(new DOMException("The operation timed out.", name));
+      }
+      if (input instanceof Request) return realFetch(new Request(ppUrl + u.pathname + u.search, input), init);
+      return realFetch(ppUrl + u.pathname + u.search, init);
     }
     if (u.hostname === "127.0.0.1" || u.hostname === "localhost") return realFetch(input, init);
     externalAttempts.push(u.href);
@@ -486,6 +831,11 @@ async function build(): Promise<Harness> {
     SUPABASE_SERVICE_ROLE_KEY: st.serviceKey,
     TEN_OPENROUTER_API_KEY: OPENROUTER_KEY,
     TEN_APP_ORIGIN: PROD_ORIGIN,
+    TEN_PAYPAL_API_BASE: PAYPAL_BASE,
+    TEN_PAYPAL_CLIENT_ID: PAYPAL_CLIENT_ID,
+    TEN_PAYPAL_CLIENT_SECRET: PAYPAL_CLIENT_SECRET,
+    TEN_PAYPAL_WEBHOOK_ID: PAYPAL_WEBHOOK_ID,
+    TEN_PAYPAL_MERCHANT_ID: PAYPAL_MERCHANT_ID,
   };
   (Deno.env as any).get = (k: string) => fakeEnv[k];
   (Deno.env as any).toObject = () => ({ ...fakeEnv });
@@ -512,6 +862,25 @@ async function build(): Promise<Harness> {
   captured = null;
   await import("../../supabase/functions/ten-delete-account/index.ts");
   const del = captured!;
+  captured = null;
+  await import("../../supabase/functions/ten-paypal/index.ts");
+  const paypal = captured!;
+  captured = null;
+  await import("../../supabase/functions/ten-paypal-webhook/index.ts");
+  const webhook = captured!;
+  captured = null;
+  delete fakeEnv.TEN_PAYPAL_WEBHOOK_ID;
+  await import("../../supabase/functions/ten-paypal-webhook/index.ts?no-webhook-id");
+  const webhookNoId = captured!;
+  fakeEnv.TEN_PAYPAL_WEBHOOK_ID = PAYPAL_WEBHOOK_ID;
+  captured = null;
+  delete fakeEnv.TEN_PAYPAL_MERCHANT_ID;
+  await import("../../supabase/functions/ten-paypal/index.ts?no-merchant-id");
+  const paypalNoMerchant = captured!;
+  captured = null;
+  await import("../../supabase/functions/ten-paypal-webhook/index.ts?no-merchant-id");
+  const webhookNoMerchant = captured!;
+  fakeEnv.TEN_PAYPAL_MERCHANT_ID = PAYPAL_MERCHANT_ID;
   (Deno as any).serve = realServe;
 
   const h: Harness = {
@@ -521,6 +890,12 @@ async function build(): Promise<Harness> {
     setUpstream: (s) => (script = s),
     proxy,
     del,
+    paypal,
+    webhook,
+    webhookNoId,
+    paypalNoMerchant,
+    webhookNoMerchant,
+    pp,
     pending,
     logs,
     anonKey: st.anonKey,
@@ -530,6 +905,7 @@ async function build(): Promise<Harness> {
       const fresh = newState();
       Object.assign(st, fresh, { anonKey: st.anonKey, serviceKey: st.serviceKey });
       upstreamHits.length = 0;
+      Object.assign(pp, newPpState());
       pending.length = 0;
       logs.length = 0;
       script = () => sse(okStream("gen-default"));
@@ -549,6 +925,8 @@ async function build(): Promise<Harness> {
 // ------------------------------------------------------------- helpers ----
 export const FN = "http://ivunfotoggdxbjouumdk.supabase.co/ten-model-proxy";
 export const DEL = "http://ivunfotoggdxbjouumdk.supabase.co/ten-delete-account";
+export const PAY = "http://ivunfotoggdxbjouumdk.supabase.co/functions/v1/ten-paypal";
+export const HOOK = "http://ivunfotoggdxbjouumdk.supabase.co/functions/v1/ten-paypal-webhook";
 
 export function preq(
   body: unknown,

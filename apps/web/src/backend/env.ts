@@ -39,6 +39,14 @@ export interface TenEnv {
    *  changes the model"); an unrecognized value fails readEnv entirely
    *  (below), so this field is never itself invalid. */
   coachModel: CoachModel;
+  /** § 17.1: the PUBLIC PayPal JS SDK client id (`VITE_PAYPAL_CLIENT_ID`).
+   *  Deliberately NOT in the required-vars list below — unlike Supabase's
+   *  own vars, buying credit is a member-only ADDITION (§ 17.2), never
+   *  load-bearing for the chat itself, so a blank value never fails the
+   *  whole app's boot. The Buy-credit dialog itself refuses to open (or
+   *  load the SDK) when this is empty, showing a plain "can't start a
+   *  payment right now" line instead. */
+  paypalClientId: string;
 }
 
 export class MissingEnvError extends Error {
@@ -87,12 +95,14 @@ export function readEnv(source: Record<string, string | undefined>): TenEnv {
   if (missing.length > 0) throw new MissingEnvError(missing);
 
   const modelProxyUrl = source.VITE_MODEL_PROXY_URL?.trim() || defaultModelProxyUrl(supabaseUrl!);
+  const paypalClientId = source.VITE_PAYPAL_CLIENT_ID?.trim() ?? "";
   return {
     supabaseUrl: supabaseUrl!.replace(/\/+$/, ""),
     supabaseAnonKey: supabaseAnonKey!,
     modelProxyUrl,
     siteUrl: siteUrl!,
     coachModel,
+    paypalClientId,
   };
 }
 

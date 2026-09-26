@@ -24,7 +24,8 @@ import {
   userJwt,
 } from "./_harness.ts";
 
-const OVER_BALANCE = "Your beta credit is used up. Ask the person who invited you for more.";
+// design-web-ui.md § 1.11 (replaced after C § 17.4), word for word.
+const OVER_BALANCE = "Your credit is used up. You can buy more from your balance at the top.";
 const CEILING_MSG = "The beta has reached today's limit. Try again tomorrow.";
 
 async function run(tok: string, body: unknown = baseBody()) {

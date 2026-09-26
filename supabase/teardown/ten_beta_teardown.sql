@@ -1,14 +1,22 @@
 -- Ten web beta teardown: drops exactly what
 -- supabase/migrations/20260923000000_ten_beta_init.sql,
--- supabase/migrations/20260924000000_ten_ledger_finish_reason.sql, and
--- supabase/migrations/20260924100000_ten_conversations.sql created, and
--- nothing else. The second file adds no object of its own to drop —
--- ten_usage_ledger.finish_reason is one column on a table this file already
--- drops, so it goes with the table; no new statement here. The third file
--- DOES add its own statements below (a new table and function it owns).
+-- supabase/migrations/20260924000000_ten_ledger_finish_reason.sql,
+-- supabase/migrations/20260924100000_ten_conversations.sql, and
+-- supabase/migrations/20260925000000_ten_paypal_credit.sql created, and
+-- nothing else. The second and fourth files add no object of their own to
+-- drop — ten_usage_ledger.gross_usd/fee_usd and the wider kind/paypal-
+-- breakdown checks are on a table this file already drops, so they go with
+-- the table; no new statement here for either. The third file DOES add its
+-- own statements below (a new table and function it owns).
 -- Applied by the OWNER, never by an agent. DESTROYS all beta data (workspace
 -- files, ledger, gate log, saved conversation). The shared auth users are
 -- NOT touched.
+--
+-- STEP 0 — PAID ROWS (§ 17.3): this file REFUSES to run while any
+-- `paypal:`- or `paypal-refund:`-prefixed ledger row exists — those are
+-- money records, and the teardown must never silently discard them. Export
+-- them first (query in 20260925000000_ten_paypal_credit.sql's header),
+-- then remove them by hand (as the owner, service role) once exported.
 --
 -- STEP 1 — THROUGH THE STORAGE API, FIRST (service role key, never in a browser).
 -- Supabase refuses direct SQL deletes from storage.objects/buckets
@@ -36,6 +44,11 @@ begin
   if exists (select 1 from storage.buckets where id = 'ten-workspaces')
      or exists (select 1 from storage.objects where bucket_id = 'ten-workspaces') then
     raise exception 'ten beta teardown: empty and delete the ten-workspaces bucket through the Storage API first (see header)';
+  end if;
+  -- § 17.3: refuse while paid rows exist, until the owner exports them.
+  if exists (select 1 from public.ten_usage_ledger
+              where request_id like 'paypal:%' or request_id like 'paypal-refund:%') then
+    raise exception 'ten beta teardown: paypal: / paypal-refund: ledger rows still exist; export them first (see 20260925000000_ten_paypal_credit.sql header), then remove them, before running this teardown';
   end if;
 end $$;
 
@@ -81,6 +94,10 @@ commit;
 -- NOT in SQL (the owner reverses these by hand):
 --   supabase functions delete ten-model-proxy
 --   supabase functions delete ten-delete-account
+--   supabase functions delete ten-paypal
+--   supabase functions delete ten-paypal-webhook
+--   supabase secrets unset TEN_PAYPAL_CLIENT_ID TEN_PAYPAL_CLIENT_SECRET TEN_PAYPAL_API_BASE TEN_PAYPAL_WEBHOOK_ID
+--   developer.paypal.com: remove Ten's webhook URL from the shared app
 --   supabase secrets unset TEN_OPENROUTER_API_KEY (do NOT revoke the key: the live
 --   CareerCoach app uses it too)
 --   Auth > URL Configuration > Redirect URLs: remove the Vercel production URL

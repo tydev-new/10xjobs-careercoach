@@ -187,7 +187,7 @@ for (const vp of [{ width: 1280, height: 800, tag: "desktop" }, { width: 375, he
   await select(page, "over-limit-error");
   await playTyped(page, "over-limit-error");
   const err = await page.locator(".card--error").innerText();
-  rec(err.includes("over_balance") && err.includes("Your beta credit is used up. Ask the person who invited you for more.") && !/add funds/i.test(err), T("error card renders code + the proxy's message verbatim, no next-step line"), err.replace(/\n/g, " | "));
+  rec(err.includes("over_balance") && err.includes("Your credit is used up. You can buy more from your balance at the top.") && !/add funds/i.test(err), T("error card renders code + the proxy's message verbatim, no next-step line"), err.replace(/\n/g, " | "));
   // ui § 2.5: a pre-call refusal -> no model reply after it (the error card is the last thing in the turn, and no later turn)
   const lastChildIsError = await page.locator(".bubble--assistant").last().evaluate((b) => b.lastElementChild?.classList.contains("card--error"));
   const bubblesAfter = await page.evaluate(() => { const e = document.querySelector(".card--error"); const all = [...document.querySelectorAll(".bubble")]; return all.length - 1 - all.indexOf(e.closest(".bubble")); });

@@ -450,6 +450,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         conversationStore={conversationStore}
         supabaseUrl={env.supabaseUrl}
         accessToken={accessToken}
+        paypalClientId={env.paypalClientId}
         authClient={authClient}
         userEmail={screen.email}
         onSignOut={handleSignOut}

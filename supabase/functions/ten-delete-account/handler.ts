@@ -1,16 +1,18 @@
 // The testable core of ten-delete-account (docs/design-web-agent.md § 8,
-// as amended by the fix-round-1 lead ruling S5/S6/S7): requires a
-// SIGNED-IN user only, not membership — an ex-member (their credit spent
-// or removed) must still be able to erase their own beta data. Deletes the
-// caller's beta data: Storage objects under users/{uid}/ (via the Storage
-// API, service role, paged — see N2 in _shared/supabase.ts — SQL deletes
-// are refused by `storage.protect_delete` and would orphan the backend
-// files), then `ten_ws_files`, `ten_gate_log`, and the caller's 'credit'
-// ledger rows only. 'call' ledger rows are KEPT: they are cost records
-// with no file content, and removing them would let a self-delete erase
-// the user's own history from today's beta-wide $5 ceiling (fix-round-1
-// SHOULD). Idempotent: a second call finds nothing left and still returns
-// 200 with a zeroed summary. The shared auth user is kept. No
+// as amended by the fix-round-1 lead ruling S5/S6/S7, and again by § 17.4):
+// requires a SIGNED-IN user only, not membership — an ex-member (their
+// credit spent or removed) must still be able to erase their own beta data.
+// Deletes the caller's beta data: Storage objects under users/{uid}/ (via
+// the Storage API, service role, paged — see N2 in _shared/supabase.ts —
+// SQL deletes are refused by `storage.protect_delete` and would orphan the
+// backend files), then `ten_ws_files`, `ten_gate_log`, and
+// `ten_conversations` only. NO `ten_usage_ledger` row is ever deleted here
+// (§ 17.4, amended 2026-09-25: "ten-delete-account stops deleting ledger
+// rows, the $5 starter included: calls aren't tied to the credit they
+// used, so deleting any credit row can take paid credit with it. A member
+// who deletes keeps membership and balance, with an empty workspace.").
+// Idempotent: a second call finds nothing left and still returns 200 with a
+// zeroed summary. The shared auth user is kept. No
 // `window`/`document`/`localStorage`/`node:` API here, so this runs the
 // same in tests and on the Edge Runtime.
 //
@@ -23,11 +25,12 @@ import { allowedOrigins, corsHeaders } from "../_shared/cors.ts";
 
 export const BUCKET = "ten-workspaces";
 
-// Round 2, item 4: names the one thing this delete deliberately keeps (the
-// 'call' ledger rows), so "beta data" doesn't read as "everything, always".
+// § 17.4 / design-web-ui.md § 1.11's "Replaced, after the function change"
+// copy, word for word: unlike the pre-§ 17 wording this used to carry
+// ("Unused credit is forfeited"), credit now survives a delete, and the
+// sentence says so.
 export const SUMMARY_MESSAGE =
-  "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Unused credit is forfeited. " +
-  "Your usage records, which show only amounts spent and no content, are kept.";
+  "This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Your credit stays, and so do your payment and usage records, which show only amounts and no content.";
 
 export interface DeleteDeps {
   verifyUser(token: string): Promise<{ id: string } | null>;
@@ -90,20 +93,18 @@ export async function handleRequest(
   }
 
   // 2. Then the beta data rows, acting only on this user's own rows (§ 8).
-  // ten_usage_ledger last, and filtered to 'credit' rows only — 'call' rows
-  // (cost records, no content) are kept so the beta ceiling and the user's
-  // own cost history survive a self-delete.
+  // § 17.4: ten_usage_ledger is NEVER touched here any more — no row of any
+  // kind ('credit' included) is deleted, so a self-delete can never take
+  // paid credit (or the $5 starter) with it.
   let files = 0;
   let gateLog = 0;
   let conversationRows = 0;
-  let creditRows = 0;
   try {
     files = await deps.deleteOwnRows("ten_ws_files", user.id);
     gateLog = await deps.deleteOwnRows("ten_gate_log", user.id);
     // § 11.7: "ten-delete-account deletes the row" (ten_conversations, one
     // row per user, § 11.2) — the same shape as the two deletes above.
     conversationRows = await deps.deleteOwnRows("ten_conversations", user.id);
-    creditRows = await deps.deleteOwnRows("ten_usage_ledger", user.id, "kind=eq.credit");
   } catch (e) {
     deps.log?.warn({ msg: "ten-delete-account: row delete failed", err: String(e) });
     return jsonError(503, "delete_failed", "Could not delete your data. Try again.", cors);
@@ -117,7 +118,6 @@ export async function handleRequest(
         textFiles: files,
         gateLogRows: gateLog,
         conversationRows,
-        creditRows,
       },
     }),
     { status: 200, headers: { "Content-Type": "application/json", ...cors } },

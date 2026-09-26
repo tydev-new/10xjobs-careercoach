@@ -27,7 +27,7 @@ STOP = set("the a an of to in on for and or is are be with at by from your my th
 
 
 def waiting_rows(text):
-    m = re.search(r"^Waiting on you\s*\n(.*?)(?=^(?:To do|Doing|Done|##)\b|\Z)", text, re.S | re.M)
+    m = re.search(r"^Waiting on you\s*\n(.*?)(?=^(?:(?:To do|Doing|Done)\b|#)|\Z)", text, re.S | re.M)
     if not m:
         return []
     rows, cur = [], None

@@ -26,7 +26,7 @@ function posixJoin(...parts) {
   return a.endsWith("/") ? a + b : `${a}/${b}`;
 }
 
-// Python: re.search(r"^Waiting on you\s*\n(.*?)(?=^(?:To do|Doing|Done|##)\b|\Z)", text, re.S|re.M)
+// Python: re.search(r"^Waiting on you\s*\n(.*?)(?=^(?:(?:To do|Doing|Done)\b|#)|\Z)", text, re.S|re.M)
 // `^`/`$` under Python's re.M matches only at real `\n` boundaries — NOT
 // the broader set `.splitlines()` recognizes — so this extraction step
 // stays LF-only (text is already through `universalNewlines`, which
@@ -36,7 +36,17 @@ function posixJoin(...parts) {
 // of the other three remains in the text). `$(?![\s\S])` is `\Z`: end of
 // the WHOLE string, not "before a trailing newline" (which plain `$`
 // would also accept under the `m` flag).
-const WAITING_RE = /^Waiting on you\s*\n([\s\S]*?)(?=^(?:To do|Doing|Done|##)\b|$(?![\s\S]))/m;
+//
+// Fix (2026-09-26, independent-reviewer repro): `\b` between `#` and a
+// space is never a word boundary (`#` and ` ` are both non-word chars),
+// so the old `##\b` alternative never matched a real `## Heading` line —
+// a `## Standing floor` or `## Queue` section after Waiting on you never
+// closed the block, and its bullet rows silently satisfied the
+// --asked/keyword check. Bare `#` (no `\b`) stops at ANY line that starts
+// with `#` in column 0 (every ATX heading, and a stray `#word` line too —
+// the safe direction, as helpers.ts's To do parser does), matching
+// schema.md's optional sections after the Board.
+const WAITING_RE = /^Waiting on you\s*\n([\s\S]*?)(?=^(?:(?:To do|Doing|Done)\b|#)|$(?![\s\S]))/m;
 
 export function waitingRows(text) {
   const m = WAITING_RE.exec(text);

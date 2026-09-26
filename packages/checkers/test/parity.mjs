@@ -399,6 +399,16 @@ function addCase(c) {
     "- the comp floor — criteria.md § Compensation\n" +
     "- warm-path pick: which of the three mutuals to Flo\n" +
     "To do\n- review the Corvid letter (10 min)\n";
+  // Regression corpus (independent-reviewer repro, 2026-09-26): Waiting on
+  // you is the LAST board section, followed by the two optional sections
+  // schema.md allows. The old regex's `##\b` never matched a real
+  // "## Heading" line (no word boundary between `#` and a space), so these
+  // rows leaked into the Waiting-on-you block.
+  const TRAILING_PLAN =
+    "Goal: x by 2026-10-01\nBudget: 60 min/day\n\n## Board\nWaiting on you\n" +
+    "- the comp floor — criteria.md\n\n" +
+    "## Standing floor\n- 1 practice rep a day\n\n" +
+    "## Queue\n- timer: follow up Acme 10-02\n";
   const closeoutCases = [
     { name: "clean", covers: "test_clean", plan: PLAN, args: ["--stage", "applying", "--asked", "which mutual to Flo", "--asked", "your comp floor"] },
     { name: "bad_stage_fails", covers: "test_bad_stage_fails", plan: PLAN, args: ["--stage", "planning"] },
@@ -406,6 +416,8 @@ function addCase(c) {
     { name: "stale_plan_fails", covers: "test_stale_plan_fails", plan: PLAN, args: ["--stage", "applying"], old: true },
     { name: "missing_plan_fails", covers: "test_missing_plan_fails", plan: null, args: ["--stage", "applying"] },
     { name: "stage_auto_inferred", covers: "test_stage_auto_inferred", plan: PLAN, args: ["--asked", "which mutual to Flo", "--asked", "your comp floor"] },
+    { name: "waiting-stops-at-trailing-sections-fail", covers: "test_waiting_on_you_stops_at_trailing_optional_sections", plan: TRAILING_PLAN, args: ["--stage", "applying", "--asked", "follow up on the timer"] },
+    { name: "waiting-stops-at-trailing-sections-pass", covers: "test_waiting_on_you_stops_at_trailing_optional_sections", plan: TRAILING_PLAN, args: ["--stage", "applying", "--asked", "the comp floor"] },
   ];
   for (const c of closeoutCases) {
     addCase({

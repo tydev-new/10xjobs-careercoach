@@ -123,6 +123,7 @@ const MANIFEST = {
   test_stale_plan_fails: { parity: "stale_plan_fails" },
   test_missing_plan_fails: { parity: "missing_plan_fails" },
   test_stage_auto_inferred: { parity: "stage_auto_inferred" },
+  test_waiting_on_you_stops_at_trailing_optional_sections: { parity: "waiting-stops-at-trailing-sections-fail" }, // + waiting-stops-at-trailing-sections-pass
 };
 
 function extractTestNames(pyFile) {

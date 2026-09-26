@@ -26,7 +26,7 @@
           "highUsd": 0.90,
           "balanceUsd": 1.00
         } } },
-        { "type": "text", "text": "That's under your balance and under the spend threshold, so no gate needed — starting now." },
+        { "type": "text", "text": "That's under your balance and under the amount that needs your yes, so I'm starting now." },
         { "type": "tool-web_search", "toolCallId": "call-2", "state": "output-available",
           "input": { "query": "Meridian Labs funding stage", "maxResults": 3 },
           "output": { "results": [
@@ -42,7 +42,7 @@
           "score": 64,
           "reason": "Series B stage matches target; one leveling gap"
         } } },
-        { "type": "text", "text": "Meridian Labs – Product Lead: recorded as Investable Stretch. Moving to the next one." },
+        { "type": "text", "text": "Meridian Labs – Product Lead: an Investable Stretch, and it's on your job list now. Moving to the next one." },
         { "type": "tool-web_search", "toolCallId": "call-4", "state": "output-available",
           "input": { "query": "Solterra Robotics company reviews", "maxResults": 5 },
           "output": { "results": [
@@ -58,7 +58,7 @@
           "score": 31,
           "reason": "Hardware-heavy roadmap, little overlap with candidate's SaaS background"
         } } },
-        { "type": "text", "text": "Solterra Robotics – Group PM: recorded as Weak Fit. Moving to the next one." },
+        { "type": "text", "text": "Solterra Robotics – Group PM: a Weak Fit, and it's on your job list now. Moving to the next one." },
         { "type": "data-error", "data": {
           "code": "over_balance",
           "message": "Your credit is used up. You can buy more from your balance at the top.",

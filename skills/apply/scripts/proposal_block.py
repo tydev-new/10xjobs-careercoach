@@ -93,7 +93,7 @@ def main():
         outs = [r for r in sel if len(r) == 7 and r[3].lower().strip("`*_ ") == "out"]
         ins = [r for r in sel if len(r) == 7 and r[3].lower().strip("`*_ ") == "in"]
         if outs:
-            out.append(f"**Cut — {len(outs)} of {len(outs) + len(ins)} bullets, weakest first.** Say \"keep <bullet>\" and it comes back.")
+            out.append(f"**Cut — {len(outs)} of {len(outs) + len(ins)} bullets, weakest first.** Say \"keep\" and the bullet's name or number to bring one back.")
             for i, r in enumerate(outs, 1):
                 bullet = r[2] if len(r[2]) <= 70 else r[2][:67].rstrip() + "…"
                 out.append(f"{i}. {r[1]} — {bullet} — *{r[6]}*")
@@ -117,7 +117,7 @@ def main():
         gaps = [r for r in cov if len(r) == 4 and r[1].lower().strip("`*_ ") == "gap"]
         if sbu:
             out.append("")
-            out.append("**Their words, placed** — say \"Summary\" / \"Skills\" / \"leave it out\" to move any of these:")
+            out.append("**Their words, placed** — say \"Summary\", \"Skills\", or \"leave it out\" to move any of these:")
             for r in sbu:
                 out.append(f"- **{r[0]}** — true of you ({r[2][:60]}{'…' if len(r[2]) > 60 else ''}); placed where the document shows it")
         if gaps:

@@ -143,5 +143,5 @@ in the reply next to the table.
 Show the table either way — a check that leaves no record didn't happen.
 
 **A reply that is not the JSON table is a VOID check, not a pass.**
-Re-spawn the checker once. If it fails again, say the language check
+Re-spawn the checker once. If it fails again, say the wording check
 could not run, and do not deliver as though it had.

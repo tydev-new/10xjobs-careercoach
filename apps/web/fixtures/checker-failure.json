@@ -39,7 +39,7 @@
             { "level": "FAIL", "message": "Experience bullet not verbatim from base: \"Scaled the data platform to 4x throughput while cutting infra spend by…\" — patterns.md: selection is the tailoring. A JD-vocabulary rewording is allowed only when the candidate approved it and it is declared in § Reworded (base: / tailored: pair)" }
           ]
         } } },
-        { "type": "text", "text": "First pass didn't hold — check_materials caught a reworded bullet that wasn't in the base and wasn't declared. Fixing it myself, no need to look yet." },
+        { "type": "text", "text": "The automatic checks caught a bullet I'd reworded from your base résumé without saying so. I'm fixing it myself, so there's nothing to look at yet." },
         { "type": "tool-write_file", "toolCallId": "call-5", "state": "output-available",
           "input": { "path": "applications/brightline-data-eng-lead-resume.md", "content": "# Deshawn Whitfield…\n- Rebuilt the ingestion pipeline to handle 3x the event volume without adding headcount…" },
           "output": { "path": "applications/brightline-data-eng-lead-resume.md", "written": true } },
@@ -62,7 +62,7 @@
           "htmlPath": "applications/brightline-data-eng-lead-resume.html",
           "checker": "clean"
         } } },
-        { "type": "text", "text": "Clean now — check_materials passes with 0 fail and 0 warn, and the bullet is back to the base's own wording. Ready when you are." }
+        { "type": "text", "text": "Clean now: the automatic checks pass with nothing failed and nothing flagged, and the bullet is back to your base résumé's own wording. Ready when you are." }
       ]
     }
   ]

@@ -57,7 +57,7 @@
       "id": "m4",
       "role": "assistant",
       "parts": [
-        { "type": "text", "text": "That wasn't a yes, so the gate above is still pending and nothing started." },
+        { "type": "text", "text": "That wasn't a yes, so the request above is still waiting and nothing has started." },
         { "type": "data-gate-status", "data": { "gateId": "gate-priya-1", "status": "pending" } },
         { "type": "tool-estimate_cost", "toolCallId": "call-2", "state": "output-available",
           "input": { "steps": 15, "webSearches": 15, "action": "evaluate 5 saved roles", "items": [
@@ -74,7 +74,7 @@
           "highUsd": 0.48,
           "balanceUsd": 4.20
         } } },
-        { "type": "text", "text": "5 comes to $0.35–$0.48, under the threshold, so that one needs no gate at all. The gate for all 6 is still open above if you want them all — say yes to that one, or tell me to go ahead with 5." }
+        { "type": "text", "text": "5 roles come to $0.35–$0.48. That's under the amount that needs your yes, so I can start those without asking. The request for all 6 is still open above if you want them all: say yes to it, or tell me to go ahead with 5." }
       ]
     },
     {
@@ -90,7 +90,7 @@
       "role": "assistant",
       "parts": [
         { "type": "data-gate-status", "data": { "gateId": "gate-priya-1", "status": "approved" } },
-        { "type": "text", "text": "Starting on the 6 roles now — that's the gate your yes confirmed. Say so if you'd rather I stopped at 5." }
+        { "type": "text", "text": "Starting on the 6 roles now, as your yes approved. Say so if you'd rather I stopped at 5." }
       ]
     }
   ]

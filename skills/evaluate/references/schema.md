@@ -79,7 +79,7 @@ at the source so re-prep can't resurrect a disproven fact.
 ## The summary card — the reply's shape
 
 ```markdown
-## [Company] — [Role]: [Verdict] ([score][, Track X when criteria.md defines tracks])
+## [Company] — [Role]: [Verdict] ([score][, your <target name> target — its name as criteria.md's Targets section writes it, when criteria.md defines tracks])
 
 **The role** (from decode): [2-3 lines — what this role actually is, seniority signal, top competencies]
 **The company** (from research): [2-3 lines — stage, trajectory, the signals that matter for this decision]
@@ -92,5 +92,5 @@ at the source so re-prep can't resurrect a disproven fact.
 1. [question — what it resolves]
 2. …
 
-Full analyses: `jd-analysis/<file>` · `company/<file>` — verdict recorded in the pipeline.
+The full analysis: `jd-analysis/<file>` · the company notes: `company/<file>`. It's on your job list.
 ```

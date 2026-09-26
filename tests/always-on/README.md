@@ -241,7 +241,7 @@ skills, not this repo's. `check_env.sh` warns when it sees one.
 `claude -p` prints only the final assistant block — prose emitted between
 tool calls is silently dropped, which produced one false FAIL before this
 was found. Every runner uses `--output-format stream-json --verbose` and
-reassembles the full text with `extract_text.py`. Each run also snapshots
+reassembles the full text with `extract_text.py`. Since 2026-09-26 (plain replies) it drops subagent events (`parent_tool_use_id` set), so transcripts from before and after that date are not directly comparable if a run used subagents. Each run also snapshots
 the workspace afterwards (`<run>-ws/`) and records which skills actually
 fired (`<run>.skills.txt`).
 

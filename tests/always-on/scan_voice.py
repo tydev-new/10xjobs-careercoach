@@ -48,6 +48,10 @@ PY_FILE = re.compile(r"\b[\w./-]*[a-z_]+\.py\b")
 # starts with a digit). *.py is handled separately above (HARD, not
 # REVIEW) and checked first, so it always wins that overlap.
 FILEPATH = re.compile(r"\b[a-z0-9_][\w./-]*\.[a-z][a-z0-9]{1,5}\b")
+# A capitalised workspace file name ("CLAUDE.md", "README.md") is still a
+# pointer (§ 3: workspace *.md names are REVIEW); only a document extension
+# counts, so prose like "Node.js" stays out.
+CAP_FILENAME = re.compile(r"\b[A-Z][\w-]*\.(?:md|txt|json|pdf|html|csv)\b")
 # A scheme-less URL or bare domain path (design § 3: "outside a URL or
 # email" — a scheme-less one is still a path). Requires a dot BEFORE the
 # slash, so it never eats "6/7 held" or similar digit/digit phrases.
@@ -130,7 +134,8 @@ def scan_text(text, candidate_tokens, source):
         consumed.append((m.start(), m.end()))
 
     # 3. workspace file names / any other dotted-extension token — REVIEW.
-    for m in FILEPATH.finditer(text):
+    for pat in (CAP_FILENAME, FILEPATH):
+      for m in pat.finditer(text):
         if _inside(m.start(), excluded) or _overlaps(m.start(), m.end(), consumed):
             continue
         hits.append(Hit(REVIEW, source, m.group(0), _context_for(text, m.start(), m.end())))

@@ -132,6 +132,43 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "cm-bullets-only-summary-passes-case-budget", files: { "resume.md":
     "# Alex Chen\n\n## Summary\n\n- Platform engineering leader delivering reliability at scale.\n- Cut incident response time from 4 hours to 40 minutes.\n- Built the on-call rotation from zero to a 6-person bench.\n\n## Experience\n\nPlatform Lead — Northwind Labs.\n" },
     args: ["--workspace", ".", "--resume", "resume.md"] });
+
+  // Independent review of 9842d81 (2026-09-25), adversarial ASCII-arrow corpus.
+  // The URL exemption is `https?://\S+`; Python's \s and JS's \s differ on
+  // U+001C-U+001F, U+0085 (Python: whitespace) and U+FEFF (JS: whitespace) —
+  // the same gap py-text.mjs's PY_S / PY_NOT_S exist to close.
+  const L = letter;
+  const LA = ["--workspace", ".", "--letter", "letter.md"];
+  add({ s, id: "cm-review-arrow-url-then-x1c", files: { "letter.md": L("Notes at https://example.com/notes\x1c->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-review-arrow-url-then-x1f", files: { "letter.md": L("Notes at https://example.com/notes\x1f->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-review-arrow-url-then-nel", files: { "letter.md": L("Notes at https://example.com/notes\u0085->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-review-arrow-url-then-bom", files: { "letter.md": L("Notes at https://example.com/notes﻿->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-review-arrow-url-then-nbsp", files: { "letter.md": L("Notes at https://example.com/notes ->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-review-arrow-inline-code-u2028", files: { "letter.md": L("The macro `a ->b` stayed internal, never shipped to any customer at all.") }, args: LA });
+  add({ s, id: "cm-review-arrow-inline-code-lone-cr", files: { "letter.md": L("The macro `a\r->b` stayed internal, never shipped to any customer at all.") }, args: LA });
+  add({ s, id: "cm-review-arrow-crlf-fence", files: { "letter.md": CRLF(L("```\na->b\n```\n\nExplained the diagram above to the whole panel, calmly and clearly.")) }, args: LA });
+  add({ s, id: "cm-review-negative-number", files: { "letter.md": L("Hardware held at <-5 C in the field trials, every unit, all winter long.") }, args: LA });
+  add({ s, id: "cm-review-gt-chain-no-finding", files: { "letter.md": L("Moved work from intake > triage > fix across teams, every week without fail.") }, args: LA });
+  add({ s, id: "cm-review-math-le-no-finding", files: { "letter.md": L("Kept p99 latency x <= 5 ms and error rate <== budget all quarter long.") }, args: LA });
+  add({ s, id: "cm-review-double-backtick-code", files: { "letter.md": L("Documented ``a->b`` in the internal wiki only, never in customer docs.") }, args: LA });
+  add({ s, id: "cm-review-url-adjacent-arrow", files: { "letter.md": L("See https://example.com->then the appendix, thanks for reading it all.") }, args: LA });
+  add({ s, id: "cm-review-exempt-no-glue", files: { "letter.md": L("Split -`x`> and -<!-- c -->> never form an arrow when the spans go.") }, args: LA });
+  add({ s, id: "cm-review-multiline-comment", files: { "letter.md": L("<!-- draft note\na->b\nstill internal -->\n\nReviewed twice before sending, carefully and calmly.") }, args: LA });
+  add({ s, id: "cm-review-first-match-only", files: { "letter.md": L("Went a=>b, then c->d, then e<-f over the whole year, steadily enough.") }, args: LA });
+  add({ s, id: "cm-review-claim-rules-stripped", files: { "resume.md":
+    "# Alex Chen\n\n## Summary\n\n- Platform engineering leader delivering reliability at scale.\n\n## Claim rules\n\n- never write a->b transitions\n" },
+    args: ["--workspace", ".", "--resume", "resume.md"] });
+  add({ s, id: "cm-review-seven-bullet-summary", files: { "resume.md":
+    "# Alex Chen\n\n*Platform engineering leader — reliability at scale*\n\n## Summary\n\n" +
+    "- Platform engineering leader who keeps a payments platform available through 10x growth.\n" +
+    "- **8+ years in SRE:** yes — Northwind Labs on-call lead since 2021.\n" +
+    "- Cut incident response time from 4 hours to 40 minutes across 12 services.\n" +
+    "- Built the on-call rotation from zero to a 6-person bench.\n" +
+    "- Moved deploys from weekly to daily with zero customer-facing rollbacks.\n" +
+    "- Reduced cloud spend 30% by retiring two legacy clusters.\n" +
+    "- Ran the incident review program for 40 engineers.\n\n" +
+    "## Experience\n\n### Northwind Labs — Platform Lead\n\n- Led the reliability program.\n" },
+    args: ["--workspace", ".", "--resume", "resume.md"] });
 }
 
 // ---- proposal_block

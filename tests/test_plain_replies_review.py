@@ -496,6 +496,60 @@ def test_mvp_journey_proposal_block_output_is_the_real_script_output():
         shutil.rmtree(d)
 
 
+def test_before_txt_is_the_five_design_quotes_verbatim_and_tagged():
+    # § 3 as amended (lead, 2026-09-26): the five § 1 quotes, verbatim,
+    # each tagged with its expected class.
+    design = _read("docs", "design-plain-replies.md")
+    sec1 = design.split("## 1.", 1)[1].split("A candidate has to decode", 1)[0]
+    quotes = [_norm(q) for q in re.findall(r'"([^"]+)"', sec1)]
+    tagged = [l.split("\t", 1) for l in _read("tests", "fixtures", "voice", "before.txt").splitlines() if l.strip()]
+    assert [_norm(t) for _, t in tagged] == quotes, (quotes, tagged)
+    for cls, text in tagged:
+        got = {c for c, _ in _hits(text)}
+        assert cls in got and (cls == "HARD" or "HARD" not in got), (cls, text, _hits(text))
+
+
+def test_mvp_journey_text_takes_the_designer_target_copy():
+    # § 5: "The assistant text takes the designer's T.target copy" (branch
+    # worktree-agent-a7b2db3c5da9cc5ae, direction-c-home.html, `T.target`
+    # m2/m4/m6/m10), typographic apostrophes normalised.
+    texts = [t.replace("’", "'") for t in _assistant_texts(_fixture("mvp-journey"))]
+    for want in [
+        "Got it — I've read your résumé and saved your experience as your base résumé. Before I tailor anything, "
+        "I need three things: the roles you're aiming for, how much time you can give this each day, and when "
+        "you'd like an offer by. Got a few minutes now?",
+        "Saved. Goal: an offer by Nov 30, with 45 minutes a day. Paste a job posting whenever you've got one, "
+        "or I can start finding roles for you.",
+        "It's a Strong Fit, and it's on your job list now. Want me to tailor a résumé and cover letter for this one?",
+        "That's your plan: send the letter, submit once you have, and tell me if you want more roles found.",
+    ]:
+        assert want in texts, want
+
+
+def test_dump_tools_results_pairs_the_subagent_result_too():
+    # M5 fix: the wording check runs as a subagent; its own result must
+    # reach the voice judge (UNVERIFIED against a live capture).
+    d = tempfile.mkdtemp()
+    try:
+        cap = os.path.join(d, "x.turn1.stream.json")
+        _capture(cap, "x")
+        out = subprocess.run([sys.executable, os.path.join(AO, "dump_tools.py"), "--results", cap],
+                             capture_output=True, text=True).stdout.splitlines()
+        i = next(k for k, l in enumerate(out) if l.startswith("TOOL Task(subagent)"))
+        assert out[i + 1].startswith("  PROMPT: ") and out[i + 2] == "  RESULT: '{\"rows\":[]}'", out[i:i + 3]
+    finally:
+        shutil.rmtree(d)
+
+
+def test_judge_voice_exits_nonzero_when_any_reply_is_unresolved():
+    r, verdicts, _ = _judge_voice_on(["t21-plain-report-t1", "mystery-case-t1"], _runner_suffix)
+    assert r.returncode != 0 and "mystery-case-t1" in r.stderr, (r.returncode, r.stderr)
+    assert verdicts == ["t21-plain-report-t1"]
+    r, verdicts, texts = _judge_voice_on(["bare-t1", "guardrails-t1", "full-t1"], _runner_suffix)
+    assert r.returncode == 0 and len(verdicts) == 3
+    assert all("Expected — t4" in t for t in texts), "run_t4.sh's condition-only names resolve to t4-intake"
+
+
 def test_verdict_card_track_suffix_removed():
     assert "(Track " not in _read("apps", "web", "src", "components", "Cards.tsx")
 

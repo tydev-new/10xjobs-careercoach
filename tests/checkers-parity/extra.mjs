@@ -179,6 +179,33 @@ const LONG = ("word ".repeat(4000)).trim();
     "- Ran the incident review program for 40 engineers.\n\n" +
     "## Experience\n\n### Northwind Labs — Platform Lead\n\n- Led the reliability program.\n" },
     args: ["--workspace", ".", "--resume", "resume.md"] });
+
+  // Independent review of round 2 (a0abefe): the tilde-fence and
+  // double-backtick branches, and PY_NOT_S at the URL's edges, probed on
+  // both engines (docs/design-apply-three-lens.md § 4, amended 86089d7).
+  add({ s, id: "cm-r2rev-tilde-fence-crlf", files: { "letter.md": CRLF(L("~~~\na->b\n~~~\n\nExplained the diagram above to the whole panel, calmly and clearly.")) }, args: LA });
+  add({ s, id: "cm-r2rev-tilde-fence-lone-cr", files: { "letter.md": L("~~~\ra->b\r~~~\n\nExplained the diagram above to the whole panel, calmly and clearly.") }, args: LA });
+  add({ s, id: "cm-r2rev-tilde-fence-unclosed", files: { "letter.md": L("~~~\na->b\n\nExplained the diagram above to the whole panel, calmly and clearly.") }, args: LA });
+  add({ s, id: "cm-r2rev-tilde-fence-with-info-string", files: { "letter.md": L("~~~text\nx => y\n~~~\n\nExplained the diagram above to the whole panel, calmly and clearly.") }, args: LA });
+  add({ s, id: "cm-r2rev-backtick-fence-inside-tilde", files: { "letter.md": L("~~~\n```\na->b\n~~~\nthen c=>d outside, in the prose that follows it.") }, args: LA });
+  add({ s, id: "cm-r2rev-double-backtick-holds-a-backtick", files: { "letter.md": L("Documented `` a`->b `` in the internal wiki only, never in customer docs.") }, args: LA });
+  add({ s, id: "cm-r2rev-double-backtick-unclosed-crosses-no-line", files: { "letter.md": L("Opened `` here, a->b\nand closed `` there, in the internal wiki only.") }, args: LA });
+  add({ s, id: "cm-r2rev-double-backtick-u2028", files: { "letter.md": L("Documented ``a ->b`` in the internal wiki only, never in customer docs.") }, args: LA });
+  add({ s, id: "cm-r2rev-double-backtick-u2029-then-arrow", files: { "letter.md": L("Documented ``a`` c->d in the internal wiki only, never in customer docs.") }, args: LA });
+  add({ s, id: "cm-r2rev-double-backtick-lone-cr", files: { "letter.md": L("Documented ``a\r->b`` in the internal wiki only, never in customer docs.") }, args: LA });
+  add({ s, id: "cm-r2rev-two-double-backtick-spans", files: { "letter.md": L("Documented ``a->b``, then ``c=>d``, in the internal wiki only today.") }, args: LA });
+  add({ s, id: "cm-r2rev-url-then-u2028", files: { "letter.md": L("Notes at https://example.com/notes ->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-r2rev-url-then-u2029", files: { "letter.md": L("Notes at https://example.com/notes ->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-r2rev-url-then-u3000", files: { "letter.md": L("Notes at https://example.com/notes　->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-r2rev-url-then-u200b", files: { "letter.md": L("Notes at https://example.com/notes​->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-r2rev-url-astral", files: { "letter.md": L("Notes at https://example.com/\u{1F680}->next steps, thanks for reading them all today.") }, args: LA });
+  add({ s, id: "cm-r2rev-url-uppercase-scheme", files: { "letter.md": L("Notes at HTTPS://example.com/a->b for the writeup, thanks for reading it.") }, args: LA });
+  add({ s, id: "cm-r2rev-summary-prose-51-words", files: { "resume.md":
+    "# Alex Chen\n\n## Summary\n\n" + Array(51).fill("word").join(" ") + "\n\n- Cut costs 30%.\n" }, args: ["--workspace", ".", "--resume", "resume.md"] });
+  add({ s, id: "cm-r2rev-summary-prose-50-words", files: { "resume.md":
+    "# Alex Chen\n\n## Summary\n\n" + Array(50).fill("word").join(" ") + "\n\n- Cut costs 30%.\n" }, args: ["--workspace", ".", "--resume", "resume.md"] });
+  add({ s, id: "cm-r2rev-summary-repeated-number-warn", files: { "resume.md":
+    "# Alex Chen\n\n## Summary\n\n- Cut costs 30%.\n- Grew revenue 30%.\n" }, args: ["--workspace", ".", "--resume", "resume.md"] });
 }
 
 // ---- proposal_block

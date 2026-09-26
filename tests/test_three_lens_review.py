@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Independent review of 9842d81 — the three-lens panel, the ASCII-arrow
-FAIL and the search_jargon rule — tests derived from the spec
-(docs/design-apply-three-lens.md §§ 3-5 and the § 7 test plan, owner
-rulings § 8), not from the code.
+"""Independent review of 9842d81 and its round 2 (a0abefe) — the three-lens
+panel, the ASCII-arrow FAIL and the search_jargon rule — tests derived from
+the spec (docs/design-apply-three-lens.md as amended in 86089d7: §§ 1-5,
+the § 7 test plan, owner rulings 1-7 in § 8), not from the code.
 
     python3 tests/test_three_lens_review.py  (or via tests/run.py)
 """
@@ -21,9 +21,12 @@ CM_JS = os.path.join(ROOT, "packages", "checkers", "src", "check-materials.mjs")
 MSG_PY = os.path.join(ROOT, "skills", "outreach", "scripts", "check_messages.py")
 CF_PY = os.path.join(ROOT, "skills", "profile", "scripts", "check_files.py")
 
-# § 4, the message, verbatim.
-SPEC_MSG = ('arrow/scaffolding chain "{m}" — write transitions in words '
-            '("from 80% to under 1%"); symbol arrows garble in ATS parsers')
+# § 4 (round 2), the message, verbatim — the same text in all three checkers.
+SPEC_MSG = ('arrow chain "{m}" — write it in words ("from 80% to under 1%"); '
+            'a reader sees an arrow as notes, not a sentence')
+# § 4 (round 2): the Python exempt alternation, same source text in both
+# Python checkers; the double-backtick branch before the single-backtick one.
+SPEC_EXEMPT = r"```.*?```|~~~.*?~~~|<!--.*?-->|``[^\n]*?``|`[^`\n]*`|https?://\S+"
 
 
 def read(*p):
@@ -41,7 +44,7 @@ def shared(text):
 
 
 def chain_fails(results):
-    return [m for lvl, m in results if lvl == "FAIL" and "arrow/scaffolding chain" in m]
+    return [m for lvl, m in results if lvl == "FAIL" and m.startswith('arrow chain "')]
 
 
 # ---- check_materials: the ASCII-arrow FAIL (§ 4) ---------------------------
@@ -59,7 +62,7 @@ def test_only_the_first_ascii_arrow_is_reported():
 
 def test_unicode_and_ascii_arrows_fail_twice_unicode_first():
     res = [m for lvl, m in shared("Cut cost 80%→<1%, then 80->90.") if lvl == "FAIL"]
-    arrows = [m for m in res if m.startswith("arrow/scaffolding")]
+    arrows = [m for m in res if m.startswith(("arrow/scaffolding glyph", 'arrow chain "'))]
     assert len(arrows) == 2, res
     assert arrows[0].startswith('arrow/scaffolding glyph "→"'), arrows
     assert arrows[1] == SPEC_MSG.format(m="->"), arrows
@@ -160,7 +163,7 @@ def test_ascii_arrows_has_the_same_source_text_in_all_three_checkers():
 def test_exempt_spans_are_the_same_alternation_in_both_python_checkers():
     a = _py_regex(CM_PY, "ARROW_EXEMPT_SPANS")
     b = _py_regex(MSG_PY, "EXEMPT_SPANS")
-    assert a == b == r"```.*?```|<!--.*?-->|`[^`\n]*`|https?://\S+", (a, b)
+    assert a == b == SPEC_EXEMPT, (a, b)
 
 
 # ---- check_messages: the same pattern, scoped to drafts (§ 4) -------------
@@ -177,7 +180,8 @@ def _run_messages(contacts_body):
 def test_messages_cli_fails_an_ascii_arrow_in_a_draft_with_the_spec_message():
     code, out = _run_messages("# Acme\n\n> Grew signal 80%->90% this quarter across teams.\n")
     assert code == 1, out
-    assert '[FAIL] draft 1: arrow chain "->" — write it in words' in out, out
+    # § 4 (round 2): "draft <i>: " followed by the same message as check_materials.
+    assert "[FAIL] draft 1: " + SPEC_MSG.format(m="->") + "\n" in out, out
 
 
 def test_messages_arrow_outside_a_draft_is_not_a_fail():
@@ -277,6 +281,276 @@ def test_t10_verbatim_panel_carries_ruling_3_word_for_word():
     assert ("A persona review beyond that one re-check (owner 2026-09-25: the author must not "
             "grade its own fixes, so the failing lenses re-check once; nothing further).") in text
     assert "A second wave of persona reviews" not in text
+
+
+# ==== round 2 (a0abefe), derived from the amended design (86089d7) ===========
+
+# ---- § 4: the new exempt spans, and what they must NOT swallow --------------
+
+def test_tilde_fence_and_double_backtick_span_are_exempt():
+    for text in ("~~~\na->b\n~~~\nBody.",
+                 "~~~text\nx => y\n~~~\nBody.",
+                 "Documented ``a->b`` in the wiki.",
+                 "Documented `` a`->b `` in the wiki.",   # a backtick inside a double span
+                 "Documented ``a->b``, ``c=>d`` twice."):
+        assert not chain_fails(shared(text)), text
+
+
+def test_text_after_a_double_backtick_span_or_tilde_fence_is_still_scanned():
+    for text in ("Documented ``a->b`` here, then wrote c=>d.",
+                 "~~~\nx\n~~~\nthen a->b",
+                 "``x`` then `y` then a->b"):
+        assert chain_fails(shared(text)), text
+
+
+def test_a_double_backtick_span_never_crosses_a_line():
+    # "(one line)": an unclosed pair on one line must not swallow the next.
+    assert chain_fails(shared("Opened `` here, a->b\nand closed `` there."))
+
+
+def test_unclosed_fences_and_comments_exempt_nothing():
+    for text in ("~~~\na->b", "```\na->b", "<!-- note a->b"):
+        assert chain_fails(shared(text)), text
+
+
+def test_accepted_limits_are_pinned_as_the_design_table_states():
+    # § 4 "Known limits": accepted false FAILs stay FAILs, the accepted miss stays a miss.
+    for text in ("Held at <-5 C in the field.", "    a->b", "See example.com/a->b today."):
+        assert chain_fails(shared(text)), text
+    assert not chain_fails(shared("See https://x.com/p->next today."))
+
+
+def test_url_exemption_is_scheme_bound_and_case_sensitive():
+    assert not chain_fails(shared("See http://x.com/a->b today."))
+    assert chain_fails(shared("See HTTPS://x.com/a->b today."))
+
+
+def test_js_url_branch_uses_py_not_s_and_no_bare_js_s():
+    # § 4 / § 7 item 6: never a bare JS \\S in the URL branch.
+    js = open(CM_JS, encoding="utf-8").read()
+    line = next(l for l in js.splitlines() if l.startswith("const ARROW_EXEMPT_SPANS"))
+    assert line == ('const ARROW_EXEMPT_SPANS = new RegExp("```[\\\\s\\\\S]*?```|~~~[\\\\s\\\\S]*?~~~|'
+                    '<!--[\\\\s\\\\S]*?-->|``[^\\\\n]*?``|`[^`\\\\n]*`|https?://" + PY_NOT_S + "+", "g");'), line
+    assert re.search(r'import \{[^}]*\bPY_NOT_S\b[^}]*\} from "\./py-text\.mjs"', js), \
+        "PY_NOT_S must be imported from py-text.mjs"
+
+
+def test_arrow_message_is_word_for_word_in_all_three_checkers():
+    tail = '— write it in words ("from 80% to under 1%"); a reader sees an arrow as notes, not a sentence'
+    # Python's two checkers are asserted at runtime (SPEC_MSG above); the JS
+    # port's template literal carries the text on one line.
+    assert ('add("FAIL", `arrow chain "${m[0]}" ' + tail + '`);') in open(CM_JS, encoding="utf-8").read()
+    # "garble" survives only in the Unicode glyph message (and its receipt comment)
+    for path in (CM_PY, MSG_PY, CM_JS):
+        for ln in open(path, encoding="utf-8").read().splitlines():
+            if "garble" in ln:
+                assert "glyph" in ln or "arrows garble in ATS parsers and read as audit" in ln, (path, ln)
+
+
+def test_arrow_chain_has_no_ats_claim_in_any_message():
+    for form in ("->", "<=>"):
+        for m in chain_fails(shared("a" + form + "b")):
+            assert "ATS" not in m and "garble" not in m, m
+
+
+def test_messages_new_spans_exempt_inside_a_draft():
+    for draft in ("> Notes ``a->b`` stay internal.\n",
+                  "> ~~~\n> a->b\n> ~~~\n> Thanks for the time.\n"):
+        code, out = _run_messages("# Acme\n\n" + draft)
+        assert "arrow chain" not in out, (draft, out)
+
+
+def test_messages_unicode_glyph_message_is_unchanged():
+    # § 4: "The Unicode glyph FAIL keeps its message unchanged in all three files."
+    code, out = _run_messages("# Acme\n\n> Cut cost 80%→1% this year.\n")
+    assert '[FAIL] draft 1: arrow glyph "→" — write it in words\n' in out, out
+
+
+# ---- § 4: "the rest of the case goes too" ----------------------------------
+
+def test_summary_prose_fail_carries_the_round_2_message():
+    words = " ".join(["word"] * 51)
+    r = "# Alex Chen\n\n## Summary\n\n" + words + "\n\n- Cut costs 30%.\n"
+    f = [m for lvl, m in cm.check_resume(r) if lvl == "FAIL"]
+    want = ("Summary opens with 51 words of prose (max 50) — the Summary is bullets "
+            "(apply's patterns.md § The Summary); a recruiter reads 7-11s in an F-pattern "
+            "and prose past ~2 lines is invisible")
+    assert want in f, f
+    # exactly 50 words is the budget, not over it
+    r50 = "# Alex Chen\n\n## Summary\n\n" + " ".join(["word"] * 50) + "\n\n- Cut costs 30%.\n"
+    assert not any(m.startswith("Summary opens with") for m in fails_of(cm.check_resume(r50)))
+
+
+def fails_of(results):
+    return [m for lvl, m in results if lvl == "FAIL"]
+
+
+def test_repeated_number_warn_says_the_summary_not_the_case():
+    r = "# A\n\n## Summary\n\n- Cut costs 30%.\n- Grew revenue 30%.\n"
+    w = [m for lvl, m in cm.check_resume(r) if lvl == "WARN" and "repeated" in m]
+    assert w and "the Summary carries each number once" in w[0] and "the case" not in w[0], w
+
+
+def test_case_constant_is_renamed_in_both_files():
+    assert hasattr(cm, "SUMMARY_PROSE_MAX_WORDS") and cm.SUMMARY_PROSE_MAX_WORDS == 50
+    assert not hasattr(cm, "CASE_MAX_WORDS")
+    js = open(CM_JS, encoding="utf-8").read()
+    assert "const SUMMARY_PROSE_MAX_WORDS = 50;" in js and "CASE_MAX_WORDS" not in js
+
+
+# ---- § 4: rule 6, bounded (static — the t15c measurement is unapproved spend) --
+
+def _rule6():
+    text = flat(read("skills", "profile", "references", "language-check.md"))
+    return text.split("6. **`search_jargon`**", 1)[1].split("## What is not a violation", 1)[0]
+
+
+def test_rule6_scope_names_the_sent_documents_and_excludes_story_files():
+    body = _rule6()
+    assert ("must not appear in a document that goes to an employer or a contact: the tailored "
+            "résumé, the cover letter, application answers, and outreach drafts.") in body
+    assert "A story file is the candidate's own record and is never sent, so this rule has no row for it." in body
+    assert "in any wording" not in body, "round 1's unbounded phrase is back"
+
+
+def test_rule6_describes_every_plain_english_probe_as_passing():
+    body = _rule6()
+    s = body.split("Ordinary English is never this rule's flag", 1)[1]
+    for phrase in ('"a strong fit for this team"', '"at this stage"', '"on track"',
+                   '"leads a team of 12"', '"my lane"', '"the decision to migrate"',
+                   '"scored 96/100 in the customer survey"'):
+        assert phrase in s.split("all pass.")[0], phrase
+    assert "When a word could be either, it is English — pass it." in s
+    assert "The echo exemption applies: the posting's own word, quoted, is not jargon." in s
+    assert "*Severity: fix-before-delivery.*" in s
+
+
+def test_rule6_lists_labels_in_their_label_shape():
+    body = _rule6()
+    for label in ('"Strong Fit"', '"Investable Stretch"', '"Long-Shot Stretch"', '"Weak Fit"',
+                  '"Strong Fit — 82/100"', '"fit 82/100"', '"Track B"', '"To Review"',
+                  '"6/7 held"', '"recruiter Revise"', '"ATS-Ready"', '"DECISION" in capitals'):
+        assert label in body, label
+    coined = body.split("terms Ten coined", 1)[1].split("Ordinary English", 1)[0]
+    assert "in any capitalization" in coined
+    for term in ('"investable stretch"', '"long-shot stretch"', '"shown-but-unnamed"',
+                 '"band call"', '"spine role"', '"mandate sentence"'):
+        assert term in coined, term
+
+
+def test_rule6_names_only_labels_that_exist_elsewhere_in_skills():
+    # § 7 item 7: no source-tier, no scout, no lane label, no Track A.
+    body = _rule6()
+    for gone in ("source-tier", "scout", "Track A", "Lane A", '"long shot"'):
+        assert gone not in body, gone
+    others = []
+    for dp, _, fs in os.walk(os.path.join(ROOT, "skills")):
+        for f in fs:
+            if f != "language-check.md" and f.endswith((".md", ".py")):
+                others.append(open(os.path.join(dp, f), encoding="utf-8").read().lower())
+    blob = "\n".join(others)
+    for label in ("strong fit", "investable stretch", "long-shot stretch", "weak fit", "track b",
+                  "to review", "6/7 held", "recruiter revise", "ats-ready", "decision",
+                  "shown-but-unnamed", "band call", "spine role", "mandate sentence"):
+        assert label in blob, f"rule 6 names {label!r}, which no other skill file defines"
+
+
+def test_consumers_of_rule6_are_wired():
+    oe = flat(read("skills", "outreach", "references", "eval.md"))
+    assert "aggregate year counts, arrow glyphs and ASCII arrow chains (code, comments, and URLs exempt), draft scoping" in oe
+    assert "and `search_jargon` — Ten's own labels in a draft." in oe
+    ae = flat(read("skills", "apply", "references", "eval.md"))
+    assert "confirm-tier hazards," in ae and "— and `search_jargon`" in ae
+    ap = flat(read("skills", "apply", "references", "patterns.md"))
+    assert ("**No search jargon**: a document sent to an employer or a contact never carries Ten's own "
+            "labels (a verdict tier, a track name, a round count); the language checker's "
+            "`search_jargon` rule holds the list.") in ap
+
+
+# ---- §§ 1-2: builder notes out, destination and exit match the lenses -------
+
+def test_builder_notes_are_not_in_skill_files():
+    for f in ("eval.md", "schema.md"):
+        t = flat(read("skills", "apply", "references", f))
+        for note in ("points here", "The existing form stands", "leave the lens lists",
+                     "already accepts", "unchanged."):
+            assert note not in t, (f, note)
+
+
+def test_panel_paragraph_is_the_target_text():
+    t = flat(read("skills", "apply", "references", "eval.md"))
+    assert ("Each lens returns a verdict with a one-line why, then its `lens · finding` rows. "
+            "**Fail**: a Fail-if holds. **Revise**: none holds, but a finding must be fixed first. "
+            "**Pass**: neither. Every finding ends `fixed` or `discarded — why`; an empty table is "
+            "VOID. In `## Panel` the lenses are named `ats`, `recruiter`, and `hiring manager`.") in t
+
+
+def test_judged_destination_names_the_lens_verdicts_and_the_recheck():
+    t = flat(read("skills", "apply", "references", "eval.md"))
+    assert ("`N/M held; unmet: …` and the three lens verdicts in `## Rounds`, the earlier rows read "
+            "first; the exit said M/M with every lens at Pass, budget, or the ceiling.") in t
+    assert ("**The panel was three subagents, one per lens**, each fed the SOURCE documents (raw JD, "
+            "decode, company brief), never the author's summary; one incorporation round; the checker "
+            "re-ran; the lenses short of Pass re-checked once (t10-verbatim-panel).") in t
+
+
+def test_apply_skill_goal_row_budget_and_round_match_section_2():
+    t = read("skills", "apply", "SKILL.md")
+    assert ("| Deterministic checks pass, and all three panel lenses Pass or are waived in chat, "
+            "before the package is called ready |") in t
+    assert ("- **Budget:** Two self-passes; one review incorporation round, which re-checks only "
+            "the lenses short of Pass, once. Said up front.") in t
+    assert "Run the checks and the three-lens panel (`references/eval.md § The panel — three lenses`)." in t
+    assert "multi-persona" not in t.lower()
+
+
+# ---- § 3 / § 3a: the Summary has ONE home; ruling 7 points there -------------
+
+def test_summary_rule_has_one_home_in_apply_patterns():
+    t = read("skills", "apply", "references", "patterns.md")
+    assert t.count("4–7") == 1 and t.count("Bullet 1 is the mandate sentence") == 1
+    home = t.split("### The Summary", 1)[1].split("\n### ", 1)[0]
+    assert "4–7" in home and "Bullet 1 is the mandate sentence" in home
+    ft = flat(t)
+    assert ("3. **`## Summary` — the single opening section; its shape is § The Summary.** Never a "
+            "second list (\"Core Expertise\", \"Highlights\") that re-says it.") in ft
+
+
+def test_ruling_7_base_resume_summary_lives_in_apply_home():
+    home = flat(read("skills", "apply", "references", "patterns.md").split("### The Summary", 1)[1]
+                .split("\n### ", 1)[0])
+    assert ("**The base résumé's Summary has the same shape.** With no posting, bullet 1's mandate is "
+            "the target in `criteria.md § Targets`, and the proofs lead with what that target's "
+            "postings screen for hardest. Tailoring then reorders and swaps the base's bullets "
+            "instead of rewriting a paragraph.") in home
+    assert "This form answers one posting, so the base résumé never takes it." in home
+
+
+def test_ruling_7_profile_points_to_apply_and_states_no_shape_of_its_own():
+    sk = flat(read("skills", "profile", "SKILL.md"))
+    assert ("Read the base resolution ladder (`references/schema.md`), the audit "
+            "(`references/eval.md`), reader craft (`references/patterns.md`), and the Summary's "
+            "shape (`../apply/references/patterns.md § The Summary`).") in sk
+    pp = flat(read("skills", "profile", "references", "patterns.md"))
+    assert ("(`../../apply/references/patterns.md § The Summary` turns those 7–11 seconds into the "
+            "Summary's shape, for the base résumé too; `check_materials.py` FAILs more than 50 "
+            "words of Summary prose.)") in pp
+    pe = flat(read("skills", "profile", "references", "eval.md"))
+    assert "the Summary's shape (`../../apply/references/patterns.md § The Summary`)" in pe
+    for dp, _, fs in os.walk(os.path.join(ROOT, "skills", "profile")):
+        for f in fs:
+            if f.endswith(".md"):
+                txt = open(os.path.join(dp, f), encoding="utf-8").read()
+                assert "4–7" not in txt and "case budget" not in txt, f
+    # the three pointers resolve to a real heading
+    assert "### The Summary" in read("skills", "apply", "references", "patterns.md")
+
+
+def test_receipts_record_ruling_6_as_a_named_exception():
+    r = flat(read("docs", "receipts.md"))
+    row = next(l for l in read("docs", "receipts.md").splitlines() if l.startswith("| ASCII arrow chains"))
+    assert "None — a named exception to the earned-FAIL bar" in row and "ruling 6" in row, row
+    assert "| Summary prose ≤50 words before its bullets (once called the case) |" in r
 
 
 if __name__ == "__main__":

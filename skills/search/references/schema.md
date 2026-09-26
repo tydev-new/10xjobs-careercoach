@@ -13,6 +13,9 @@ last with their reasons. Script-written: sweeps append · `update_job.py`
 moves stages, dismisses, restores (loud-fail on ambiguous matches) ·
 evaluate's `record_verdict.py` judges. Read it anywhere.
 
+- `JD` is the raw posting in `jd-inbox/`; `Analysis` is evaluate's
+  decode in `jd-analysis/`, written by `record_verdict.py
+  --analysis-file` (the latest wins).
 - **A role's URL is the employer's own posting — it is the application
   link.** Aggregator URLs never sit on a pipeline role. The one other
   URL a row may carry: a hiring-manager's LinkedIn post

@@ -106,6 +106,12 @@ const MANIFEST = {
   test_find_ambiguous_returns_all: { unit: "find: ambiguous returns all", file: "jobs-md.test.mjs" },
   test_stage_sections_render_in_board_order: { unit: "stage sections render in board order", file: "jobs-md.test.mjs" },
   test_notes_survive_saves_and_never_parse_as_roles: { unit: "notes survive saves and never parse as roles", file: "jobs-md.test.mjs" },
+  // ---- design-web-search.md § 4.3 (S1): B2 sanitising + the Analysis field
+  test_save_collapses_whitespace_and_trims_every_field_and_heading: { unit: "save collapses whitespace and trims every field and heading", file: "jobs-md.test.mjs" },
+  test_save_rewrites_em_dash_in_company_to_hyphen: { unit: "save rewrites an em dash in company to a hyphen", file: "jobs-md.test.mjs" },
+  test_save_never_cleans_the_search_notes_block: { unit: "save never cleans the Search notes block", file: "jobs-md.test.mjs" },
+  test_injection_title_with_newline_and_fake_offer_heading_stays_one_line: { unit: "injection: a title with a newline and a fake Offer heading stays one line, no forged Verdict", file: "jobs-md.test.mjs" },
+  test_analysis_field_is_distinct_from_jd_and_round_trips: { unit: "Analysis field is distinct from JD and round-trips", file: "jobs-md.test.mjs" },
 
   // ---- test_check_closeout.py
   test_clean: { parity: "test_clean" },

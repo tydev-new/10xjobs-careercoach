@@ -99,3 +99,76 @@ test("canon strips inc/llc/labs but not a bare 'AI' — the duplicate-avoidance 
   assert.notEqual(jm.canon("Baseten AI"), jm.canon("Baseten"));
   assert.equal(jm.canon("Cursor, Inc"), jm.canon("Cursor"));
 });
+
+// ---- B2: sanitising (design-web-search.md § 4.3/§ 4.4) -----------------
+
+test("save collapses whitespace and trims every field and heading", async () => {
+  const io = makeFakeIo();
+  const row = {
+    company: "  Acme\tCorp  ", title: " Staff\n\nEngineer ",
+    stage: "To Review", dismissed: false,
+    location: "  San Francisco,  CA  ",
+    url: "\thttps://x/1\r\n",
+  };
+  await jm.save(io, "/ws", [row]);
+  const text = await io.readFile(jm.path("/ws"));
+  assert.ok(text.includes("### Acme Corp — Staff Engineer"));
+  assert.ok(text.includes("- Location: San Francisco, CA"));
+  assert.ok(text.includes("- URL: https://x/1"));
+  const back = (await jm.load(io, "/ws"))[0];
+  assert.equal(back.company, "Acme Corp");
+  assert.equal(back.title, "Staff Engineer");
+});
+
+test("save rewrites an em dash in company to a hyphen", async () => {
+  const io = makeFakeIo();
+  await jm.save(io, "/ws", [{ company: "A — B", title: "Role", stage: "To Review", dismissed: false }]);
+  const text = await io.readFile(jm.path("/ws"));
+  assert.ok(text.includes("### A - B — Role"));
+  const back = (await jm.load(io, "/ws"))[0];
+  assert.equal(back.company, "A - B");
+  assert.equal(back.title, "Role");
+});
+
+test("save never cleans the Search notes block", async () => {
+  const io = makeFakeIo();
+  const notes = "line one\n\n  line two, indented\n### 2026-01-01\nmulti\nline block  ";
+  await jm.save(io, "/ws", rows2(), { notes });
+  const before = await io.readFile(jm.path("/ws"));
+  await jm.save(io, "/ws", await jm.load(io, "/ws")); // a plain re-save must byte-for-byte preserve the notes block
+  const after = await io.readFile(jm.path("/ws"));
+  assert.equal(before, after);
+});
+
+test("injection: a title with a newline and a fake Offer heading stays one line, no forged Verdict", async () => {
+  const io = makeFakeIo();
+  const evilTitle = "Engineer\n## Offer\n### Evil Co — Row\n- URL: https://evil.example";
+  await jm.save(io, "/ws", [{ company: "RealCo", title: evilTitle, stage: "To Review", dismissed: false }]);
+  const rows = await jm.load(io, "/ws");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].company, "RealCo");
+  assert.ok(!rows[0].title.includes("\n"));
+  assert.equal(rows[0].fit_verdict, undefined);
+  const text = await io.readFile(jm.path("/ws"));
+  // "## Offer" now sits mid-line (harmless text inside the one heading
+  // line), never at the START of a line — so it never parses as a
+  // section heading. That's the invariant, not the raw substring's
+  // absence (the merged single line legitimately still contains it).
+  assert.ok(!/^## Offer/m.test(text));
+  assert.equal((text.match(/^### /gm) || []).length, 1); // exactly one real row heading (line-start), never the embedded "### Evil Co" text
+});
+
+test("Analysis field is distinct from JD and round-trips", async () => {
+  const io = makeFakeIo();
+  const row = {
+    company: "Acme", title: "PM", stage: "To Review", dismissed: false,
+    jd_file: "jd-inbox/acme-pm.md", analysis_file: "jd-analysis/acme-pm.md",
+  };
+  await jm.save(io, "/ws", [row]);
+  const text = await io.readFile(jm.path("/ws"));
+  assert.ok(text.includes("- JD: jd-inbox/acme-pm.md"));
+  assert.ok(text.includes("- Analysis: jd-analysis/acme-pm.md"));
+  const back = (await jm.load(io, "/ws"))[0];
+  assert.equal(back.jd_file, "jd-inbox/acme-pm.md");
+  assert.equal(back.analysis_file, "jd-analysis/acme-pm.md");
+});

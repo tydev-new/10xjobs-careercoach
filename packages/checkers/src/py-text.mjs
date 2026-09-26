@@ -26,8 +26,15 @@ import { unicodeDigitValue } from "./py-digits.mjs";
 // label/value separator, so a checker whose OWN `\s*`-equivalent doesn't
 // ALSO consume the sentinel leaves it glued to the front of the captured
 // value instead.
-const U2028_SENTINEL = "";
-const U2029_SENTINEL = "";
+// Exported (2026-09-26, design-web-search.md § 4.3) so jobs-md.mjs's OWN
+// narrower sanitising whitespace class (never PY_S — see that file) can
+// still recognize a real U+2028/U+2029 that arrived via a value already
+// round-tripped through `load()` (where it's this sentinel, not the real
+// character — see the comment block above) as the SAME whitespace a
+// value fresh off argv carries as the real character (argv is never run
+// through `universalNewlines`, so it keeps the real code point).
+export const U2028_SENTINEL = "";
+export const U2029_SENTINEL = "";
 const U2028_CHAR = " ";
 const U2029_CHAR = " ";
 

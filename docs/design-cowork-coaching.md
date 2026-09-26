@@ -308,11 +308,12 @@ revisions run on.
 The agent may freely make **new uses of general capabilities**: web-search
 a niche board it found, read it attended, harvest companies from it —
 bounded, and everything from a runtime-found source enters at the **lead
-tier**: confirmed against the employer's own board before the candidate
-spends time, or presented as unconfirmed. The agent may **not** improvise
-a new fetcher at runtime — vendors are code under test. A source the
-agent can't reach becomes a **build request** written to the shared
-field→sources map with evidence (the accretion loop diagrammed below);
+tier**: confirmed against the employer's own board, or kept internal;
+the report names sources and counts of leads, never a lead. The agent
+may **not** improvise a new fetcher at runtime — vendors are code under
+test. A source the agent can't reach becomes a **build request** written
+to the shared field→sources map with evidence (the accretion loop
+diagrammed below);
 USAJOBS is the designated first proof vendor for that path — search-first
 like hiring.cafe, and the first credentialed one (a free registered API
 key, held in the user's workspace like `market-api.json`).

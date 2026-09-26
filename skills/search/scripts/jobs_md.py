@@ -25,10 +25,47 @@ FIELDS = [
     ("Seen", "seen_at"), ("Updated", "updated_at"),
     ("Verdict", "fit_verdict"), ("Score", "fit_score"), ("Reason", "fit_reason"),
     ("Dealbreakers", "dealbreakers"), ("Track", "track"), ("Flags", "flags"),
-    ("Sim", "jd_sim"), ("JD", "jd_file"), ("Company file", "company_file"),
+    ("Sim", "jd_sim"), ("JD", "jd_file"), ("Analysis", "analysis_file"),
+    ("Company file", "company_file"),
     ("Evaluated", "evaluated_at"), ("Was", "was_stage"), ("Dismissed", "dismiss_note"),
 ]
 LABEL_TO_KEY = {l: k for l, k in FIELDS}
+
+# B2: sanitising (design-web-search.md § 4.3/§ 4.4) — every row value save()
+# writes (a field's value, and the company/title in a row's heading; NEVER
+# the `## Search notes` block, which save() copies as it is) has every run
+# of THIS exact class collapsed to one space, then is trimmed. This is
+# deliberately NOT Python's `\s` (broader: it also counts 0x1c-0x1f, 0x1680,
+# 0x2000-0x200a, 0x202f, 0x205f, 0x3000) and NOT re.escape('\s') — a
+# different, narrower, written-out class so both languages agree on the
+# same posting (the design's own reasoning for why `\s` would make Python
+# and JavaScript disagree). Prevents a posting title carrying a newline and
+# `## Offer` or `- URL:` from becoming a stage heading or a field of
+# another row (a job posting is the plan's named prompt-injection risk).
+_SANITISE_WS = " \t\n\r\f\v\x85\xa0  "
+_SANITISE_WS_RE = re.compile("[" + re.escape(_SANITISE_WS) + "]+")
+
+
+def _clean(value):
+    """Collapse every run of the sanitising whitespace class to one space
+    and trim both ends. `None` (an absent field) stays `None`."""
+    if value is None:
+        return None
+    cleaned = _SANITISE_WS_RE.sub(" ", str(value))
+    return cleaned.strip(_SANITISE_WS)
+
+
+def _clean_company(value):
+    """Like `_clean`, plus: a company containing ` — ` (space, em dash,
+    space) has it rewritten as ` - ` (space, hyphen, space) — a row's
+    heading splits company from title on the FIRST ` — `, so a company
+    that legitimately carries an em dash must never be misread as the
+    company/title separator. Titles keep theirs; the split above takes
+    the first one."""
+    cleaned = _clean(value)
+    if cleaned is None:
+        return None
+    return cleaned.replace(" — ", " - ")
 
 
 def canon(s):
@@ -152,7 +189,8 @@ def save(workspace, rows, notes=None):
 
 
 def _block(r, dismissed=False):
-    lines = [f"### {r['company']} — {r['title']}"]
+    company, title = _clean_company(r["company"]), _clean(r["title"])
+    lines = [f"### {company} — {title}"]
     for label, k in FIELDS:
         if k == "was_stage" and not dismissed:
             continue
@@ -160,6 +198,7 @@ def _block(r, dismissed=False):
             v = r.get("dismiss_note") or (r.get("dismiss_reason") if dismissed else None)
         else:
             v = r.get(k)
+        v = _clean(v)
         if v not in (None, ""):
             lines.append(f"- {label}: {v}")
     lines.append("")

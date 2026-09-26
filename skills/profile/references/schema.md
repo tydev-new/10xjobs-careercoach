@@ -38,8 +38,8 @@ they fire while you work rather than while you write a record.
 - `## Dealbreakers`
 - `## Target companies` — their own watchlist, the one home for it
 - `## Retired`
-- `## Search settings` — optional; the search's knobs (yield per sweep · max per company · active cap · stale days). Absent = defaults, which every sweep report prints
-- `## Search plan` — optional; the standing plan the agent proposed and the candidate approved (instruments + queries + why). Scheduled runs execute it verbatim
+- `## Search settings` — optional; the search's knobs (yield per run · max new per company · active cap · stale days · quick passes per run, default 10). Absent = defaults; every search report says the values in force
+- `## Search plan` — optional; the standing plan the agent proposed and the candidate approved (companies with their job-board addresses, title words, locations, web searches, quick passes per run, and why). Scheduled runs execute it verbatim
 - `## Other notes` — optional
 
 ## `base-resume.md` — the fact floor *(free-form body — the résumé keeps the candidate's own headings; only `## Claim rules` is required)*

@@ -537,6 +537,37 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "r4-cc-waiting-then-h1-title-leak-fails", files: { "plan.md": TITLE_AFTER }, args: ["--workspace", ".", "--stage", "applying", "--asked", "follow up on the timer"] });
 }
 
+// ------------------------------------------------------------------ round 6 (coder, design-web-search.md § 4.3 / S1)
+// jobs_md's B2 sanitising, the new `Analysis` field, and record_verdict's
+// `--existing` — proved end to end through the real CLI, across all three
+// engines (py, jsbin, jsbash).
+{
+  const s = "record_verdict";
+  const RV = (extra) => ["--workspace", ".", "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong", ...extra];
+  const JOBS_WITH_ROW = (extraFields = "") =>
+    "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n" +
+    "## To Review\n\n### Acme — Staff Engineer\n- URL: https://board/acme\n- Location: Remote\n" +
+    "- Seen: 2026-01-01T00:00:00+00:00\n" + extraFields + "\n";
+
+  add({ s, id: "s1-rv-em-dash-company-rewritten", files: {},
+    args: ["--workspace", ".", "--company", "A — B", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-newline-and-fake-heading-in-title-collapses", files: {},
+    args: ["--workspace", ".", "--company", "RealCo", "--title", "Engineer\n## Offer\n### Evil Co — Row\n- URL: https://evil.example", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-analysis-file-latest-wins-jd-file-keeps-first",
+    files: { "jobs.md": JOBS_WITH_ROW("- JD: jd-inbox/old.md\n- Analysis: jd-analysis/old.md\n") },
+    args: RV(["--jd-file", "jd-inbox/new.md", "--analysis-file", "jd-analysis/new.md"]) });
+  add({ s, id: "s1-rv-existing-on-missing-key-exits-2", files: {}, args: [...RV([]), "--existing"] });
+  add({ s, id: "s1-rv-existing-with-url-refused", files: { "jobs.md": JOBS_WITH_ROW() }, args: [...RV(["--url", "http://x"]), "--existing"] });
+  add({ s, id: "s1-rv-existing-with-location-refused", files: { "jobs.md": JOBS_WITH_ROW() }, args: [...RV(["--location", "SF"]), "--existing"] });
+  add({ s, id: "s1-rv-existing-with-jd-file-refused", files: { "jobs.md": JOBS_WITH_ROW() }, args: [...RV(["--jd-file", "jd-inbox/x.md"]), "--existing"] });
+  add({ s, id: "s1-rv-existing-on-present-key-changes-only-verdict-and-timestamps",
+    files: { "jobs.md": JOBS_WITH_ROW("- Company file: company/acme.md\n- Track: A\n") },
+    args: [...RV(["--score", "62", "--reasons", "quick-scan: fits"]), "--existing"] });
+  add({ s, id: "s1-rv-multiline-search-notes-untouched-by-reverdict",
+    files: { "jobs.md": JOBS_WITH_ROW() + "## Search notes\n\nline one\n\n  line two, indented\nline three\n" },
+    args: RV(["--score", "70"]) });
+}
+
 // ------------------------------------------------------------------ engines
 function seed(ws, c) {
   rmSync(ws, { recursive: true, force: true });

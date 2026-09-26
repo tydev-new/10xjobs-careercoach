@@ -39,6 +39,8 @@ that a decode without it matches an unskilled read.
    --dealbreakers …` (`--help` for all flags) — on the row's exact
    strings (rule 6).
 
+   `--analysis-file jd-analysis/<file>.md` (the analysis you just wrote)
+
    In a run over several roles, record each one as soon as its verdict is
    decided (its analysis file and its `record_verdict.py` call), then move
    to the next role. Never hold verdicts back to write together at the end:

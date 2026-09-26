@@ -5,7 +5,7 @@
 // `() => new Date()`) so the parity test can freeze time exactly the way
 // the real script's `datetime.now(timezone.utc)` is frozen for comparison.
 import { join } from "./path-util.mjs";
-import { pyInt, codePointCompare, pyRstrip, pyStrip, restoreLineSeparators, PY_S } from "./py-text.mjs";
+import { pyInt, codePointCompare, pyRstrip, pyStrip, restoreLineSeparators, PY_S, U2028_SENTINEL, U2029_SENTINEL } from "./py-text.mjs";
 
 // The Python source's `\s` in these patterns is Python's own whitespace
 // set, which INCLUDES U+2028/U+2029 — but by the time text reaches here,
@@ -32,10 +32,62 @@ const FIELDS = [
   ["Seen", "seen_at"], ["Updated", "updated_at"],
   ["Verdict", "fit_verdict"], ["Score", "fit_score"], ["Reason", "fit_reason"],
   ["Dealbreakers", "dealbreakers"], ["Track", "track"], ["Flags", "flags"],
-  ["Sim", "jd_sim"], ["JD", "jd_file"], ["Company file", "company_file"],
+  ["Sim", "jd_sim"], ["JD", "jd_file"], ["Analysis", "analysis_file"],
+  ["Company file", "company_file"],
   ["Evaluated", "evaluated_at"], ["Was", "was_stage"], ["Dismissed", "dismiss_note"],
 ];
 const LABEL_TO_KEY = new Map(FIELDS);
+
+// B2: sanitising (design-web-search.md § 4.3/§ 4.4) — every row value
+// save() writes (a field's value, and the company/title in a row's
+// heading; NEVER the `## Search notes` block, which save() copies as it
+// is) has every run of THIS exact class collapsed to one space, then is
+// trimmed. Deliberately NOT PY_S (this file's own import, matching
+// Python's broader `\s`) and NOT a native JS `\s` — a different,
+// narrower, written-out class so both languages agree on the same
+// posting (the design's own reasoning: `\s` differs between Python and
+// JS on several code points, so a checker whose sanitiser used either
+// language's native `\s` would disagree with its counterpart on the same
+// input). Prevents a posting title carrying a newline and `## Offer` or
+// `- URL:` from becoming a stage heading or a field of another row (a
+// job posting is the plan's named prompt-injection risk).
+//
+// Also includes the two PY_S sentinels (U2028_SENTINEL/U2029_SENTINEL,
+// imported above): a value fresh off argv carries a REAL U+2028/U+2029
+// (argv is never run through `universalNewlines`), but a value that came
+// from `load()`'s parse of an existing jobs.md carries the SENTINEL
+// instead (this file's own `load()` reads through `io.readFile`, which
+// already ran `universalNewlines` — see this module's HEADING2_RE
+// comment above). Both must collapse the SAME way, or a re-verdict on a
+// row already holding a real U+2028 (see `save()`'s own
+// `restoreLineSeparators` at the very end, which swaps the sentinel back
+// afterward either way) would sanitise differently than the fresh-argv
+// case — Python has no sentinel concept at all, so its `_clean` already
+// treats both origins identically by construction.
+const SANITISE_WS_CHARS = ` \\t\\n\\r\\f\\v\\u0085\\u00a0\\u2028\\u2029${U2028_SENTINEL}${U2029_SENTINEL}`;
+const SANITISE_WS_RE = new RegExp(`[${SANITISE_WS_CHARS}]+`, "g");
+const SANITISE_TRIM_RE = new RegExp(`^[${SANITISE_WS_CHARS}]+|[${SANITISE_WS_CHARS}]+$`, "g");
+
+// Collapse every run of the sanitising whitespace class to one space and
+// trim both ends. `null`/`undefined` (an absent field) pass through
+// unchanged.
+function cleanValue(value) {
+  if (value === null || value === undefined) return value;
+  const cleaned = String(value).replace(SANITISE_WS_RE, " ");
+  return cleaned.replace(SANITISE_TRIM_RE, "");
+}
+
+// Like cleanValue, plus: a company containing ` — ` (space, em dash,
+// space) has it rewritten as ` - ` (space, hyphen, space) — a row's
+// heading splits company from title on the FIRST ` — `, so a company
+// that legitimately carries an em dash must never be misread as the
+// company/title separator. Titles keep theirs; the split above takes the
+// first one.
+function cleanCompany(value) {
+  const cleaned = cleanValue(value);
+  if (cleaned === null || cleaned === undefined) return cleaned;
+  return cleaned.split(" — ").join(" - ");
+}
 
 export function canon(s) {
   let out = (s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ");
@@ -196,7 +248,9 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
 }
 
 function _block(r, dismissed) {
-  const lines = [`### ${r.company} — ${r.title}`];
+  const company = cleanCompany(r.company);
+  const title = cleanValue(r.title);
+  const lines = [`### ${company} — ${title}`];
   for (const [label, k] of FIELDS) {
     if (k === "was_stage" && !dismissed) continue;
     let v;
@@ -205,6 +259,7 @@ function _block(r, dismissed) {
     } else {
       v = r[k];
     }
+    v = cleanValue(v);
     if (v !== undefined && v !== null && v !== "") lines.push(`- ${label}: ${v}`);
   }
   lines.push("");

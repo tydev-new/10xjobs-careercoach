@@ -21,13 +21,14 @@ every time.
 
 ## `jd-analysis/<company_key>-<title_key>.md` — one full decode per role
 
-Filename = the job's `company_key` + `title_key` from `jobs.md`
-(deterministic, so two roles at the same company don't collide) — NOT a
-free-form role name. The quick-scan tier writes NO file here; when a
-later graduation writes one, its title line carries the depth. No
-script parses this file — every consumer reads it as prose — so the
-shape below is the one the written files already share, kept so the
-readers find things where they expect them.
+Filename = a slug of the company and the title (lowercase; every run
+of other characters becomes `-`), written once; the row's `Analysis`
+field records the exact path, so no reader rebuilds the name. The
+quick-scan tier writes NO file here; when a later graduation writes
+one, its title line carries the depth. No script parses this file —
+every consumer reads it as prose — so the shape below is the one the
+written files already share, kept so the readers find things where
+they expect them.
 
 - `# [Company] — [Title]: decode ([date])` — with ` · deep` when the
   extras ran.

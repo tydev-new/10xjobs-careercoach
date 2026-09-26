@@ -63,10 +63,11 @@ Later, the server loop: same packages/agent + a server entry + deferGate
 (refuses every side effect and leaves it in plan.md) + pg_cron/queue.
 ```
 
-**Page fetching:** OpenRouter documents no equivalent of Anthropic's
-`webFetch`. A job URL on a supported board goes through that board's public
-API; for anything else, the candidate pastes the text. That is what the skills
-already assume.
+**Page fetching:** OpenRouter documents `openrouter:web_fetch`
+(2026-09-26), not used: the skills assume pasted text for pages that
+aren't on a supported job board. A job URL on a supported board goes
+through that board's public API; for anything else, the candidate
+pastes the text. That is what the skills already assume.
 
 ---
 
@@ -286,6 +287,9 @@ The next milestone is real beta users on a Vercel deployment. It is steps 2,
 - [ ] steps 2, 3, 4, 5b exits all green
 - [ ] `design-web-ui.md` § 5.9 workspace stages 1–4 exits green (owner,
       2026-09-26: the workspace ships before this goal post)
+- [ ] `design-web-search.md` stages S0–S7 exits green (owner,
+      2026-09-26: search, simplified in both hosts, ships before this
+      goal post)
 - [ ] the production deployment serves the default build (no fixture picker
       or Autoplay; grep the deployed bundle)
 - [ ] the O dogfood run (step 6's first exit) passes on the deployed URL
@@ -310,7 +314,7 @@ lowers the cost per turn the MVP pays.
 
 **Step 7 - Scheduled search (the server loop)** · Co, Te. A server entry for
 `packages/agent`, `deferGate`, `pg_cron` plus a queue running one short job per
-company batch, and the `search_ats` port.
+company batch, reusing `list_board` and `add_roles` (`design-web-search.md`).
 
 - [ ] a nightly run adds on-target roles to `jobs.md` with **zero side effects**
 - [ ] a concurrent browser-plus-cron write test passes

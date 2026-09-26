@@ -4,6 +4,7 @@
 import { forwardRef, type ReactElement } from "react";
 import { kindOf } from "../store.ts";
 import type { FileRead } from "../types.ts";
+import { Icon } from "../icons.tsx";
 import { MarkdownView } from "./MarkdownView";
 
 export interface SidePanelProps {
@@ -55,7 +56,7 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
     <aside className={`side-panel${open ? " side-panel--open" : ""}`} aria-label="File preview">
       <div className="side-panel-header">
         <button type="button" className="side-panel-back" onClick={onClose} aria-label="Close">
-          ←
+          <Icon name="arrowLeft" size={18} />
         </button>
         <span className="side-panel-path">{file ? file.path : "Nothing open yet."}</span>
       </div>

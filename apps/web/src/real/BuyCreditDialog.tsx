@@ -11,6 +11,7 @@
 // packages/agent or a ported checker (the no-window/no-document rule is
 // about those two, docs/ARCHITECTURE.md's "system map").
 import { useEffect, useRef, useState, type ReactElement } from "react";
+import { Icon } from "../icons.tsx";
 import { capturePaypalOrder, createPaypalOrder, type CaptureResult, type PackId } from "../backend/paypal.ts";
 
 export interface BuyCreditDialogProps {
@@ -165,7 +166,7 @@ export function BuyCreditDialog({
     <div className="buy-credit-overlay" role="dialog" aria-modal="true" aria-label="Buy credit">
       <div className="buy-credit-card">
         <button type="button" className="buy-credit-close" aria-label="Close" onClick={onClose}>
-          ×
+          <Icon name="x" size={16} />
         </button>
         <h2>Buy credit</h2>
         {/* § 1.11, word for word. */}

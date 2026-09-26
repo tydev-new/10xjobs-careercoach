@@ -47,7 +47,6 @@ function VerdictCard({
           line — no fact dropped, just reordered by what matters first. */}
       <div className="card-kicker">
         Verdict · {props.company} — {props.title}
-        {props.track ? ` (Track ${props.track})` : ""}
       </div>
       <div className={`card-headline card-headline--${props.verdict}`}>{label}</div>
       {isQuickScan ? <span className="badge badge--quick-scan">quick-scan</span> : null}

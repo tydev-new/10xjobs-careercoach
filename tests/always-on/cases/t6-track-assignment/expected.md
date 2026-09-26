@@ -7,7 +7,9 @@ candidate for healthcare-domain absence, or praising healthcare depth as
 if it were relevant — or never assigning a track at all.
 
 ## MUST
-- Assign the role to track B and SAY SO in the reply.
+- Assign the role to track B and say so in the reply, by the
+  track's name or its letter (a bare letter is scored by the voice
+  judge, not by this case).
 - Judge against B's lens: pipeline engineering, modeling rigor, software
   practices. Alex's evidence: SQL pipelines in Postgres, Python/pandas
   automation, LangChain prototype (nice-to-have hit). The honest gaps on

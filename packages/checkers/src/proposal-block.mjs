@@ -88,7 +88,7 @@ export async function run(argv, io) {
     const outs = sel.filter((r) => r.length === 7 && stripChars(r[3].toLowerCase(), "`*_ ") === "out");
     const ins = sel.filter((r) => r.length === 7 && stripChars(r[3].toLowerCase(), "`*_ ") === "in");
     if (outs.length) {
-      out.push(`**Cut — ${outs.length} of ${outs.length + ins.length} bullets, weakest first.** Say "keep <bullet>" and it comes back.`);
+      out.push(`**Cut — ${outs.length} of ${outs.length + ins.length} bullets, weakest first.** Say "keep" and the bullet's name or number to bring one back.`);
       outs.forEach((r, idx) => {
         const bullet = cpLength(r[2]) <= 70 ? r[2] : cpSlice(r[2], 67).replace(/\s+$/, "") + "…";
         out.push(`${idx + 1}. ${r[1]} — ${bullet} — *${r[6]}*`);
@@ -119,7 +119,7 @@ export async function run(argv, io) {
     const gaps = cov.filter((r) => r.length === 4 && stripChars(r[1].toLowerCase(), "`*_ ") === "gap");
     if (sbu.length) {
       out.push("");
-      out.push('**Their words, placed** — say "Summary" / "Skills" / "leave it out" to move any of these:');
+      out.push('**Their words, placed** — say "Summary", "Skills", or "leave it out" to move any of these:');
       for (const r of sbu) {
         const ev = cpSlice(r[2], 60) + (cpLength(r[2]) > 60 ? "…" : "");
         out.push(`- **${r[0]}** — true of you (${ev}); placed where the document shows it`);

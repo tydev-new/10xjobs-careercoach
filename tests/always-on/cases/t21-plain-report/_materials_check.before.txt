@@ -1,0 +1,8 @@
+structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)
+
+RESUME acme-senior-data-analyst-resume.md: pass (0 fail, 0 warn)
+
+LETTER acme-senior-data-analyst-cover-letter.md: pass (0 fail, 1 warn)
+  [WARN] letter is 127 words — patterns.md § Cover letter wants 250-400
+
+✔ mechanical checks clean

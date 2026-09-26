@@ -354,6 +354,58 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "cc-arg-asked-missing-value", files: {}, args: ["--workspace", ".", "--asked"] });
 }
 
+// ------------------------------------------------------------------ round 5 (tester, check_closeout)
+// Tester re-verification of the round-4 fix (2026-09-26), from the coach
+// schema (skills/coach/references/schema.md § plan.md), not the code: every
+// block end Waiting on you can meet, the --asked verdict both ways, and the
+// newline / BOM / bullet / continuation shapes — all three engines. Expected
+// verdicts are asserted in tests/test_closeout_waiting_shapes.py; this
+// corpus holds the jsbash (shipping-path) engine to the same bytes.
+{
+  const s = "check_closeout";
+  const HEAD = "# Plan — Test Candidate\nGoal: an offer by 2026-12-01\nBudget: 60 min/day\n\n## Board\n";
+  const ROW = "- the comp floor — criteria.md § Compensation\n";
+  const LEAK = "- timer: follow up Acme recruiter 10-02\n";
+  const TAILS = {
+    "to-do": "To do\n" + LEAK,
+    "doing": "Doing\n" + LEAK,
+    "done": "Done\n" + LEAK,
+    "standing-floor": "\n## Standing floor\n" + LEAK,
+    "queue": "\n## Queue\n" + LEAK,
+    "other-notes": "\n## Other notes\n" + LEAK,
+    "h1": "\n# Next plan\n" + LEAK,
+    "h3": "\n### Aside\n" + LEAK,
+    "floor-then-queue": "\n## Standing floor\n- 1 practice rep a day\n\n## Queue\n" + LEAK,
+    "eof": "",
+  };
+  const cc = (id, plan, ...asked) => add({ s, id: `r5-cc-${id}`, files: { "plan.md": plan },
+    args: ["--workspace", ".", "--stage", "applying", ...asked.flatMap((q) => ["--asked", q])] });
+  for (const [name, tail] of Object.entries(TAILS)) {
+    const plan = HEAD + "Waiting on you\n" + ROW + tail;
+    cc(`end-${name}-row`, plan, "your comp floor");
+    cc(`end-${name}-leak`, plan, "follow up with the Acme recruiter");
+    cc(`end-${name}-empty-waiting`, HEAD + "Waiting on you\n" + tail, "follow up with the Acme recruiter");
+  }
+  const Q = HEAD + "Waiting on you\n" + ROW + "\n## Standing floor\n- 1 rep\n\n## Queue\n" + LEAK;
+  cc("crlf-queue-leak", CRLF(Q), "follow up with the Acme recruiter", "your comp floor");
+  cc("lone-cr-queue-leak", Q.replace(/\n/g, "\r"), "follow up with the Acme recruiter", "your comp floor");
+  cc("bom-queue-leak", "﻿" + Q, "follow up with the Acme recruiter", "your comp floor");
+  cc("bom-crlf-queue-leak", "﻿" + CRLF(Q), "follow up with the Acme recruiter", "your comp floor");
+  cc("no-final-newline", HEAD + "Waiting on you\n" + ROW.trimEnd(), "your comp floor");
+  cc("empty-waiting-queue-no-asked-warns", HEAD + "Waiting on you\n\n## Queue\n" + LEAK);
+  cc("bullets-continuation-then-queue",
+    HEAD + "Waiting on you\n- the comp floor\n  pointer: criteria.md\n* which mutual — contacts/flo.md\n• relocation — profile.md\n\n## Queue\n" + LEAK,
+    "compensation pointer", "mutual", "relocation", "follow up with the Acme recruiter");
+  cc("hash-row-text-and-indented-hash",
+    HEAD + "Waiting on you\n- #42 which referral — contacts/flo.md\n  #referral pointer\n" + ROW + "\n## Queue\n" + LEAK,
+    "which referral", "your comp floor");
+  // Column-0 `#word` continuation (not a CommonMark heading, not a schema
+  // row either): parity only — the verdict is a lead/owner call, reported.
+  cc("col0-hashtag-continuation", HEAD + "Waiting on you\n- which mutual to ask\n#referral\n" + ROW, "your comp floor");
+  cc("nel-before-heading", HEAD + "Waiting on you\n- comp floor\x85## Queue\n" + LEAK, "follow up with the Acme recruiter");
+  cc("indented-heading", HEAD + "Waiting on you\n" + ROW + "   ## Queue\n" + LEAK, "follow up with the Acme recruiter");
+}
+
 // ------------------------------------------------------------------ round 2
 // New adversarial cases (re-verify of fix round 1), aimed at the areas round 1
 // found broken: CRLF / lone CR, BOM, argparse, code-point lengths, code-point

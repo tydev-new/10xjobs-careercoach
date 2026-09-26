@@ -78,7 +78,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       },
       "c3",
     ),
-    textStep("Strong Fit, recorded in jobs.md. Want me to tailor a resume and cover letter for this one?"),
+    textStep("Strong Fit. It's on your job list now. Want me to tailor a resume and cover letter for this one?"),
 
     // ---- turn 2: tailor ----
     toolCallStep("write_file", { path: "applications/acme-resume.md", content: "# Jordan Alvarez\n\n## Summary\n..." }, "c4"),
@@ -89,7 +89,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       "c6",
     ),
     toolCallStep("bash", { command: "python3 apply/scripts/render_resume.py --md applications/acme-resume.md --html applications/acme-resume.html" }, "c7"),
-    textStep("Résumé is 109 words. Both files pass check_materials's mechanical checks."),
+    textStep("Résumé is 109 words. Both documents pass the automatic checks — nothing failed, nothing flagged."),
 
     // ---- turn 3: what's next ----
     toolCallStep(
@@ -98,7 +98,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       "c8",
     ),
     toolCallStep("bash", { command: "python3 coach/scripts/check_closeout.py --workspace . --stage applying" }, "c9"),
-    textStep("That's what's queued in plan.md — send the letter, and tell me if you want more roles found."),
+    textStep("That's what's queued in your plan — send the letter, and tell me if you want more roles found."),
   ];
   // loosely-typed mock chunk script (matches spike 1's own pattern);
   // runtime-verified by this whole test, not structurally typed against

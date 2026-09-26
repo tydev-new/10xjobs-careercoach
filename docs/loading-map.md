@@ -12,7 +12,7 @@ Generated from disk 2026-08-21 (regenerated after all eleven shape conversions; 
 
 ---
 
-## Tier 0 — always on: the interrupts (671 words)
+## Tier 0 — always on: the interrupts (980 words)
 
 `skills/profile/templates/workspace-CLAUDE.md`, copied into the
 candidate's workspace at intake and loaded **every turn of every
@@ -25,6 +25,12 @@ skill to load does not belong here.
 
 Entry bar: a new line needs a measurement receipt. It grew from ~300 to
 467 words only by measured rules, and that is the whole budget story.
+Latest: +91 words, § How you talk, docs/design-plain-replies.md (owner
+ruling 2026-09-26) — plain-words-to-the-candidate is an always-on rule
+because the leaking replies come from skills that load AFTER it (apply,
+evaluate), so the guard has to already be live; measured profile turn
+2,971 → 3,066 words (`tests/agent/loading.test.ts`), inside the ~3,300
+cap.
 
 ## Tier 1 — always on: the router (794 words)
 

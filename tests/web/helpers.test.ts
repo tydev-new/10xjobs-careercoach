@@ -57,7 +57,7 @@ const PLAN = [
   "1. Send the Acme cover letter (`applications/acme-letter.md`) — 5 min — checks are clean",
   "- Submit the Acme application yourself — 10 min — I have no submit tool",
   "* Review `jd-analysis/beta.md` then `company/beta.md` — 15 min — why: strongest lead",
-  "10. Tell me if you want more Track A roles — 2 min — one pass takes that long",
+  "10. Tell me if you want more roles for your target — 2 min — one pass takes that long",
   "",
   "Doing",
   "- Researching Beta Corp",
@@ -79,7 +79,7 @@ test("parsePlanTodo: text is the line minus its bullet, word for word (why + min
   assert.equal(items[0].text, "Send the Acme cover letter (`applications/acme-letter.md`) — 5 min — checks are clean");
   assert.equal(items[1].text, "Submit the Acme application yourself — 10 min — I have no submit tool");
   assert.equal(items[2].text, "Review `jd-analysis/beta.md` then `company/beta.md` — 15 min — why: strongest lead");
-  assert.equal(items[3].text, "Tell me if you want more Track A roles — 2 min — one pass takes that long");
+  assert.equal(items[3].text, "Tell me if you want more roles for your target — 2 min — one pass takes that long");
 });
 
 test("parsePlanTodo: ref = first backticked path, absent when none", () => {

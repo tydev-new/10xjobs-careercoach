@@ -138,7 +138,7 @@ function scenarios(extra: Scenario[] = []): Scenario[] {
           ],
         },
         { tools: [{ name: "bash", args: { command: CMD_RECORD } }] },
-        { text: "Strong Fit, recorded in jobs.md. Want me to tailor a resume and cover letter for this one?" },
+        { text: "Strong Fit. It's on your job list now. Want me to tailor a resume and cover letter for this one?" },
       ],
     },
     {
@@ -159,7 +159,7 @@ function scenarios(extra: Scenario[] = []): Scenario[] {
         },
         { tools: [{ name: "bash", args: { command: CMD_CHECK } }] },
         { tools: [{ name: "bash", args: { command: CMD_RENDER } }] },
-        { text: "Both files ran through check_materials; the résumé is rendered. The language check has not run." },
+        { text: "The automatic checks and the résumé render both ran. The wording check hasn't run." },
       ],
     },
     {
@@ -169,7 +169,7 @@ function scenarios(extra: Scenario[] = []): Scenario[] {
         { tools: [{ name: "read_file", args: { path: "plan.md" } }] },
         { tools: [{ name: "write_file", args: { path: "plan.md", content: F["plan.md"] } }] },
         { tools: [{ name: "bash", args: { command: CMD_CLOSEOUT } }] },
-        { text: "That's what's queued in plan.md." },
+        { text: "That's what's queued in your plan." },
       ],
     },
     {

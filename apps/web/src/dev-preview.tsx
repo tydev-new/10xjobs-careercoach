@@ -62,7 +62,7 @@ function UpdateNoticePreview(): ReactElement {
         <div className="transcript">
           <div className="bubble bubble--assistant">
             <div className="bubble-role">Ten</div>
-            <p>Strong Fit, recorded in jobs.md. Want me to tailor a résumé and cover letter for this one?</p>
+            <p>Strong Fit. It's on your job list now. Want me to tailor a résumé and cover letter for this one?</p>
           </div>
         </div>
         <div className="update-notice">

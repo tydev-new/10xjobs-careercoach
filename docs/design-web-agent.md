@@ -16,6 +16,10 @@ gap; draft for owner approval).
 Again 2026-09-25: § 17 (buying credit with PayPal; approved by the owner,
 2026-09-25, with the answers in § 17.9; § 17.10, only Ten's own orders, lead
 ruling 2026-09-25).
+Again 2026-09-26: § 18 (one reader for the plan board, for the workspace
+pages of `design-web-ui.md` § 5; owner ruling 2026-09-26 on the product
+shape; the reader choice is a lead ruling, fix round 1), and § 10.2
+(the version check runs on every member page).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -61,6 +65,7 @@ export type SkillBundle = Readonly<Record<string, string>>; // "skills/apply/SKI
 export function matchGateReply(text: string, origin: "typed" | "ui"): "approve" | "decline" | "none"; // § 3
 export function statusOf(messages: UIMessage[], chat: ChatStatus): Status;                          // § 6.1
 export function parsePlanTodo(md: string): { text: string; ref?: string }[];                        // § 6.2
+export function readPlanBoard(md: string): PlanBoard;                                               // § 18 (amended 2026-09-26)
 ```
 
 - The browser entry builds `model`: the OpenRouter provider with `baseURL` =
@@ -446,13 +451,16 @@ this table. A card is a
   exists (host note, § 7). With no `jd_file`, the card has no `ref` and shows
   "no analysis file linked"; it never guesses.
 - **`parsePlanTodo(md) → { text, ref? }[]`** is pure and exported from
-  `packages/agent`. The card builder and `apps/workspace-ui` (its `parsePlan`
-  maps from it) both use it.
+  `packages/agent`. The card builder uses it. (Corrected 2026-09-26: this
+  line used to say `apps/workspace-ui`'s `parsePlan` maps from it. It
+  doesn't: `workspace-core.mjs:71-95` is its own parser, and § 18 names
+  it as not used.)
   - CRLF is normalized to LF. It reads the lines under the `To do` heading
     (a trailing count such as `To do (2)` is allowed), up to the next board
     heading or `##`.
-  - It accepts `1. `, `- ` and `* ` bullets; `text` is the line without its
-    bullet, word for word.
+  - It accepts `1. `, `- `, `* ` and `• ` bullets; `text` is the line without its
+    bullet, word for word. (`• ` and the rest of the item grammar: § 18,
+    amended 2026-09-26.)
   - `ref` is the first backticked span that contains `/` or ends in a file
     extension (`keep` is not a ref), otherwise absent.
   - It never extracts a why, a time estimate, or a priority from the prose
@@ -1137,7 +1145,7 @@ tab runs the code it loaded until it reloads.
   output, or its id in no file under `assets/` (else every tab stays
   silent).
 
-### 10.2 Detection (`apps/web`, member chat screen only)
+### 10.2 Detection (`apps/web`, every member page)
 
 A check fetches `/version.json` (2 s timeout). **Newer** means status 200
 and a non-empty string `id` that differs from the built-in one (differs,
@@ -1148,6 +1156,11 @@ Once newer is known, checks stop.
 
 **When:** on mount; when the tab becomes visible or the window gets focus;
 every 5 minutes while visible; before every send.
+
+*(Amended 2026-09-26, `design-web-ui.md` § 5.1.)* The check runs in the
+workspace frame, so it runs whichever page is open, and the notice shows
+on every member page. On Talk to Ten it sits above the composer, as
+`design-web-ui.md` § 1.8 says.
 
 ### 10.3 No turn starts on replaced code
 
@@ -2397,6 +2410,131 @@ non-secret setting.
    `supplementary_data.related_ids.order_id`; that id missing or the order
    404 → 200, no row. `TEN_PAYPAL_MERCHANT_ID` unset → create-order and
    capture-order 503 with no PayPal call; the webhook 503 and no row.
+
+---
+
+## 18. One reader for the plan board (amendment, 2026-09-26)
+
+The workspace's Home page (`design-web-ui.md` § 5, owner ruling
+2026-09-26) shows `plan.md`'s head lines and its Waiting on you and To do
+sections. Two plan readers exist in the web runtime today: `parsePlanTodo`
+(§ 6.2, To do only) and `waitingRows` in the check_closeout port
+(`packages/checkers/src/check-closeout.mjs:39-62`, Waiting on you only,
+parity-tested against `check_closeout.py`). A third, `apps/workspace-ui`'s
+own `parsePlan` (`apps/workspace-ui/server/workspace-core.mjs:71-95`), is
+**not used**: it invents priorities and due dates (rule 8). A new
+reader beside the first two would be a third parser of one file (rule 12).
+So the one reader reuses `waitingRows` for Waiting on you, the way the
+Jobs page reuses the port's `load()`, and uses the same item grammar for
+the other sections. `parsePlanTodo` becomes a view of it.
+(Lead ruling, 2026-09-26, fix round 1: reuse `waitingRows`.)
+
+```ts
+// packages/agent, exported beside parsePlanTodo (§ 1)
+export function readPlanBoard(md: string): PlanBoard;
+export interface PlanBoard {
+  goalLine?: string;    // the first line starting "Goal:", word for word
+  budgetLine?: string;  // the first line starting "Budget:", word for word
+  sections: {
+    label: "Waiting on you" | "To do" | "Doing" | "Done";
+    items: { text: string; ref?: string }[];
+    unreadable: string[];                       // lines as written
+  }[];                  // only the labels found, in file order
+}
+// parsePlanTodo(md) === the "To do" section's items, or [] when absent.
+```
+
+- **Line endings.** The text goes through the port's `universalNewlines`
+  first, as check_closeout's own reads do, and every returned string goes
+  back through `restoreLineSeparators` (`packages/checkers/src/py-text.mjs`).
+- **Head lines.** `goalLine` and `budgetLine` are looked for only before
+  the first `## ` heading. An optional `# ` title may sit above them
+  (coach's `schema.md`: "An optional H1 title, then two head lines";
+  `tests/always-on/cases/t8-routing/plan.md:1-3`).
+- **Board labels** use check_closeout's own test: a line that begins
+  with `Waiting on you`, `To do`, `Doing` or `Done`, case-sensitive,
+  followed by a word boundary (`WAITING_RE`'s end test,
+  `check-closeout.mjs:39`). So `To do (2)` and `To do:` are labels. The
+  first occurrence of each label wins.
+- **Waiting on you's items are `waitingRows(text)`**, unchanged, as its
+  `text`, with `ref` = § 6.2's first backticked path in that text.
+- **The other three sections** run from their label to the next board
+  label, a line starting `#`, or the end of the file. They use
+  `waitingRows`' item grammar, plus the numbered bullet § 6.2 already
+  accepts: a line matching `^\s*(?:\d+\.|[-*•])\s+` starts an item, and
+  its `text` is the line minus that bullet, word for word. A later
+  non-blank line that isn't a bullet is a continuation: it is trimmed and
+  joined to the item above with one space, as `waitingRows` does. Blank
+  lines are skipped.
+- **Unreadable** is only a non-blank line before a section's first item.
+  When `waitingRows` returns no rows and the Waiting on you section has
+  non-blank lines, every non-blank line in it is unreadable (for example
+  under a label form its pattern rejects, such as `Waiting on you (1)`),
+  so Home says so loudly instead of showing an empty list.
+- It never extracts a why, a time, a priority or a date (§ 6.2, rule 8).
+- **One new import direction.** `packages/agent` imports
+  `waitingRows` (`packages/checkers/src/check-closeout.mjs`) and
+  `universalNewlines` and `restoreLineSeparators`
+  (`packages/checkers/src/py-text.mjs`). The modules this pulls in are
+  `check-closeout.mjs`, `argx.mjs`, `py-text.mjs` and `help-text.mjs`;
+  none imports `window`, `document`, `localStorage` or `node:*`, so § 1's
+  lint rule still holds for them. (No claim is made here about the rest
+  of `packages/checkers`.) Each `.mjs` import from `packages/checkers`
+  carries `// @ts-expect-error - plain .mjs, no type declarations` (the
+  posture of `apps/web/src/backend/script-runner.ts:17-19`). The tester
+  updates `mutantCopy` (`tests/agent/browser-safety.test.ts:128-135`) so
+  the copy sits at `<tmp>/packages/agent` beside a copy of
+  `<tmp>/packages/checkers/src`. This is a named, allowed change to a
+  tester-owned test; no assertion changes. (Lead ruling, 2026-09-26, fix
+  round 3.)
+- **Waits for a script fix.** Stage 3c (`design-web-ui.md` § 5.9) waits
+  for check_closeout's section-end fix: `##\b` never matched a `## `
+  heading, so a Waiting on you block ran on into `## Standing floor` /
+  `## Queue`. The fix (`check_closeout.py:30` and
+  `check-closeout.mjs:39` → `(?=^(?:(?:To do|Doing|Done)\b|#)|\Z)`) is
+  built separately. `readPlanBoard` never clips `waitingRows`' output
+  itself: a second section-end rule would be a second grammar (rule 12).
+
+**Every behaviour change against today's `parsePlanTodo`**
+(`packages/agent/src/helpers.ts:142-189`), each with its own table case:
+
+| Input line(s) | Today | Now |
+|---|---|---|
+| `to do` (lower case) | a To do label (`/^to do\b/i`, `helpers.ts:156`) | not a label (case-sensitive) |
+| `  To do` (indented label) | a label (the line is trimmed) | not a label (a label starts the line) |
+| `## To do` | not a label | not a label (unchanged; it ends a section) |
+| `To do:` / `To do list` | a label | a label (unchanged) |
+| a prose line starting `To do` inside another section | starts To do | starts To do (unchanged: check_closeout's grammar) |
+| `  - x` (indented bullet) | ends the list | an item |
+| `• x` | ends the list | an item |
+| a non-bullet line after an item | ends the list | joined to the item above |
+| a non-bullet line before the first item | ends the list (`[]`) | `unreadable`; later items still read |
+| a `# ` line inside To do | ends the list | ends the section (unchanged) |
+| an undefined plain-text heading after To do items (e.g. `Later`), then bullets | ends the list | the heading joins the item above as a continuation, and its bullets become To do items. Accepted: it matches check_closeout's grammar |
+
+§ 6.2's bullet list gains `• ` (amended below). The plan card keeps
+showing `items` only (`design-web-ui.md` § 2.2); the Home page shows
+`unreadable` loudly (`design-web-ui.md` § 5.2 rule 6).
+
+**Prevents:** plan readers that disagree (rule 12); Home saying "Nothing
+here right now" over lines it couldn't read (rule 8).
+**Proved by:**
+
+- These existing tables pass **unchanged**: `tests/web/helpers.test.ts`,
+  `apps/web/src/agent-helpers.test.ts:47-80`, `tests/agent/cards.test.ts`,
+  `packages/agent/test/cards.test.ts:156`. A failing old case goes back
+  to the architect; it is never edited to pass.
+- A parity test: for every `check_closeout` corpus case that has a
+  `plan.md` (`tests/checkers-parity/extra.mjs`, including
+  `r2-cc-lone-cr-plan` at :383 and `r2-cc-bom-waiting`),
+  `readPlanBoard`'s Waiting on you texts equal
+  `waitingRows(universalNewlines(text))`, the way check_closeout's own io
+  reads the file (`packages/checkers/src/io-node.mjs:33`). The corpus
+  includes the section-end fix's new case: Waiting on you last on the
+  board, then `## Standing floor` and `## Queue`.
+- A new table test: a `# Plan — <name>` title above the head lines;
+  each of the four labels; `To do (2)`; a label missing; a file with no
+  board; CRLF; and every row of the behaviour-change table above.
 
 ---
 

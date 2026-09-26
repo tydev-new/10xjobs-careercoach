@@ -207,7 +207,7 @@ agent's work without leaving the chat, and a record of what ran.
 What not to take: its roster of many bots. We have **one coach and one
 conversation** (rule 12).
 
-**One screen, two panes:**
+**One screen, two panes** (since 2026-09-26 this is the Talk to Ten page of the workspace; see the amendment below):
 
 ```
 ┌───────────────────────────────────────────────┬──────────────────────────┐
@@ -244,6 +244,19 @@ conversation** (rule 12).
   interview prep) come back after the MVP, and only if dogfooding shows chat plus
   cards isn't enough.
 
+**Amended 2026-09-26 (owner ruling, "approved changing product shape").** The
+bullet above is superseded. The app is now a workspace with a left rail: Home,
+Talk to Ten, Jobs, Applications, Documents. Talk to Ten is the two-pane screen
+drawn above, still one coach and one conversation. The other four are read-only
+pages of the candidate's own files, and every action still goes through the
+conversation. The Part 1 reason: promise 2, "the numbers change every week",
+needs a place to see them (`PRINCIPLES.md` rule 12's note). The caveat that
+travels with it (rule 17): the trigger was the owner's own reaction to the live
+app, one person, not usage data. Order (owner, 2026-09-26): the workspace
+stages come **before** the private-beta goal post below. Contract and build
+stages:
+`docs/design-web-ui.md` § 5.
+
 ### Step 6 - Dogfood, closing review, private beta · L, Ar, O
 
 **Exit:**
@@ -271,6 +284,8 @@ The next milestone is real beta users on a Vercel deployment. It is steps 2,
 **Exit:**
 
 - [ ] steps 2, 3, 4, 5b exits all green
+- [ ] `design-web-ui.md` § 5.9 workspace stages 1–4 exits green (owner,
+      2026-09-26: the workspace ships before this goal post)
 - [ ] the production deployment serves the default build (no fixture picker
       or Autoplay; grep the deployed bundle)
 - [ ] the O dogfood run (step 6's first exit) passes on the deployed URL

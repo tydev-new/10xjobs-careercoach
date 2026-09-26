@@ -6,7 +6,10 @@ Owner: De. Feeds step 5a (UI on a mock agent). Precedence:
 inspiration only: few core objects, avatar motion as the single status
 signal, structured cards over prose, a pinned side panel, a transcript
 that shows what ran — but one coach, one conversation, no bot roster
-(rule 12).
+(rule 12). Since 2026-09-26 (owner ruling, § 5) that one conversation
+sits inside a workspace: a left rail with Home, Talk to Ten, Jobs,
+Applications and Documents, where every page but Talk to Ten is a
+read-only view of the candidate's own files.
 
 This doc owns the UI: screens, layout, and each card's rendering and
 copy rules. It does **not** own the envelope, the gate protocol, the
@@ -26,12 +29,18 @@ app by this ruling; the v2 dark tokens stay in `styles.css`
 switch, and the dev/build:preview mock still renders both for design
 review.
 
-## 1. The one screen
+## 1. The one screen (now Talk to Ten, § 5)
 
 Two panes: transcript (left) + pinned side panel (right), composer
 pinned to the bottom of the transcript. No other screens in the MVP —
 no settings page, no jobs table, no interview view (`apps/workspace-ui`'s
 job, post-MVP only if dogfooding shows chat + cards isn't enough).
+
+**Amended 2026-09-26 (owner ruling, § 5).** The "no other screens" line
+above is superseded. This screen is now **Talk to Ten**, one of five
+places in the workspace (§ 5). Everything in § 1.1–§ 1.11 still holds for
+it; § 5 says what moves to the workspace frame (the header) and what the
+four new pages are. Still no settings page and no interview view.
 
 ### 1.1 Desktop wireframe
 
@@ -185,7 +194,8 @@ same four steps — either way, no button, ever.
 ### 1.8 A newer version is live
 
 Mechanism: C § 10. On the member chat screen, one line above the
-composer. It blocks nothing, uses neutral styling (never error or alarm,
+composer (since 2026-09-26, on every member page too: § 5.1). It
+blocks nothing, uses neutral styling (never error or alarm,
 rule 8), and can't be dismissed. It shows only when no turn is running:
 the agent runs in this tab, so a reload mid-turn would stop the run.
 
@@ -568,3 +578,522 @@ Files:
   needed); no `document` card exists until the fix renders cleanly.
 - `empty-first-run.json` — the first-run state (§ 1.5): one static
   agent line, no cards.
+
+## 5. The workspace (amendment, 2026-09-26; owner ruling)
+
+**The ruling.** On 2026-09-26 the owner found the live app "too basic,
+like a school project", was shown three layout sketches, chose C ("I
+like C better"), was told C changes the product shape and that the
+chain must be amended first, and answered: "approved changing product
+shape". C turns the one screen into a **workspace**: a left rail with
+five places, **Home, Talk to Ten, Jobs, Applications, Documents**.
+
+**The Part 1 reason.** Promise 2: "the sign it's working: the numbers
+change every week." Until now the only way to see those numbers was to
+ask Ten, which is work the candidate shouldn't have to do (promise 3).
+The pages keep the search's state in view. **The caveat that travels
+with it** (rule 17): the trigger was one person's reaction to the live
+app, not usage data. A5 in § 5.10 names what would show the pages
+aren't earning their place.
+
+**What stays the same.** One coach, one conversation (rule 12). The
+conversation doesn't split into threads or per-page chats; the
+cross-host contract already says "changing workspace sections or
+selected files does not create another CareerCoach conversation"
+(`design-cross-host-active-context.md`, Chat boundary). The gate stays
+typed-yes only (rule 7, § 2.5). Every card, copy line and screen in
+§ 1–§ 4 still holds for Talk to Ten.
+
+**What's new.** Four read-only pages of the candidate's own files.
+`design-cowork-coaching.md` § 8 already held this rule for Cowork:
+deliverables are read-only pages, and data changes go through chat so
+the record and its view can't disagree. `PRINCIPLES.md` rule 12's
+2026-09-26 note says what makes a page safe under "one of everything":
+it reads the file each time it shows it and keeps no copy.
+
+### 5.1 The frame
+
+- **The rail** holds the five places, in the order above, plus the
+  brand mark. It shows only to a signed-in member after setup (C § 11.6).
+  Sign-in, not-a-member (§ 1.6), recovery (§ 1.10) and the setup error
+  screen have no rail.
+- **The header** moves from Talk to Ten to the frame, so it shows on
+  every page: the avatar and its five states (§ 1.3), the balance chip
+  (§ 1.1, § 1.11), the `⋯` menu (§ 1.7, § 1.10, § 1.11). Its behaviour
+  doesn't change.
+- **The conversation stays mounted.** `useChat` and the coach live in
+  the frame, not in the Talk to Ten page. Changing pages hides the
+  transcript; it never unmounts it. A turn that is running keeps running
+  and is saved at its end (C § 11.4) whichever page is open.
+  *Prevents:* a page change silently killing a running turn, or losing
+  its save. *Proved by:* an e2e test that starts a mock turn, opens Jobs
+  mid-stream, returns, and finds the finished reply; and the save count
+  below.
+- **One frame for both builds.** One `Frame` component wraps both
+  `ChatShell` (mock) and `RealChatShell` (real). The save count and the
+  restored-gate landing case are proved in a `tests/web/*.test.ts` run of
+  `RealChatShell` with a spy conversation store: exactly one save per
+  ended turn, whichever page is open. § 5.2 rule 4's rewrite is the test
+  writing `plan.md` into the in-memory store during a mock turn; the mock
+  transport is unchanged. (Lead ruling, 2026-09-26, fix round 1.)
+- **The new-version check** (C § 10.2, amended 2026-09-26) runs in the
+  frame, so its notice shows on every page, not only above the
+  composer.
+- **A gate while you're elsewhere.** When a gate is pending, the header
+  avatar shows `needs-you` (as today), and the rail's Talk to Ten item
+  carries a plain marker with the words "Needs your yes". Neither is
+  alarm-styled (rule 8). The app doesn't switch pages on its own: a
+  page changing under the candidate's hand is its own harm, and the
+  header already shows on every page. The yes can only be typed in
+  Talk to Ten's composer, beside the complete thing (rule 7).
+  *Prevents:* a spend waiting unseen behind another page. *Proved by:*
+  an e2e test that opens a gate from the mock while Jobs is showing and
+  finds `needs-you` on the avatar and the rail marker; the gate approves
+  only from Talk to Ten's composer with a typed exact `yes`.
+- **Where the app opens** after setup: Talk to Ten when the restored
+  conversation has a pending gate (rule 7 beats everything) or when no
+  conversation is saved yet (first run, § 1.5: the only next step is to
+  talk). Otherwise Home. *Proved by:* one case per branch: no saved
+  conversation and a saved one in e2e on the mock, the restored pending
+  gate in the `RealChatShell` run below.
+- **Moving between pages is app state, not the address bar.** No URL
+  changes and no router package. Why: the sign-in flows read the
+  address bar's `#` and `?` parts (`apps/web/src/backend/auth.ts`,
+  `authRedirectFromUrl`; `RealApp.tsx` clears them after an expired or
+  used link, `RealApp.tsx:100`), and path-style routes would need a hosting rewrite, which is a
+  production change only the owner makes (C § 15). A reload opens where
+  the rule above says. The browser's Back button leaves the app, as it
+  does today. Revisit on evidence (§ 5.8).
+
+### 5.2 Rules every page follows
+
+Each rule names what it prevents and the test that proves it.
+"Pages" means Home, Jobs, Applications, Documents.
+
+1. **Pages never write.** They call only `list()` and `read()` on the
+   same `WorkspaceStore` instance the agent uses (C § 2: "The UI gets
+   the same instance and never calls agent tools"). No page uploads,
+   edits, moves a stage or deletes. *Prevents:* a record changed
+   outside the conversation, where the duplicate-key and schema checks
+   can't protect it (`jobs.md`'s own header says "change it via chat").
+   *Proved by:* an e2e run through every page and every control on a
+   spy store whose `write` and `upload` throw; zero calls.
+2. **Pages never send.** No page control sends a message or starts a
+   turn. A turn spends the candidate's credit (promise 5), so only
+   their own send in the composer starts one. A page may only open Talk
+   to Ten, and "Ask Ten about this" may also put a draft in the
+   composer (§ 5.4). *Prevents:* a click that spends money or starts
+   work the candidate didn't word. *Proved by:* the same e2e run on a
+   spy transport; zero `sendMessages` calls.
+3. **Word for word, never restated.** Every line a page shows from a
+   file is that file's own text, or a count or date that code reads
+   from it. No page summarizes, ranks, re-sorts, or computes a due
+   date, a priority or a "next step" (rules 8 and 11). Within a file,
+   file order is page order. A list of files is sorted by the one fixed
+   key § 5.3 names for that page (path, or newest change first), never
+   by a judgment. *Prevents:* a page saying more than its file.
+   *Proved by:* table tests that render each fixture page and compare
+   its text with the reader's output, string for string.
+4. **Fresh reads, no copy.** A page reads its files when it's shown and
+   again when a turn ends while it's showing. Nothing is kept in
+   `localStorage`, `sessionStorage` or IndexedDB. While a turn is
+   running, the page shows one neutral line: "Ten is working. This page
+   updates when it finishes." *Prevents:* a page disagreeing with the
+   file (rule 12). *Proved by:* an e2e test where a mock turn rewrites
+   `plan.md` while Home is showing: Home shows the new lines at turn
+   end, with no reload; a grep finds no browser storage call in the
+   page code.
+5. **A card is a receipt; a page is now.** A card in the conversation
+   shows its file as it was when the card was built (C § 6.2). A page
+   shows the file as it is. They may differ, and neither is wrong.
+   *Prevents:* anyone "fixing" a card to follow its file, which would
+   rewrite history. *Proved by:* the same e2e test: after the rewrite,
+   the old plan card is unchanged and Home shows the new lines.
+6. **Missing is empty; unreadable is loud.** A file that doesn't exist
+   (`resource_missing`) shows the page's empty state. Any other read
+   failure shows "Couldn't read <path>. Try again in a moment." with a
+   Retry button, never the empty state. A section a reader can't parse
+   shows its lines as written under "Ten couldn't read these lines of
+   <path>:" and a link that opens the file (`design-cowork-coaching.md`
+   § 1, principle 8, "degrade loudly"). *Prevents:* "No roles yet" or
+   "Nothing here right now" shown over a file that has them (rule 8).
+   *Proved by:* a store whose `read` throws a non-missing error; a
+   `plan.md` with a prose line before a section's first item.
+7. **Links out are only web links.** A URL from a file (a posting's
+   `URL:` field) becomes a link only when it starts with `https://` or
+   `http://`. It opens in a new tab with `rel="noopener noreferrer"`.
+   Anything else shows as plain text. *Prevents:* a `javascript:` or
+   `data:` URL, planted by a job posting (the plan's named prompt-
+   injection risk), running when clicked. *Proved by:* a table test
+   over `javascript:alert(1)`, `data:text/html,…`, ` https://x` (a
+   leading space), and a normal https URL.
+8. **One viewer.** Every page opens files in the same viewer component
+   Talk to Ten's side panel uses (`SidePanel`: `.md` through
+   `MarkdownView`, `.html` in the sandboxed iframe with its CSP and the
+   print button, § 2.3 and C § 6.1; binary files show "Binary file — no
+   preview."). *Prevents:* a second renderer that forgets the sandbox.
+   *Proved by:* `verify:screens`' injected-script check, run from a
+   page as well as from the conversation.
+
+### 5.3 The pages
+
+Readers named here run in the browser on the same store. None needs a
+store change. § 5.9 flags the stages that add or change a reader.
+
+#### Home: the state of the search
+
+**Shows**, top to bottom:
+
+- **The goal.** The `Goal:` line and the `Budget:` line from the head
+  of `plan.md`, each as written, when present.
+- **Waiting on you**, then **To do**, from `plan.md § Board`: each
+  line as written, in file order, each with a chip for its first
+  backticked path (it opens the viewer). Waiting on you comes first
+  because coach's schema makes it the attention index (open questions
+  and gated decisions). If a section is absent, or has no items and no
+  unreadable lines, it reads "Nothing here right now." The 2–4 count is coach's rule to hold
+  when it writes the file; this page never enforces or checks it (as
+  § 2.2).
+- **The pipeline in numbers.** One count per active stage in the
+  order `jobs.md` uses (To Review, Interested, Applied, Interviewing,
+  Offer), then the dismissed count. A stage with no roles shows 0.
+  These are the numbers promise 2 says change week to week. The page
+  shows only today's numbers: no arrows, deltas, percentages or praise
+  (rule 8). Each count opens Jobs at that stage.
+- **Continue with Ten**, which opens Talk to Ten with no draft.
+
+**Reads:** `plan.md` and `jobs.md`.
+**Parsed by:** `readPlanBoard` (a new export of `packages/agent`, C
+§ 18: the one reader behind both this page and `parsePlanTodo`; its
+Waiting on you items are check_closeout's own `waitingRows`, reused), and
+the `jobs_md` port's `load()` (`packages/checkers/src/jobs-md.mjs`, the
+parity-tested port of `jobs_md.py`), through the read-only store
+adapter described under Jobs. Counts are rows by stage, counted by code
+(rule 14). The page never reads `jobs.md`'s own bold `Active:` line,
+which would be a second source for one number.
+**Empty** (the two files have no items and no unreadable lines between
+them, which includes neither file existing): "Nothing here yet. Ten writes your plan and your
+pipeline as you work together." and Continue with Ten.
+
+#### Talk to Ten: the conversation
+
+§ 1 unchanged: transcript, composer, side panel, every card, gate, error
+and notice line (§ 1.8, § 1.9). The only change is that the header now
+belongs to the frame (§ 5.1). The composer exists only here.
+
+#### Jobs: the pipeline record
+
+**Shows** every role in `jobs.md`, grouped by stage in the port's own
+order (`STAGES`: To Review, Interested, Applied, Interviewing, Offer).
+Each group heading has its count. Within a group, rows are in file
+order: the script already sorts them, so the page never re-sorts. Then
+a **Dismissed** group, closed by default, with its count.
+
+Each row shows, as written: `Company — Title`; Verdict through § 2.1's
+static label table (an unknown value is shown as written; no verdict
+shows "Not evaluated yet"); Score as `load()` reads it (a whole number;
+the scripts only write whole numbers, `record_verdict.py:37`); Track; Location; Reason word for
+word, with § 2.1's quick-scan badge when it begins `quick-scan:`;
+Dealbreakers, only on a row with a Verdict, reading "none" when absent
+(§ 2.1); the date part of Seen and Updated; URL under § 5.2 rule 7.
+A dismissed row adds its Dismissed note word for word and the stage it
+was in (`Was`).
+
+Row controls: **Open analysis** opens the row's `JD` file (`jd_file`)
+in the viewer; with none, the row reads "No analysis file linked" (C
+§ 6.2's own wording). **Ask Ten about this** (§ 5.4).
+
+**Reads:** `jobs.md`.
+**Parsed by:** `load(io, "")` from `packages/checkers/src/jobs-md.mjs`,
+unchanged. The only new code is a read-only `io` adapter over the store
+(`apps/web/src/workspace/store-io.ts`): `exists(p)` is true when
+`read(p)` succeeds and false on `resource_missing` (any other error is
+thrown, so § 5.2 rule 6 can show it); `readFile(p)` returns the text;
+`writeFile` throws. *Not* reused: `apps/workspace-ui`'s `parseJobs`,
+which invents a "next move", a due date and a warm/cool signal
+(`apps/workspace-ui/server/workspace-core.mjs:37-68`), all against
+rule 8.
+**Empty** (no file, or no rows): "No roles yet. Paste a job link or a
+posting's text into the conversation and Ten will evaluate it."
+
+#### Applications: the materials per role
+
+**Shows** one entry per role that has files in `applications/`. Each
+entry has:
+
+- **The role**: `Company — Title` from the linked `jobs.md` row, else
+  the file key as written (for example `acme-staff-pm`).
+- **Its stage** from that row, or "Dismissed" plus the note. With no
+  linked row: "Not linked to a role in your pipeline." The page never
+  guesses a link from a company name.
+- **Its files**, each opening the viewer: the application notes, the
+  résumé, the résumé ready to print (the `.html`, which the viewer
+  prints to PDF, § 2.3), and the cover letter. A file that doesn't
+  exist isn't listed; nothing is flagged as missing.
+
+Entries are ordered newest change first, by the latest `updatedAt` among
+the entry's files (`FileInfo`, C § 2). **Ask Ten about this** (§ 5.4).
+
+**Reads:** `store.list("applications")`, and `jobs.md` through the same
+`load()`.
+**Parsed by:** a new pure function, `groupApplications(paths)`
+(`apps/web/src/workspace/applications.ts`). It reads **file names
+only**, never file contents. The key is the name with the first
+matching suffix removed, tried in this order: `-resume.html`,
+`-resume.pdf`, `-resume.md`, `-cover-letter.md`, `-application.md`,
+`.md`. A name that matches none of them (a `.txt`, a `.docx`) is its
+own entry, keyed by its full name, and reads "Not linked to a role in
+your pipeline." Nothing is dropped. There are
+two suffixes for the application notes because the chain disagrees
+today: `skills/apply/references/schema.md` names the file `<key>.md`,
+while `skills/apply/SKILL.md:16` and `fixtures/mvp-journey.json` use
+`<key>-application.md` (reported to the lead to fix the chain; this
+page reads either). The **link** to `jobs.md` is exact: the row whose
+`JD` field is `jd-analysis/<key>.md`. Both file names come from the
+same `company_key` + `title_key` (apply and evaluate schemas), so an
+exact match is the only honest join.
+**Empty:** "No applications yet. When you decide to apply for a role,
+Ten drafts the materials and they show here."
+
+#### Documents: every file
+
+**Shows** every file `store.list()` returns (C § 2: recursive, depth ≤
+3), except `leads.md`: search's schema says a lead is unvalidated and
+"the candidate never sees one". The export still includes it (rule 9).
+Files at the top level come first, under "Your records". Then one group
+per top-level folder, labelled from a static UI table keyed by the
+folder names `check_files.py` lists in `MANIFEST_DIRS` (`documents`:
+"Your uploads", `applications`, `jd-analysis`, `jd-inbox`, `company`,
+`contacts`, `prep`, `practice`, `stories`, `courses`, `negotiation`).
+The words for each label are stage 4's: stage 4 starts with the
+architect writing this table into this section, and the coder copies it
+word for word. An unknown folder shows under its own name. After the
+first turn "Your records" always holds the workspace `CLAUDE.md` (the
+app writes it before the first agent turn, C § 2). That is intended: the
+file is the candidate's (`design-cowork-coaching.md` § 7). The empty
+state below is tested on a workspace with no turn yet. Within a group, files are sorted by path, each with the
+date part of its `updatedAt`. A file opens in the viewer. **Ask Ten
+about this** (§ 5.4).
+
+**Reads:** `store.list()`; `read()` for the file being viewed.
+**Parsed by:** nothing. It uses the list and a static label table.
+**Empty** (the list is empty): "No files yet. Drop your résumé into the
+conversation to start."
+
+### 5.4 How the conversation and the pages link
+
+- **Into the viewer.** A chip or card `ref` in the conversation opens
+  the side panel, as today (§ 1.1). A file on any page opens the same
+  viewer (§ 5.2 rule 8).
+- **Continue with Ten** (Home) opens Talk to Ten, composer focused, no
+  draft.
+- **Ask Ten about this** (a Jobs row, an Applications entry, a Documents
+  file) opens Talk to Ten and puts a draft in the composer: `About
+  <label>: `, where `<label>` is `Company — Title` for a role, or the
+  path for a file. The draft is one line, capped at 120 characters (a
+  longer label is cut to fit). The draft goes in **only when the composer is
+  empty**; unsent text is never overwritten (§ 1.8 counts unsent text
+  as something a candidate can lose). The draft is never sent for them
+  (§ 5.2 rule 2). Once they edit and send it, it's their own typed
+  message.
+  *Prevents:* a draft that could pass the gate. The gate approves only
+  a whole message that is exactly `yes` (C § 3), and every draft starts
+  with `About `. *Proved by:* `matchGateReply(draft, "typed") ===
+  "none"` for every draft form, including a role whose company is
+  literally "yes".
+- **Pages to pages.** A Home count opens Jobs at that stage. Nothing
+  else links page to page in this step.
+
+### 5.5 Phone (placeholder until the designer's pick)
+
+The designer's round-2 direction picks how the rail works at 375px (a
+bottom bar, a menu, or something else). Whatever it picks must hold
+these, and the tester checks them at exactly 375px:
+
+- every place is reachable from any page in at most two taps;
+- the header (avatar, balance chip, `⋯`) shows on every page;
+- no horizontal scroll; tap targets ≥ 44px (§ 1.2);
+- the composer is never covered by the navigation, including with the
+  keyboard up (`design-web-ui-refresh.md`, "Phone / keyboard-up");
+- the viewer is a full-screen sheet with a back arrow (§ 1.2).
+
+### 5.6 Visual spec: SLOT for the designer's chosen direction
+
+> **Slot, not yet filled.** The designer is producing direction C
+> (round 2) in `design/directions/2026-09-26-r2/` on another branch. On
+> the owner's pick, this subsection gets: the token table (color, type,
+> space, radius, elevation, motion), the fonts and their fallback
+> stacks, the one icon set and its license, the brand mark, the rail's
+> look and its item states (rest, hover, current, focus-visible, the
+> needs-you marker), the page layouts (list plus viewer), the empty-
+> state look, the phone navigation pattern (§ 5.5), and each
+> component's states (rest, hover, focus-visible, disabled, loading,
+> error).
+
+Whatever fills the slot must already agree with the chain, or it goes
+back to the owner:
+
+- **Light only.** The 2026-09-24 ruling at the top of this doc stands;
+  the owner confirmed on 2026-09-26 that light is the production
+  default and dark is optional later (§ 5.10, Q1). Dark tokens may exist
+  dormant, as today.
+- One accent. Amber is only for `needs-you` (§ 1.3). No alert-styled
+  count badges (`design-references.md`, Huntr and Teal; rule 8).
+- A rail summary line, if the design keeps one, uses words the files
+  support. Round 1's "3 things queued this week" says more than
+  `plan.md` does, since To do items carry no week. Say "3 to-dos".
+- Tokens are CSS custom properties in `apps/web/src/styles.css`. No UI
+  framework or CSS build step is added; the round-1 README recommends
+  the same, and rule 18 makes deletion the default.
+
+### 5.7 Fixtures for the pages
+
+One new fixture, `apps/web/fixtures/workspace-pages.json`, under § 4's
+rules (invented persona; every script-written file produced by running
+the real scripts in a `mktemp -d` workspace, never `~/job-search`). Its
+`files` must include: a `jobs.md` with at least one role in each of the
+five stages plus a dismissed role, one row without a `JD` field, and one
+quick-scan row; a `plan.md` with Goal, Budget, and lines under both
+Waiting on you and To do; an `applications/` folder with one role using
+`<key>.md` and one using `<key>-application.md`, one with a rendered
+`.html`, and one whose key matches no `jobs.md` row; an upload under
+`documents/`; and a `leads.md`, to prove Documents hides it. The unsafe-
+URL and unreadable-section cases are unit-test inputs, not fixture
+files, so no fixture holds a hand-edited script-written file.
+`empty-first-run.json` proves every empty state.
+
+### 5.8 Out of scope for this step
+
+- Editing, uploading, renaming or deleting from a page; moving a stage
+  by drag or button. Every change goes through the conversation.
+- A profile page, an interview or practice page, a contacts or outreach
+  page, a knowledge or skills page (`apps/workspace-ui` has views for
+  these; they come back only on evidence).
+- Trends, charts, week-over-week deltas, "new this week" counts.
+- Search, filter or sort controls beyond the file's own order.
+- Running a checker, re-rendering a résumé, or any agent work from a
+  page.
+- URL routes, deep links and Back-button navigation between pages
+  (§ 5.1).
+- More than one conversation, threads, or a conversation list (C § 11.1).
+- "Ask in Claude/ChatGPT" cross-host launch (`apps/workspace-ui`'s job).
+- A UI framework migration (Tailwind, shadcn/ui, Radix).
+- Dark mode in production.
+
+### 5.9 Build stages
+
+Each stage is one PR, built by a coder in its own worktree and tested by
+a tester who didn't build it, from this section. Every stage must also
+keep `python3 tests/run.py`, `tests/web/*.test.ts`, `tests/web/e2e.mjs`
+and `npm run verify:screens` green. **No stage changes the store.**
+Stages that add or change a reader are marked **READER**.
+
+**Stage 1: Foundation.** Tokens, fonts, icon set, brand mark and
+component states from the filled § 5.6, applied to the screens that
+exist today. No layout change, no new screen.
+*Exit:* every existing screen renders in the new tokens (owner reviews
+screenshots at 1440 and 375 px); no color, font or radius literal
+outside the token block in `styles.css`; no new runtime dependency
+except the fonts and icon package § 5.6 names.
+*Tester checks:* the existing e2e and `verify:screens` pass unchanged;
+a grep for hex or `rgb(` literals outside the token block; text
+contrast at WCAG AA for every text/background token pair (computed,
+not eyeballed); no horizontal scroll at 375px; `:focus-visible` on
+every control.
+
+**Stage 2: The frame.** Rail, header in the frame, page switching as app
+state, the landing rule, the conversation kept mounted, the needs-you
+marker, and each new page showing only its empty state.
+*Exit:* § 5.1's three proofs pass (a turn survives a page change, a gate
+seen from another page, the three landing cases); § 5.2 rules 1 and 2
+pass on the frame; § 5.5's phone rules hold with the designer's pattern.
+*Tester checks:* those e2e cases on the mock; the `RealChatShell` run
+with a spy conversation store for the save count and the restored-gate
+landing (§ 5.1, "One frame for both builds"); an e2e check that the
+new-version notice shows on a page other than Talk to Ten; a spy store
+and a spy transport; the 375px checks on every page.
+
+**Stage 3: The pages, one PR each, in this order** (least new code
+first):
+
+- **3a Documents.** No reader. *Exit:* every fixture file listed once
+  in its group, `leads.md` absent, sorted by path, the viewer opens
+  `.md`, `.html` (sandboxed, print works) and binary; § 5.2 rules 1, 2,
+  6 and 8.
+- **3b Jobs. READER (reuse):** the `jobs_md` port unchanged, plus the
+  small read-only `store-io.ts` adapter. It also deletes the stub
+  `packages/agent/src/jobs-md.ts` (its own comment says it waits for the
+  port): `cards.ts:6` moves to the port, the public re-export of
+  `parseJobsMdRows` and `findJobsMdRow` at `packages/agent/src/index.ts:19`
+  is removed, and the verdict card's builder tests pass unchanged. Each
+  `.mjs` import from `packages/checkers` carries
+  `// @ts-expect-error - plain .mjs, no type declarations` (the posture of
+  `apps/web/src/backend/script-runner.ts:17-19`). The tester updates
+  `mutantCopy` (`tests/agent/browser-safety.test.ts:128-135`) so the copy
+  sits at `<tmp>/packages/agent` beside a copy of
+  `<tmp>/packages/checkers/src`: a named, allowed change to a tester-owned
+  test, with no assertion changed. *Exit:* every `### ` role under
+  a stage heading in the fixture's `jobs.md` shows once, in its stage,
+  in file order, with fields word for word; Dismissed closed with its
+  count; § 5.2 rule 7's URL table. *Tester checks:* compare the page
+  with `load()` over the fixture, field by field; the adapter's
+  `exists` on a missing read and on a failing read.
+- **3c Home. READER (change):** `readPlanBoard` in `packages/agent`
+  (C § 18), with `parsePlanTodo` re-expressed through it. **Waits for**
+  check_closeout's section-end fix (C § 18, "Waits for a script fix"),
+  built separately. *Exit:*
+  the four existing tables C § 18 names pass **unchanged** (a failing
+  old case goes back to the architect; it is never edited to pass); C
+  § 18's `waitingRows` parity test and its new table; Home's
+  counts equal `load()`'s rows by stage; § 5.2 rules 4, 5 and 6.
+- **3d Applications. READER (new):** `groupApplications` and the exact
+  `JD` join. *Exit:* a table test over both name forms, the `.html`,
+  an unknown suffix and an unmatched key; the page's roles, stages and
+  "Not linked" line match the fixture.
+
+**Stage 4: Copy and voice.** It starts with the architect writing the
+Documents label table into § 5.3; the coder copies it word for word.
+Every page line, label and empty state
+written here and in § 5.3's label table, word for word in the code.
+*Exit:* an independent reviewer (not the author) checks every string
+against rules 8 and 18 and § 2.7's rule (say what's true and what the
+candidate can do, never what the agent will do); a test greps each
+string from this section in the built bundle.
+
+**Stage 5: Acceptance.** The owner's live run on their own account
+(PROCESS step 6), reported back as numbers only: the counts § 5.10's
+falsifiers need. Then the architect's closing review, and
+`ARCHITECTURE.md` (its "Chat screen" box) and `apps/web/README.md`
+brought up to date.
+
+### 5.10 Assumptions, and what would prove them wrong
+
+| # | Assumption | How we'd know it's wrong |
+|---|---|---|
+| A1 | Reading a page's files on every show is fast enough | a page taking over 1 s to show on the owner's live run |
+| A2 | The port reads the real `jobs.md` fully | Jobs shows fewer roles than there are `### ` headings under stage sections in the owner's file (a count, reported as numbers only) |
+| A3 | Markdown stays the right record at this size | `jobs.md` past a few hundred rows (goals doc, goal 3's named escape hatch) |
+| A4 | Nobody needs to edit from a page | two independent asks to edit a file from a page (rule 17) |
+| A5 | The pages carry the state, so the candidate stops asking for it | in two weeks of the owner's use, asks like "what's in my pipeline" or "what's on my list" still happen |
+
+**Resolved (owner, 2026-09-26, in chat; relayed by the lead):**
+
+- **Q1.** Direction C's round-1 sketch was dark-first, while the
+  2026-09-24 ruling says the real app is always light. **Answer: light
+  is the production default; dark is optional later.** The 2026-09-24
+  ruling stands.
+- **Q2.** Do the workspace stages come before or after the private-beta
+  goal post (`plan-portable-skills-and-web-agent.md`, "Goal post - Beta
+  on Vercel")? **Answer: before.**
+
+**Chain fixes for the coder** (found in review; separate from the
+stages, each through its own review):
+
+- apply's application-file name: `skills/apply/SKILL.md:16` says
+  `<key>-application.md`, `skills/apply/references/schema.md` says
+  `<key>.md`, and `fixtures/mvp-journey.json` uses the first.
+- The comments at `packages/agent/src/helpers.ts:154-155` and
+  `tests/web/helpers.test.ts:110-111` (tester-owned: the tester edits
+  it) repeat the false claim that `apps/workspace-ui`'s `parsePlan` maps
+  from `parsePlanTodo` (corrected in C § 6.2).
+- check_closeout's section-end fix (C § 18), which stage 3c waits for.

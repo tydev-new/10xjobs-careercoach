@@ -470,6 +470,17 @@ agent could say in a sentence, it's a message, not a panel. Living files
 are **read from disk before every touch** — the candidate may have edited
 them; that replaces any change-marker machinery.
 
+**The web app (amended 2026-09-26, owner ruling; `PRINCIPLES.md` rule
+12's note).** The same rules hold in a different frame. The one
+conversation is one of five places in a workspace: Home, Talk to Ten,
+Jobs, Applications, Documents. The other four are the web's artifacts:
+read-only pages of the candidate's own files. Nothing on a page writes a
+file or sends a message; data changes go through the conversation. The
+anti-rule applies to each page: a page earns its place by showing the
+search's standing state, which a message scrolls away (promise 2). A page
+that only repeats what one message could say is deleted. Pages, sources
+and tests: `design-web-ui.md` § 5.
+
 ## 9. Enforcement — guaranteed vs asked for
 
 | Invariant | How | Where |

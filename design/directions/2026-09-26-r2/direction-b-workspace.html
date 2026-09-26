@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ten — Direction B · Document-first workspace</title>
+<link rel="icon" id="fav">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;600;700&family=Karla:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+/* ================= Direction B tokens — light is the production default ================= */
+:root{
+  --font-head:"Figtree",ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-ui:"Karla",ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --font-doc:"Source Serif 4",ui-serif,Georgia,"Times New Roman",serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#FFFFFF; --canvas:#E9ECF1; --surface:#FFFFFF; --surface-2:#F6F7F9; --muted:#EDEFF3;
+  --border:#E0E3E9; --border-strong:#CBD0D8;
+  --text:#111827; --text-2:#4B5563; --text-3:#8A919C;
+  --accent:#2446B3; --accent-hover:#1C3890; --accent-soft:#EDF1FC; --on-accent:#FFFFFF;
+  --primary:#111827; --primary-hover:#262F40; --on-primary:#FFFFFF;
+  --hover:#F1F3F6; --press:#E6E9EE; --focus:#2446B3;
+  --ok:#157F3C; --ok-bg:#E9F6EE; --wait:#9A5B07; --wait-bg:#FFF6E6; --wait-border:#F0D29C;
+  --cut:#B42318; --cut-bg:#FEF3F2;
+  --paper:#FFFFFF; --ink:#16181D;
+  --e1:0 1px 2px rgba(17,24,39,.06),0 0 0 1px rgba(17,24,39,.07);
+  --e2:0 1px 3px rgba(17,24,39,.08),0 12px 32px -8px rgba(17,24,39,.16);
+  --e3:0 24px 56px -12px rgba(17,24,39,.28),0 0 0 1px rgba(17,24,39,.08);
+  --r-xs:4px;--r-sm:6px;--r-md:10px;--r-lg:14px;--r-full:999px;
+  --dur-fast:120ms;--dur:200ms;--ease-out:cubic-bezier(.2,.8,.2,1);--ease:cubic-bezier(.4,0,.2,1);
+}
+[data-theme="dark"]{
+  --bg:#15171C; --canvas:#0E1014; --surface:#1B1E24; --surface-2:#20242B; --muted:#262A32;
+  --border:#2A2F38; --border-strong:#39404B;
+  --text:#E8EAF0; --text-2:#A0A6B3; --text-3:#6B7280;
+  --accent:#8AA4FF; --accent-hover:#A6BBFF; --accent-soft:#1B2547; --on-accent:#0E1014;
+  --primary:#E8EAF0; --primary-hover:#FFFFFF; --on-primary:#111827;
+  --hover:#222630; --press:#2A2F38; --focus:#8AA4FF;
+  --ok:#4ADE80; --ok-bg:#12301C; --wait:#F5B454; --wait-bg:#33260F; --wait-border:#664A18;
+  --cut:#F97066; --cut-bg:#3A1714;
+  --paper:#FFFFFF; --ink:#16181D; /* the page stays paper-white in dark: it is what prints */
+  --e1:0 1px 2px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.07);
+  --e2:0 12px 32px -8px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.06);
+  --e3:0 24px 56px -12px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--font-ui);color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:4px}
+.ic{flex:none;display:block}
+.stage{position:fixed;inset:0;overflow:auto;background:var(--bg)}
+.sp{flex:1}
+.dot{width:3px;height:3px;border-radius:50%;background:var(--text-3);display:inline-block;flex:none}
+.shell{container:shell/inline-size;position:relative;height:100%;overflow:hidden;background:var(--bg);color:var(--text)}
+.app{display:grid;grid-template-rows:52px minmax(0,1fr);height:100%}
+.hd{display:flex;align-items:center;gap:10px;padding:0 14px 0 16px;border-bottom:1px solid var(--border);background:var(--bg);min-width:0}
+.brand{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--text)}
+.wm{font:700 18px/1 var(--font-head);letter-spacing:-.02em}
+.sep{color:var(--border-strong);font-size:18px}
+.title{font:600 14.5px/20px var(--font-head);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tier{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px 0 7px;border-radius:var(--r-full);background:var(--ok-bg);color:var(--ok);font:600 12.5px/1 var(--font-head);white-space:nowrap}
+.credit{display:flex;align-items:center;gap:8px;height:32px;padding:0 4px 0 11px;border-radius:var(--r-full);box-shadow:0 0 0 1px var(--border);font:500 13px/1 var(--font-ui);color:var(--text-2);white-space:nowrap}
+.credit b{color:var(--text);font:600 13.5px/1 var(--font-head)}
+.credit .buy{height:24px;padding:0 10px;border-radius:var(--r-full);background:var(--primary);color:var(--on-primary);font:600 12px/24px var(--font-head)}
+.credit .buy:hover{background:var(--primary-hover)}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--on-accent);font:700 11.5px/30px var(--font-head);text-align:center}
+.work{display:grid;grid-template-columns:minmax(0,1fr) 420px;min-height:0}
+/* center: the document */
+.docside{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--canvas)}
+.band{display:flex;align-items:center;gap:16px;padding:14px 24px;background:var(--bg);border-bottom:1px solid var(--border)}
+.band .sc{font:700 30px/1 var(--font-head);letter-spacing:-.03em}
+.band .sc small{font:500 12.5px/1 var(--font-ui);color:var(--text-3);letter-spacing:0;margin-left:2px}
+.band .rs{flex:1;min-width:0}
+.band .rs b{display:flex;align-items:center;gap:8px;font:600 15px/20px var(--font-head)}
+.band .rs p{margin:2px 0 0;font:400 13.5px/19px var(--font-ui);color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;border-radius:var(--r-sm);font:500 13px/1 var(--font-ui);color:var(--text-2);white-space:nowrap}
+.lk:hover{background:var(--hover);color:var(--text)}
+.tabs{display:flex;align-items:flex-end;gap:2px;padding:0 16px 0 20px;background:var(--bg);border-bottom:1px solid var(--border)}
+.tab{position:relative;display:inline-flex;align-items:center;gap:7px;height:44px;padding:0 12px;font:600 14px/1 var(--font-head);color:var(--text-3);white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--text)}
+.tab.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;border-radius:2px;background:var(--accent)}
+.tab .ok{color:var(--ok)}
+.tab .n{font:500 12px/1 var(--font-ui);color:var(--text-3)}
+.tools{margin-left:auto;display:flex;align-items:center;gap:4px;padding-bottom:6px}
+.tg{display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 10px;border-radius:var(--r-sm);font:500 13px/1 var(--font-ui);color:var(--text-2)}
+.tg:hover{background:var(--hover)}
+.sw{width:28px;height:16px;border-radius:9px;background:var(--accent);position:relative}
+.sw::after{content:"";position:absolute;top:2px;right:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+.ib{width:32px;height:32px;border-radius:var(--r-sm);display:grid;place-items:center;color:var(--text-2)}
+.ib:hover{background:var(--hover);color:var(--text)}
+.statusbar{display:flex;align-items:center;gap:8px;padding:8px 24px;font:500 12.5px/1 var(--font-ui);color:var(--text-3);background:var(--canvas)}
+.statusbar .okt{display:inline-flex;align-items:center;gap:4px;color:var(--ok)}
+.canvas{flex:1;overflow:auto;padding:4px 24px 48px}
+.pagewrap{position:relative;max-width:900px;margin:0 auto;display:grid;grid-template-columns:minmax(0,680px) 200px;gap:20px;justify-content:center}
+.paper{background:var(--paper);color:var(--ink);border-radius:2px;box-shadow:var(--e2);padding:56px 64px 72px;font-family:var(--font-doc);min-height:880px}
+.paper h1{font:700 30px/1.1 var(--font-doc);letter-spacing:-.01em;margin:0 0 6px}
+.paper .ct{font:400 13px/1.4 var(--font-doc);color:#4a4f58;margin:0 0 20px}
+.paper h2{font:600 11px/1 var(--font-head);letter-spacing:.12em;text-transform:uppercase;color:#4a4f58;margin:22px 0 10px;padding-bottom:6px;border-bottom:1px solid #d9dce1}
+.paper h3{font:600 15px/1.35 var(--font-doc);margin:0 0 4px}
+.paper h3 small{font:400 13px/1 var(--font-doc);color:#5b616b;float:right;margin-top:3px}
+.paper p,.paper li{font:400 14.5px/1.5 var(--font-doc)}
+.paper p{margin:0}
+.paper ul{margin:4px 0 0;padding-left:18px}.paper li{margin:0 0 4px}
+.paper .cutrole{margin-top:14px;padding:10px 12px;margin-left:-12px;margin-right:-12px;border-radius:4px;background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(180,35,24,.035) 6px 12px);outline:1px dashed #e7b1ab}
+.paper .cutrole h3,.paper .cutrole li{color:#9aa0a8;text-decoration:line-through;text-decoration-color:rgba(180,35,24,.55)}
+.notes{position:relative}
+.note{position:absolute;left:0;right:0;padding:10px 12px;border-radius:var(--r-md);background:var(--surface);box-shadow:var(--e1);font:400 12.5px/17px var(--font-ui);color:var(--text-2)}
+.note b{display:flex;align-items:center;gap:6px;font:600 12.5px/17px var(--font-head);color:var(--text);margin-bottom:3px}
+.note .k{display:inline-block;margin-top:6px;font:500 12px/1 var(--font-mono);color:var(--accent);background:var(--accent-soft);padding:3px 6px;border-radius:4px}
+.note::before{content:"";position:absolute;left:-20px;top:16px;width:20px;border-top:1px dashed var(--border-strong)}
+/* right: the coach */
+.coach{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--border);background:var(--bg)}
+.coach-hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border)}
+.coach-hd b{font:600 14.5px/20px var(--font-head)}
+.coach-hd small{font:400 12.5px/1 var(--font-ui);color:var(--text-3)}
+.thread{flex:1;overflow:auto;padding:16px 16px 8px}
+.m{margin:0 0 18px}
+.m.you{display:flex;justify-content:flex-end}
+.m.you .bb{max-width:88%;padding:8px 12px;border-radius:12px 12px 4px 12px;background:var(--accent-soft);color:var(--text);font:400 14.5px/21px var(--font-ui)}
+.m .who{display:flex;align-items:center;gap:8px;margin-bottom:6px;font:600 13px/1 var(--font-head)}
+.m p{margin:0 0 8px;font:400 14.5px/22px var(--font-ui);color:var(--text)}
+.act{display:inline-flex;align-items:center;gap:7px;height:26px;padding:0 9px 0 7px;border-radius:var(--r-sm);background:var(--surface-2);box-shadow:0 0 0 1px var(--border);font:500 12.5px/1 var(--font-ui);color:var(--text-2);margin:0 0 8px}
+.act .ok{color:var(--ok)}.act .n{color:var(--text-3);font-weight:400}
+.act.live{background:var(--surface);color:var(--text)}
+.chip{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border-radius:var(--r-md);box-shadow:var(--e1);background:var(--surface);text-align:left;margin:0 0 8px}
+.chip:hover{box-shadow:var(--e2)}
+.chip.on{box-shadow:0 0 0 2px var(--accent)}
+.chip .fi{width:28px;height:34px;border-radius:4px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--border);display:grid;place-items:center;color:var(--text-2)}
+.chip b{display:block;font:600 13.5px/18px var(--font-head)}
+.chip small{display:flex;gap:6px;align-items:center;font:400 12px/16px var(--font-ui);color:var(--text-2)}
+.chip small .okt{color:var(--ok);display:inline-flex;gap:3px;align-items:center}
+.plan{border-radius:var(--r-md);box-shadow:var(--e1);background:var(--surface);margin:0 0 8px;overflow:hidden}
+.plan .ph{display:flex;align-items:center;gap:8px;padding:9px 12px;font:600 13.5px/18px var(--font-head);border-bottom:1px solid var(--border)}
+.plan .ph small{margin-left:auto;font:400 12px/1 var(--font-ui);color:var(--text-3)}
+.plan li{list-style:none;display:grid;grid-template-columns:16px minmax(0,1fr) auto;gap:10px;padding:9px 12px;border-top:1px solid var(--border);font:500 13.5px/19px var(--font-ui)}
+.plan li:first-child{border-top:0}
+.plan ol{margin:0;padding:0}
+.plan .rg{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border-strong);margin-top:2px}
+.plan .w{display:block;font:400 12.5px/17px var(--font-ui);color:var(--text-2)}
+.plan .mn{font:500 12px/19px var(--font-ui);color:var(--text-3);white-space:nowrap}
+.composer{margin:8px 12px 12px;border-radius:var(--r-lg);box-shadow:0 0 0 1px var(--border-strong);background:var(--surface);padding:10px 10px 8px 12px}
+.composer:focus-within{box-shadow:0 0 0 2px var(--accent)}
+.composer textarea{display:block;width:100%;border:0;outline:0;resize:none;background:transparent;font:400 14.5px/21px var(--font-ui);min-height:21px;padding:0 0 8px}
+.composer textarea::placeholder{color:var(--text-3)}
+.crow{display:flex;align-items:center;gap:4px}
+.send{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:var(--accent);color:var(--on-accent)}
+.send:disabled{background:var(--muted);color:var(--text-3)}
+.ctx{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:var(--r-full);background:var(--accent-soft);color:var(--accent);font:500 12px/1 var(--font-ui)}
+@media (prefers-reduced-motion:no-preference){.spin{animation:spin 900ms linear infinite}.caret{animation:blink 1s steps(1) infinite}}
+@keyframes spin{to{transform:rotate(360deg)}}@keyframes blink{50%{opacity:0}}
+.caret{display:inline-block;width:7px;height:16px;background:var(--text);vertical-align:-3px;margin-left:2px;border-radius:2px}
+/* phone: the document is the screen; the coach is a bottom sheet */
+.sheet{display:none}
+@container shell (max-width:760px){
+  .app{grid-template-rows:50px minmax(0,1fr)}
+  .hd .wm,.hd .sep,.hd .tier,.credit .lbl,.credit .buy{display:none}
+  .credit{padding:0 11px}
+  .work{grid-template-columns:1fr}
+  .coach{display:none}
+  .band{padding:10px 14px;gap:10px}.band .sc{font-size:24px}.band .lk{display:none}
+  .band .rs p{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .tabs{padding:0 6px}.tools{display:none}.tab{padding:0 10px}
+  .statusbar{padding:8px 14px;flex-wrap:wrap}.statusbar .path{display:none}
+  .canvas{padding:4px 10px 150px}
+  .pagewrap{grid-template-columns:1fr}.notes{display:none}
+  .paper{padding:28px 22px 40px;min-height:0}
+  .paper h1{font-size:24px}
+  .paper .cutrole{margin-left:-8px;margin-right:-8px}
+  .sheet{display:block;position:absolute;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-radius:18px 18px 0 0;box-shadow:0 -12px 32px -8px rgba(17,24,39,.22),0 0 0 1px var(--border)}
+  .sheet .grab{width:36px;height:4px;border-radius:2px;background:var(--border-strong);margin:8px auto 6px}
+  .sheet .last{display:flex;gap:10px;align-items:flex-start;padding:4px 16px 8px;font:400 13.5px/19px var(--font-ui);color:var(--text-2)}
+  .sheet .last b{color:var(--text);font-family:var(--font-head)}
+  .sheet .composer{margin:0 10px 10px}
+  .sheet.open{top:88px;display:flex;flex-direction:column}
+  .sheet.open .thread{flex:1}
+}
+/* phone frames */
+.phones{min-height:100%;display:flex;gap:40px;justify-content:center;align-items:flex-start;padding:40px 24px;background:var(--canvas)}
+.phone{width:375px;height:812px;flex:none;border-radius:44px;background:var(--bg);box-shadow:0 0 0 10px #16171a,0 0 0 11px #3a3c42,var(--e3);overflow:hidden;display:flex;flex-direction:column}
+.phone .sbar{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 28px;font:600 15px/1 var(--font-head);color:var(--text);background:var(--bg)}
+.phone .shell{flex:1;height:auto;min-height:0}
+.ph-cap{font:500 13px/18px var(--font-ui);color:var(--text-2);text-align:center;margin-top:16px}
+@media (max-width:760px){.phones{padding:0;gap:0;flex-direction:column;background:var(--bg)}.phone{width:100%;height:100vh;border-radius:0;box-shadow:none}.phone .sbar,.ph-cap,.phones>div+div{display:none}}
+</style>
+</head>
+<body class="has-proto">
+<div id="proto"></div>
+<div class="stage" id="stage"></div>
+<script>
+/* ---- shared kit: icons (Lucide 1.48.0, ISC), brand mark, fixture content, router ---- */
+const ICONS = {"arrow-left":"<path d=\"m12 19-7-7 7-7\" /><path d=\"M19 12H5\" />","arrow-right":"<path d=\"M5 12h14\" /><path d=\"m12 5 7 7-7 7\" />","arrow-up":"<path d=\"m5 12 7-7 7 7\" /><path d=\"M12 19V5\" />","at-sign":"<circle cx=\"12\" cy=\"12\" r=\"4\" /><path d=\"M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8\" />","badge-check":"<path d=\"M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z\" /><path d=\"m16 9-5.5 5.5L8 12\" />","book-open":"<path d=\"M12 5v16\" /><path d=\"M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z\" />","briefcase":"<path d=\"M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16\" /><rect width=\"20\" height=\"14\" x=\"2\" y=\"6\" rx=\"2\" />","building-2":"<path d=\"M10 12h4\" /><path d=\"M10 8h4\" /><path d=\"M14 21v-3a2 2 0 0 0-4 0v3\" /><path d=\"M6 10H4a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-2\" /><path d=\"M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16\" />","calendar":"<path d=\"M8 2v3\" /><path d=\"M16 2v3\" /><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" /><path d=\"M3 9h18\" />","check":"<path d=\"M20 6 9 17l-5-5\" />","chevron-down":"<path d=\"m6 9 6 6 6-6\" />","chevron-left":"<path d=\"m15 18-6-6 6-6\" />","chevron-right":"<path d=\"m9 18 6-6-6-6\" />","circle-alert":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><line x1=\"12\" x2=\"12\" y1=\"8\" y2=\"12\" /><line x1=\"12\" x2=\"12.01\" y1=\"16\" y2=\"16\" />","circle-check":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"m16 9-5.5 5.5L8 12\" />","circle-dot":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"12\" cy=\"12\" r=\"10\" />","circle-pause":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><line x1=\"10\" x2=\"10\" y1=\"15\" y2=\"9\" /><line x1=\"14\" x2=\"14\" y1=\"15\" y2=\"9\" />","circle":"<circle cx=\"12\" cy=\"12\" r=\"10\" />","clock":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 6v6l4 2\" />","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\" /><path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\" />","corner-down-left":"<path d=\"M20 4v7a4 4 0 0 1-4 4H4\" /><path d=\"m9 10-5 5 5 5\" />","credit-card":"<rect width=\"20\" height=\"14\" x=\"2\" y=\"5\" rx=\"2\" /><line x1=\"2\" x2=\"22\" y1=\"10\" y2=\"10\" /><path d=\"M6 14h2\" />","download":"<path d=\"M12 15V3\" /><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\" /><path d=\"m7 10 5 5 5-5\" />","ellipsis":"<circle cx=\"12\" cy=\"12\" r=\"1\" /><circle cx=\"19\" cy=\"12\" r=\"1\" /><circle cx=\"5\" cy=\"12\" r=\"1\" />","external-link":"<path d=\"M15 3h6v6\" /><path d=\"M10 14 21 3\" /><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\" />","eye-off":"<path d=\"M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49\" /><path d=\"M14.084 14.158a3 3 0 0 1-4.242-4.242\" /><path d=\"M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143\" /><path d=\"m2 2 20 20\" />","file-check":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"m9 15 2 2 4-4\" />","file-pen":"<path d=\"M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z\" />","file-search":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><circle cx=\"11.5\" cy=\"14.5\" r=\"2.5\" /><path d=\"M13.3 16.3 15 18\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" /><path d=\"M14 2v5a1 1 0 0 0 1 1h5\" /><path d=\"M10 9H8\" /><path d=\"M16 13H8\" /><path d=\"M16 17H8\" />","files":"<path d=\"M15 2h-4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8\" /><path d=\"M16.706 2.706A2.4 2.4 0 0 0 15 2v5a1 1 0 0 0 1 1h5a2.4 2.4 0 0 0-.706-1.706z\" /><path d=\"M5 7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h8a2 2 0 0 0 1.732-1\" />","folder-down":"<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\" /><path d=\"M12 10v6\" /><path d=\"m15 13-3 3-3-3\" />","globe":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20\" /><path d=\"M2 12h20\" />","hourglass":"<path d=\"M5 22h14\" /><path d=\"M5 2h14\" /><path d=\"M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22\" /><path d=\"M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2\" />","house":"<path d=\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\" /><path d=\"M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\" />","info":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><path d=\"M12 16v-4\" /><path d=\"M12 8h.01\" />","key-round":"<path d=\"M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z\" /><circle cx=\"16.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />","layers":"<path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /><path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /><path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />","link":"<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\" /><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\" />","list-checks":"<path d=\"M13 5h8\" /><path d=\"M13 12h8\" /><path d=\"M13 19h8\" /><path d=\"m3 17 2 2 4-4\" /><path d=\"m3 7 2 2 4-4\" />","list-todo":"<path d=\"M13 5h8\" /><path d=\"M13 12h8\" /><path d=\"M13 19h8\" /><path d=\"m3 17 2 2 4-4\" /><rect x=\"3\" y=\"4\" width=\"6\" height=\"6\" rx=\"1\" />","loader-circle":"<path d=\"M21 12a9 9 0 1 1-6.219-8.56\" />","lock":"<rect width=\"18\" height=\"11\" x=\"3\" y=\"11\" rx=\"2\" ry=\"2\" /><path d=\"M7 11V7a5 5 0 0 1 10 0v4\" />","log-out":"<path d=\"m16 17 5-5-5-5\" /><path d=\"M21 12H9\" /><path d=\"M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4\" />","mail":"<path d=\"m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7\" /><rect x=\"2\" y=\"4\" width=\"20\" height=\"16\" rx=\"2\" />","map-pin":"<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /><circle cx=\"12\" cy=\"10\" r=\"3\" />","menu":"<path d=\"M4 5h16\" /><path d=\"M4 12h16\" /><path d=\"M4 19h16\" />","message-square":"<path d=\"M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z\" />","mic":"<path d=\"M12 19v3\" /><path d=\"M19 10v2a7 7 0 0 1-14 0v-2\" /><rect x=\"9\" y=\"2\" width=\"6\" height=\"13\" rx=\"3\" />","moon":"<path d=\"M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401\" />","panel-left":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /><path d=\"M9 3v18\" />","panel-right":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /><path d=\"M15 3v18\" />","paperclip":"<path d=\"m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551\" />","pencil-line":"<path d=\"M13 21h8\" /><path d=\"m15 5 4 4\" /><path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" />","plus":"<path d=\"M5 12h14\" /><path d=\"M12 5v14\" />","printer":"<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\" /><path d=\"M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6\" /><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\" rx=\"1\" />","refresh-cw":"<path d=\"M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8\" /><path d=\"M21 3v5h-5\" /><path d=\"M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16\" /><path d=\"M8 16H3v5\" />","scale":"<path d=\"M12 3v18\" /><path d=\"m19 8 3 8a5 5 0 0 1-6 0zV7\" /><path d=\"M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1\" /><path d=\"m5 8 3 8a5 5 0 0 1-6 0zV7\" /><path d=\"M7 21h10\" />","scissors":"<circle cx=\"6\" cy=\"6\" r=\"3\" /><path d=\"M8.12 8.12 12 12\" /><path d=\"M20 4 8.12 15.88\" /><circle cx=\"6\" cy=\"18\" r=\"3\" /><path d=\"M14.8 14.8 20 20\" />","search":"<path d=\"m21 21-4.34-4.34\" /><circle cx=\"11\" cy=\"11\" r=\"8\" />","shield-check":"<path d=\"M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z\" /><path d=\"m9 12 2 2 4-4\" />","square":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" />","sun":"<circle cx=\"12\" cy=\"12\" r=\"4\" /><path d=\"M12 2v2\" /><path d=\"M12 20v2\" /><path d=\"m4.93 4.93 1.41 1.41\" /><path d=\"m17.66 17.66 1.41 1.41\" /><path d=\"M2 12h2\" /><path d=\"M20 12h2\" /><path d=\"m6.34 17.66-1.41 1.41\" /><path d=\"m19.07 4.93-1.41 1.41\" />","target":"<circle cx=\"12\" cy=\"12\" r=\"10\" /><circle cx=\"12\" cy=\"12\" r=\"6\" /><circle cx=\"12\" cy=\"12\" r=\"2\" />","terminal":"<path d=\"M12 19h8\" /><path d=\"m4 17 6-6-6-6\" />","trash-2":"<path d=\"M10 11v6\" /><path d=\"M14 11v6\" /><path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" /><path d=\"M3 6h18\" /><path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />","user":"<path d=\"M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\" /><circle cx=\"12\" cy=\"7\" r=\"4\" />","wallet":"<path d=\"M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1\" /><path d=\"M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4\" />","x":"<path d=\"M18 6 6 18\" /><path d=\"m6 6 12 12\" />"};
+function ic(name, size, sw, cls) {
+  size = size || 16; sw = sw || (window.ICON_STROKE || 1.75);
+  return '<svg class="ic ' + (cls || '') + '" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + sw + '" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (ICONS[name] || '') + '</svg>';
+}
+/* Brand mark: a rounded tile holding "1" and "0" — Ten, read as the numeral. */
+function markSvg(size, tile, bar, ring, title) {
+  return '<svg class="mark" width="' + size + '" height="' + size + '" viewBox="0 0 32 32" role="img" aria-label="' + (title || 'Ten') + '">' +
+    '<rect width="32" height="32" rx="9" fill="' + tile + '"/>' +
+    '<rect x="7" y="8.5" width="3.6" height="15" rx="1.8" fill="' + bar + '"/>' +
+    '<ellipse cx="19.4" cy="16" rx="4.6" ry="5.7" fill="none" stroke="' + ring + '" stroke-width="3.6"/></svg>';
+}
+function faviconHref(tile, bar, ring) {
+  const s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="' + tile + '"/><rect x="6.5" y="8" width="4.4" height="16" rx="2.2" fill="' + bar + '"/><ellipse cx="19.6" cy="16" rx="4.4" ry="5.8" fill="none" stroke="' + ring + '" stroke-width="4.4"/></svg>';
+  return 'data:image/svg+xml,' + encodeURIComponent(s);
+}
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+/* ---------- invented personas only (the fixtures' own) ---------- */
+const P = {
+  jordan: { name: 'Jordan Alvarez', initials: 'JA', email: 'jordan.alvarez.demo@example.com', phone: '555-0142' },
+  priya: { name: 'Priya Nakamura', initials: 'PN', email: 'priya.nakamura.demo@example.com' },
+  sam: { name: 'Sam Okafor', initials: 'SO', email: 'sam.okafor.demo@example.com' },
+};
+/* Balance values: $5.00 (empty-first-run meta), $4.20 (gate-moment estimate_cost.balanceUsd),
+   $1.00 then $0.00 (over-limit-error). mvp-journey carries no balance, so its screens borrow
+   gate-moment's $4.20 — flagged in the README, never invented. */
+const BAL = { first: '$5.00', mvp: '$4.20', gate: '$4.20', errBefore: '$1.00', err: '$0.00' };
+
+/* applications/acme-staff-pm-resume.md (verbatim) + the two base bullets the proposal cut */
+const RESUME = {
+  name: 'Jordan Alvarez', contact: 'jordan.alvarez.demo@example.com · 555-0142',
+  summary: '8 years of B2B SaaS product management, most recently leading platform and partner ecosystem roadmaps. Grew partner API revenue from 2% to 40% of new-logo bookings in 18 months by treating partners as a first-class segment.',
+  roles: [{ head: 'Senior Product Manager, Fernbridge Data (2021-2026)', bullets: [
+    'Took the partner API from an internal afterthought to 40% of new-logo revenue in 18 months',
+    'Instrumented the partner funnel and shipped only what the data showed partners were blocked on',
+    'Led a cross-functional team of 6 engineers and 2 designers on the ecosystem roadmap'] }],
+  cutRole: { head: 'Product Manager, Cascade Systems (2018-2021)', bullets: [
+    { t: 'Owned the core billing platform used by 400+ enterprise customers', why: 'Weakest fit for this posting — cut first to save space' },
+    { t: 'Cut onboarding time from 6 weeks to 9 days by redesigning the setup flow', why: 'Second-weakest — an earlier role, less about partner ecosystems' }] },
+  education: 'BS Computer Science, State University',
+  skills: 'Roadmapping, API strategy, partner ecosystems, SQL, Figma',
+};
+const LETTER = [
+  'Dear Acme Hiring Team,',
+  'I lead platform roadmaps for B2B SaaS products where the ecosystem, not any single feature, is the moat, which is the bet your Staff PM posting is making. Over the last five years I have watched the same pattern play out at two different companies: the product that wins is the one whose partners can build on it without waiting for a roadmap slot, and the team that gets there first is the team that treats the partner surface as its own product from day one.',
+  'At Fernbridge Data I took our partner API from an internal afterthought to 40% of new-logo revenue in 18 months. The turn came from instrumenting the partner funnel before writing a line of new API surface, so every build decision traced back to where partners were actually stuck, not where we assumed they were stuck. That same discipline carried into the billing platform work earlier in my career at Cascade Systems, where a redesigned onboarding flow cut time-to-value from six weeks to nine days for over 400 enterprise customers.',
+  'Your posting describes the same inflection point Acme is at with its own ecosystem: real usage, an unclear next layer, and a decision about whether the partner experience gets a dedicated roadmap or stays a side project. I would bring the same approach: instrument first, then build only what the data says partners are blocked on, and keep the roadmap honest about the tradeoff between platform depth and shipping speed.',
+  'I would welcome the chance to talk about where Acme’s ecosystem strategy stands today and where a Staff PM could move it fastest.',
+  'Jordan Alvarez<br>jordan.alvarez.demo@example.com · 555-0142'];
+const POSTING = 'Acme is looking for a Staff PM to own our partner ecosystem end to end: roadmap, GTM alignment with partnerships, and the API surface partners build on. You’ll work closely with engineering and partnerships leadership. Occasional travel required. 6+ years of B2B SaaS product management experience preferred.';
+const SIGNALS = ['Series C, 2026 (verified: news.example.com/acme-series-c)', 'Engineering culture: small teams, weekly releases (verified: eng.acme.example.com/blog)', 'Staff PM leveling guide does not state whether the role carries direct reports (unknown)'];
+const REASON = '8 years of B2B SaaS platform PM experience matches the core ask; partner-API story lines up with their stated ecosystem priority';
+const TIER = { strong: 'Strong Fit', investable_stretch: 'Investable Stretch', long_shot: 'Long-Shot Stretch', weak: 'Weak Fit' };
+const PRIYA_ROLES = ['Solace Metrics — Senior PM', 'Northwind Analytics — Staff PM', 'Vantage Cloud — Group PM', 'Bright Harbor Software — Senior PM', 'Cedar Peak Data — Staff PM', 'Fernline Logistics — Senior PM'];
+
+/* ---------- activity rows: a UI-owned lookup from each tool part to plain words ----------
+   raw = the part's literal input/output, shown only in the third, "details" level (rule 11). */
+const ACT = {
+  m2: { sum: 'Read your résumé', steps: [
+    ['book-open', 'Read your résumé', 'jordan-alvarez-resume.pdf', 'read_file {"path":"documents/jordan-alvarez-resume.pdf"} → extracted: true'],
+    ['pencil-line', 'Saved your experience as your base résumé', '', 'write_file {"path":"base-resume.md"} → written: true'],
+    ['circle-check', 'Checked your files', '1 file, 0 problems', 'python3 profile/scripts/check_files.py --workspace . → "1 file(s) checked against 11 schema(s); 0 failure(s)." exit 0']] },
+  m4: { sum: 'Saved your goals', steps: [
+    ['target', 'Saved what you’re looking for', 'Senior/Staff PM · B2B SaaS · Remote US', 'write_file {"path":"criteria.md"} → written: true'],
+    ['list-todo', 'Started your plan', 'Offer by Nov 30 · 45 min a day', 'write_file {"path":"plan.md"} → written: true'],
+    ['circle-check', 'Checked your files', '3 files, 0 problems', 'python3 profile/scripts/check_files.py --workspace . → "3 file(s) checked against 11 schema(s); 0 failure(s)." exit 0']] },
+  m6: { sum: 'Researched Acme and scored the fit', steps: [
+    ['globe', 'Opened the posting', 'Acme — Staff PM · Remote (US)', 'fetch_job {"url":"https://boards.greenhouse.io/acme/jobs/4102938"} → board: greenhouse, savedTo: jd-inbox/acme-staff-pm.md'],
+    ['search', 'Searched “Acme Series C funding 2026”', '1 result', 'web_search {"query":"Acme Series C funding 2026","maxResults":4} → 1 result'],
+    ['search', 'Searched “Acme engineering blog culture”', '1 result', 'web_search {"query":"Acme engineering blog culture","maxResults":5} → 1 result'],
+    ['file-search', 'Wrote the fit analysis', '', 'write_file {"path":"jd-analysis/acme-staff-pm.md"} → written: true'],
+    ['building-2', 'Saved notes on Acme', '', 'write_file {"path":"company/acme.md"} → written: true'],
+    ['briefcase', 'Added the role to your job list', 'Strong Fit · 82', 'python3 evaluate/scripts/record_verdict.py … → "recorded (created NEW role): Acme — Staff PM → strong (82)" exit 0']] },
+  m8: { sum: 'Tailored your résumé and cover letter', steps: [
+    ['book-open', 'Read your base résumé', '', 'read_file {"path":"base-resume.md"}'],
+    ['book-open', 'Read the fit analysis', '', 'read_file {"path":"jd-analysis/acme-staff-pm.md"}'],
+    ['file-pen', 'Wrote the tailored résumé', '3 of your 5 bullets', 'write_file {"path":"applications/acme-staff-pm-resume.md"} → written: true'],
+    ['file-pen', 'Wrote the cover letter', '', 'write_file {"path":"applications/acme-staff-pm-cover-letter.md"} → written: true'],
+    ['circle-check', 'Checked both documents', '0 failed · 0 flagged', 'python3 apply/scripts/check_materials.py … → "RESUME acme-staff-pm-resume.md: pass (0 fail, 0 warn)" · "LETTER acme-staff-pm-cover-letter.md: pass (0 fail, 0 warn)" exit 0'],
+    ['printer', 'Laid out the résumé for print', '109 words', 'python3 apply/scripts/render_resume.py … → "words: 109 -> applications/acme-staff-pm-resume.html" exit 0'],
+    ['pencil-line', 'Saved the application notes', '', 'write_file {"path":"applications/acme-staff-pm-application.md"} → written: true'],
+    ['scissors', 'Listed what was cut and why', '2 of 5 bullets', 'python3 apply/scripts/proposal_block.py … exit 0 (1 WARN: “cross-functional leadership” — their word not in the base)']] },
+  m10: { sum: 'Updated your plan', steps: [
+    ['briefcase', 'Read your job list', '1 active role', 'read_file {"path":"jobs.md"}'],
+    ['list-todo', 'Updated your plan', '3 things to do', 'write_file {"path":"plan.md"} → written: true'],
+    ['circle-check', 'Checked the plan', 'clean', 'python3 coach/scripts/check_closeout.py --workspace . --stage applying → "close-out clean: stage applying; plan.md written; 0 question(s) each have a row" exit 0']] },
+  g2: { sum: 'Estimated the cost', steps: [['wallet', 'Estimated the cost of 6 evaluations', '$0.50–$0.70', 'estimate_cost {"steps":18,"webSearches":18,"action":"evaluate 6 saved roles"} → lowUsd 0.5, highUsd 0.7, balanceUsd 4.2, needsGate: true']] },
+  g4: { sum: 'Estimated the cost', steps: [['wallet', 'Estimated the cost of 5 evaluations', '$0.35–$0.48', 'estimate_cost {"steps":15,"webSearches":15,"action":"evaluate 5 saved roles"} → lowUsd 0.35, highUsd 0.48, balanceUsd 4.2, needsGate: false']] },
+  e1: { sum: 'Estimated the cost', steps: [['wallet', 'Estimated the cost of 8 evaluations', '$0.60–$0.90', 'estimate_cost {"steps":24,"webSearches":24,"action":"evaluate 8 roles"} → lowUsd 0.6, highUsd 0.9, balanceUsd 1, needsGate: false']] },
+  e2: { sum: 'Researched Meridian Labs', steps: [
+    ['search', 'Searched “Meridian Labs funding stage”', '1 result', 'web_search {"query":"Meridian Labs funding stage","maxResults":3} → 1 result'],
+    ['briefcase', 'Added the role to your job list', 'Investable Stretch · 64', 'python3 evaluate/scripts/record_verdict.py … → "recorded (created NEW role): Meridian Labs — Product Lead → investable_stretch (64)" exit 0']] },
+  e3: { sum: 'Researched Solterra Robotics', steps: [
+    ['search', 'Searched “Solterra Robotics company reviews”', '1 result', 'web_search {"query":"Solterra Robotics company reviews","maxResults":5} → 1 result'],
+    ['briefcase', 'Added the role to your job list', 'Weak Fit · 31', 'python3 evaluate/scripts/record_verdict.py … → "recorded (created NEW role): Solterra Robotics — Group PM → weak (31)" exit 0']] },
+};
+
+/* ---------- the mvp-journey transcript, two voices ---------- */
+const T = {
+  target: {
+    m2: 'Got it — I’ve read your résumé and saved your experience as your base résumé. Before I tailor anything, I need three things: the roles you’re aiming for, how much time you can give this each day, and when you’d like an offer by. Got a few minutes now?',
+    m4: 'Saved. Goal: an offer by Nov 30, with 45 minutes a day. Paste a job posting whenever you’ve got one, or I can start finding roles for you.',
+    m6: 'It’s a Strong Fit, and it’s on your job list now. Want me to tailor a résumé and cover letter for this one?',
+    m8a: 'Both are ready. The résumé is 109 words, and both documents pass the format checks — nothing failed, nothing flagged. The wording check hasn’t run yet, so I can vouch for the structure but not the phrasing. I can’t make a PDF here: open the résumé and use Print to save one. I don’t write outreach plans in this app either.',
+    m8cutHead: 'What I cut — 2 of your 5 bullets, weakest fit first. Say “keep” and the bullet’s number to bring one back.',
+    m8words: 'Their words, placed: “enterprise billing platform experience” is true of you, so it sits where your résumé already shows it. Say Summary, Skills, or leave it out to move it.',
+    m8end: 'Otherwise, this is the version.',
+    m10: 'That’s your plan: send the letter, submit once you have, and tell me if you want more roles found.',
+  },
+  verbatim: {
+    m2: 'Got it — I pulled your experience into base-resume.md. Before I can tailor anything, I need your target roles, a budget, and a goal date. Got a few minutes now?',
+    m4: 'Saved. Goal: offer by Nov 30, budget: 45 min/day. Paste a job posting whenever you’ve got one, or I can start finding roles for you.',
+    m6: 'Strong Fit, recorded in jobs.md. Want me to tailor a resume and cover letter for this one?',
+    m8a: 'Résumé is 109 words (render_resume). Both files pass check_materials’s mechanical checks, 0 fail and 0 warn each — the language check hasn’t run yet, so I can’t say the wording itself is clean, only that the structure is. This app doesn’t produce an outreach plan or a PDF — only the .md files and the printable HTML; print to PDF yourself when you’re ready. Here’s what I cut and placed:',
+    m8cutHead: '<b>Cut — 2 of 5 bullets, weakest first.</b> Say "keep &lt;bullet&gt;" and it comes back.',
+    m8words: '<b>Their words, placed</b> — say "Summary" / "Skills" / "leave it out" to move any of these:<br>• <b>enterprise billing platform experience</b> — true of you; placed where the document shows it',
+    m8end: 'Otherwise this is the version.',
+    m10: 'That’s what’s queued in plan.md — send the letter, submit once you have, and tell me if you want more roles found.',
+    cut: ['Cascade Systems — Owned the core billing platform used by 400+ enterprise customers — <i>weakest fit for this JD; page budget cut here first</i>', 'Cascade Systems — Cut onboarding time from 6 weeks to 9 days by redesigning the setup… — <i>second-weakest fit; earlier role, less ecosystem-relevant</i>'],
+    plan: [
+      'Send the Acme cover letter (<code>applications/acme-staff-pm-cover-letter.md</code>) — 5 min — mechanical checks are clean; the language check has not run',
+      'Submit the Acme application yourself once you’ve sent the letter (<code>applications/acme-staff-pm-application.md</code>) — 10 min — I have no submit tool yet',
+      'Tell me if you want me to keep looking for more Track A roles — 2 min — one search pass takes about that long'],
+  },
+};
+/* Target-voice plan items: the same three plan.md lines, split on the schema's " — " separators
+   (a proposed § 2.2 amendment) with the backticked path lifted into a document chip. */
+const PLAN = [
+  { t: 'Send the Acme cover letter', min: 5, why: 'Format checks are clean; the wording check hasn’t run', doc: 'letter' },
+  { t: 'Submit the Acme application yourself, once you’ve sent the letter', min: 10, why: 'I can’t submit applications for you yet', doc: 'app' },
+  { t: 'Tell me if you want me to keep looking for more roles like this one', min: 2, why: 'One search takes about that long' }];
+const DOCS = {
+  resume: { title: 'Tailored résumé — Acme', meta: '109 words', check: 'Format checks passed', path: 'applications/acme-staff-pm-resume.md' },
+  letter: { title: 'Cover letter — Acme', meta: 'Cover letter', check: 'Format checks passed', path: 'applications/acme-staff-pm-cover-letter.md' },
+  app: { title: 'Application notes — Acme', meta: 'What to cover and why', check: '', path: 'applications/acme-staff-pm-application.md' },
+};
+
+/* ---------- copy fixed by docs/design-web-ui.md ---------- */
+const COPY = {
+  firstRun: 'I don’t have anything of yours yet. Drop in a résumé, or tell me the job you’re going for, and I’ll start your workspace.',
+  gateLine: 'This costs up to $0.70 — nothing starts until you say yes.',
+  overBalance: 'Your credit is used up. You can buy more from your balance at the top.',
+  creditIntro: 'Credit pays for Ten’s work. You pay in PayPal’s window; Ten adds what arrives after PayPal’s fee, a few percent plus a fixed amount. This is a one-time payment: nothing renews, and Ten never charges you on its own.',
+  creditUnder: 'Paid credit stays if you delete your beta data. The beta has a shared daily limit, so on a busy day Ten can pause until tomorrow even with credit. For a refund, email support@10xjobs.co.',
+  credited: 'Added $9.16 of credit. PayPal charged $10.00; its fee was $0.84.',
+  value: 'Help you get a job offer you actually want.',
+  local: 'Prefer local? Run it from your terminal',
+};
+const PROOF = [
+  ['briefcase', 'A verdict on every role, with the reasons', 'Paste a posting. Ten researches the company, scores the fit out of 100, and says why in plain words.'],
+  ['file-check', 'Tailored from your facts, never inflated', 'Ten picks from what you gave it, never states a claim stronger than that, and shows you what it cut.'],
+  ['shield-check', 'Nothing spent without your yes', 'Bigger jobs show a cost range first, and only your typed yes starts them. Ten never sends or submits as you.'],
+];
+const TRUST = ['Your files stay yours', 'Export anytime', 'Delete anytime'];
+const SIGNIN_NOTE = 'Invite-only beta. Your sign-in is shared with the older app.';
+
+/* ---------- router: #screen&flag&flag ---------- */
+const SCREENS = [['landing', 'Landing / sign-in'], ['first', 'First run'], ['convo', 'Conversation'], ['verbatim', 'Conversation (fixture verbatim)'], ['doc', 'Document open'], ['gate', 'Gate'], ['credit', 'Buy credit'], ['error', 'Error'], ['phone', 'Phone 375px'], ['states', 'States']];
+function route() {
+  const h = (location.hash || '#convo').slice(1).split('&');
+  const flags = {}; h.slice(1).forEach(f => { const [k, v] = f.split('='); flags[k] = v === undefined ? true : v; });
+  return { screen: h[0] || 'convo', flags };
+}
+function setFlag(name, on) {
+  const r = route(); if (on) r.flags[name] = true; else delete r.flags[name];
+  location.hash = r.screen + Object.keys(r.flags).map(k => '&' + k + (r.flags[k] === true ? '' : '=' + r.flags[k])).join('');
+}
+function protoBar(title, extra) {
+  const r = route();
+  return '<nav class="proto" aria-label="Prototype screens"><span class="proto-t">' + title + '</span>' +
+    SCREENS.map(s => '<a href="#' + s[0] + (r.flags.dark ? '&dark' : '') + '" class="' + (r.screen === s[0] ? 'on' : '') + '">' + s[1] + '</a>').join('') +
+    '<span class="proto-sp"></span>' + (extra || '') +
+    '<label><input type="checkbox" ' + (r.flags.dark ? 'checked' : '') + ' onchange="setFlag(\'dark\',this.checked)"> Dark</label></nav>';
+}
+const PROTO_CSS = `.proto{position:fixed;top:0;left:0;right:0;height:40px;z-index:1000;display:flex;align-items:center;gap:2px;padding:0 12px;background:#0b0b0d;color:#a1a1aa;font:500 12px/1 Inter,system-ui,sans-serif;overflow-x:auto;white-space:nowrap}
+.proto a{color:#a1a1aa;text-decoration:none;padding:6px 8px;border-radius:6px}.proto a:hover{color:#fff;background:#1f1f23}.proto a.on{color:#0b0b0d;background:#fff}
+.proto-t{color:#fff;font-weight:600;margin-right:10px}.proto-sp{flex:1}.proto label{display:flex;gap:6px;align-items:center;padding:0 8px;cursor:pointer}
+body.has-proto .stage{top:40px}body.clean .proto{display:none}`;
+
+window.ICON_STROKE = 1.6;
+document.head.insertAdjacentHTML('beforeend', '<style>' + PROTO_CSS + '</style>');
+document.getElementById('fav').href = faviconHref('#2446B3', '#FFFFFF', '#FFFFFF');
+const MARK = (s) => markSvg(s || 26, 'var(--accent)', 'var(--on-accent)', 'var(--on-accent)');
+function theme() { return route().flags.dark ? 'dark' : 'light'; }
+SCREENS.length = 0; [['convo', 'Conversation (target voice)'], ['phone', 'Phone 375px']].forEach(s => SCREENS.push(s));
+
+function resumePage() {
+  const R = RESUME;
+  return '<article class="paper"><h1>' + R.name + '</h1><p class="ct">' + R.contact + '</p><h2>Summary</h2><p>' + R.summary + '</p><h2>Selected experience</h2>' +
+    '<h3>Senior Product Manager, Fernbridge Data <small>2021–2026</small></h3><ul>' + R.roles[0].bullets.map(b => '<li>' + b + '</li>').join('') + '</ul>' +
+    '<div class="cutrole" id="cut"><h3>Product Manager, Cascade Systems <small>2018–2021</small></h3><ul>' + R.cutRole.bullets.map(b => '<li>' + b.t + '</li>').join('') + '</ul></div>' +
+    '<h2>Education</h2><p>' + R.education + '</p><h2>Skills</h2><p>' + R.skills + '</p></article>';
+}
+function docSide(o) {
+  o = o || {};
+  return '<section class="docside"><div class="band"><span class="sc">82<small>/100</small></span><div class="rs"><b><span class="tier">' + ic('check', 13, 2.5) + 'Strong Fit</span>Acme · Staff PM · Remote (US)</b><p>' + REASON + '</p></div><button class="lk">' + ic('file-search', 15) + 'Fit analysis</button><button class="lk">' + ic('external-link', 15) + 'Posting</button></div>' +
+    '<div class="tabs" role="tablist"><button class="tab on" role="tab">' + ic('file-text', 16) + 'Résumé<span class="ok">' + ic('circle-check', 14) + '</span></button><button class="tab" role="tab">' + ic('mail', 16) + 'Cover letter<span class="ok">' + ic('circle-check', 14) + '</span></button><button class="tab" role="tab">' + ic('list-checks', 16) + 'Answers<span class="n">none yet</span></button>' +
+    '<div class="tools"><button class="tg"><span class="sw"></span>Show what was cut</button><button class="ib" aria-label="Copy text">' + ic('copy', 17) + '</button><button class="ib" aria-label="Print or save PDF">' + ic('printer', 17) + '</button></div></div>' +
+    '<div class="statusbar"><span>109 words</span><i class="dot"></i><span class="okt">' + ic('check', 13, 2.5) + 'Format checks passed</span><i class="dot"></i><span>Wording check not run</span><span class="sp"></span><span class="path" style="font-family:var(--font-mono);font-weight:400">applications/acme-staff-pm-resume.md</span></div>' +
+    '<div class="canvas"><div class="pagewrap">' + resumePage() + '<div class="notes"><div class="note" style="top:372px"><b>' + ic('scissors', 14) + 'Cut, weakest fit first</b>Both Cascade Systems bullets — an earlier role, less about partner ecosystems.<span class="k">say “keep 1”</span></div><div class="note" style="top:150px"><b>' + ic('check', 14) + 'Their words, placed</b>“enterprise billing platform experience” — true of you; sits where your résumé shows it.</div></div></div></div></section>';
+}
+function act(k, live) { const a = ACT[k]; return '<div class="act' + (live ? ' live' : '') + '">' + (live ? '<span class="spin">' + ic('loader-circle', 14) + '</span>' + live : '<span class="ok">' + ic('circle-check', 14) + '</span>' + a.sum + '<span class="n">' + a.steps.length + ' steps</span>') + ic('chevron-right', 13) + '</div>'; }
+function chip(k, on) { const d = DOCS[k]; return '<button class="chip' + (on ? ' on' : '') + '"><span class="fi">' + ic('file-text', 15) + '</span><span style="flex:1;min-width:0"><b>' + d.title + '</b><small>' + d.meta + (d.check ? '<i class="dot"></i><span class="okt">' + ic('check', 12, 2.5) + d.check + '</span>' : '') + '</small></span>' + (on ? '<span class="ctx">Open</span>' : ic('chevron-right', 15)) + '</button>'; }
+function plan() { return '<div class="plan"><div class="ph">' + ic('list-todo', 15) + 'Your plan<small>17 of 45 min</small></div><ol>' + PLAN.map(p => '<li><span class="rg"></span><span>' + p.t + '<span class="w">' + p.why + '</span></span><span class="mn">' + p.min + ' min</span></li>').join('') + '</ol></div>'; }
+function thread(o) {
+  o = o || {};
+  const ten = (inner) => '<div class="m"><div class="who">' + MARK(20) + 'Ten</div>' + inner + '</div>';
+  const you = (t) => '<div class="m you"><div class="bb">' + t + '</div></div>';
+  let h = you('found this one: https://boards.greenhouse.io/acme/jobs/4102938');
+  h += ten(act('m6') + '<p>' + T.target.m6 + '</p>');
+  h += you('yes please');
+  h += ten(act('m8') + chip('resume', true) + chip('letter') + '<p>Both are ready. The résumé is 109 words, and both pass the format checks — nothing failed, nothing flagged. The wording check hasn’t run yet.</p><p>I cut 2 of your 5 bullets, weakest fit first — they’re marked on the page. Say “keep” and the number to bring one back. Use Print to save a PDF.</p>');
+  h += you('great, what’s next?');
+  h += o.stream ? ten(act('m10', 'Updating your plan…') + '<p>That’s your plan: send the letter<span class="caret"></span></p>') : ten(act('m10') + plan() + '<p>' + T.target.m10 + '</p>');
+  return h;
+}
+function composer(ph) { return '<div class="composer"><textarea rows="1" placeholder="' + (ph || 'Ask Ten about this résumé') + '" aria-label="Message Ten"></textarea><div class="crow"><button class="ib" aria-label="Attach a file">' + ic('paperclip', 16) + '</button><span class="ctx">' + ic('file-text', 12) + 'Résumé — Acme</span><span class="sp"></span><button class="send" disabled aria-label="Send">' + ic('arrow-up', 16, 2.25) + '</button></div></div>'; }
+function app(o) {
+  o = o || {};
+  const hd = '<header class="hd"><a class="brand" href="#convo">' + MARK(26) + '<span class="wm">Ten</span></a><span class="sep">/</span><span class="title">Acme · Staff PM</span><span class="sp"></span><div class="credit">' + ic('wallet', 15) + '<span><b>' + BAL.mvp + '</b><span class="lbl"> credit</span></span><button class="buy">Buy credit</button></div><button class="avatar" aria-label="Account menu">JA</button></header>';
+  const coach = '<aside class="coach"><div class="coach-hd">' + MARK(22) + '<b>Ten</b><small>your coach for this application</small></div><div class="thread">' + thread(o) + '</div>' + composer() + '</aside>';
+  const sheet = o.sheetOpen ? '<div class="sheet open"><div class="grab"></div><div class="thread">' + thread(o) + '</div>' + composer() + '</div>' : '<div class="sheet"><div class="grab"></div><div class="last">' + MARK(20) + '<span><b>Ten</b> · ' + T.target.m10 + '</span></div>' + composer('Ask Ten about this résumé') + '</div>';
+  return '<div class="shell" data-theme="' + theme() + '"><div class="app">' + hd + '<div class="work">' + docSide(o) + coach + '</div></div>' + sheet + '</div>';
+}
+const SB = '<span style="display:flex;gap:6px;align-items:center"><svg width="18" height="11" viewBox="0 0 18 11"><rect x="0" y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="10" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="11" rx="1" fill="currentColor"/></svg><svg width="26" height="12" viewBox="0 0 26 12"><rect x=".5" y=".5" width="22" height="11" rx="3.5" fill="none" stroke="currentColor" opacity=".4"/><rect x="2" y="2" width="17" height="8" rx="2" fill="currentColor"/></svg></span>';
+const S = {
+  convo: (f) => app({ stream: f.stream }),
+  phone: () => { const ph = (inner, cap) => '<div><div class="phone" data-theme="' + theme() + '"><div class="sbar"><span>9:41</span>' + SB + '</div>' + inner + '</div><div class="ph-cap">' + cap + '</div></div>'; return '<div class="phones" data-theme="' + theme() + '">' + ph(app({}), 'The page is the screen; Ten waits in a sheet') + ph(app({ sheetOpen: true }), 'Pull the sheet up to talk to Ten') + '</div>'; },
+};
+function render() {
+  const r = route(); if (!S[r.screen]) r.screen = 'convo';
+  document.body.classList.toggle('clean', !!r.flags.clean); document.body.classList.toggle('has-proto', !r.flags.clean);
+  document.getElementById('proto').innerHTML = protoBar('Direction B · Document-first (stopped at two screens — owner picked C)', r.screen === 'convo' ? '<a href="#convo' + (r.flags.stream ? '' : '&stream') + '">' + (r.flags.stream ? 'Show finished' : 'Show mid-reply') + '</a>' : '');
+  document.documentElement.setAttribute('data-theme', theme());
+  const st = document.getElementById('stage'); st.innerHTML = S[r.screen](r.flags);
+  st.querySelectorAll('.coach .thread, .sheet.open .thread').forEach(t => { t.scrollTop = t.scrollHeight; });
+}
+window.addEventListener('hashchange', render); render();
+</script>
+</body>
+</html>

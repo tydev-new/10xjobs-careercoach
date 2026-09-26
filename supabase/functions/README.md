@@ -154,10 +154,14 @@ the CLI will refuse to let you set yourself; every other Edge Function gets
 them automatically once deployed to the project.
 
 ```sh
-# From the repo root, once linked to career-coach-nextgen (ref ivunfotoggdxbjouumdk):
-supabase functions deploy ten-model-proxy --project-ref ivunfotoggdxbjouumdk
-supabase functions deploy ten-delete-account --project-ref ivunfotoggdxbjouumdk
-supabase functions deploy ten-paypal --project-ref ivunfotoggdxbjouumdk
+# From the repo root, once linked to career-coach-nextgen (ref ivunfotoggdxbjouumdk).
+# EVERY Ten function is deployed --no-verify-jwt: each checks the caller's
+# token itself, and the gateway's JWT check would refuse the browser's CORS
+# preflight (OPTIONS carries no token). The CLI defaults to verify_jwt=true,
+# so a redeploy without the flag breaks the live function.
+supabase functions deploy ten-model-proxy --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
+supabase functions deploy ten-delete-account --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
+supabase functions deploy ten-paypal --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
 supabase functions deploy ten-paypal-webhook --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
 
 # Secrets ten-model-proxy needs (never printed, never committed):
@@ -264,7 +268,7 @@ runs any of this):
    TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com
    TEN_PAYPAL_MERCHANT_ID=… --project-ref ivunfotoggdxbjouumdk`.
 6. `supabase functions deploy ten-delete-account`, then `ten-paypal`, then
-   `ten-paypal-webhook --no-verify-jwt` (same project ref) — this order
+   `ten-paypal-webhook`, each `--no-verify-jwt` (same project ref) — this order
    matters (§ 17.4: delete must stop touching ledger rows before a
    purchase can land).
 7. developer.paypal.com → the shared app → Webhooks → Add:

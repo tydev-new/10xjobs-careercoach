@@ -2247,7 +2247,9 @@ records survive a delete.
    TEN_PAYPAL_MERCHANT_ID=… TEN_PAYPAL_API_BASE=https://api-m.sandbox.paypal.com
    --project-ref ivunfotoggdxbjouumdk`.
 5. `supabase functions deploy ten-delete-account`, then `ten-paypal`, then
-   `ten-paypal-webhook --no-verify-jwt` (same project ref).
+   `ten-paypal-webhook`, each `--no-verify-jwt` (same project ref; every Ten
+   function checks the caller itself, and the gateway check would refuse
+   the browser's CORS preflight).
 6. developer.paypal.com → the app → Webhooks → Add:
    `https://ivunfotoggdxbjouumdk.supabase.co/functions/v1/ten-paypal-webhook`,
    "Payment capture completed" only. Copy the Webhook ID PayPal shows,

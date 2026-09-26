@@ -516,6 +516,27 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s: "check_files", id: "r3-cf-explicit-skills-beats-default", files: { "profile.md": PROFILE }, args: ["--workspace", ".", "--skills", "nowhere"], mount: "design" });
 }
 
+// ------------------------------------------------------------------ round 4
+// Fix round (independent-reviewer repro, 2026-09-26): the WAITING_RE
+// `##\b` alternative never matched a real "## Heading" line — `\b`
+// between `#` and a space is never a word boundary — so Waiting on you
+// never ended at a following optional section. schema.md (§ plan.md)
+// allows exactly this shape: Board (Waiting on you last), then optional
+// `## Standing floor` / `## Queue` sections.
+{
+  const s = "check_closeout";
+  // Waiting on you is the LAST board section, followed by BOTH optional
+  // sections the schema allows.
+  const TRAILING = "Goal: x\n\n## Board\nWaiting on you\n- the comp floor — criteria.md\n\n" +
+    "## Standing floor\n- 1 practice rep a day\n\n## Queue\n- timer: follow up Acme 10-02\n";
+  add({ s, id: "r4-cc-waiting-then-standing-floor-and-queue-row-matches", files: { "plan.md": TRAILING }, args: ["--workspace", ".", "--stage", "applying", "--asked", "the comp floor"] });
+  add({ s, id: "r4-cc-waiting-then-standing-floor-and-queue-leak-fails", files: { "plan.md": TRAILING }, args: ["--workspace", ".", "--stage", "applying", "--asked", "follow up on the timer"] });
+  // A `# ` title-style (H1) line following Waiting on you must also close
+  // the block — not just `##`.
+  const TITLE_AFTER = "## Board\nWaiting on you\n- the comp floor — criteria.md\n\n# Next chapter\n- timer: follow up Acme 10-02\n";
+  add({ s, id: "r4-cc-waiting-then-h1-title-leak-fails", files: { "plan.md": TITLE_AFTER }, args: ["--workspace", ".", "--stage", "applying", "--asked", "follow up on the timer"] });
+}
+
 // ------------------------------------------------------------------ engines
 function seed(ws, c) {
   rmSync(ws, { recursive: true, force: true });

@@ -321,6 +321,47 @@ def test_s1_company_em_dash_round_trips_as_hyphen_title_keeps_its_own_both_runti
         assert jm.key(py_rows[0]) == jm.key({"company": company, "title": title})
 
 
+# ------------------------------------------------------------ § 4.3 as amended in S1 fix round 1
+
+EMPTY_ERR = "error: empty company or title after cleaning; nothing written\n"
+
+
+def test_s1_company_ending_in_em_dash_written_as_hyphen_both_runtimes():
+    """Amended § 4.3: a company "ending in ` —`" has that em dash written as
+    `-`, so the heading's first ` — ` is the real separator."""
+    if _skip():
+        return
+    for company, want in (("Acme —", "Acme -"), ("Acme  \u2014\t", "Acme -"), ("Acme\u00a0\u2014", "Acme -"),
+                          ("A \u2014 B \u2014", "A - B -"), ("Acme \u2014\u2028", "Acme -")):
+        res, final, ws = _both_rv([["--company", company, "--title", "Director \u2014 Platform", "--verdict", "weak"]])
+        assert res[0][0] == 0, (company, res)
+        heads = [l for l in _lines(final) if l.startswith("### ")]
+        assert heads == [f"### {want} \u2014 Director \u2014 Platform"], (company, heads)
+        rows = jm.load(ws)
+        assert [(r["company"], r["title"]) for r in rows] == [(want, "Director \u2014 Platform")], (company, rows)
+        # stable: a second write on the same key updates, never duplicates
+        res2, final2, ws2 = _both_rv([["--company", company, "--title", "Director \u2014 Platform", "--verdict", "weak"]] * 2)
+        assert [c for c, _, _ in res2] == [0, 0] and len(jm.load(ws2)) == 1, (company, res2)
+
+
+def test_s1_empty_company_or_title_after_cleaning_refused_exit_2_nothing_written_both_runtimes():
+    """Amended § 4.3: "A company or title that is empty after cleaning is
+    refused: the writer exits 2 and jobs.md is unchanged." Every class
+    character alone, and the empty string, on either name; with and
+    without a jobs.md already present."""
+    if _skip():
+        return
+    seed = _script_written([_row(url="https://x/1")])
+    blanks = [""] + [ch * 2 for ch in CLASS] + [" \t\n\u2028\u00a0 "]
+    for blank in blanks:
+        for company, title in ((blank, "Role"), ("Beta", blank)):
+            args = ["--company", company, "--title", title, "--verdict", "weak", "--score", "5"]
+            for present in (seed, None):
+                res, final, _ = _both_rv([args], seed=present)
+                assert res[0] == (2, "", EMPTY_ERR), (repr(company), repr(title), res)
+                assert final == present, (repr(company), repr(title), "jobs.md changed")
+
+
 # ------------------------------------------------------------ ## Search notes (§ 4.3)
 
 NOTES = ("### 2026-01-01\n\nline one  \n\ttabbed line\n\n\n  indented\n"

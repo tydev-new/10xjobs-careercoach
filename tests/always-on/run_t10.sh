@@ -27,10 +27,9 @@ TRIALS="${TRIALS:-1}"
 # The vault (2026-08-20 incident class): the founder's real ~/job-search is
 # immutable for the whole run — locked before the first turn, unlocked on
 # every exit path (EXIT after the final wait; INT/TERM also kill the group).
-REALJS="$HOME/job-search"
-vault_unlock() { find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null; }
-vault_lock()   { find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null; }
-[ -d "$REALJS" ] && { vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM; }
+# Vault lock/unlock: shared, reference-counted (lib_env.sh) -- see its
+# comment for the race this fixes (a sibling run_*.sh unlocking early).
+vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM
 
 # Targeted by default (founder, 2026-08-21): name the cases whose rules moved.
 # The full suite is the receipt for a conversion or a shared-text change —

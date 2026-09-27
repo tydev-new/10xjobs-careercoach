@@ -53,6 +53,47 @@ if [ -f "$HOME/.claude/plugins/installed_plugins.json" ]; then
   fi
 fi
 
+# 5. Process-safety guard (2026-09-26 Chrome incident): guard-bin's
+#    pkill/killall/kill shims exist, are executable, and lib_env.sh puts
+#    them first on PATH — before any runner can start an agent that might
+#    reach for a name-based kill.
+if [ -x "$ROOT/guard-bin/pkill" ] && [ -x "$ROOT/guard-bin/killall" ] && [ -x "$ROOT/guard-bin/kill" ]; then
+  say ok "guard-bin/{pkill,killall,kill} present and executable"
+else
+  say FAIL "guard-bin is missing an executable shim (pkill/killall/kill)"; fail=1
+fi
+if grep -q 'guard-bin' "$ROOT/lib_env.sh"; then
+  say ok "lib_env.sh puts guard-bin first on PATH"
+else
+  say FAIL "lib_env.sh does not reference guard-bin — the kill guards are not wired in"; fail=1
+fi
+
+# 6. Clean environment: lib_env.sh must scrub inherited CLAUDE_CODE_* vars
+#    (a desktop session's own vars were found to change the agent's tools).
+if grep -q 'CLAUDE_CODE_' "$ROOT/lib_env.sh" && grep -q 'unset "\$_v"' "$ROOT/lib_env.sh"; then
+  say ok "lib_env.sh scrubs ambient CLAUDE_CODE_* vars"
+else
+  say FAIL "lib_env.sh does not scrub ambient CLAUDE_CODE_* vars"; fail=1
+fi
+
+# 7. Vault lock must be the ONE shared, reference-counted copy in
+#    lib_env.sh — not a private copy per run_*.sh (the sibling-unlock race
+#    this fixed).
+if grep -q 'vault_lock()' "$ROOT/lib_env.sh" && grep -q 'vault_unlock()' "$ROOT/lib_env.sh"; then
+  say ok "lib_env.sh defines the shared vault_lock/vault_unlock"
+else
+  say FAIL "lib_env.sh is missing the shared vault_lock/vault_unlock"; fail=1
+fi
+stray=""
+for f in "$ROOT"/run_*.sh; do
+  grep -q 'vault_lock()\|vault_unlock()' "$f" 2>/dev/null && stray="$stray $(basename "$f")"
+done
+if [ -z "$stray" ]; then
+  say ok "no run_*.sh still defines its own private vault_lock/vault_unlock"
+else
+  say FAIL "still define their own vault_lock/vault_unlock (the race this fixed):$stray"; fail=1
+fi
+
 echo
 [ "$fail" = 0 ] && echo "PREFLIGHT CLEAN" || echo "PREFLIGHT FAILED — fix before trusting results"
 exit $fail

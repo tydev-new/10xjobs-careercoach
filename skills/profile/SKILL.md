@@ -61,7 +61,7 @@ Anything not yet true is written into its file as `TODO:` and resurfaces when it
 - **Each round:** Re-read brief in full. Apply changes reshape-only to `base-resume.md`. **Budget:** 2–3 rounds, said up front.
 - **Self-loop:** Run `../apply/scripts/check_materials.py` for structure and independent language checker (`references/language-check.md`) for wording (max 2 passes).
 - **Score & ceiling:** Score against `§ FIXED` as `N/M held` count over FIXED bullets plus reader tiers. Append row to `## Rounds` in `base-resume.md` (or `base-resume-history.md`). Read earlier rows first.
-- **Exits:** Draft scores M/M; budget expires; or **the ceiling: two rounds in a row with the same count and tiers** → stop and present tradeoff as a **DECISION**. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
+- **Exits:** Draft scores M/M; budget expires; or **the ceiling: two rounds in a row with the same count and tiers** → stop and present tradeoff as a decision for them to make. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
 
 ### Pitch — public positioning (the loop)
 
@@ -71,7 +71,7 @@ Anything not yet true is written into its file as `TODO:` and resurfaces when it
 - **Budget:** 2 rounds, said up front. Read earlier rows in `## Rounds` in `pitch.md` (or `pitch-history.md`) first.
 - **Each round:** Re-read brief in full. Apply minimum change to move diagnostic score (`references/eval.md`). Run substitution test on core statement.
 - **Score & write:** Score against `§ FIXED` as `N/M held` count plus 1–5 diagnostic. Append row to `## Rounds` in `pitch.md` (or `pitch-history.md`).
-- **Exits:** Scores M/M; budget expires; or **the ceiling: two rounds in a row with the same count and diagnostic** → stop and present tradeoff as a **DECISION**. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
+- **Exits:** Scores M/M; budget expires; or **the ceiling: two rounds in a row with the same count and diagnostic** → stop and present tradeoff as a decision for them to make. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
 
 ### LinkedIn (a sequence)
 

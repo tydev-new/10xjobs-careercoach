@@ -29,12 +29,15 @@ maybe_dry_run runner "$RESULTS" && exit 0
 # ~/job-search is made IMMUTABLE for the duration of the run. A sandboxed
 # agent that constructs the real path (unix file ownership leaks the
 # username; unscrubable) gets a write ERROR instead of clobbering a file.
-# The trap guarantees unlock on any exit; unlock-first heals a prior crash.
-REALJS="$(eval echo ~)/job-search"
-vault_unlock() { find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null; }
-vault_lock()   { find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null; }
+# Shared, reference-counted lock/unlock (lib_env.sh) — see its comment.
+# The old "unlock-first, to heal a prior crash" step is DROPPED: under a
+# shared refcount, an unconditional unlock at start is exactly the race
+# the shared version fixes (it could unlock a vault a SIBLING run_*.sh is
+# still relying on). A genuinely stale lock from a crashed run is a
+# separate, rarer problem (results/.vault-refcount stuck above 0) and is
+# not this fix's scope.
 trap vault_unlock EXIT INT TERM
-vault_unlock; vault_lock
+vault_lock
 TRIALS="${TRIALS:-1}"
 MAX_TURNS="${MAX_TURNS:-8}"
 for trial in $(seq 1 "$TRIALS"); do

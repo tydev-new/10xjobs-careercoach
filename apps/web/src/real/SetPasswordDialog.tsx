@@ -7,6 +7,7 @@ import type { FormEvent, ReactElement } from "react";
 import type { AuthClientLike } from "../backend/auth.ts";
 import { PasswordFields } from "./PasswordFields";
 import { usePasswordSave } from "./use-password-save.ts";
+import { useDialogFocus } from "./use-dialog-focus.ts";
 
 export interface SetPasswordDialogProps {
   client: AuthClientLike;
@@ -16,6 +17,7 @@ export interface SetPasswordDialogProps {
 
 export function SetPasswordDialog({ client, email, onClose }: SetPasswordDialogProps): ReactElement {
   const form = usePasswordSave(client, email);
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
 
   const cancel = () => {
     form.reset();
@@ -29,7 +31,7 @@ export function SetPasswordDialog({ client, email, onClose }: SetPasswordDialogP
 
   if (form.phase === "success") {
     return (
-      <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
+      <div className="delete-confirm-overlay" role="dialog" aria-modal="true" ref={dialogRef}>
         <div className="delete-confirm-card">
           <h2>Set a new password</h2>
           <p>Password saved. Use it next time you sign in, here or in the older app.</p>
@@ -44,7 +46,7 @@ export function SetPasswordDialog({ client, email, onClose }: SetPasswordDialogP
   }
 
   return (
-    <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
+    <div className="delete-confirm-overlay" role="dialog" aria-modal="true" ref={dialogRef}>
       <div className="delete-confirm-card">
         <h2>Set a new password</h2>
         {form.phase === "code" ? (
@@ -73,8 +75,10 @@ export function SetPasswordDialog({ client, email, onClose }: SetPasswordDialogP
           {form.info ? <p className="sign-in-sent">{form.info}</p> : null}
           {form.error ? <p className="delete-confirm-error">{form.error}</p> : null}
           <div className="delete-confirm-actions">
-            <button type="submit" disabled={form.saving}>
-              {form.saving ? "Saving…" : "Save password"}
+            {/* design-web-ui.md § 5.6, "Buttons — Loading": never a size
+                or label change while loading — aria-busy carries it. */}
+            <button type="submit" disabled={form.saving} aria-busy={form.saving ? "true" : undefined}>
+              Save password
             </button>
             {form.phase === "code" ? (
               <button

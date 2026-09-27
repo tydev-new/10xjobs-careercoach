@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { readUIMessageStream } from "../../apps/web/node_modules/ai/dist/index.js";
 import { CUT_OFF_MESSAGE, TOOL_CLOSE_TEXT } from "../agent/_spec9.ts";
 import { sse, stubbedOpenRouter, textReply } from "../agent/_openrouter_stub.ts";
@@ -21,20 +21,39 @@ const req = createRequire(new URL("package.json", WEB));
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#x27;").replace(/"/g, "&quot;");
 
 /** Transpiles an apps/web component and renders it to static HTML. `open`
- *  forces every useState(false) toggle to start true (the expanded view). */
+ *  forces every useState(false) toggle to start true (the expanded view).
+ *  A relative import ("../icons.tsx", "./Avatar") is transpiled and loaded
+ *  the same way, resolved from the importing file (as-is, then .tsx, .ts,
+ *  /index.tsx, /index.ts); a bare id comes from apps/web's node_modules,
+ *  with "react" patched for `open` in every module. */
 function render(file: string, exportName: string, props: any, open = false): string {
   const ts = req("typescript");
-  const src = readFileSync(new URL(`src/components/${file}`, WEB), "utf8");
-  const out = ts.transpileModule(src, {
-    compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-  }).outputText;
   const React = req("react");
   const patched = open ? { ...React, useState: (v: unknown) => React.useState(v === false ? true : v) } : React;
-  const localReq = (id: string) => (id === "react" ? patched : req(id));
-  const mod: any = { exports: {} };
-  new Function("require", "exports", "module", out)(localReq, mod.exports, mod);
+  const cache = new Map<string, any>();
+  const resolve = (spec: string, from: URL): URL => {
+    for (const suffix of ["", ".tsx", ".ts", "/index.tsx", "/index.ts"]) {
+      const u = new URL(spec + suffix, from);
+      if (existsSync(u) && statSync(u).isFile()) return u;
+    }
+    throw new Error(`cut-off-ui harness: cannot resolve "${spec}" from ${from.pathname}`);
+  };
+  const load = (url: URL): any => {
+    const hit = cache.get(url.href);
+    if (hit) return hit.exports;
+    const out = ts.transpileModule(readFileSync(url, "utf8"), {
+      fileName: url.pathname,
+      compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const mod: any = { exports: {} };
+    cache.set(url.href, mod);
+    const localReq = (id: string) => (id === "react" ? patched : id.startsWith(".") ? load(resolve(id, url)) : req(id));
+    new Function("require", "exports", "module", out)(localReq, mod.exports, mod);
+    return mod.exports;
+  };
+  const exports = load(new URL(`src/components/${file}`, WEB));
   const { renderToStaticMarkup } = req("react-dom/server");
-  return renderToStaticMarkup(React.createElement(mod.exports[exportName], props));
+  return renderToStaticMarkup(React.createElement(exports[exportName], props));
 }
 const metas = (html: string) => [...html.matchAll(/<p class="card-meta">([^<]*)<\/p>/g)].map((m) => m[1]);
 

@@ -1965,9 +1965,12 @@ only. Its words change only by the § 3 amendment that
 - **Collapsed:**
   - a pill 30px high, padding 0 10px 0 8px, radius full, `--bg-sunken`
     fill, `0 0 0 1px var(--border)`, `--type-small` in `--fg-muted`;
-  - a 15px leading icon: `circle-check` in `--green` when done;
-  - the step count in `--fg-subtle`, then `chevron-right`, which turns
-    90° over `--duration-base` when open.
+  - a 15px leading icon: `circle-check` in `--green` when done, then
+    `chevron-right`, which turns 90° over `--duration-base` when open,
+    then the label and the step count in `--fg-subtle`. (Amended
+    2026-09-26 from the Stage 1 review: a chevron after the label shifted
+    the streaming line at 375px, measured CLS 0.0026; before the label it
+    doesn't.)
 - **Hover:** `--bg-hover`, `--fg`.
 - **Live** (a tool part not yet done):
   - `--bg-panel` fill, `0 0 0 1px var(--border-strong)`, `--fg` text;

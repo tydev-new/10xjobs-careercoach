@@ -1,5 +1,7 @@
 import { useState, type ReactElement } from "react";
 import { Avatar } from "./Avatar";
+import { BrandMark } from "./BrandMark";
+import { Icon } from "../icons.tsx";
 import { formatBalanceUsd } from "../format.ts";
 import type { CoachModel } from "../backend/coach-model.ts";
 import type { FixtureEntry } from "../fixtures";
@@ -104,6 +106,9 @@ export function Header(props: HeaderProps): ReactElement {
       <div className="app-header-left">
         <Avatar status={status} />
         <span className="app-header-title">
+          <span aria-hidden="true">
+            <BrandMark size={28} />
+          </span>{" "}
           Ten <span className="app-header-status">· {STATE_LABEL[status.state]}</span>
         </span>
         {status.action ? <span className="app-header-action">{status.action}</span> : null}
@@ -143,10 +148,12 @@ export function Header(props: HeaderProps): ReactElement {
             target (rule 8, no untrue UI). */}
         {onBuyCredit ? (
           <button type="button" className="balance-chip balance-chip--button" onClick={onBuyCredit}>
+            <Icon name="wallet" size={16} />
             {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
           </button>
         ) : (
           <span className="balance-chip">
+            <Icon name="wallet" size={16} />
             {balanceUsd === undefined ? "—" : `$${formatBalanceUsd(balanceUsd)}`}
           </span>
         )}
@@ -157,7 +164,7 @@ export function Header(props: HeaderProps): ReactElement {
             aria-label="Menu"
             onClick={() => setMenuOpen((v) => !v)}
           >
-            ⋯
+            <Icon name="ellipsis" size={16} />
           </button>
           {menuOpen ? (
             <div className="menu-panel" role="menu">
@@ -170,6 +177,7 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="folderDown" size={16} />
                 Export workspace
               </button>
               <button
@@ -181,6 +189,14 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                {/* § 5.6 names folder-down for "export workspace" but no
+                    icon for import — rather than add a new glyph outside
+                    its closed list (and outside the reviewer's icon-parity
+                    fixture, which has no digest for one), this is the same
+                    vendored folder-down path, turned 180°: the same
+                    precedent as the activity line's caret rotating for
+                    expand/collapse. Reads as "up" against Export's "down". */}
+                <Icon name="folderDown" size={16} className="menu-item-icon--flip" />
                 Import workspace
               </button>
               {/* No per-candidate key to manage: one shared app key sits
@@ -199,6 +215,7 @@ export function Header(props: HeaderProps): ReactElement {
                     setMenuOpen(false);
                   }}
                 >
+                  <Icon name="wallet" size={16} />
                   Buy credit
                 </button>
               ) : null}
@@ -226,6 +243,7 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="trash2" size={16} />
                 Delete my beta data
               </button>
               {/* design-web-ui.md § 1.10 — "Set a new password" or "Change
@@ -240,6 +258,7 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="keyRound" size={16} />
                 Set a new password
               </button>
               <button
@@ -251,12 +270,14 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="logOut" size={16} />
                 Sign out
               </button>
               {/* § 13.6 (3): the Privacy link, just above the model line,
                   in real AND mock mode — plain, honest copy in the house
                   voice lives at the page itself, never restated here. */}
               <a className="menu-item-link" role="menuitem" href="/privacy.html" target="_blank" rel="noreferrer">
+                <Icon name="externalLink" size={16} />
                 Privacy
               </a>
               {/* § 13.3: plain text, not a button — never focusable as an

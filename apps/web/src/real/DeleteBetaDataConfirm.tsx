@@ -11,6 +11,7 @@
 import { useState, type FormEvent, type ReactElement } from "react";
 import { matchGateReply } from "../../../../packages/agent/src/helpers.ts";
 import { deleteBetaAccount } from "../backend/delete-account.ts";
+import { useDialogFocus } from "./use-dialog-focus.ts";
 
 export interface DeleteBetaDataConfirmProps {
   supabaseUrl: string;
@@ -51,6 +52,7 @@ export function DeleteBetaDataConfirm({
   const [typed, setTyped] = useState("");
   const [phase, setPhase] = useState<Phase>("confirming");
   const [error, setError] = useState<string | undefined>(undefined);
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -82,7 +84,7 @@ export function DeleteBetaDataConfirm({
 
   if (phase === "declined") {
     return (
-      <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
+      <div className="delete-confirm-overlay" role="dialog" aria-modal="true" ref={dialogRef}>
         <div className="delete-confirm-card">
           <p>Declined — nothing was deleted.</p>
           <button type="button" onClick={onClose}>
@@ -94,7 +96,7 @@ export function DeleteBetaDataConfirm({
   }
 
   return (
-    <div className="delete-confirm-overlay" role="dialog" aria-modal="true">
+    <div className="delete-confirm-overlay" role="dialog" aria-modal="true" ref={dialogRef}>
       <div className="delete-confirm-card">
         <h2>Delete my beta data</h2>
         {/* § 1.7 point 1: the complete thing, named, not summarized. */}
@@ -119,8 +121,11 @@ export function DeleteBetaDataConfirm({
             />
           </label>
           <div className="delete-confirm-actions">
-            <button type="submit" disabled={phase === "deleting"}>
-              {phase === "deleting" ? "Deleting…" : "Submit"}
+            {/* design-web-ui.md § 5.6, "Buttons — Loading": a button never
+                changes size or label while loading — aria-busy is the
+                honest signal instead. */}
+            <button type="submit" disabled={phase === "deleting"} aria-busy={phase === "deleting" ? "true" : undefined}>
+              Submit
             </button>
             <button type="button" onClick={onClose} disabled={phase === "deleting"}>
               Cancel

@@ -776,7 +776,14 @@ test('P7c C § 16.2: every password-screen form is method="post" and no field ha
 
 const PHONE = { width: 375, height: 740 };
 async function phoneCheck(page: Page, scope: string, label: string) {
-  const r = await page.evaluate((sel) => {
+  const r = await page.evaluate(async (sel) => {
+    // Measure the settled layout, not an entrance's first frame: a dialog
+    // that pops in with scale(0.98) is momentarily 2% smaller than the
+    // controls the candidate actually taps (design-web-ui.md § 5.6,
+    // "Dialog"). Every finite animation is awaited to its end; infinite ones
+    // (a spinner) never settle and never resize the box, so they're skipped.
+    const finite = () => document.getAnimations().filter((a) => a.playState !== "finished" && Number(a.effect?.getComputedTiming().endTime) !== Infinity);
+    for (let i = 0; i < 5 && finite().length; i++) await Promise.all(finite().map((a) => a.finished.catch(() => undefined)));
     const root = document.querySelector(sel) as HTMLElement | null;
     const small: string[] = [];
     let minH = Infinity;

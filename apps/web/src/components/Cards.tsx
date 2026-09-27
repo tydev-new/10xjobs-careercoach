@@ -11,6 +11,7 @@ import type {
   VerdictCardProps,
 } from "../types";
 import { formatUsd } from "../format.ts";
+import { Icon } from "../icons.tsx";
 
 const VERDICT_LABEL: Record<string, string> = {
   strong: "Strong Fit",
@@ -27,6 +28,18 @@ function OpenInPanel({ onOpen }: { onOpen: () => void }): ReactElement {
   );
 }
 
+// § 5.6, "Cards — Tier pills": the words carry the meaning, color only
+// marks the category. Strong Fit alone gets the check icon.
+function TierPill({ verdict }: { verdict: string }): ReactElement {
+  const label = VERDICT_LABEL[verdict] ?? verdict;
+  return (
+    <span className={`tier-pill tier-pill--${verdict}`}>
+      {verdict === "strong" ? <Icon name="check" size={13} /> : null}
+      {label}
+    </span>
+  );
+}
+
 function VerdictCard({
   props,
   ref: fileRef,
@@ -36,25 +49,35 @@ function VerdictCard({
   ref?: string;
   onOpen: (ref: string) => void;
 }): ReactElement {
-  const label = VERDICT_LABEL[props.verdict] ?? props.verdict;
   const isQuickScan = props.reason.toLowerCase().startsWith("quick-scan:");
   return (
     <div className="card card--verdict">
-      {/* v2: the tier is the headline (design-web-ui-refresh.md § v2 —
-          "recognizable at a glance"), colored by category (§ 2.4's own
-          tier mapping), never a background/stripe. The kicker keeps the
-          company/title/track context that used to lead the old title
-          line — no fact dropped, just reordered by what matters first. */}
+      {/* the kicker keeps the company/title/track context; no fact
+          dropped, just reordered by what matters first — § 5.6's own
+          "Verdict" shape leads with the initial tile, the score, then
+          the tier pill. */}
       <div className="card-kicker">
         Verdict · {props.company} — {props.title}
       </div>
-      <div className={`card-headline card-headline--${props.verdict}`}>{label}</div>
+      <div className="verdict-head">
+        <div className="verdict-tile" aria-hidden="true">
+          {props.company.charAt(0).toUpperCase()}
+        </div>
+        <div className="verdict-titles">
+          <div className="card-title">{props.title}</div>
+          <div className="card-meta">{props.company}</div>
+        </div>
+        {typeof props.score === "number" ? (
+          <div className="verdict-score">
+            {props.score}
+            <span className="verdict-score-max">/100</span>
+          </div>
+        ) : null}
+      </div>
+      <TierPill verdict={props.verdict} />
       {isQuickScan ? <span className="badge badge--quick-scan">quick-scan</span> : null}
       <p className="card-body">{props.reason}</p>
-      <p className="card-meta">
-        {typeof props.score === "number" ? `Score ${props.score}. ` : ""}
-        Dealbreakers: {props.dealbreakers ? props.dealbreakers : "none"}.
-      </p>
+      <p className="card-meta">Dealbreakers: {props.dealbreakers ? props.dealbreakers : "none"}.</p>
       {fileRef ? (
         <OpenInPanel onOpen={() => onOpen(fileRef)} />
       ) : (

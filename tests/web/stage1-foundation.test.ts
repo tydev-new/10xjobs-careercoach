@@ -394,11 +394,19 @@ async function settled(page: Page) {
   }, null, { timeout: 60000 });
   await page.waitForTimeout(250);
 }
-async function play(page: Page, fixture: string, opts: { expand?: boolean } = {}) {
+async function play(page: Page, fixture: string, opts: { expand?: boolean; userFocus?: boolean } = {}) {
   for (const m of fx(fixture).messages ?? []) {
     if (m.role !== "user") continue;
     const text = m.parts.find((p: any) => p.type === "text")?.text;
     if (!text) continue;
+    // `userFocus`: focus the composer with a trusted click first, as a person
+    // does (LEAD RULING, Stage 2): `.fill()` alone focuses it
+    // programmatically, which the Layout Instability API treats as no input,
+    // so a shift the frame makes on focus (the phone tab bar hiding while
+    // typing, § 5.6) would count as unprompted. A shift in the 500 ms after
+    // any trusted input (this click, the Enter below) is excluded by the API
+    // itself; anything later while the reply streams still counts.
+    if (opts.userFocus) await page.locator(".composer-input").click();
     await page.locator(".composer-input").fill(text);
     await page.locator(".composer-input").press("Enter");
     await page.waitForTimeout(40);
@@ -599,19 +607,57 @@ async function shot(page: Page, name: string) {
 
 // ---------------------------------------------------------------- browser tests
 
-test("brand mark: the rendered mark is § 5.6's SVG (fills are tokens) at § 5.6's sizes — 28px in the header, 30px on sign-in", async () => {
+// LEAD RULING (Stage 2, 2026-09-27): the frame header carries NO brand mark
+// beside its title — the rail carries the wordmark (§ 5.1: "the rail holds
+// the five places … plus the brand mark"), and the phone shows no wordmark
+// at all (§ 5.5: "No wordmark on the phone"). The one mark § 5.6 still puts
+// in the header is Ten's avatar ("The 28px mark", § 5.6 "Ten's avatar"),
+// so a mark inside the avatar is allowed and must be the 28px mark.
+test("brand mark: § 5.6's SVG (fills are tokens) — the wordmark in the rail at 28px on desktop, no wordmark on the phone, no mark in the header outside Ten's avatar, 30px on sign-in", async () => {
   const spec = fence(sub("The brand mark"), "html");
   const norm = (s: string) =>
     [...s.matchAll(/<(svg|rect|ellipse)\b([^>]*?)\/?>/g)].map((m) => `${m[1]} ${[...m[2].matchAll(/([a-z-]+)="([^"]*)"/g)].filter((a) => !["width", "height", "class"].includes(a[1]) || m[1] !== "svg").map((a) => `${a[1]}=${a[2]}`).sort().join(" ")}`);
+  const marks = (page: Page) =>
+    page.evaluate(() => {
+      const shown = (e: Element) => e.getClientRects().length > 0 && getComputedStyle(e).visibility === "visible" && !e.closest("[hidden]");
+      const header = Array.from(document.querySelectorAll("header, .app-header"));
+      const inHeader = (e: Element) => header.some((h) => h.contains(e));
+      const all = Array.from(document.querySelectorAll("svg.mark")).filter(shown);
+      return {
+        headerNonAvatar: all.filter((m) => inHeader(m) && !m.closest(".avatar")).map((m) => m.parentElement?.outerHTML.slice(0, 120) ?? "?"),
+        avatar: all.filter((m) => inHeader(m) && m.closest(".avatar")).map((m) => ({ html: m.outerHTML, w: m.getAttribute("width") })),
+        wordmarks: Array.from(document.querySelectorAll(".wordmark")).filter(shown).map((w) => {
+          const m = w.querySelector("svg.mark");
+          return { inHeader: inHeader(w), text: w.textContent?.trim(), html: m?.outerHTML ?? "", w: m?.getAttribute("width") ?? null };
+        }),
+      };
+    });
+  const bad: string[] = [];
   const ctx = await context();
-  const app = await openApp(ctx);
-  const header = await app.locator(".app-header svg.mark").first().evaluate((e) => ({ html: e.outerHTML, w: e.getAttribute("width"), h: e.getAttribute("height") }));
+  const desk = await marks(await openApp(ctx));
+  const phoneCtx = await context({ width: 375, height: 812 });
+  const phone = await marks(await openApp(phoneCtx));
+  await phoneCtx.close();
   const signIn = await (await openPreview(ctx, "sign-in")).locator("svg.mark").first().evaluate((e) => ({ html: e.outerHTML, w: e.getAttribute("width") }));
   await ctx.close();
-  assert.deepEqual(norm(header.html), norm(spec), "the header's mark is § 5.6's markup");
-  assert.deepEqual(norm(signIn.html), norm(spec), "sign-in's mark is § 5.6's markup");
-  assert.equal(signIn.w, "30", "30px on sign-in");
-  assert.equal(header.w, "28", "28px in the header (§ 5.6, 'Sizes')");
+  for (const [vp, r] of [["1440", desk], ["375", phone]] as const) {
+    if (r.headerNonAvatar.length) bad.push(`${vp}: a brand mark in the header outside Ten's avatar: ${r.headerNonAvatar.join(" | ")}`);
+    for (const a of r.avatar) {
+      if (JSON.stringify(norm(a.html)) !== JSON.stringify(norm(spec))) bad.push(`${vp}: the avatar's mark is not § 5.6's markup`);
+      if (a.w !== "28") bad.push(`${vp}: the avatar's mark is ${a.w}px, § 5.6 says 28px`);
+    }
+  }
+  if (desk.wordmarks.length !== 1) bad.push(`1440: ${desk.wordmarks.length} wordmarks shown, want exactly one (the rail's)`);
+  for (const w of desk.wordmarks) {
+    if (w.inHeader) bad.push("1440: the wordmark sits in the header, § 5.1 puts it in the rail");
+    if (w.text !== "Ten") bad.push(`1440: wordmark text "${w.text}"`);
+    if (JSON.stringify(norm(w.html)) !== JSON.stringify(norm(spec))) bad.push("1440: the rail wordmark's mark is not § 5.6's markup");
+    if (w.w !== "28") bad.push(`1440: the rail wordmark's mark is ${w.w}px, § 5.6 says 28px in the rail`);
+  }
+  if (phone.wordmarks.length) bad.push(`375: ${phone.wordmarks.length} wordmark(s) shown, § 5.5 says none on the phone`);
+  if (JSON.stringify(norm(signIn.html)) !== JSON.stringify(norm(spec))) bad.push("sign-in's mark is not § 5.6's markup");
+  if (signIn.w !== "30") bad.push(`sign-in's mark is ${signIn.w}px, § 5.6 says 30px`);
+  assert.deepEqual(bad, []);
 });
 
 test("fonts: Bricolage is loaded from this origin and set on the wordmark and dialog titles; nothing is fetched from any other host", async () => {
@@ -856,7 +902,7 @@ test("streaming: no layout shift while a fixture streams (cumulative layout-shif
         (window as any).__cls = 0;
         (window as any).__shifts = [];
       });
-      await play(page, f, { expand: false });
+      await play(page, f, { expand: false, userFocus: true });
       const r = await page.evaluate(() => ({ cls: (window as any).__cls as number, shifts: (window as any).__shifts as string[] }));
       if (r.cls > 0.001) bad.push(`${f}@${vp.name}: CLS ${r.cls.toFixed(4)} (${r.shifts.slice(0, 4).join(" | ")})`);
       await ctx.close();

@@ -213,17 +213,38 @@ for (const vp of [{ width: 1280, height: 800, tag: "desktop" }, { width: 375, he
   const title = await page.locator(".avatar").getAttribute("title");
   rec(title?.includes("evaluate 6 saved roles"), T("needs-you hover = gate label"), title);
   rec((await page.locator(".card--gate button, .card--gate [role=button], .card--gate input").count()) === 0, T("gate card has no button/input"));
-  // click every enabled non-dev button on the page; gate must stay pending
+  // click every enabled non-dev button on the page; gate must stay pending.
+  // Stage 2 (LEAD RULING): the rail / tab bar's page buttons are clicked too
+  // (a page change must not approve anything either), then Talk to Ten is
+  // re-opened by its own name (§ 5.1 rail "Talk to Ten", § 5.5 tab "Ten")
+  // before the next click, so every later click and the typing below still
+  // happen in the conversation.
+  const backToTalk = async () => {
+    if (await page.locator(".composer-input").isVisible().catch(() => false)) return true;
+    for (const role of ["button", "link", "tab"]) {
+      const nav = page.getByRole(role, { name: /^(Talk to Ten|Ten)$/ });
+      for (let i = 0; i < (await nav.count()); i++) {
+        if (!(await nav.nth(i).isVisible().catch(() => false))) continue;
+        await nav.nth(i).click({ timeout: 2000 }).catch(() => {});
+        await page.waitForTimeout(80);
+        if (await page.locator(".composer-input").isVisible().catch(() => false)) return true;
+      }
+    }
+    return false;
+  };
   const handles = await page.locator("button:enabled").elementHandles();
   const clicked = [];
+  const lost = [];
   for (const b of handles) {
-    const txt = ((await b.innerText()) || (await b.getAttribute("aria-label")) || "").trim();
+    const txt = ((await b.innerText().catch(() => "")) || (await b.getAttribute("aria-label").catch(() => "")) || "").trim();
     if (/Autoplay/.test(txt)) continue;
-    if (!(await b.isVisible())) continue;
+    if (!(await b.isVisible().catch(() => false))) continue;
     await b.click({ timeout: 2000 }).catch(() => {}); clicked.push(txt); await page.waitForTimeout(80);
     if (await page.locator(".side-panel-back").isVisible() && phone) await page.locator(".side-panel-back").click().catch(() => {});
+    if (!(await backToTalk())) lost.push(txt);
   }
   await page.waitForTimeout(300);
+  rec(lost.length === 0, T("after every button click, Talk to Ten can be re-opened by name"), lost.length ? `no way back after: ${lost.join(",")}` : `${clicked.length} clicks`);
   rec((await page.locator(".card--gate .badge").innerText()) === "pending", T("clicking every enabled button leaves the gate pending"), clicked.join(","));
   await type(page, "hmm, let me think");
   const lastBubble = await page.locator(".bubble--assistant").last().innerText();

@@ -347,10 +347,12 @@ untouched; the injection test in § 4.3 run through this path.
 first has each run of whitespace turned into one space and is trimmed.
 Whitespace here is one explicit class, the same in both languages (§ 4.4):
 space, tab, `\n`, `\r`, form feed, vertical tab, U+0085, U+00A0,
-U+2028, U+2029. A company containing ` — ` (space, em dash,
-space) has it written as ` - `, because a row's heading splits company
-from title on the first ` — `. Titles keep theirs; the split takes the
-first one. It lives in `save()`, so every writer (the adds,
+U+2028, U+2029. A company containing ` — ` (space, em dash, space),
+or ending in ` —`, has that em dash written as `-`, because a row's
+heading splits company from title on the first ` — `. Titles keep
+theirs; the split takes the first one. A company or title that is
+empty after cleaning is refused: the writer exits 2 and jobs.md is
+unchanged. It lives in `save()`, so every writer (the adds,
 `record_verdict.py`, `update_job.py`) is protected in both languages.
 **Prevents:** a posting title that carries a newline and `## Offer` or
 `- URL:` becoming a stage heading or a field of another row (a job post

@@ -12,7 +12,7 @@ set logic uses plain dicts. The escape hatch stays: at a few hundred roles,
 parsing markdown to answer questions gets silly and the pipeline moves back
 to a real table — reverse on evidence.
 """
-import os, re
+import os, re, sys
 from datetime import datetime, timezone
 
 STAGES = ["To Review", "Interested", "Applied", "Interviewing", "Offer"]
@@ -57,15 +57,23 @@ def _clean(value):
 
 def _clean_company(value):
     """Like `_clean`, plus: a company containing ` — ` (space, em dash,
-    space) has it rewritten as ` - ` (space, hyphen, space) — a row's
+    space), or ENDING in ` —` (space, em dash, nothing after — the
+    heading's own separator supplies the space and the title that would
+    otherwise follow), has that em dash written as `-` — a row's
     heading splits company from title on the FIRST ` — `, so a company
     that legitimately carries an em dash must never be misread as the
     company/title separator. Titles keep theirs; the split above takes
-    the first one."""
+    the first one. (S1 review, finding 8: a company ending in ` —` with
+    no rewrite would make the heading read `### Acme — — Role`, two
+    ` — ` runs, so the FIRST one — the company's own trailing dash, not
+    the real separator — is what load() would split on.)"""
     cleaned = _clean(value)
     if cleaned is None:
         return None
-    return cleaned.replace(" — ", " - ")
+    cleaned = cleaned.replace(" — ", " - ")
+    if cleaned.endswith(" —"):
+        cleaned = cleaned[:-1] + "-"
+    return cleaned
 
 
 def canon(s):
@@ -89,7 +97,14 @@ def path(workspace):
 def load(workspace):
     """Parse jobs.md -> list of row dicts. Absent file -> empty pipeline.
     Unknown ## sections (e.g. Search notes) are NOT stages — their content
-    never parses as roles."""
+    never parses as roles. Parsing STOPS at the `## Search notes` heading
+    (S1 review, finding 1): everything after it is notes, matching
+    load_notes(); a posting quoted inside that block can legitimately carry
+    a line that reads like a real stage heading (`## Offer` is both a
+    stage name and ordinary English) or a fake `### Company — Title` /
+    `- URL:` row — those must never parse as a row, the same threat model
+    § 4.3's B1 sanitising already covers for a title arriving through a
+    field."""
     p = path(workspace)
     rows, cur_stage, row = [], None, None
     if not os.path.exists(p):
@@ -99,6 +114,8 @@ def load(workspace):
         m = re.match(r"^##\s+(.+?)\s*$", line)
         if m and not line.startswith("###"):
             name = m.group(1).strip()
+            if name == NOTES:
+                break
             cur_stage = name if name in STAGES or name == DISMISSED else None
             continue
         m = re.match(r"^###\s+(.+?)\s*$", line)
@@ -190,6 +207,15 @@ def save(workspace, rows, notes=None):
 
 def _block(r, dismissed=False):
     company, title = _clean_company(r["company"]), _clean(r["title"])
+    # LEAD spec amendment (S1 review, finding 6; design-web-search.md § 4.3):
+    # a company or title that is empty after cleaning is refused — the
+    # writer exits 2 and jobs.md is unchanged (this check runs before any
+    # line of `out` is written to disk, so a raise here never touches the
+    # file). Never SystemExit(str) (the duplicate-key error's own form,
+    # always exit 1) — this is a distinct failure with its own exit code.
+    if not company or not title:
+        print("error: empty company or title after cleaning; nothing written", file=sys.stderr)
+        raise SystemExit(2)
     lines = [f"### {company} — {title}"]
     for label, k in FIELDS:
         if k == "was_stage" and not dismissed:

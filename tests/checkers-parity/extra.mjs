@@ -566,6 +566,18 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "s1-rv-multiline-search-notes-untouched-by-reverdict",
     files: { "jobs.md": JOBS_WITH_ROW() + "## Search notes\n\nline one\n\n  line two, indented\nline three\n" },
     args: RV(["--score", "70"]) });
+
+  // LEAD spec amendments (S1 review, findings 6 and 8; design-web-search.md § 4.3)
+  add({ s, id: "s1-rv-company-ending-in-em-dash-rewritten", files: {},
+    args: ["--workspace", ".", "--company", "Acme —", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-company-two-em-dashes-one-trailing", files: {},
+    args: ["--workspace", ".", "--company", "A — B —", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-refuses-empty-title-after-cleaning", files: {},
+    args: ["--workspace", ".", "--company", "Acme", "--title", "   ", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-refuses-empty-company-after-cleaning", files: {},
+    args: ["--workspace", ".", "--company", "\t\n", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-refuses-empty-company-with-existing-file-present", files: { "jobs.md": JOBS_WITH_ROW() },
+    args: ["--workspace", ".", "--company", " ", "--title", "New Role", "--verdict", "weak"] });
 }
 
 // ------------------------------------------------------------------ round 7 (tester, design-web-search.md § 4.3 / S1)

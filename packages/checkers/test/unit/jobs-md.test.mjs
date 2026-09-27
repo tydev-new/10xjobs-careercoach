@@ -158,6 +158,44 @@ test("injection: a title with a newline and a fake Offer heading stays one line,
   assert.equal((text.match(/^### /gm) || []).length, 1); // exactly one real row heading (line-start), never the embedded "### Evil Co" text
 });
 
+test("save rewrites a trailing em dash in company to a hyphen", async () => {
+  // S1 review, finding 8 (LEAD spec amendment): a company ENDING in ` —`
+  // (no character after the dash) would otherwise make the heading read
+  // `### Acme — — Role` — two ` — ` runs, so the FIRST one (the
+  // company's own trailing dash) is what load() would split on.
+  const io = makeFakeIo();
+  await jm.save(io, "/ws", [{ company: "Acme —", title: "Role", stage: "To Review", dismissed: false }]);
+  const text = await io.readFile(jm.path("/ws"));
+  assert.ok(text.includes("### Acme - — Role"));
+  assert.equal((text.match(/^### /gm) || []).length, 1);
+  const back = (await jm.load(io, "/ws"))[0];
+  assert.equal(back.company, "Acme -");
+  assert.equal(back.title, "Role");
+});
+
+test("save refuses an empty company or title after cleaning", async () => {
+  // S1 review, finding 6 (LEAD spec amendment): save() refuses loudly;
+  // the writer exits 2 (EmptyFieldError, mapped by every CLI caller) and
+  // jobs.md is unchanged.
+  const io = makeFakeIo();
+  for (const row of [
+    { company: "   ", title: "Role", stage: "To Review", dismissed: false },
+    { company: "Acme", title: "\t\n", stage: "To Review", dismissed: false },
+  ]) {
+    await assert.rejects(() => jm.save(io, "/ws", [row]), jm.EmptyFieldError);
+  }
+  assert.equal(await io.exists(jm.path("/ws")), false); // jobs.md unchanged (never existed)
+  // unchanged when a PRIOR jobs.md already exists, too
+  await jm.save(io, "/ws", rows2());
+  const before = await io.readFile(jm.path("/ws"));
+  await assert.rejects(
+    () => jm.save(io, "/ws", [...rows2(), { company: "", title: "Role", stage: "To Review", dismissed: false }]),
+    jm.EmptyFieldError
+  );
+  const after = await io.readFile(jm.path("/ws"));
+  assert.equal(before, after);
+});
+
 test("Analysis field is distinct from JD and round-trips", async () => {
   const io = makeFakeIo();
   const row = {

@@ -9,11 +9,13 @@ rounds, panel — are checked by `../../profile/scripts/check_files.py`
 script's enum sets are the authority and the declarations below match
 them.
 
-All filenames use the job's `company_key` + `title_key` from `jobs.md`
-(deterministic, so two roles at the same company don't collide) — NOT a
-free-form role name.
+All filenames use a slug of the company and the title (lowercase; every
+run of other characters becomes `-`) — the same slug evaluate's
+`jd-analysis/` file uses (`../../evaluate/references/schema.md`), so the
+two files share one key with no separate pointer field — NOT a free-form
+role name.
 
-## `applications/<company_key>-<title_key>.md` — the application file
+## `applications/<slug>.md` — the application file
 
 One canonical file per application: the standard, the proposal, the
 round record, the form's fields and answers, the submission record, the
@@ -71,7 +73,7 @@ outreach-plan summary.
   themselves live in `contacts/<company>.md` — outreach's file,
   outreach's rules.
 
-## `applications/<company_key>-<title_key>-resume.md` — the tailored résumé
+## `applications/<slug>-resume.md` — the tailored résumé
 
 The `.md` is the artifact; the PDF is the deliverable that gets
 uploaded. Sections in `patterns.md § Shape` order. Experience bullets are
@@ -87,7 +89,7 @@ the base's own sentences except the declared `## Reworded` pairs.
   target · file size against the upload limit the script states). Its filename is
   the one human-facing name: `<Candidate Name> - <Company> - Resume.pdf`.
 
-## `applications/<company_key>-<title_key>-cover-letter.md`
+## `applications/<slug>-cover-letter.md`
 
 Length bounds are `check_materials.py`'s advisory WARNs. Opens on the pitch's core
 statement when `pitch.md` exists. Gets a PDF only when a form takes one.

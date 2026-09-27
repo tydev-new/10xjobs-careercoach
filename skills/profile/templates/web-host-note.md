@@ -7,5 +7,4 @@ Outreach plans and PDF files are not made here; say so when you deliver.
 `CLAUDE.md` is already in place. Pass `--analysis-file` to
 `record_verdict.py` when you write an analysis, and `--jd-file` when a
 posting file exists. Where a skill says to spawn a language checker,
-call `check_language` on every delivered document. Search uses the
-job-board tools here; scheduled searches don't run here.
+call `check_language` on every delivered document.

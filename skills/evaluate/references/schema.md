@@ -19,7 +19,7 @@ every time.
   prefixes (`dq:` among them) are search's: `../../search/references/
   schema.md`.
 
-## `jd-analysis/<company_key>-<title_key>.md` — one full decode per role
+## `jd-analysis/<slug>.md` — one full decode per role
 
 Filename = a slug of the company and the title (lowercase; every run
 of other characters becomes `-`), written once; the row's `Analysis`

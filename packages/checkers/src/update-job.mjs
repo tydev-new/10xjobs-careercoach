@@ -53,6 +53,7 @@ export async function run(argv, io, now = () => new Date()) {
     await jm.save(io, a.workspace, rows, { now });
   } catch (e) {
     if (e instanceof jm.DuplicateKeyError) return { stdout: "", stderr: e.message + "\n", exitCode: 1 };
+    if (e instanceof jm.EmptyFieldError) return { stdout: "", stderr: e.message + "\n", exitCode: 2 };
     throw e;
   }
   return { stdout: restoreLineSeparators(`updated: ${r.company} — ${r.title} — ${action}\n`), stderr: "", exitCode: 0 };

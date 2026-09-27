@@ -658,6 +658,28 @@ function addCase(c) {
     diffFiles: ["jobs.md"],
     freezeClock: true,
   });
+  addCase({
+    script, bin, name: "sanitises-trailing-em-dash-in-company",
+    covers: "design-web-search.md § 4.3 (S1 review, finding 8): a company ENDING in ' —' has that em dash written as '-'",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "Acme —", "--title", "Role", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "refuses-empty-title-after-cleaning",
+    covers: "design-web-search.md § 4.3 (S1 review, finding 6): empty after cleaning -> the writer exits 2, jobs.md unchanged",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "Acme", "--title", "   ", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+  });
+  addCase({
+    script, bin, name: "refuses-empty-company-after-cleaning",
+    covers: "design-web-search.md § 4.3 (S1 review, finding 6): empty after cleaning -> the writer exits 2, jobs.md unchanged",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "\t\n", "--title", "Role", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+  });
 }
 
 // ---------------------------------------------------------------- update_job.py

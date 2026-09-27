@@ -129,6 +129,46 @@ def test_injection_title_with_newline_and_fake_offer_heading_stays_one_line():
     assert len(re.findall(r"(?m)^### ", text)) == 1  # exactly one real row heading (line-start), never the embedded "### Evil Co" text
 
 
+def test_save_rewrites_a_trailing_em_dash_in_company_to_hyphen():
+    # S1 review, finding 8 (LEAD spec amendment): a company ENDING in
+    # ` —` (no character after the dash) would otherwise make the heading
+    # read `### Acme — — Role` — two ` — ` runs, so the FIRST one (the
+    # company's own trailing dash) is what load() would split on.
+    d = tempfile.mkdtemp()
+    jm.save(d, [{"company": "Acme —", "title": "Role", "stage": "To Review", "dismissed": False}])
+    text = open(jm.path(d), encoding="utf-8").read()
+    assert "### Acme - — Role" in text
+    assert len(re.findall(r"(?m)^### ", text)) == 1
+    back = jm.load(d)[0]
+    assert back["company"] == "Acme -" and back["title"] == "Role"
+
+
+def test_save_refuses_an_empty_company_or_title_after_cleaning():
+    # S1 review, finding 6 (LEAD spec amendment): save() refuses loudly;
+    # the writer exits 2 and jobs.md is unchanged.
+    d = tempfile.mkdtemp()
+    for row in (
+        {"company": "   ", "title": "Role", "stage": "To Review", "dismissed": False},
+        {"company": "Acme", "title": "\t\n", "stage": "To Review", "dismissed": False},
+    ):
+        try:
+            jm.save(d, [row])
+            assert False, f"should have refused: {row}"
+        except SystemExit as e:
+            assert e.code == 2
+    assert not os.path.exists(jm.path(d))  # jobs.md unchanged (never existed)
+    # unchanged when a PRIOR jobs.md already exists, too
+    jm.save(d, rows2())
+    before = open(jm.path(d), "rb").read()
+    try:
+        jm.save(d, rows2() + [{"company": "", "title": "Role", "stage": "To Review", "dismissed": False}])
+        assert False, "should have refused"
+    except SystemExit as e:
+        assert e.code == 2
+    after = open(jm.path(d), "rb").read()
+    assert before == after
+
+
 def test_analysis_field_is_distinct_from_jd_and_round_trips():
     d = tempfile.mkdtemp()
     row = {"company": "Acme", "title": "PM", "stage": "To Review", "dismissed": False,

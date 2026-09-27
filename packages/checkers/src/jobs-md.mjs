@@ -5,7 +5,7 @@
 // `() => new Date()`) so the parity test can freeze time exactly the way
 // the real script's `datetime.now(timezone.utc)` is frozen for comparison.
 import { join } from "./path-util.mjs";
-import { pyInt, codePointCompare, pyRstrip, pyStrip, restoreLineSeparators, PY_S, U2028_SENTINEL, U2029_SENTINEL } from "./py-text.mjs";
+import { pyInt, codePointCompare, pyRstrip, pyStrip, restoreLineSeparators, PY_S } from "./py-text.mjs";
 
 // The Python source's `\s` in these patterns is Python's own whitespace
 // set, which INCLUDES U+2028/U+2029 — but by the time text reaches here,
@@ -26,6 +26,7 @@ const FIELD_RE = new RegExp(`^-${PY_S}+([^:]+):${PY_S}*(.*)$`);
 
 export const STAGES = ["To Review", "Interested", "Applied", "Interviewing", "Offer"];
 export const DISMISSED = "Dismissed";
+export const NOTES = "Search notes";
 
 const FIELDS = [
   ["URL", "url"], ["Location", "location"], ["Posted", "posted_at"],
@@ -52,19 +53,19 @@ const LABEL_TO_KEY = new Map(FIELDS);
 // `- URL:` from becoming a stage heading or a field of another row (a
 // job posting is the plan's named prompt-injection risk).
 //
-// Also includes the two PY_S sentinels (U2028_SENTINEL/U2029_SENTINEL,
-// imported above): a value fresh off argv carries a REAL U+2028/U+2029
-// (argv is never run through `universalNewlines`), but a value that came
-// from `load()`'s parse of an existing jobs.md carries the SENTINEL
-// instead (this file's own `load()` reads through `io.readFile`, which
-// already ran `universalNewlines` — see this module's HEADING2_RE
-// comment above). Both must collapse the SAME way, or a re-verdict on a
-// row already holding a real U+2028 (see `save()`'s own
-// `restoreLineSeparators` at the very end, which swaps the sentinel back
-// afterward either way) would sanitise differently than the fresh-argv
-// case — Python has no sentinel concept at all, so its `_clean` already
-// treats both origins identically by construction.
-const SANITISE_WS_CHARS = ` \\t\\n\\r\\f\\v\\u0085\\u00a0\\u2028\\u2029${U2028_SENTINEL}${U2029_SENTINEL}`;
+// This class holds the 10 REAL characters § 4.3 names, nothing else — in
+// particular NOT the two PY_S sentinels (S1 review, finding 7): a literal
+// U+E000/U+E001 in a value (rare, but not impossible — a candidate's own
+// text, or a board's) is an ORDINARY character to this design, exactly as
+// Python sees it (Python has no sentinel concept at all), so it must
+// never collapse to a space. `load()` (below) is the one place that
+// makes this safe: it converts each extracted field's own sentinel-form
+// value back to the real U+2028/U+2029 the FILE held, immediately after
+// that value is captured out of the line-oriented parse and before it
+// ever reaches this class — so by the time ANY value (fresh off argv, or
+// returned by `load()`) arrives here, a sentinel code point can only ever
+// mean "a literal U+E000/U+E001", never "a stand-in for U+2028/U+2029".
+const SANITISE_WS_CHARS = " \\t\\n\\r\\f\\v\\u0085\\u00a0\\u2028\\u2029";
 const SANITISE_WS_RE = new RegExp(`[${SANITISE_WS_CHARS}]+`, "g");
 const SANITISE_TRIM_RE = new RegExp(`^[${SANITISE_WS_CHARS}]+|[${SANITISE_WS_CHARS}]+$`, "g");
 
@@ -78,15 +79,22 @@ function cleanValue(value) {
 }
 
 // Like cleanValue, plus: a company containing ` — ` (space, em dash,
-// space) has it rewritten as ` - ` (space, hyphen, space) — a row's
-// heading splits company from title on the FIRST ` — `, so a company
-// that legitimately carries an em dash must never be misread as the
+// space), or ENDING in ` —` (space, em dash, nothing after — the
+// heading's own separator supplies the space and the title that would
+// otherwise follow), has that em dash written as `-` — a row's heading
+// splits company from title on the FIRST ` — `, so a company that
+// legitimately carries an em dash must never be misread as the
 // company/title separator. Titles keep theirs; the split above takes the
-// first one.
+// first one. (S1 review, finding 8: a company ending in ` —` with no
+// rewrite would make the heading read `### Acme — — Role`, two ` — `
+// runs, so the FIRST one — the company's own trailing dash, not the
+// real separator — is what load() would split on.)
 function cleanCompany(value) {
-  const cleaned = cleanValue(value);
+  let cleaned = cleanValue(value);
   if (cleaned === null || cleaned === undefined) return cleaned;
-  return cleaned.split(" — ").join(" - ");
+  cleaned = cleaned.split(" — ").join(" - ");
+  if (cleaned.endsWith(" —")) cleaned = cleaned.slice(0, -1) + "-";
+  return cleaned;
 }
 
 export function canon(s) {
@@ -114,6 +122,13 @@ export function path(workspace) {
   return join(workspace, "jobs.md");
 }
 
+// Parse jobs.md -> row objects. Parsing STOPS at the `## Search notes`
+// heading (S1 review, finding 1): everything after it is notes, matching
+// loadNotes(); a posting quoted inside that block can legitimately carry
+// a line that reads like a real stage heading (`## Offer` is both a stage
+// name and ordinary English) or a fake `### Company — Title` / `- URL:`
+// row — those must never parse as a row, the same threat model § 4.3's
+// B1 sanitising already covers for a title arriving through a field.
 export async function load(io, workspace) {
   const p = path(workspace);
   const rows = [];
@@ -127,6 +142,7 @@ export async function load(io, workspace) {
     let m = line.match(HEADING2_RE);
     if (m && !line.startsWith("###")) {
       const name = pyStrip(m[1]);
+      if (name === NOTES) break;
       curStage = STAGES.includes(name) || name === DISMISSED ? name : null;
       continue;
     }
@@ -136,9 +152,13 @@ export async function load(io, workspace) {
       const sepIdx = head.indexOf(" — ");
       const company = sepIdx === -1 ? head : head.slice(0, sepIdx);
       const title = sepIdx === -1 ? "" : head.slice(sepIdx + 3);
+      // restoreLineSeparators AFTER pyStrip (which needs PY_S's sentinel
+      // form to strip a leading/trailing U+2028/U+2029 the same way
+      // Python's str.strip() strips the real character) and BEFORE this
+      // value goes anywhere else — see SANITISE_WS_CHARS's comment above.
       row = {
-        company: pyStrip(company),
-        title: pyStrip(title),
+        company: restoreLineSeparators(pyStrip(company)),
+        title: restoreLineSeparators(pyStrip(title)),
         stage: curStage !== DISMISSED ? curStage : null,
         dismissed: curStage === DISMISSED,
       };
@@ -148,7 +168,10 @@ export async function load(io, workspace) {
     m = line.match(FIELD_RE);
     if (m && row !== null) {
       const k = LABEL_TO_KEY.get(pyStrip(m[1]));
-      if (k) row[k] = pyStrip(m[2]) || null;
+      if (k) {
+        const v = pyStrip(m[2]);
+        row[k] = v ? restoreLineSeparators(v) : null;
+      }
     }
   }
   for (const r of rows) {
@@ -169,7 +192,8 @@ export async function loadNotes(io, workspace) {
   if (!(await io.exists(p))) return "";
   const text = await io.readFile(p);
   const m = text.match(new RegExp(`^## Search notes${PY_S}*$\\n([\\s\\S]*)$`, "m"));
-  return m ? pyStrip(m[1]) : "";
+  // restoreLineSeparators AFTER pyStrip — see load()'s own comment above.
+  return m ? restoreLineSeparators(pyStrip(m[1])) : "";
 }
 
 export async function appendNote(io, workspace, text, now = () => new Date()) {
@@ -181,6 +205,10 @@ export async function appendNote(io, workspace, text, now = () => new Date()) {
 }
 
 export class DuplicateKeyError extends Error {}
+// LEAD spec amendment (S1 review, finding 6; design-web-search.md § 4.3):
+// a company or title that is empty after cleaning is refused — every
+// caller maps this to exit 2 (never DuplicateKeyError's own exit 1).
+export class EmptyFieldError extends Error {}
 
 export async function save(io, workspace, rows, { notes = undefined, now = () => new Date() } = {}) {
   const seen = new Map();
@@ -243,13 +271,26 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
   if (finalNotes) {
     out.push("## Search notes", "", finalNotes, "");
   }
-  const text = restoreLineSeparators(pyRstrip(out.join("\n"))) + "\n";
+  // No blanket restoreLineSeparators here (S1 review, finding 7): every
+  // value already reaching `out` is already in its final, real-character
+  // form — `_block()`'s row values (fresh off argv, or `load()`'s own
+  // per-value restore above) and `finalNotes` (fresh, or `loadNotes()`'s
+  // own restore above) — so a blanket call at this point could only ever
+  // MISinterpret a literal U+E000/U+E001 a value legitimately carries as
+  // a translated sentinel, silently rewriting it into a real
+  // U+2028/U+2029 that was never there.
+  const text = pyRstrip(out.join("\n")) + "\n";
   await io.writeFile(path(workspace), text);
 }
 
 function _block(r, dismissed) {
   const company = cleanCompany(r.company);
   const title = cleanValue(r.title);
+  // this check runs before any line of `out` is written to disk, so a
+  // throw here never touches the file — see EmptyFieldError's own comment.
+  if (!company || !title) {
+    throw new EmptyFieldError("error: empty company or title after cleaning; nothing written");
+  }
   const lines = [`### ${company} — ${title}`];
   for (const [label, k] of FIELDS) {
     if (k === "was_stage" && !dismissed) continue;

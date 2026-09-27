@@ -219,6 +219,23 @@ change what happens next, which is exactly principle 7's test.
 
 ## 6. Job search — a plan over instruments
 
+**Amended 2026-09-26 (owner ruling, "yes now"; `design-web-search.md`).**
+Search is simplified toward the owner's own Grok pack, in both hosts.
+The model judges which roles fit; code reads job boards and writes
+every row from board data; there is no lead tier, no company file and
+no generated criteria file. The plan stays: composed attended,
+confirmed by the candidate, run verbatim when unattended, and it now
+records each company's board address. Every role a run adds gets
+evaluate's quick pass in the same run. Instruments: company job boards
+(five systems locally, four in the web app), web search limited to
+job-board sites, and, locally and attended, general web search and
+page reading for companies the plan should add. A hit from anywhere
+else is counted in the report, never added. Delisting survives as
+"gone from its board", proposed in the prune batch. The caveat that
+travels with it (rule 17): the pack is one person's practice; the
+change stands on the measured comparison in `design-web-search.md`
+§ 8, and reverts where it lost.
+
 **The model composes the search; tools execute it.** This restores the
 imported design's own split, which the shipped skill had drifted from:
 the model decides which sources are worth hitting for *this* target, what
@@ -255,38 +272,6 @@ zero companies, zero discovery, the source's own search is the sweep.
               └── discovery maintains it ───────┘
                   (only when the plan needs this class)
 ```
-
-### The two-file company model
-
-`criteria.md § Target companies` holds the candidate's own picks — theirs
-to edit, search only reads. **`companies.md` is the whole working set** —
-one row per company the search touches, script-owned, human-readable:
-Company · source (`criteria` / `discovery-<channel> <date>` / `cloud`) ·
-evidence · status (`swept` / `unresolved` / `no-ats`). Rows sourced from
-`criteria.md` are regenerated from it every sweep (criteria stays
-authoritative for its rows — deletions propagate); discovered and cloud
-rows persist with provenance. One writer (the script), one readable
-answer to "what is my search covering?". `companies.txt`, the `*`
-watchlist convention, and `search-criteria.md` are deleted; every
-user-specified company gets the old watchlist treatment (always swept,
-theme filter relaxed).
-
-### The source catalog
-
-The skill's catalog, read at plan composition
-(`references/patterns.md § The catalog`), is **one card per instrument** — what it
-covers · which activity it serves · cost · freshness · JD fidelity ·
-bounds · when it wins · its earned lore. A general "pick appropriate
-sources" underperforms an enumerated menu (measured 2026-08-13: an
-enumerated list moved hazard catching from 1/7 to 7/7; the same mechanism
-applies). Cards at launch: the cloud company→ATS map (628 rows, a
-key-gated Supabase edge function; resolution pre-solved, discoveries flow
-back through a verified staging table) · the ATS sweep (10 vendor
-contracts, uniform record) · role-first fan-out (measures the market,
-finds unknown employers) · the YC vendor (seed-stage, salary+equity+
-founders) · the HN who-is-hiring parser · bounded archetype web research
-· the attended LinkedIn radar. Deterministic gotchas live in the code
-that hits them, not on the card.
 
 ### The plan — composed attended, executed frozen
 
@@ -361,30 +346,15 @@ Lifecycle — nothing is ever deleted; states change and views filter:
  sweep admits → To Review ── evaluate → verdict ── Applied → Interviewing …
                    │
                    ├─ candidate dismisses (reason recorded)
-                   ├─ DELISTED (shipped): gone from a successfully-swept
-                   │    feed → auto-dismissed — but only rows the candidate
-                   │    never touched; engaged rows are NEVER auto-closed
+                   ├─ GONE: a board read in full no longer lists it →
+                   │    proposed in the prune batch (only rows the
+                   │    candidate never moved)
                    ├─ STALE: no action for stale-after days → sorted down;
                    │    proposed in the prune report (batch confirm)
-                   ├─ OUTRANKED (#20): over the cap, weakest by quick-scan
-                   │    fit → proposed (candidate's batch yes; Target-companies
-                   │    rows exempt from auto-proposal)
-                   └─ CLOSED: stale AND the posting no longer resolves
-                        (a cheap liveness probe, run only on stale rows —
-                        covers what delisting can't: pasted links, posts)
+                   └─ OUTRANKED (#20): over the cap, weakest by quick-scan
+                        fit → proposed (candidate's batch yes; Target-companies
+                        rows exempt from auto-proposal)
 ```
-
-**Leads validate automatically** *(shipped 2026-08-14)*: an
-aggregator-sourced role is internal (`leads.md`) until the employer's
-RAW feed confirms it — then it is promoted as a pipeline row with the
-employer URL; swept-and-absent dies immediately; an unknown company
-joins the universe so the next sweep validates; unresolvable companies
-get one agent careers-site check before the stale window closes. The
-user never reads a lead. Search output the user should see lands in
-`jobs.md § Search notes` — **`criteria.md` is input-only** (its single
-search-side write is `§ Search plan`, on the explicit yes). Dedup is
-the record's own canonical keys — rejected postings are simply
-re-filtered each sweep; no separate key file exists to drift.
 
 ### Kept from prior art, deliberately
 
@@ -397,27 +367,10 @@ From career-ops (MIT — port, don't rewrite):
   (HigherEdJobs for academia) and query-addressed remote boards. A "new
   vendor" build request drops from write-from-scratch to
   translate-under-test against a working reference. (USAJOBS is not
-  among them — still ours to build.)
-- **Cross-listing detection (SimHash).** The employer+agency double-post
-  evades both URL dedup and company+title dedup — agencies strip the
-  employer name but rarely rewrite the JD. A 64-bit SimHash of the JD
-  body, flagged when two rows from *different* companies are ≥92%
-  similar within 90 days. Warn-only, and the warning matters: apply
-  through ONE channel, or the double submission burns the candidate with
-  both parties. We already store JD bodies in `jd-inbox/` — the signal
-  is nearly free.
-- **The trust validator.** Flag-only 0–100 score on admission: URL
-  structure, missing apply URL, shortener domains, company↔domain
-  mismatch against an ATS allowlist. Never drops a row — feeds the lead
-  tier's confirm-or-label rule with deterministic evidence.
-- **The liveness pattern library.** Closure-banner detection hardened by
-  real incidents — typographic apostrophes (U+2019) silently defeating
-  ASCII patterns; the Phenom "has been filled" phrasing needing
-  lookahead/lookbehind guards so "once the application form has been
-  filled…" on a LIVE posting doesn't read as expired. Our liveness probe
-  adopts these patterns wholesale instead of learning them again.
-- **Per-source yield history** and **portal health** (consecutive
-  failures flag a dying source) — as previously adopted.
+  among them — still ours to build.) The reference for any future board
+  system; SimHash cross-listing detection, the trust validator and the
+  liveness pattern library are dropped with the lead tier and delisting
+  they served (`design-web-search.md` § 7.3).
 
 From our own shipped code: the uniform record · the loud-fail
 criteria seam · the single seeded rejection-reason list (a novel reason

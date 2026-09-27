@@ -430,7 +430,7 @@ Receipt of the `jobs.md` row `record_verdict.py` wrote (C § 6.2, row
 2) — not the prose summary card evaluate's `SKILL.md` still writes in
 the reply; the two intentionally show the same tier twice, once from
 the file and once from the model (C § 6.2, "S8"). `ref` = the row's
-`jd_file`. **Side panel:** opens `ref`. **Copy:** the `verdict` enum
+`analysis_file` (C § 6.2). **Side panel:** opens `ref`. **Copy:** the `verdict` enum
 maps to a display label by a static UI table (`strong` → "Strong Fit",
 etc. — `eval.md`'s four tier names). No `dealbreakers` → the section
 reads "none", never omitted (rule 8). A `reason` beginning
@@ -1183,7 +1183,7 @@ opened. The detail shows only the parts whose source exists:
    already show them, dated by their turn (§ 5.2 rule 5).
 4. **Next, from you:** the plan items, Waiting on you and then To do,
    in file order, whose `ref` (C § 18: the first backticked path) is one
-   of this entry's file paths or the linked row's `JD` path. Each is
+   of this entry's file paths or the linked row's `Analysis` path. Each is
    shown through the plan item (below). No match: the part is left
    out. These are `plan.md`'s own lines, chosen by an exact path match;
    the page never writes a next step of its own (§ 5.2 rule 3).
@@ -1387,7 +1387,7 @@ CRLF; a file with no `## ` line; a `# ` line ending a section.
   opens Applications with that entry chosen; a Jobs detail's "Open
   application" opens Applications with the linked entry chosen; an
   application's "Role details" opens Jobs with the linked row chosen.
-  Every one of these follows an exact link (the `JD` join, § 5.3),
+  Every one of these follows an exact link (the `Analysis` join, § 5.3),
   changes only which page and item show (app state, § 5.1), and never
   sends or writes (§ 5.2 rules 1 and 2). Nothing else links page to
   page in this step. *Proved by:* one e2e case per link on the fixture,
@@ -2302,7 +2302,7 @@ One new fixture, `apps/web/fixtures/workspace-pages.json`, under § 4's
 rules (invented persona; every script-written file produced by running
 the real scripts in a `mktemp -d` workspace, never `~/job-search`). Its
 `files` must include: a `jobs.md` with at least one role in each of the
-five stages plus a dismissed role, one row without a `JD` field, and one
+five stages plus a dismissed role, one row without an `Analysis` field, and one
 quick-scan row; a `plan.md` with Goal, Budget, and lines under both
 Waiting on you and To do; an `applications/` folder with one role using
 `<key>.md` and one using `<key>-application.md`, one with a rendered
@@ -2313,10 +2313,10 @@ files, so no fixture holds a hand-edited script-written file.
 `empty-first-run.json` proves every empty state.
 
 **Added by the restore ruling (§ 5).** The same fixture also holds:
-`jobs.md` rows whose `JD` and `Company file` fields point at a
+`jobs.md` rows whose `Analysis` and `Company file` fields point at a
 `jd-analysis/<key>.md` and a `company/<slug>.md` written in evaluate's
 schema shapes (these two are model-written prose, so they are written
-by hand), plus one row whose `JD` names a file that isn't there; an
+by hand), plus one row whose `Analysis` names a file that isn't there; an
 application notes file with `## Coverage` (all three statuses) and
 `## Selection` (at least two `out` rows), whose output
 `proposal_block` produces cleanly when run in the `mktemp -d`
@@ -2389,7 +2389,11 @@ first):
   `.md`, `.html` (sandboxed, print works) and binary; § 5.2 rules 1, 2,
   6 and 8.
 - **3b Jobs. READER (reuse):** **Waits for** `design-web-search.md` S1
-  (the `Analysis` field). The `jobs_md` port unchanged, plus the
+  (the `Analysis` field). 3b also moves the verdict card's `ref` to the
+  row's `analysis_file` (C § 6.2): `packages/agent/src/cards.ts:124`,
+  `tests/agent/cards.test.ts:109-116` (tester-owned), and
+  `apps/web/fixtures/mvp-journey.json:89`'s `--jd-file jd-analysis/…` →
+  `--analysis-file`. The `jobs_md` port unchanged, plus the
   small read-only `store-io.ts` adapter. It also deletes the stub
   `packages/agent/src/jobs-md.ts` (its own comment says it waits for the
   port): `cards.ts:6` moves to the port, the public re-export of
@@ -2435,7 +2439,7 @@ first):
   `useChat` returns.
 - **3d Applications. READER (new):** **Waits for** `design-web-search.md`
   S1 (the `Analysis` field). `groupApplications` and the exact
-  `JD` join. *Exit:* a table test over both name forms, the `.html`,
+  `Analysis` join. *Exit:* a table test over both name forms, the `.html`,
   an unknown suffix and an unmatched key; the page's roles, stages and
   "Not linked" line match the fixture.
   *Restore ruling adds the detail:* **READER (change): `proposalRows`**,

@@ -1,8 +1,9 @@
 #!/bin/bash
-# Reviewer's probe for 69f35ae's safety guards — the OPEN gaps, one line
-# each, OPEN or CLOSED. Exits 1 while any is open, 0 when all are closed.
-# Zero spend, no model calls. Kept out of tests/run.py on purpose: every
-# check here fails today, and run.py must stay green for everyone.
+# Reviewer's probe for the harness safety guards (69f35ae, 6670f5c). One
+# line per check: CLOSED, OPEN, or RESIDUAL (a gap the owner accepted —
+# printed so it stays visible, never counted). Exits 1 while any check is
+# OPEN, 0 otherwise. Zero spend, no model calls. Kept out of tests/run.py:
+# it is the re-verify command for the review's findings.
 #
 # Safety: every kill below targets a dummy sleeper this script started
 # (a symlink to /bin/sleep under a unique name, in a temp dir). No real
@@ -15,78 +16,104 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
 T="$(mktemp -d)"
 open=0
-say() { printf '  %-6s %s\n' "$1" "$2"; [ "$1" = OPEN ] && open=1; }
-cleanup() { /usr/bin/pkill -f "$T/zz" 2>/dev/null; chflags -R nouchg "$T" 2>/dev/null; rm -rf "$T"; }
+# `say` returns 0 always — so `cond && say ... || say ...` can never
+# double-print (the 0b748cb version returned 1 for CLOSED and did).
+say() { printf '  %-8s %s\n' "$1" "$2"; if [ "$1" = OPEN ]; then open=1; fi; return 0; }
+check() {  # check "<closed text>" "<open text>" <command...>  — CLOSED iff the command succeeds
+  local closed="$1" opentext="$2"; shift 2
+  if "$@"; then say CLOSED "$closed"; else say OPEN "$opentext"; fi
+}
+vault_state_dir() {  # the state dir lib_env.sh derives for vault $1
+  REALJS="$1" bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; echo \"\$_VAULT_STATE_DIR\""
+}
+cleanup() {
+  /usr/bin/pkill -f "$T/zz" 2>/dev/null
+  for v in "$T/v1" "$T/v2" "$T/v3"; do [ -d "$v" ] && rm -rf "$(vault_state_dir "$v")"; done
+  chflags -R nouchg "$T" 2>/dev/null; rm -rf "$T"
+}
 trap cleanup EXIT
 
-dummy() {  # start a sleeper named $1, echo nothing
-  ln -sf /bin/sleep "$T/$1"
-  (nohup "$T/$1" 300 >/dev/null 2>&1 &)
-  sleep 0.3
-}
+dummy() { ln -sf /bin/sleep "$T/$1"; (nohup "$T/$1" 300 >/dev/null 2>&1 &); sleep 0.3; }
 alive() { pgrep -f "$T/$1" >/dev/null; }
+# A shell that sourced lib_env.sh the way run_*.sh does.
+harness() { REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; $1" >/dev/null 2>&1; }
+locked() { ls -lO "$1" | grep -q uchg; }
 
-# Run a command in a shell that sourced lib_env.sh the way run_*.sh does.
-harness() {
-  REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; $1" >/dev/null 2>&1
-}
-
-echo "== kill guard: name-based kills that bypass guard-bin (PATH shims) =="
+echo "== kill guard, shell layer (guard-bin PATH shims) =="
+# Owner ruling 2026-09-26: these reach a real process from a plain shell;
+# accepted residual risk, reduced by removing the trigger (no real Chrome
+# in a harness run) and by --disallowedTools on every `claude -p`
+# (lib_env.sh CLAUDE_KILL_GUARD_ARGS). That second layer is a claude-CLI
+# rule and can't be probed without a model call; the reviewer's live check
+# (2026-09-27, Haiku) found it denies all four forms below plus `true &&`
+# and `echo;` compounds, and does NOT deny `sh -c "/usr/bin/pkill ..."` or
+# a `python3 -c` os.kill of a pgrep lookup.
 dummy zzA; harness "/usr/bin/pkill -f zzA"
-alive zzA && say CLOSED "absolute-path /usr/bin/pkill -f <name>" || say OPEN "absolute-path /usr/bin/pkill -f <name> reached a real process"
+if alive zzA; then say CLOSED "absolute-path /usr/bin/pkill -f <name>"; else say RESIDUAL "absolute-path /usr/bin/pkill -f <name> reaches a real process from a shell"; fi
 dummy zzB; harness "/usr/bin/killall zzB"
-alive zzB && say CLOSED "absolute-path /usr/bin/killall <name>" || say OPEN "absolute-path /usr/bin/killall <name> reached a real process"
+if alive zzB; then say CLOSED "absolute-path /usr/bin/killall <name>"; else say RESIDUAL "absolute-path /usr/bin/killall <name> reaches a real process from a shell"; fi
 dummy zzC; harness 'kill $(pgrep -f zzC)'
-alive zzC && say CLOSED 'kill $(pgrep -f <name>)' || say OPEN 'kill $(pgrep -f <name>) reached a real process (numeric kill of a name lookup)'
+if alive zzC; then say CLOSED 'kill $(pgrep -f <name>)'; else say RESIDUAL 'kill $(pgrep -f <name>) reaches a real process from a shell'; fi
 dummy zzD; harness 'pgrep -f zzD | xargs kill'
-alive zzD && say CLOSED 'pgrep -f <name> | xargs kill' || say OPEN 'pgrep -f <name> | xargs kill reached a real process'
+if alive zzD; then say CLOSED 'pgrep -f <name> | xargs kill'; else say RESIDUAL 'pgrep -f <name> | xargs kill reaches a real process from a shell'; fi
+dummy zzE; harness "pkill -f zzE; killall zzE; env kill zzE"
+check "bare pkill / killall / env kill <name> are refused (guard-bin)" \
+      "a bare pkill / killall / env kill <name> reached a real process" alive zzE
 
-echo "== vault lock =="
-# Two checkouts (worktrees) = two $ROOT/results refcounts, one real vault.
-mkdir -p "$T/v1" "$T/wtA" "$T/wtB"; echo x > "$T/v1/f.md"
-( export REALJS="$T/v1" _VAULT_LOCKDIR="$T/wtA/lock" _VAULT_COUNT="$T/wtA/count"
-  source "$ROOT/lib_env.sh"; vault_lock; sleep 2
-  ls -lO "$T/v1/f.md" | grep -q uchg && echo held > "$T/xa" || echo lapsed > "$T/xa"; vault_unlock ) &
-sleep 0.4
-( export REALJS="$T/v1" _VAULT_LOCKDIR="$T/wtB/lock" _VAULT_COUNT="$T/wtB/count"
-  source "$ROOT/lib_env.sh"; vault_lock; sleep 0.3; vault_unlock )
+echo "== vault lock (keyed by the vault's resolved path) =="
+# Two checkouts: the second is a copy of lib_env.sh + guard-bin in another
+# directory, so its ROOT (and results/) differs; one shared temp vault.
+mkdir -p "$T/v1" "$T/checkout2"; echo x > "$T/v1/f.md"
+cp "$ROOT/lib_env.sh" "$T/checkout2/"; cp -R "$ROOT/guard-bin" "$T/checkout2/"
+( export REALJS="$T/v1"; source "$ROOT/lib_env.sh"; vault_lock; sleep 2
+  if locked "$T/v1/f.md"; then echo held > "$T/xa"; else echo lapsed > "$T/xa"; fi; vault_unlock ) &
+sleep 0.5
+( export REALJS="$T/v1"; ROOT="$T/checkout2"; source "$T/checkout2/lib_env.sh"; vault_lock; sleep 0.3; vault_unlock )
 wait
-[ "$(cat "$T/xa")" = held ] && say CLOSED "vault stays locked for a runner in another checkout" \
-  || say OPEN "vault UNLOCKED under a live runner when a runner in a different checkout (worktree) exited — refcount lives under each checkout's own results/"
-# Stale count: a holder killed with SIGKILL leaves count=1; vault later
-# unlocked by hand; the next runner then runs with the vault unlocked.
-mkdir -p "$T/v2" "$T/st"; echo x > "$T/v2/f.md"
-export REALJS="$T/v2" _VAULT_LOCKDIR="$T/st/lock" _VAULT_COUNT="$T/st/count"
-bash -c "ROOT='$ROOT' REPO='$REPO'; source '$ROOT/lib_env.sh'; vault_lock; kill -9 \$\$" 2>/dev/null
+held_xa() { [ "$(cat "$T/xa")" = held ]; }
+check "vault stays locked for a runner while a runner in another checkout exits" \
+      "vault UNLOCKED under a live runner when a runner in a different checkout exited" held_xa
+unlocked_v1() { ! locked "$T/v1/f.md"; }
+check "vault unlocked once the last holder (either checkout) left" \
+      "vault still locked after every holder left" unlocked_v1
+# Stale holder: SIGKILLed while holding, vault then unlocked by hand; the
+# next runner must lock it again, not trust the dead holder's registration.
+mkdir -p "$T/v2"; echo x > "$T/v2/f.md"
+REALJS="$T/v2" bash -c "ROOT='$ROOT' REPO='$REPO'; source '$ROOT/lib_env.sh'; vault_lock; kill -9 \$\$" 2>/dev/null
 chflags nouchg "$T/v2/f.md"
-bash -c "ROOT='$ROOT' REPO='$REPO'; source '$ROOT/lib_env.sh'; vault_lock; ls -lO '$T/v2/f.md' | grep -q uchg && echo held > '$T/xs' || echo lapsed > '$T/xs'; vault_unlock"
-unset REALJS _VAULT_LOCKDIR _VAULT_COUNT
-[ "$(cat "$T/xs")" = held ] && say CLOSED "a stale refcount never leaves a new runner unprotected" \
-  || say OPEN "stale refcount (holder SIGKILLed, vault unlocked by hand): the next runner holds with the vault UNLOCKED"
+REALJS="$T/v2" bash -c "ROOT='$ROOT' REPO='$REPO'; source '$ROOT/lib_env.sh'; vault_lock; if ls -lO '$T/v2/f.md' | grep -q uchg; then echo held; else echo lapsed; fi > '$T/xs'; vault_unlock"
+held_xs() { [ "$(cat "$T/xs")" = held ]; }
+check "a dead holder's registration never leaves a new runner unprotected" \
+      "stale holder (SIGKILLed, vault unlocked by hand): the next runner holds with the vault UNLOCKED" held_xs
+# Abandoned mutex (creator died inside the critical section): recovered
+# promptly, not waited out or bypassed.
+mkdir -p "$T/v3"; echo x > "$T/v3/f.md"
+sd="$(vault_state_dir "$T/v3")"; mkdir -p "$sd/mutex"; echo 999999 > "$sd/mutex/pid"
+s=$(date +%s)
+REALJS="$T/v3" bash -c "ROOT='$ROOT' REPO='$REPO'; source '$ROOT/lib_env.sh'; vault_lock; if ls -lO '$T/v3/f.md' | grep -q uchg; then echo held; else echo lapsed; fi > '$T/xm'; vault_unlock" 2>/dev/null
+waited=$(( $(date +%s) - s ))
+mutex_ok() { [ "$(cat "$T/xm")" = held ] && [ "$waited" -lt 5 ]; }
+check "a dead creator's mutex is recovered at once and the vault still locks (${waited}s)" \
+      "abandoned mutex: waited ${waited}s or proceeded unprotected ($(cat "$T/xm"))" mutex_ok
+
+# Two runners on one vault whose environments carry different TMPDIRs
+# (e.g. the owner's terminal and a sandboxed agent session): lib_env.sh
+# keys the state dir under ${TMPDIR:-/tmp}, so they may not share it.
+mkdir -p "$T/v4" "$T/tmpA" "$T/tmpB"; echo x > "$T/v4/f.md"
+( export REALJS="$T/v4" TMPDIR="$T/tmpA/"; source "$ROOT/lib_env.sh"; vault_lock; sleep 2
+  if locked "$T/v4/f.md"; then echo held > "$T/xt"; else echo lapsed > "$T/xt"; fi; vault_unlock ) &
+sleep 0.5
+( export REALJS="$T/v4" TMPDIR="$T/tmpB/"; source "$ROOT/lib_env.sh"; vault_lock; sleep 0.3; vault_unlock )
+wait
+held_xt() { [ "$(cat "$T/xt")" = held ]; }
+check "vault stays locked across runners whose TMPDIR differs" \
+      "vault UNLOCKED under a live runner when a runner with a different TMPDIR exited — the state dir is keyed under \${TMPDIR:-/tmp}, not a fixed path" held_xt
 
 echo "== render_resume.py never launches a real browser in this harness =="
-# Owner ruling 2026-09-26 (replacing the test-user isolation plan this whole
-# file was originally written to demand): a harness run should have no REAL
-# Chrome to hang in the first place. This does not remove the checks below
-# (render_resume.py's own timeout/process-group/message safety still matters
-# for a REAL candidate run, where RENDER_RESUME_CHROME is unset) — it closes
-# the specific incident's TRIGGER inside this harness, which the checks
-# below can no longer exercise here by construction (they call to_pdf()
-# directly with an explicit chrome=, bypassing the harness's own env var —
-# this section is what proves an AGENT under test, which never passes an
-# explicit chrome=, gets the fake).
-# NOTE on the && / || shape below: `say`'s own exit status is 0 for OPEN,
-# 1 for CLOSED (its `[ "$1" = OPEN ] && open=1` tail) — so `cond && say
-# CLOSED ... || say OPEN ...` spuriously ALSO prints the OPEN line whenever
-# CLOSED fires (found live, resolving this same file's pre-existing vault
-# checks above, which show the identical double-print when truly CLOSED).
-# Every check added here puts the OPEN branch first instead, which does
-# not have that problem.
 harness_chrome="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; echo \"\$RENDER_RESUME_CHROME\"")"
-[ "$harness_chrome" != "$ROOT/fixtures/fake-chrome" ] && say OPEN "RENDER_RESUME_CHROME is not wired to the harness fake (got: ${harness_chrome:-<empty>})" \
-  || say CLOSED "lib_env.sh points RENDER_RESUME_CHROME at the harness fake"
-[ ! -x "$ROOT/fixtures/fake-chrome" ] && say OPEN "fixtures/fake-chrome is missing or not executable" \
-  || say CLOSED "fixtures/fake-chrome exists and is executable"
+is_fake() { [ "$harness_chrome" = "$ROOT/fixtures/fake-chrome" ] && [ -x "$ROOT/fixtures/fake-chrome" ]; }
+check "lib_env.sh points RENDER_RESUME_CHROME at an executable harness fake" \
+      "RENDER_RESUME_CHROME is not the harness fake (got: ${harness_chrome:-<empty>})" is_fake
 harness_pdf="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; python3 - '$REPO' '$T' <<'EOF'
 import sys, os
 sys.path.insert(0, os.path.join(sys.argv[1], 'skills', 'apply', 'scripts'))
@@ -96,10 +123,11 @@ open(os.path.join(t, 'harness.html'), 'w').write('<html></html>')
 ok, err = rr.to_pdf(os.path.join(t, 'harness.html'), os.path.join(t, 'harness.pdf'))
 print('OK' if ok else 'FAIL:' + str(err))
 EOF")"
-[ "$harness_pdf" != "OK" ] && say OPEN "an agent-under-test call (no explicit chrome=) did not resolve to the harness fake: $harness_pdf" \
-  || say CLOSED "an agent-under-test call (no explicit chrome=) renders via the fake, never real Chrome, and never hangs"
+pdf_ok() { [ "$harness_pdf" = OK ]; }
+check "an agent-style call (no explicit chrome=) renders via the fake" \
+      "an agent-style call did not render via the harness fake: $harness_pdf" pdf_ok
 
-echo "== render_resume.py to_pdf() timeout (production safety — RENDER_RESUME_CHROME is unset for a real candidate run, so these still apply there) =="
+echo "== render_resume.py to_pdf() timeout (a real candidate run, RENDER_RESUME_CHROME unset) =="
 cat > "$T/fakechrome" <<EOF
 #!/bin/bash
 # stands in for Chrome: a browser process with a helper child of its own
@@ -116,14 +144,18 @@ open(os.path.join(t, "r.html"), "w").write("<html></html>")
 rr.to_pdf(os.path.join(t, "r.html"), os.path.join(t, "r.pdf"), chrome=os.path.join(t, "fakechrome"), timeout=1)
 EOF
 sleep 0.3
-alive zzHelper && say OPEN "timeout kills the Chrome PID only; its helper children are orphaned and keep running (no process-group kill)" \
-  || say CLOSED "timeout stops Chrome's own helper children too"
+helper_gone() { ! alive zzHelper; }
+check "timeout stops Chrome's own helper children too" \
+      "timeout kills the Chrome PID only; its helper children keep running" helper_gone
 dflt="$(python3 -c "import inspect,sys; sys.path.insert(0,'$REPO/skills/apply/scripts'); import render_resume as rr; print(inspect.signature(rr.to_pdf).parameters['timeout'].default)")"
-[ "$dflt" -lt 120 ] && say CLOSED "to_pdf timeout ($dflt s) is under the agent Bash tool's 120 s default" \
-  || say OPEN "to_pdf timeout default is ${dflt}s — not under the agent Bash tool's 120 s default, so the tool can cut the script off before its plain message prints"
-grep -q -F 'check whether another Chrome window is open' "$REPO/skills/apply/scripts/render_resume.py" \
-  && say OPEN "timeout message points the agent at 'another Chrome window' (the owner's browser) though the run no longer shares a profile" \
-  || say CLOSED "timeout message does not point at other Chrome windows"
+# the 10 s reap after the kill counts too: timeout + 10 must land under 120
+under_tool() { [ $((dflt + 10)) -lt 120 ]; }
+check "to_pdf timeout (${dflt}s + 10s reap) is under the agent Bash tool's 120s default" \
+      "to_pdf timeout ${dflt}s (+10s reap) is not under the agent Bash tool's 120s default" under_tool
+no_hint() { ! grep -q -F 'another Chrome window' "$REPO/skills/apply/scripts/render_resume.py"; }
+check "timeout message does not point at other Chrome windows" \
+      "timeout message points the agent at 'another Chrome window' (the owner's browser)" no_hint
 
 echo
-[ "$open" = 0 ] && { echo "ALL CLOSED"; exit 0; } || { echo "OPEN GAPS REMAIN"; exit 1; }
+if [ "$open" = 0 ]; then echo "NO OPEN GAPS (RESIDUAL lines are owner-accepted)"; exit 0; fi
+echo "OPEN GAPS REMAIN"; exit 1

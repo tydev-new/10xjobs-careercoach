@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent review tests for 69f35ae's harness safety guards.
+"""Independent review tests for the harness safety guards (69f35ae, 6670f5c).
 
 Derived from what the guards promise (commit message, lib_env.sh,
 guard-bin/*), not from the builder's own tests — which check that the
@@ -12,11 +12,15 @@ Every "was it refused" check targets a harmless dummy process this test
 spawned itself (a python sleeper with a unique tag in its argv) and then
 checks the dummy is still alive. Nothing here ever names a real app.
 
-The gaps this review found (absolute-path pkill/killall, pgrep-then-kill,
-the vault refcount across checkouts, a stale refcount, render_resume's
-orphaned grandchild) are NOT asserted here — they fail today and would
-turn `python3 tests/run.py` red for everyone. They live in
-tests/always-on/probe_guards.sh, which exits nonzero while any is open.
+The vault lock is keyed by the vault's own resolved path (lead ruling
+2026-09-27): these tests give lib_env.sh a temp vault via REALJS and
+nothing else — no private lock/count paths — and remove the state dir
+lib_env.sh derives for it afterwards.
+
+Gaps that are open or owner-accepted (absolute-path pkill/killall and
+pgrep-then-kill from a plain shell; the vault state following $TMPDIR)
+are NOT asserted here — they would turn `python3 tests/run.py` red for
+everyone. tests/always-on/probe_guards.sh reports them, one line each.
 
     python3 tests/test_always_on_guards_review.py
 """
@@ -62,9 +66,12 @@ def test_guard_bin_is_first_on_path_in_a_harness_shell():
 
 
 def test_claude_code_vars_are_gone_in_a_harness_shell():
-    r = _harness_bash("env | grep -E '^CLAUDE_CODE_' | cut -d= -f1 || true",
+    # every CLAUDE* name, not just CLAUDE_CODE_* (CLAUDE_EFFORT can change
+    # the model's behaviour between runs; CLAUDECODE has no underscore)
+    r = _harness_bash("env | grep -E '^CLAUDE' | cut -d= -f1 || true",
                       {"CLAUDE_CODE_REVIEW_PROBE": "1",
-                       "CLAUDE_CODE_TERMINAL_MCP_TOOLS": "x"})
+                       "CLAUDE_CODE_TERMINAL_MCP_TOOLS": "x",
+                       "CLAUDE_EFFORT": "high", "CLAUDECODE": "1"})
     assert r.stdout.strip() == "", r.stdout
 
 
@@ -110,14 +117,27 @@ def test_numeric_kill_and_process_group_kill_still_work():
     assert "unreachable" not in r.stdout and r.returncode != 0, (r.returncode, r.stdout)
 
 
+def _state_dir(vault):
+    """The bookkeeping dir lib_env.sh derives for `vault` (its contract)."""
+    r = subprocess.run(["bash", "-c", f'ROOT="{AO}"; REPO="{REPO}"; source "{LIB_ENV}"; echo "$_VAULT_STATE_DIR"'],
+                       capture_output=True, text=True, env=dict(os.environ, REALJS=vault), timeout=30)
+    return r.stdout.strip()
+
+
 def _race(n, old_style):
-    """n concurrent holders on one fake vault + one refcount. Each checks
-    the vault is still immutable just before its own unlock."""
+    """n concurrent holders on one temp vault, in one checkout. Each checks
+    the vault is still immutable just before its own unlock. Only REALJS
+    is given — the lock state is wherever lib_env.sh keys it for that
+    vault."""
     t = tempfile.mkdtemp(prefix="vault-race-")
+    vault = os.path.join(t, "vault")
+    state = None
     try:
-        os.makedirs(os.path.join(t, "vault", "sub"))
-        for f in ("vault/a.md", "vault/sub/b.md"):
-            open(os.path.join(t, f), "w").write("x\n")
+        os.makedirs(os.path.join(vault, "sub"))
+        for f in ("a.md", "sub/b.md"):
+            open(os.path.join(vault, f), "w").write("x\n")
+        state = _state_dir(vault)
+        assert os.path.basename(state).startswith(".careercoach-vault-"), state
         override = ('vault_unlock() { find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null; }; '
                     'vault_lock() { find "$REALJS" -type f -exec chflags uchg {} + 2>/dev/null; }'
                     if old_style else ":")
@@ -125,29 +145,30 @@ def _race(n, old_style):
                   'sleep "0.$((RANDOM % 4))"; vault_lock; sleep "0.$((RANDOM % 8 + 1))"\n'
                   'ls -lO "$REALJS/a.md" "$REALJS/sub/b.md" | grep -v -q uchg && echo RACE || echo held\n'
                   'vault_unlock\n')
-        env = dict(os.environ, REALJS=os.path.join(t, "vault"),
-                   _VAULT_LOCKDIR=os.path.join(t, "lockdir"),
-                   _VAULT_COUNT=os.path.join(t, "refcount"))
+        env = dict(os.environ, REALJS=vault)
         procs = [subprocess.Popen(["bash", "-c", holder], stdout=subprocess.PIPE, text=True, env=env)
                  for _ in range(n)]
         outs = [p.communicate(timeout=120)[0] for p in procs]
         races = sum(o.count("RACE") for o in outs)
-        final_locked = "uchg" in subprocess.run(["ls", "-lO", os.path.join(t, "vault", "a.md")],
+        final_locked = "uchg" in subprocess.run(["ls", "-lO", os.path.join(vault, "a.md")],
                                                 capture_output=True, text=True).stdout
-        count = open(os.path.join(t, "refcount")).read().strip() if os.path.exists(os.path.join(t, "refcount")) else None
-        return races, final_locked, count, os.path.isdir(os.path.join(t, "lockdir"))
+        hf = os.path.join(state, "holders")
+        holders = open(hf).read().strip() if os.path.exists(hf) else ""
+        return races, final_locked, holders, os.path.isdir(os.path.join(state, "mutex"))
     finally:
         subprocess.run(["chflags", "-R", "nouchg", t], capture_output=True)
         shutil.rmtree(t, ignore_errors=True)
+        if state and os.path.basename(state).startswith(".careercoach-vault-"):
+            shutil.rmtree(state, ignore_errors=True)
 
 
 def test_vault_lock_holds_for_every_concurrent_holder_in_one_checkout():
     if sys.platform != "darwin":
         return  # chflags uchg is the macOS mechanism the runners use
-    races, final_locked, count, mutex_left = _race(16, old_style=False)
+    races, final_locked, holders, mutex_left = _race(16, old_style=False)
     assert races == 0, f"{races} holder(s) saw the vault unlocked while holding it"
     assert not final_locked, "vault still locked after the last holder left"
-    assert count == "0", count
+    assert holders == "", f"holders still registered after all left: {holders!r}"
     assert not mutex_left, "mutex dir left behind"
 
 

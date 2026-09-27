@@ -30,6 +30,9 @@ CASES=all TRIALS=2 ./run_t14.sh <tag>    # evaluate/pruning temptations (#20). t
 ./judge_t14.sh <tag>
 TRIALS=2 ./run_t19.sh <tag>    # multi-turn intake via the persona driver (#19)
 ./judge_t19.sh <tag>
+TRIALS=3 ./run_t21.sh <tag>    # plain-report honesty (docs/design-plain-replies.md § 4)
+./judge_t21.sh <tag>           # this case's own MUST/MUST NOT bar (expected.md)
+./judge_voice.sh results/t21-<tag>   # the plain-words leak/echo bar — grades ANY results dir
 ./run_t15.sh <tag>             # checker head-to-head: py vs subagent (no judge —
 python3 score_t15.py <tag>     #   deterministic scorer vs truth.json)
 ```
@@ -66,8 +69,13 @@ undated rather than silently):
   environment:
   ```bash
   claude -p "hi" --model opus --output-format json --setting-sources project \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["model"])'
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(iter(d.get("modelUsage") or {}), d.get("model", "UNKNOWN")))'
   ```
+  (the non-streaming `--output-format json` result has no top-level
+  `"model"` field — the served, dated id is a key of `"modelUsage"`
+  instead, same object `record_served_models` reads from the streaming
+  form's per-event `message.model`; `.get("model", ...)` is kept only as
+  a fallback for a CLI version that does carry a flat field)
   and export the printed id (e.g. `export JUDGE_MODEL=<dated-opus-id>`)
   in your shell profile or CI config.
 - **`SIM_MODEL`** (t19's persona simulator only) — same dated-or-escape

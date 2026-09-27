@@ -381,7 +381,7 @@ def test_t21_planted_files_trip_exactly_the_letter_band_warn():
     case = os.path.join(AO, "cases", "t21-plain-report")
     d = tempfile.mkdtemp()
     try:
-        for f in ("plan.md", "criteria.md", "jobs.md"):
+        for f in ("plan.md", "criteria.md", "jobs.md", "base-resume.md"):
             shutil.copy(os.path.join(case, f), d)
         shutil.copytree(os.path.join(case, "applications"), os.path.join(d, "applications"))
         R = glob.glob(os.path.join(d, "applications", "*-resume.md"))[0]

@@ -121,13 +121,64 @@ def find_chrome():
     return None
 
 
-def to_pdf(html_path, pdf_path):
-    chrome = find_chrome()
+def to_pdf(html_path, pdf_path, chrome=None, timeout=120):
+    """Render html_path to pdf_path with headless Chrome.
+
+    Earned 2026-09-26 (the Chrome-hang incident): headless Chrome with no
+    --user-data-dir reaches for the CALLER's default profile, and a real
+    Chrome window already holding that profile's singleton lock makes the
+    headless run hang instead of failing fast. The old code also called
+    subprocess.run(..., timeout=120) with no except around it — an
+    uncaught TimeoutExpired crashed this script with a traceback instead
+    of a plain message, and left the agent under test to freelance its own
+    fix; it chose `pkill -f "Google Chrome"`, which killed every Chrome
+    process on the machine, including the owner's own browser. Two fixes,
+    both here: (1) a fresh, throwaway --user-data-dir per call, so this
+    run never touches (or waits on) anyone's real profile; (2) a real
+    subprocess handle so a timeout kills ONLY this call's own Chrome PID
+    (never a name-based pkill/killall) and is reported as plain text, not
+    an exception.
+
+    RENDER_RESUME_CHROME (owner ruling 2026-09-26, replacing the tentest-user
+    isolation plan): the always-on harness must never launch a REAL browser
+    at all — that's what hung in the first place, and a live test session
+    "fixing" a hang is the incident above. A harness runner sets this env
+    var to point at its own fake (tests/always-on/fixtures/fake-chrome),
+    which writes a small, realistically-sized PDF immediately and never
+    hangs. It is read ONLY when the caller does not pass an explicit
+    `chrome=` argument — an explicit argument (e.g. a script's own test, or
+    a future caller with a specific need) always wins, and this whole
+    branch is a no-op in production (the var is unset outside the harness),
+    so this never changes behaviour for a real candidate run.
+    """
+    chrome = chrome or os.environ.get("RENDER_RESUME_CHROME") or find_chrome()
     if not chrome:
         return False, "no Chrome/Chromium found — see references/patterns.md § The PDF (the conversion ladder)"
-    subprocess.run([chrome, "--headless", "--disable-gpu", "--no-pdf-header-footer",
-                    f"--print-to-pdf={pdf_path}", html_path],
-                   capture_output=True, timeout=120)
+    profile_dir = tempfile.mkdtemp(prefix="render-resume-chrome-profile-")
+    proc = None
+    try:
+        proc = subprocess.Popen(
+            [chrome, "--headless", "--disable-gpu", "--no-pdf-header-footer",
+             f"--user-data-dir={profile_dir}",
+             f"--print-to-pdf={pdf_path}", html_path],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        try:
+            _, stderr = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            # Kill only THIS process, by its own PID — never a broader,
+            # name-based kill of anything else on the machine.
+            proc.kill()
+            try:
+                proc.communicate(timeout=10)
+            except subprocess.TimeoutExpired:
+                pass  # best-effort reap; we still report the timeout plainly below
+            return False, (f"Chrome did not finish within {timeout}s and was stopped "
+                            "(its own process only) — no PDF was produced. Try again, "
+                            "or check whether another Chrome window is open.")
+    finally:
+        shutil.rmtree(profile_dir, ignore_errors=True)
+    if proc.returncode not in (0, None) and not os.path.exists(pdf_path):
+        return False, f"Chrome exited {proc.returncode} with no PDF produced"
     return (os.path.exists(pdf_path), None) if os.path.exists(pdf_path) else (False, "Chrome produced no file")
 
 

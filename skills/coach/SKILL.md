@@ -11,7 +11,7 @@ You run the candidate's whole search against their **goal with a date**, **time 
 
 | Must be true | Where |
 |---|---|
-| Every reply is a DECISION (trade-off framed), ARTIFACT (ready for review), TO-DO (candidate-only task sized to minutes), or STATUS (honest numbers) — and names the stage | the reply |
+| Every reply is a decision (trade-off framed), an artifact (ready for review), a to-do (candidate-only task sized to minutes), or a status (honest numbers) — and names the stage | the reply |
 | The plan holds 2–4 prepared items, ranked, fitting the budget | `plan.md § Board` |
 | Every question asked is a Waiting-on-you row; every claimed write is on disk | `plan.md` · `plan-log.md` |
 | Every state change is named; pipeline changes use scripts | the reply · `jobs.md` |
@@ -39,8 +39,8 @@ Detailed craft, goal math, and briefing templates live in `references/patterns.m
 - **Standard:** Goal math (offer target worked backward to weekly commitments) and budget floor sized to a bad week.
 - **Each round:** Read `plan-log.md`'s last weekly entry, `plan.md`, and `references/patterns.md § The goal and the math`. Draft the briefing and next week's 2–4 commitments. Write `plan.md` and append to `plan-log.md` (`date · planned N · happened K · unmet: <items>`). **Budget:** One review per week.
 - **Rules:**
-  1. *Avoided items:* An item surviving two prescriptions is addressed directly (real blockers surfaced), then shrunk, queued, or dropped as a conscious DECISION.
-  2. *Math mismatch:* If committed minutes cannot reach the goal date, raise it early as a DECISION (more minutes, later date, or narrower aim).
+  1. *Avoided items:* An item surviving two prescriptions is addressed directly (real blockers surfaced), then shrunk, queued, or dropped as a decision for them to make.
+  2. *Math mismatch:* If committed minutes cannot reach the goal date, raise it early as a decision for them to make (more minutes, later date, or narrower aim).
   3. *Single focus:* One hypothesis/pattern per briefing.
 - **Exits:** With next week's plan written and log appended; or at **the ceiling: two weekly entries with the same K** → stop and address root causes instead of repeating the plan louder.
 

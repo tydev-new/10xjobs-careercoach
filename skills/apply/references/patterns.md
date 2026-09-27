@@ -254,7 +254,12 @@ extractor (`pdftotext` / `pypdf` — never stream-grep; Chrome's subset
 fonts defeat it and produce a false "empty" verdict); numbers and names
 match the `.md` exactly; page count measured against the target; file
 size under ~100KB (the Chrome rung lands 50–80KB for two pages — if
-over, cut content, not quality).
+over, cut content, not quality). **The render's own size line is a
+must-say fact**: when it prints the file over the upload limit, that
+line is said in the reply, plainly, every time — a candidate who never
+hears it will try to upload a file that fails, and "the render measured
+it" is not the same as "the candidate was told" (the same class of miss
+as a dropped check result).
 
 ## The live form — browser mechanics
 

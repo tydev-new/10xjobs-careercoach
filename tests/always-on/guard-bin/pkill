@@ -1,0 +1,22 @@
+#!/bin/bash
+# Safety guard, not the real pkill. tests/always-on/lib_env.sh puts this
+# directory first on PATH for every runner (run_*.sh) so an agent under
+# test that reaches for a name/pattern-based kill hits THIS, never the
+# real /usr/bin/pkill.
+#
+# Incident this exists for (2026-09-26): during a live plain-replies run,
+# skills/apply/scripts/render_resume.py's headless Chrome hung (no
+# --user-data-dir of its own — fixed separately, same commit). The agent
+# under test ran `pkill -f "Google Chrome"` to unblock itself. That killed
+# every Chrome process on the machine, including the owner's own open
+# browser — pkill matches by NAME/PATTERN, so there is no way to scope it
+# to "only the process this run started"; the only safe answer is refuse.
+#
+# Always refuses. Never execs the real pkill. Prints one clear line to
+# stderr so the agent under test can see why and stop retrying, and exits
+# nonzero (never 0 — a silent "success" would look like the kill happened).
+echo "pkill is disabled in this test harness (tests/always-on/guard-bin) —" >&2
+echo "a name/pattern kill can hit processes this run does not own (the" >&2
+echo "2026-09-26 Chrome incident). If a subprocess is hung, its own timeout" >&2
+echo "must kill its own child by PID — see render_resume.py's to_pdf()." >&2
+exit 1

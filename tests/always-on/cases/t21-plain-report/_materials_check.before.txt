@@ -1,4 +1,4 @@
-structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)
+structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)
 
 RESUME acme-senior-data-analyst-resume.md: pass (0 fail, 0 warn)
 

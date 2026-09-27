@@ -39,7 +39,11 @@ their estimate") — never manufactured by you, never silently implied.
 
 Go line by line and flag every hit into `base-resume.md § Claim rules`
 for the candidate to confirm. The list is the mechanism; a general
-instruction to "check ambiguous claims" does not work.
+instruction to "check ambiguous claims" does not work. When you put
+these to the candidate, describe the claim itself, in plain words —
+never the section name you filed it under (design-plain-replies.md:
+a `§` reference is the skill's own bookkeeping, not something the
+candidate needs to parse).
 
 A confirm-tier entry states its **own** condition in full: the
 qualifier's words, and where they have to sit. The default is "attached

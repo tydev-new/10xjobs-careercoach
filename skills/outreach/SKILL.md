@@ -60,7 +60,7 @@ Extended search tactics and message frameworks live in `references/patterns.md`.
 - **Standard:** Channel limit (`references/eval.md`), recipient's sourced hook, top posting competency, 5-criterion rubric, and `voice.md`.
 - **Budget:** 2 self-passes.
 - **Each round:** Apply recipient hook (recipient's own words open, positioning closes). Draft inside limit. Self-loop with `python3 scripts/check_messages.py` and language checker-subagent (`../profile/references/language-check.md`). Write rubric line next to draft.
-- **Exits:** Clears standard; or **the ceiling: two passes without clearing** → stop, record honest score (UNMET), and present tradeoff as a **DECISION**. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
+- **Exits:** Clears standard; or **the ceiling: two passes without clearing** → stop, record honest score (UNMET), and present tradeoff as a decision for them to make. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
 
 ### Plan close-out (a sequence)
 

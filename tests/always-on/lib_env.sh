@@ -63,6 +63,117 @@
 # the same commit), which a model/dir-only comparison would miss.
 set -u
 
+# --- Process-safety guard (2026-09-26 Chrome incident) ---------------------
+# A live run's agent-under-test ran `pkill -f "Google Chrome"` after
+# render_resume.py's headless Chrome hung, killing every Chrome process on
+# the machine including the owner's own browser. Two independent fixes:
+# render_resume.py now runs Chrome with its own --user-data-dir and kills
+# only its own child PID on a hard timeout (skills/apply/scripts/
+# render_resume.py); and — belt and suspenders, for anything else an agent
+# under test might try — this dir goes FIRST on PATH for every runner, so
+# pkill/killall/kill-by-name all hit a refusing shim instead of the real
+# thing. See tests/always-on/guard-bin/pkill for the full reasoning.
+export PATH="$ROOT/guard-bin:$PATH"
+
+# --- No real browser in a harness run (owner ruling 2026-09-26) ------------
+# The incident above started because render_resume.py's PDF step launched a
+# REAL headless Chrome even inside a test session, and that Chrome hung
+# (see its docstring). An earlier plan isolated the whole harness under a
+# separate macOS user so a hang could be killed without touching the
+# owner's own processes; the owner replaced that plan with a simpler fix:
+# give a harness run no real browser to hang in the first place.
+# render_resume.py's to_pdf() reads RENDER_RESUME_CHROME ONLY when its
+# caller passes no explicit `chrome=` argument, so this is a no-op outside
+# this harness (the var is unset in production). fixtures/fake-chrome
+# writes a small, realistically-sized PDF immediately and exits 0 — there
+# is nothing left for an agent under test to "fix" with a kill.
+export RENDER_RESUME_CHROME="$ROOT/fixtures/fake-chrome"
+
+# --- Clean environment (2026-09-26) ----------------------------------------
+# A trial found that ambient CLAUDE_CODE_* vars from the CALLING desktop
+# session (CLAUDE_CODE_ENTRYPOINT, CLAUDE_CODE_TERMINAL_MCP_TOOLS, etc.)
+# leak into every `claude -p` the runner starts and change what tools/mode
+# the agent under test gets — a condition's behaviour must come from what
+# that condition provides and nothing else (README, "the environment
+# contract"). Scrubbed here, once, before anything in this file or a
+# caller runs a `claude` command. A script that needs to hand ONE var to a
+# specific call still can (run_t19.sh sets CLAUDE_CODE_OAUTH_TOKEN inline,
+# right on the `claude` invocation itself, same as it always has —
+# assigning it there re-adds just that one var to just that one command).
+for _v in $(env | grep -oE '^CLAUDE_CODE_[A-Za-z0-9_]*' 2>/dev/null || true); do
+  unset "$_v"
+done
+unset _v
+
+# --- Vault lock, reference-counted (2026-09-26) ----------------------------
+# The founder's real ~/job-search is locked immutable (chflags uchg) for
+# the whole duration ANY run needs it untouched. Every run_*.sh used to
+# carry its own private vault_lock/vault_unlock pair and its own
+# `trap vault_unlock EXIT` — so two SIBLING runners (two run_*.sh processes
+# alive at once, e.g. two suites launched in parallel terminals) raced: the
+# first one to exit unlocked the vault while the second was still relying
+# on it staying locked. Fixed by making lock/unlock reference-counted
+# across ALL run_*.sh processes, not per-script: a shared refcount file
+# under results/ (never in the repo, never in the vault itself) says how
+# many holders are currently alive; the vault only actually (un)locks on
+# the 0->1 and 1->0 transitions. A plain `mkdir` is the mutex — atomic on
+# any POSIX filesystem, and portable (no `flock(1)` on macOS).
+REALJS="${REALJS:-$HOME/job-search}"
+_VAULT_LOCKDIR="${_VAULT_LOCKDIR:-$ROOT/results/.vault-lockdir}"
+_VAULT_COUNT="${_VAULT_COUNT:-$ROOT/results/.vault-refcount}"
+_VAULT_HELD=0
+
+_vault_mutex_acquire() {
+  mkdir -p "$(dirname "$_VAULT_COUNT")" 2>/dev/null
+  local tries=0
+  until mkdir "$_VAULT_LOCKDIR" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -gt 200 ]; then
+      echo "WARN: vault mutex ($_VAULT_LOCKDIR) held over ~20s — a prior run" >&2
+      echo "      may have died without releasing it. Proceeding anyway." >&2
+      break
+    fi
+    sleep 0.1
+  done
+}
+_vault_mutex_release() { rmdir "$_VAULT_LOCKDIR" 2>/dev/null; }
+
+# Call once, right after checking $REALJS exists (or unconditionally — both
+# are no-ops when it doesn't). Increments the shared refcount; only the
+# holder that takes it from 0 actually flips the immutable flag.
+vault_lock() {
+  [ -d "$REALJS" ] || return 0
+  _vault_mutex_acquire
+  local n; n="$(cat "$_VAULT_COUNT" 2>/dev/null || echo 0)"
+  case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  if [ "$n" -le 0 ]; then
+    find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null
+  fi
+  n=$((n + 1))
+  echo "$n" > "$_VAULT_COUNT"
+  _VAULT_HELD=1
+  _vault_mutex_release
+}
+# Safe to call from a trap even if vault_lock was never reached (e.g. an
+# early exit) — a holder that never actually incremented the count
+# (_VAULT_HELD=0) decrements nothing, so it can never drive the shared
+# count negative or unlock on someone else's behalf.
+vault_unlock() {
+  [ -d "$REALJS" ] || return 0
+  [ "$_VAULT_HELD" = 1 ] || return 0
+  _vault_mutex_acquire
+  local n; n="$(cat "$_VAULT_COUNT" 2>/dev/null || echo 1)"
+  case "$n" in ''|*[!0-9]*) n=1 ;; esac
+  n=$((n - 1))
+  [ "$n" -lt 0 ] && n=0
+  echo "$n" > "$_VAULT_COUNT"
+  if [ "$n" -eq 0 ]; then
+    find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null
+  fi
+  _VAULT_HELD=0
+  _vault_mutex_release
+}
+
 _KNOWN_MODEL_ALIASES="opus sonnet haiku fable"
 # A dated model id ends in -20YYMMDD (e.g. -20250514). This is what actually
 # pins a judge/runner against drift — a bare version number is not enough.

@@ -1,8 +1,19 @@
 """The renderer owns the markup — both bugs that shipped to the founder."""
-import os, sys, tempfile
+import os, stat, sys, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "skills", "apply", "scripts"))
 import render_resume as rr
+
+
+def _fake_chrome(script_body):
+    """Writes an executable shell script standing in for Chrome and
+    returns its path — never shells out to a real browser in a test."""
+    d = tempfile.mkdtemp(prefix="fake-chrome-")
+    p = os.path.join(d, "chrome")
+    with open(p, "w", encoding="utf-8") as f:
+        f.write("#!/bin/bash\n" + script_body)
+    os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+    return p
 
 WRAPPED = """# ALEX CHEN
 
@@ -56,3 +67,78 @@ def test_page_target_is_reported_not_enforced_by_default():
     src = inspect.getsource(rr.main)
     assert "never trim silently" in src
     assert '"--strict"' in src, "strict must be opt-in, not the default"
+
+
+# --- 2026-09-26 Chrome-hang incident: to_pdf() -----------------------------
+
+def test_to_pdf_gives_chrome_its_own_temporary_profile_dir():
+    """A real Chrome window holding the DEFAULT profile's lock is what made
+    headless Chrome hang in the incident — to_pdf must never reach for the
+    caller's own profile."""
+    seen = tempfile.mktemp(prefix="seen-argv-")
+    html = tempfile.mktemp(suffix=".html")
+    open(html, "w").write("<html></html>")
+    pdf = tempfile.mktemp(suffix=".pdf")
+    # a fake "chrome" that records its own argv, then writes the PDF path
+    # (its last argv element) so to_pdf's success check passes
+    chrome_argv_writer = _fake_chrome(
+        'for a in "$@"; do echo "$a" >> ' + seen + '; done\n'
+        f'echo ok > "{pdf}"\n'
+    )
+    ok, err = rr.to_pdf(html, pdf, chrome=chrome_argv_writer)
+    assert ok, err
+    argv_text = open(seen, encoding="utf-8").read()
+    assert "--user-data-dir=" in argv_text, argv_text
+    # the profile dir must be a FRESH path, never the shared default one a
+    # real Chrome window would also be using (no fixed, well-known path)
+    for line in argv_text.splitlines():
+        if line.startswith("--user-data-dir="):
+            profile_dir = line.split("=", 1)[1]
+            assert "render-resume-chrome-profile-" in profile_dir, profile_dir
+            # cleaned up afterward — never left behind
+            assert not os.path.isdir(profile_dir), "profile dir must be removed after the call"
+
+
+def test_to_pdf_timeout_kills_only_its_own_child_and_reports_plainly():
+    """The incident: an uncaught subprocess.TimeoutExpired crashed the
+    script with a traceback, and the agent under test improvised its own
+    fix (pkill'd every Chrome on the machine). Now a timeout is caught,
+    reported as plain text, and only THIS call's own Chrome PID is ever
+    targeted (Popen.kill() on our own handle — never a name-based kill)."""
+    chrome = _fake_chrome("sleep 30\n")
+    html = tempfile.mktemp(suffix=".html")
+    open(html, "w").write("<html></html>")
+    pdf = tempfile.mktemp(suffix=".pdf")
+    start = time.time()
+    ok, err = rr.to_pdf(html, pdf, chrome=chrome, timeout=1)
+    elapsed = time.time() - start
+    assert ok is False
+    assert "did not finish within 1s" in err, err
+    assert "stopped" in err
+    assert elapsed < 15, f"took {elapsed}s — the timeout did not actually cut the wait short"
+    assert not os.path.exists(pdf), "no PDF should exist after a timeout"
+
+
+def test_to_pdf_no_chrome_found_is_unchanged():
+    # Force the "no chrome" branch deterministically by monkeypatching
+    # find_chrome() — a dev laptop with a real Chrome installed must not
+    # have this test silently launch it against tmp paths that don't
+    # exist (that produced a stray real PDF in the repo worktree once;
+    # never again — chrome=None alone isn't enough, since to_pdf falls
+    # back to RENDER_RESUME_CHROME, then the real find_chrome(), when no
+    # explicit chrome is given).
+    html = tempfile.mktemp(suffix=".html")
+    pdf = tempfile.mktemp(suffix=".pdf")
+    real_find_chrome = rr.find_chrome
+    rr.find_chrome = lambda: None
+    had_env = "RENDER_RESUME_CHROME" in os.environ
+    saved_env = os.environ.pop("RENDER_RESUME_CHROME", None)
+    try:
+        ok, err = rr.to_pdf(html, pdf, chrome=None)
+    finally:
+        rr.find_chrome = real_find_chrome
+        if had_env:
+            os.environ["RENDER_RESUME_CHROME"] = saved_env
+    assert ok is False
+    assert "no Chrome/Chromium found" in err
+    assert not os.path.exists(pdf)

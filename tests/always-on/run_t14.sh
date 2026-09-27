@@ -50,11 +50,13 @@ for case_name in $CASES; do
     mkdir -p "$WS/.claude/skills"
     cp -r "$RUNNER_SKILLS_DIR/evaluate" "$RUNNER_SKILLS_DIR/search" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
+    sandbox_home_setup
     : > "$out.err"
-    ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \
+    ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$CASE/prompt.md")" \
         --model "$MODEL" --dangerously-skip-permissions \
         --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
       ) > "$out.turn1.stream.json" 2>> "$out.err"
+    sandbox_home_cleanup
     python3 "$ROOT/extract_text.py" "$out.turn1.stream.json" > "$out.md"
     mkdir -p "$out-ws"
     cp "$WS"/*.md "$out-ws/" 2>/dev/null

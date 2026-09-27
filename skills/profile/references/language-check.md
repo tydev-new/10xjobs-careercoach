@@ -1,4 +1,4 @@
-# Language check — the checker's contract
+# Wording check — the checker's contract
 
 *(A shared contract, not profile's own technique: apply, outreach and
 storybank spawn this checker; two of their scripts print this file's
@@ -9,7 +9,7 @@ is handed to the spawned checker VERBATIM as its instructions, so it
 stays standalone and exact — folding it into a host's eval would put
 that host's criteria inside every checker's prompt.)*
 
-Language checking belongs to an independent checker, not to the model
+Wording checking belongs to an independent checker, not to the model
 that did the drafting checking its own work (goal 2's checking table).
 
 Spawn a subagent with this file, the rule sources, and the documents. It

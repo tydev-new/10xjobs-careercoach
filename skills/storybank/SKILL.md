@@ -64,7 +64,7 @@ Extended craft, elicitation questions, and diagnostic score ladders live in `ref
 Owned: `storybank.md` and `stories/S###-<slug>.md` (shapes in `references/schema.md`).
 
 - **Hands back:** When records are written and proposals delivered.
-- **Session close:** Run `scripts/check_stories.py --workspace .` and `../profile/scripts/check_files.py --workspace .`. Run independent language checker-subagent (`../profile/references/language-check.md`) on edited stories. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `scripts/check_stories.py --workspace .` and `../profile/scripts/check_files.py --workspace .`. Run the independent wording check subagent (`../profile/references/language-check.md`) on edited stories. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## A story is not a résumé line
 

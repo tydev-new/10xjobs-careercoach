@@ -20,10 +20,10 @@ maybe_dry_run runner "$RESULTS" && exit 0
 TRIALS="${TRIALS:-1}"
 CONDS="${CONDS:-full}"
 
-run_turn() { # ws prompt-file out-stream err-file continue?
+run_turn() { # ws prompt-file out-stream err-file continue? — HOME sandbox from the caller's own sandbox_home_setup (one per case, reused across turns so --continue finds its session)
   local cont=""
   [ "${5:-}" = "continue" ] && cont="--continue"
-  ( cd "$1" && claude -p $cont "$(cat "$2")" \
+  ( cd "$1" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p $cont "$(cat "$2")" \
       --model "$MODEL" --dangerously-skip-permissions \
       --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$3" 2>> "$4"
@@ -49,6 +49,7 @@ for case_name in ${CASES:-t7-capture-honesty t7-mining-correction t7-draft-not-c
     cp -r "$RUNNER_SKILLS_DIR/storybank" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
   fi
   echo "=== $case_name / $cond / trial $trial -> $WS"
+  sandbox_home_setup
   : > "$out.err"
   if [ -f "$CASE/turn1.md" ]; then
     run_turn "$WS" "$CASE/turn1.md" "$out.turn1.stream.json" "$out.err"
@@ -72,6 +73,7 @@ for case_name in ${CASES:-t7-capture-honesty t7-mining-correction t7-draft-not-c
     > "$out-ws/_stories_check.txt" 2>&1
   grep -ho '"skill": *"[^"]*"' "$out".turn*.stream.json 2>/dev/null | sort -u > "$out.skills.txt"
   record_served_models "$out"
+  sandbox_home_cleanup
   rm -rf "$WS"
 done
 done

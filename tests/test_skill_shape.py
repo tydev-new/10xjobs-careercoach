@@ -40,11 +40,15 @@ def test_skill_md_carries_the_shape_sections():
 
 
 def test_close_states_its_subagent_fact():
-    # inline statement required — a pointer is not a statement (spec)
+    # inline statement required — a pointer is not a statement (spec).
+    # "wording check" is the plain-vocabulary rename of "language
+    # check(er)" (fix round 4, source renames) — both accepted, since a
+    # skill converted before that sweep still says the old form.
     for skill in CONVERTED:
         t = _read(skill, "SKILL.md")
         assert ("checker-subagent" in t or "language check" in t.lower()
-                or "language checker" in t.lower()), skill
+                or "language checker" in t.lower()
+                or "wording check" in t.lower()), skill
 
 
 def test_loop_skills_score_as_a_count():

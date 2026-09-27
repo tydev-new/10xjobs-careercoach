@@ -108,7 +108,7 @@ base.
   bullets prove this mandate; patents and older roles stay below.
 - **No search jargon**: a document sent to an employer or a contact
   never carries Ten's own labels (a verdict tier, a track name, a round
-  count); the language checker's `search_jargon` rule holds the list.
+  count); the wording check's `search_jargon` rule holds the list.
 - **No arrows**: write it in words ("from six months to one month");
   `check_materials.py` and `check_messages.py` FAIL arrow glyphs and
   ASCII arrow chains.

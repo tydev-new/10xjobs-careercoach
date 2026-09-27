@@ -55,16 +55,16 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
   # HOME sandbox — earned 2026-08-18, first folder-hazard run: BOTH trial
   # agents ran mkdir/ls/grep/git against the REAL ~/job-search and created
   # candidate dirs in the REAL home (~/job-search-jordan). A conversational
-  # runner with skip-permissions WILL reach ~; give it a fake one. Only the
-  # CLI's own config is linked through.
-  # NOT symlinks: a failed auth inside the fake home wrote EMPTY tokens back
-  # through the link into the real Keychain entry and logged the founder's CLI
-  # out (2026-08-18). Copy the config in; the fake home must be a dead end for
-  # writes, which is the entire point of a sandbox.
-  FAKEHOME="$(mktemp -d)"
-  cp -R "$HOME/.claude" "$FAKEHOME/.claude" 2>/dev/null
-  [ -f "$HOME/.claude.json" ] && cp "$HOME/.claude.json" "$FAKEHOME/.claude.json"
-  rm -rf "$FAKEHOME/.claude/projects" "$FAKEHOME/.claude/todos" 2>/dev/null
+  # runner with skip-permissions WILL reach ~; give it a fake one.
+  # Fix round 4: this used to `cp -R "$HOME/.claude" "$FAKEHOME/.claude"` —
+  # the owner's ENTIRE `.claude/` dir, including skills/ (the DEPLOYED
+  # skills, not the build under test) and history.jsonl/sessions/. A
+  # re-test found an agent `find`-ing and RUNNING the owner's deployed
+  # ~/.claude/skills/coach/scripts/check_closeout.py from exactly this
+  # copy. Now uses the shared, minimal sandbox_home_setup (lib_env.sh) —
+  # verified live to still authenticate with nothing copied but the
+  # top-level .claude.json and an EMPTY .claude/ dir.
+  sandbox_home_setup   # sets $FAKEHOME and $HTOK
   # ws-seed/ plants what the session OPENS INTO (e.g. a code repo — the
   # folder-hazard branch); dotfiles included, so .git can be planted
   [ -d "$CASE/ws-seed" ] && cp -R "$CASE/ws-seed/." "$WS/"
@@ -90,9 +90,10 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
     printf '\n## Candidate (turn %s)\n%s\n' "$turn" "$CAND_MSG" >> "$out.transcript.md"
     cont=""; [ "$turn" -gt 1 ] && cont="--continue"
     # sandbox auth: keychain-held logins are invisible under a fake HOME
-    # (2026-08-20). The founder's setup-token lands in ~/.claude/harness-token
-    # (chmod 600); export it to the sandboxed CLI only.
-    HTOK=""; [ -f "$HOME/.claude/harness-token" ] && HTOK="$(cat "$HOME/.claude/harness-token")"
+    # (2026-08-20). $HTOK (from sandbox_home_setup above) is the founder's
+    # setup-token, read once from ~/.claude/harness-token (chmod 600, never
+    # written to the fake home's filesystem or logged) and handed to the
+    # sandboxed CLI only as this one invocation's own env var.
     # Identity scrub (2026-08-20 incident): HOME=FAKEHOME contained `~`, but
     # the agent WROTE to the literal /Users/<user>/job-search — it can rebuild
     # the real path from USER/LOGNAME. Scrub them. Defense 2 of 2; the
@@ -139,7 +140,8 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
   ls -RA "$FAKEHOME" 2>/dev/null | grep -v '^\.' | head -50 > "$out-ws/_fakehome.txt"
   python3 "$ROOT/dump_tools.py" "$out".turn*.stream.json > "$out.tools.txt" 2>/dev/null
   record_served_models "$out"
-  rm -rf "$WS" "$SIMD" "$FAKEHOME"
+  sandbox_home_cleanup
+  rm -rf "$WS" "$SIMD"
 done
 done
 echo "done: $RESULTS"

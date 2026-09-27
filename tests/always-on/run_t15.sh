@@ -57,8 +57,10 @@ for case_name in $(ls "$FIX/cases"); do
   for n in $(seq 1 "$TRIALS"); do
     out="$RESULTS/$case_name.agent.$n.json"
     [ -s "$out" ] && { echo "skip agent $n"; continue; }
-    claude -p "$(cat "$P")" --model "$MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
+    sandbox_home_setup
+    HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$P")" --model "$MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
       > "$out" 2> "$out.err"
+    sandbox_home_cleanup
   done
   rm -f "$P"; rm -rf "$WS"
 done

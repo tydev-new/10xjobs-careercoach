@@ -111,6 +111,39 @@ else
   say FAIL "fixtures/fake-chrome is missing or not executable"; fail=1
 fi
 
+# 9. HOME sandbox for every runner (fix round 4): a re-test found an agent
+#    under test running/reading the owner's DEPLOYED ~/.claude/skills via
+#    the real (or a too-broadly-copied) HOME. lib_env.sh must define the
+#    shared, minimal sandbox_home_setup/cleanup, and every run_*.sh that
+#    grants tool access (--dangerously-skip-permissions or
+#    --permission-mode) must call it.
+if grep -q 'sandbox_home_setup()' "$ROOT/lib_env.sh" && grep -q 'sandbox_home_cleanup()' "$ROOT/lib_env.sh"; then
+  say ok "lib_env.sh defines the shared sandbox_home_setup/cleanup"
+else
+  say FAIL "lib_env.sh is missing sandbox_home_setup/cleanup"; fail=1
+fi
+unsandboxed=""
+for f in "$ROOT"/run_*.sh; do
+  if grep -qE -- '--dangerously-skip-permissions|--permission-mode' "$f" && ! grep -q 'sandbox_home_setup' "$f"; then
+    unsandboxed="$unsandboxed $(basename "$f")"
+  fi
+done
+if [ -z "$unsandboxed" ]; then
+  say ok "every runner granting tool access calls sandbox_home_setup"
+else
+  say FAIL "grant tool access with no HOME sandbox:$unsandboxed"; fail=1
+fi
+# RESIDUAL, stated plainly (2026-09-27 live probe, one Haiku call): HOME
+# sandboxing stops ~-relative reaches and the owner's skills from being
+# copied in — it does NOT stop an ABSOLUTE-PATH read. Unix permissions are
+# per OWNING USER, not per $HOME, and the owner's ruling is that harness
+# runs use the owner's own account (no separate OS user). vault_lock
+# already makes ~/job-search's files immutable, so a WRITE through an
+# absolute path still fails at the OS level — a READ does not. Closing
+# that needs real process isolation (a separate OS user or a cloud
+# sandbox); not checkable here, so it is only ever stated, never scored.
+say warn "residual (owner-accepted): an absolute-path READ of the owner's real home still succeeds under HOME sandboxing — only OS-level user isolation closes it"
+
 echo
 [ "$fail" = 0 ] && echo "PREFLIGHT CLEAN" || echo "PREFLIGHT FAILED — fix before trusting results"
 exit $fail

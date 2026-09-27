@@ -462,8 +462,10 @@ def test_consumers_of_rule6_are_wired():
     ae = flat(read("skills", "apply", "references", "eval.md"))
     assert "confirm-tier hazards," in ae and "— and `search_jargon`" in ae
     ap = flat(read("skills", "apply", "references", "patterns.md"))
+    # "wording check" is the plain-vocabulary rename of "language checker"
+    # (fix round 4, source renames) — same rule, renamed prose.
     assert ("**No search jargon**: a document sent to an employer or a contact never carries Ten's own "
-            "labels (a verdict tier, a track name, a round count); the language checker's "
+            "labels (a verdict tier, a track name, a round count); the wording check's "
             "`search_jargon` rule holds the list.") in ap
 
 

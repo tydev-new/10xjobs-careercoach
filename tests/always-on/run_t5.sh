@@ -35,8 +35,8 @@ CASES="${CASES:-}"
 # comment for the race this fixes (a sibling run_*.sh unlocking early).
 vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM
 
-run_turn() { # ws prompt-file out-stream
-  ( cd "$1" && claude -p "$(cat "$2")" \
+run_turn() { # ws prompt-file out-stream — HOME sandbox set by the caller (one per trial, reused across turns so --continue finds its own session)
+  ( cd "$1" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$2")" \
       --model "$MODEL" --dangerously-skip-permissions \
       --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$3" 2>> "$3.err"
@@ -57,10 +57,11 @@ for case_name in $CASES; do
     mkdir -p "$WS/.claude/skills"
     cp -r "$RUNNER_SKILLS_DIR/search" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
+    sandbox_home_setup   # one FAKEHOME per trial — --continue below needs the SAME one turn1 used
     : > "$out.err"
     if [ -f "$CASE/turn1.md" ]; then
       run_turn "$WS" "$CASE/turn1.md" "$out.turn1.stream.json"
-      ( cd "$WS" && claude -p --continue "$(cat "$CASE/turn2.md")" \
+      ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p --continue "$(cat "$CASE/turn2.md")" \
           --model "$MODEL" --dangerously-skip-permissions \
           --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
         ) > "$out.turn2.stream.json" 2>> "$out.err"
@@ -80,6 +81,7 @@ for case_name in $CASES; do
     # what the turn-1 workspace looked like matters for "executed before yes":
     # jobs.db existing at ALL means a sweep ran at some point in the session.
     record_served_models "$out"
+    sandbox_home_cleanup
     rm -rf "$WS"
   ) &
 done

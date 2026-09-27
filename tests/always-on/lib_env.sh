@@ -166,6 +166,61 @@ for _v in $(env | grep -oE '^CLAUDE[A-Za-z0-9_]*' 2>/dev/null || true); do
 done
 unset _v
 
+# --- HOME sandbox for every runner (fix round 4) ---------------------------
+# Re-test finding: an agent under test ran `find / -maxdepth 6 -iname coach`,
+# then read and EXECUTED the owner's deployed
+# ~/.claude/skills/coach/scripts/check_closeout.py — the run drew on the
+# owner's installed skills, not the build under test (the environment
+# contract's own rule 1), and it browsed the owner's real home. Only
+# run_t19.sh sandboxed HOME before this; every other runner ran with the
+# REAL $HOME, --dangerously-skip-permissions, and nothing stopping an agent
+# from wandering into it.
+#
+# run_t19.sh's own sandbox was itself too broad: `cp -R "$HOME/.claude"
+# "$FAKEHOME/.claude"` copies the owner's ENTIRE `.claude/` — skills/,
+# history.jsonl, sessions/, session-env/, projects/ (removed after the
+# fact, but skills/ and history/ were not) — into the fake home, so the
+# agent finds the SAME deployed skills there, sandbox or not. VERIFIED LIVE
+# (2026-09-27, one Haiku call): a minimal fake home — the top-level
+# `.claude.json` copied in, plus an EMPTY `.claude/` dir, nothing else —
+# still authenticates and runs a real turn successfully. Credentials never
+# touch the fake home's filesystem at all: the owner's setup-token lands in
+# `~/.claude/harness-token` (chmod 600, never in the repo or a log) and is
+# read into `$HTOK` here, then handed to the sandboxed CLI as the
+# CLAUDE_CODE_OAUTH_TOKEN environment variable on the invocation itself —
+# a value that never gets written to disk under the fake home, so a failed
+# auth there has nothing to write back into the real keychain (the
+# 2026-08-18 incident a symlinked home caused). No keychain access of any
+# kind is needed for this path.
+#
+# RESIDUAL RISK, stated plainly (2026-09-27, same live probe): HOME
+# sandboxing stops `~`-relative reaches and stops the owner's deployed
+# skills from being copied in — it does NOT stop an ABSOLUTE-PATH read.
+# The same probe asked the sandboxed agent to `ls "/Users/<owner>/job-search"`
+# by its literal path (never `~`) and it printed the real directory
+# listing — Unix file permissions are per OWNING USER, not per $HOME, and
+# the owner's ruling is that harness runs use the owner's own account (no
+# separate OS user). vault_lock (above) already makes ~/job-search's files
+# immutable for the run, so a WRITE through an absolute path fails at the
+# OS level regardless of HOME — but a READ still succeeds. Closing that
+# needs real process isolation (a separate OS user or a cloud sandbox),
+# the same conclusion the kill-guard's own residual (CLAUDE_KILL_GUARD_ARGS
+# above) already reached; it is not this fix's scope.
+#
+# Call once per trial/condition — concurrent trials must not share one
+# fake home. Sets $FAKEHOME and $HTOK for the caller to splice onto its
+# own `claude -p` line (`HOME="$FAKEHOME" USER=candidate LOGNAME=candidate
+# CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p ...`, same as run_t19.sh
+# already did); call sandbox_home_cleanup when the trial is done.
+sandbox_home_setup() {
+  FAKEHOME="$(mktemp -d)"
+  [ -f "$HOME/.claude.json" ] && cp "$HOME/.claude.json" "$FAKEHOME/.claude.json" 2>/dev/null
+  mkdir -p "$FAKEHOME/.claude"
+  HTOK=""
+  [ -f "$HOME/.claude/harness-token" ] && HTOK="$(cat "$HOME/.claude/harness-token")"
+}
+sandbox_home_cleanup() { [ -n "${FAKEHOME:-}" ] && rm -rf "$FAKEHOME" 2>/dev/null; }
+
 # --- Vault lock, reference-counted, keyed by VAULT (2026-09-26; fixed 2026-09-27) ---
 # The founder's real ~/job-search is locked immutable (chflags uchg) for
 # the whole duration ANY run needs it untouched. Every run_*.sh used to

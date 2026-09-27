@@ -72,7 +72,7 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 Owned: `applications/` (shapes in `references/schema.md`).
 
 - **Hands back:** Outreach sends go to `outreach`; interview prep goes to `interview`; confirmed story leads go to `storybank`; base updates go to `profile`.
-- **Session close:** Run `python3 scripts/check_materials.py`, `python3 scripts/proposal_block.py`, and `python3 ../profile/scripts/check_files.py --workspace .`. Language checker-subagent runs on every delivered document. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `python3 scripts/check_materials.py`, `python3 scripts/proposal_block.py`, and `python3 ../profile/scripts/check_files.py --workspace .`. Wording check subagent runs on every delivered document. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

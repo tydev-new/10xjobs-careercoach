@@ -255,3 +255,87 @@ def test_every_claude_p_invocation_site_splices_in_the_kill_guard_args():
             if "--setting-sources project" in line and "CLAUDE_KILL_GUARD_ARGS" not in line:
                 missed.append(f"{os.path.basename(path)}:{i}")
     assert missed == [], f"claude invocation(s) missing the kill-guard args: {missed}"
+
+
+# --- HOME sandbox for every runner (fix round 4) ---------------------------
+# A re-test found an agent under test ran `find / -maxdepth 6 -iname coach`
+# and executed the owner's DEPLOYED ~/.claude/skills/coach/scripts/
+# check_closeout.py — only run_t19.sh sandboxed HOME before this fix, and
+# even ITS sandbox was too broad (a wholesale `cp -R "$HOME/.claude"`
+# copied the owner's skills/history/sessions into the "fake" home too).
+
+
+def test_sandbox_home_setup_never_copies_the_owners_skills_or_history():
+    """Behavioural: actually calls sandbox_home_setup (sourced the way
+    every run_*.sh does) and inspects the REAL resulting directory, not a
+    text scan of lib_env.sh."""
+    r = _source_lib_env(
+        'sandbox_home_setup\n'
+        'echo "FAKEHOME=$FAKEHOME"\n'
+        'ls -A "$FAKEHOME/.claude" 2>/dev/null | wc -l | tr -d " "\n'
+        'echo "HTOK_LEN=${#HTOK}"\n'
+        'sandbox_home_cleanup\n'
+        '[ -d "$FAKEHOME" ] && echo STILL_EXISTS || echo GONE\n'
+    )
+    lines = r.stdout.splitlines()
+    assert lines, (r.stdout, r.stderr)
+    fakehome_line = next(l for l in lines if l.startswith("FAKEHOME="))
+    fakehome = fakehome_line.split("=", 1)[1]
+    assert fakehome != os.environ.get("HOME"), "must be a throwaway dir, never the real HOME"
+    claude_dir_count = lines[lines.index(fakehome_line) + 1]
+    assert claude_dir_count == "0", (
+        f"$FAKEHOME/.claude/ must be EMPTY (no skills/, no history, no "
+        f"projects/) — found {claude_dir_count} entries"
+    )
+    assert "GONE" in lines, "sandbox_home_cleanup must remove the fake home"
+
+
+def test_sandbox_home_setup_reads_the_harness_token_without_writing_it_anywhere():
+    """The owner's setup-token (~/.claude/harness-token, chmod 600) must be
+    read into $HTOK for the ONE invocation's env var — never written to
+    the fake home's filesystem (that's the whole point: nothing there for
+    a failed auth to write an empty token back through)."""
+    if not os.path.isfile(os.path.join(os.environ.get("HOME", ""), ".claude", "harness-token")):
+        print("SKIPPED: no ~/.claude/harness-token on this host")
+        return
+    r = _source_lib_env(
+        'sandbox_home_setup\n'
+        'echo "HTOK_LEN=${#HTOK}"\n'
+        'find "$FAKEHOME" -iname "*harness-token*" | wc -l | tr -d " "\n'
+        'sandbox_home_cleanup\n'
+    )
+    lines = r.stdout.splitlines()
+    htok_len = int(next(l for l in lines if l.startswith("HTOK_LEN=")).split("=", 1)[1])
+    assert htok_len > 0, "HTOK must be populated from the real harness-token"
+    found_count = lines[-1] if lines else "?"
+    assert found_count == "0", "the token file itself must never be copied into the fake home"
+
+
+def test_every_dangerously_skip_permissions_site_calls_sandbox_home_setup():
+    """Structural check: every run_*.sh that grants --dangerously-skip-
+    permissions or --permission-mode (a conversational, tool-using agent
+    under test) must call sandbox_home_setup somewhere in the file — the
+    HOME it hands to `claude -p` must come from that call, never the
+    real, ambient $HOME."""
+    import glob
+    missed = []
+    for path in sorted(glob.glob(os.path.join(ALWAYS_ON, "run_*.sh"))):
+        text = open(path, encoding="utf-8").read()
+        needs_sandbox = "--dangerously-skip-permissions" in text or "--permission-mode" in text
+        if needs_sandbox and "sandbox_home_setup" not in text:
+            missed.append(os.path.basename(path))
+    assert missed == [], f"runner(s) grant tool access without a HOME sandbox: {missed}"
+
+
+def test_every_claude_p_site_that_uses_fakehome_also_cleans_it_up():
+    """Every run_*.sh that calls sandbox_home_setup must also call
+    sandbox_home_cleanup — a fake home leaked forever is still a smaller
+    problem than none at all, but it is still a leak (temp files, always-
+    on rule)."""
+    import glob
+    missed = []
+    for path in sorted(glob.glob(os.path.join(ALWAYS_ON, "run_*.sh"))):
+        text = open(path, encoding="utf-8").read()
+        if "sandbox_home_setup" in text and "sandbox_home_cleanup" not in text:
+            missed.append(os.path.basename(path))
+    assert missed == [], f"runner(s) call sandbox_home_setup with no matching cleanup: {missed}"

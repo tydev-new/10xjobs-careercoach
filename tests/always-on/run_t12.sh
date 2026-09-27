@@ -36,8 +36,8 @@ CASES="${CASES:-}"
 [ "$CASES" = all ] && CASES="$ALL_CASES"
 FIX="$ROOT/fixtures/apply"
 
-run_turn() { # ws prompt-file out-stream err-file
-  ( cd "$1" && claude -p "$(cat "$2")" \
+run_turn() { # ws prompt-file out-stream err-file — HOME sandbox from the caller's own sandbox_home_setup
+  ( cd "$1" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$2")" \
       --model "$MODEL" --dangerously-skip-permissions \
       --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$3" 2>> "$4"
@@ -64,8 +64,10 @@ for case_name in $CASES; do
     cp -r "$RUNNER_SKILLS_DIR/interview" "$RUNNER_SKILLS_DIR/profile" \
           "$RUNNER_SKILLS_DIR/storybank" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
+    sandbox_home_setup
     : > "$out.err"
     run_turn "$WS" "$CASE/prompt.md" "$out.turn1.stream.json" "$out.err"
+    sandbox_home_cleanup
     python3 "$ROOT/extract_text.py" "$out.turn1.stream.json" > "$out.md"
     mkdir -p "$out-ws"
     cp "$WS"/*.md "$out-ws/" 2>/dev/null

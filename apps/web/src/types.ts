@@ -151,6 +151,13 @@ export interface Status {
   action?: string;
 }
 
+// ---- Workspace pages (design-web-ui.md § 5.1) ---------------------------
+// The five rail places, in § 5.1's own order. App state only — no URL
+// route names this (§ 5.1, "Moving between pages is app state, not the
+// address bar").
+
+export type Page = "home" | "talk" | "jobs" | "applications" | "documents";
+
 // ---- Workspace store (C § 2) --------------------------------------------
 // The mock preview's store implements this shape (async read -> FileRead,
 // list, write, upload) so swapping in the real store at step 5b is the

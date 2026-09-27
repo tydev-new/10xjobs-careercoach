@@ -18,7 +18,7 @@ import { prepareConversationForSave, CONVERSATION_BYTE_CAP } from "../../../../p
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { statusOf } from "../agent-helpers.ts";
 import { Composer } from "../components/Composer";
-import { Header } from "../components/Header";
+import { Frame } from "../components/Frame";
 import { SidePanel } from "../components/SidePanel";
 import { Transcript } from "../components/Transcript";
 import { AgentChatTransport } from "../real-transport.ts";
@@ -31,7 +31,7 @@ import { DeleteBetaDataConfirm } from "./DeleteBetaDataConfirm";
 import { SetPasswordDialog } from "./SetPasswordDialog";
 import { checkConversationStale, CONVERSATION_CHECK_TIMEOUT_MS } from "./conversation-stale-check.ts";
 import { useVersionMonitor } from "./version-check.ts";
-import { VersionNotice } from "./VersionNotice";
+import { VersionNotice, type VersionNoticeMode } from "./VersionNotice";
 import { ConversationNotice } from "./ConversationNotice";
 
 function sleep(ms: number): Promise<void> {
@@ -244,6 +244,7 @@ export function RealChatShell({
   const [checkingVersion, setCheckingVersion] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
 
@@ -464,82 +465,102 @@ export function RealChatShell({
   // is already disabled for (existing `disabled={status === ...}` below).
   const turnRunning = status === "submitted" || status === "streaming";
 
+  // § 5.1: "the new-version check runs in the frame, so its notice shows
+  // on every page, not only above the composer" — Frame shows this SAME
+  // fact (never re-derived) above every page other than Talk to Ten,
+  // which keeps rendering its own copy, unchanged, directly above the
+  // composer below (C § 10; ui § 1.8's own "directly above the composer"
+  // proof stays true there).
+  const versionNoticeMode: VersionNoticeMode = sendBlockedOnce ? "blocked" : "newer";
+  const frameVersionNotice =
+    newerVersionKnown && !turnRunning
+      ? { mode: versionNoticeMode, saveFailed: saveFailed || saveConflict }
+      : undefined;
+
   return (
-    <div className="app-shell">
-      <div className="main-pane">
-        <Header
-          status={currentStatus}
-          balanceUsd={balanceUsd}
-          fixtures={EMPTY_FIXTURES}
-          currentFixtureId=""
-          onFixtureChange={() => {}}
-          autoplay={false}
-          onAutoplayToggle={() => {}}
-          theme={theme}
-          onThemeToggle={onThemeToggle}
-          onExportWorkspace={() => void handleExport()}
-          onImportWorkspace={() => importInputRef.current?.click()}
-          onDeleteBetaData={() => setShowDeleteConfirm(true)}
-          onBuyCredit={() => setShowBuyCredit(true)}
-          onSetPassword={() => setShowSetPassword(true)}
-          onSignOut={onSignOut}
-          coachModel={coachModel}
-        />
-        <input ref={importInputRef} type="file" accept=".zip" hidden onChange={(e) => void handleImportFile(e)} />
-        {importError ? <p className="import-error">{importError}</p> : null}
-        {isFirstRun ? (
-          <div className="empty-state">
-            <p>
-              Ten: I don't have anything of yours yet. Drop in a résumé, or tell me the job
-              you're going for, and I'll start your workspace.
-            </p>
-          </div>
-        ) : (
+    <>
+      <Frame
+        messages={messages}
+        status={currentStatus}
+        onFocusComposer={() => composerRef.current?.focus()}
+        versionNotice={frameVersionNotice}
+        balanceUsd={balanceUsd}
+        fixtures={EMPTY_FIXTURES}
+        currentFixtureId=""
+        onFixtureChange={() => {}}
+        autoplay={false}
+        onAutoplayToggle={() => {}}
+        theme={theme}
+        onThemeToggle={onThemeToggle}
+        onExportWorkspace={() => void handleExport()}
+        onImportWorkspace={() => importInputRef.current?.click()}
+        onDeleteBetaData={() => setShowDeleteConfirm(true)}
+        onBuyCredit={() => setShowBuyCredit(true)}
+        onSetPassword={() => setShowSetPassword(true)}
+        onSignOut={onSignOut}
+        coachModel={coachModel}
+        talkToTen={
           <>
-            {/* ui § 1.9: "at the top of the restored transcript" — shown
-                once older turns have ever been dropped for this row, and
-                stays shown (it describes the WHOLE restored history, not
-                just this load). */}
-            {olderDropped ? <ConversationNotice kind="older-dropped" /> : null}
-            <Transcript messages={messages} onOpen={handleOpen} onPrint={handlePrint} />
+            <input ref={importInputRef} type="file" accept=".zip" hidden onChange={(e) => void handleImportFile(e)} />
+            {importError ? <p className="import-error">{importError}</p> : null}
+            {isFirstRun ? (
+              <div className="empty-state">
+                <p>
+                  Ten: I don't have anything of yours yet. Drop in a résumé, or tell me the job
+                  you're going for, and I'll start your workspace.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* ui § 1.9: "at the top of the restored transcript" — shown
+                    once older turns have ever been dropped for this row, and
+                    stays shown (it describes the WHOLE restored history, not
+                    just this load). */}
+                {olderDropped ? <ConversationNotice kind="older-dropped" /> : null}
+                <Transcript messages={messages} onOpen={handleOpen} onPrint={handlePrint} />
+              </>
+            )}
+            {/* ui § 1.8: one line above the composer, hidden while a turn is
+                running (the agent runs in THIS tab, so reload mid-turn would
+                stop the run), not dismissible, no error styling. The ending
+                swaps (§ 1.8 amended) when THIS tab's own latest save didn't
+                land — either a plain failure OR a version conflict (fix round
+                2, item 1: a conflict is still "wasn't saved", never "saved"). */}
+            {newerVersionKnown && !turnRunning ? (
+              <VersionNotice mode={sendBlockedOnce ? "blocked" : "newer"} saveFailed={saveFailed || saveConflict} />
+            ) : null}
+            {/* ui § 1.9 — the conversation-specific lines, one at a time
+                (freshest first): a just-blocked stale send, else a save
+                conflict from this turn's onFinish, else a plain save failure —
+                each suppressed only while the § 1.8 notice above is ALREADY
+                showing the same "wasn't saved" fact, so the two never stack. */}
+            {staleBlockedOnce ? (
+              <ConversationNotice kind="stale-blocked" />
+            ) : saveConflict && !(newerVersionKnown && !turnRunning) ? (
+              <ConversationNotice kind="save-conflict" />
+            ) : saveFailed && !saveConflict && !(newerVersionKnown && !turnRunning) ? (
+              <ConversationNotice kind="save-failed" />
+            ) : null}
+            <Composer
+              ref={composerRef}
+              value={composerValue}
+              onChange={setComposerValue}
+              onSend={(text) => void send(text)}
+              disabled={turnRunning || checkingVersion}
+              onAttach={(file) => void handleAttach(file)}
+              attaching={attaching}
+              attachError={attachError}
+            />
           </>
-        )}
-        {/* ui § 1.8: one line above the composer, hidden while a turn is
-            running (the agent runs in THIS tab, so reload mid-turn would
-            stop the run), not dismissible, no error styling. The ending
-            swaps (§ 1.8 amended) when THIS tab's own latest save didn't
-            land — either a plain failure OR a version conflict (fix round
-            2, item 1: a conflict is still "wasn't saved", never "saved"). */}
-        {newerVersionKnown && !turnRunning ? (
-          <VersionNotice mode={sendBlockedOnce ? "blocked" : "newer"} saveFailed={saveFailed || saveConflict} />
-        ) : null}
-        {/* ui § 1.9 — the conversation-specific lines, one at a time
-            (freshest first): a just-blocked stale send, else a save
-            conflict from this turn's onFinish, else a plain save failure —
-            each suppressed only while the § 1.8 notice above is ALREADY
-            showing the same "wasn't saved" fact, so the two never stack. */}
-        {staleBlockedOnce ? (
-          <ConversationNotice kind="stale-blocked" />
-        ) : saveConflict && !(newerVersionKnown && !turnRunning) ? (
-          <ConversationNotice kind="save-conflict" />
-        ) : saveFailed && !saveConflict && !(newerVersionKnown && !turnRunning) ? (
-          <ConversationNotice kind="save-failed" />
-        ) : null}
-        <Composer
-          value={composerValue}
-          onChange={setComposerValue}
-          onSend={(text) => void send(text)}
-          disabled={turnRunning || checkingVersion}
-          onAttach={(file) => void handleAttach(file)}
-          attaching={attaching}
-          attachError={attachError}
-        />
-      </div>
-      <SidePanel
-        ref={iframeRef}
-        file={openFile}
-        open={panelOpenOnPhone}
-        onClose={() => setPanelOpenOnPhone(false)}
+        }
+        sidePanel={
+          <SidePanel
+            ref={iframeRef}
+            file={openFile}
+            open={panelOpenOnPhone}
+            onClose={() => setPanelOpenOnPhone(false)}
+          />
+        }
       />
       {showDeleteConfirm ? (
         <DeleteBetaDataConfirm
@@ -561,6 +582,6 @@ export function RealChatShell({
       {showSetPassword ? (
         <SetPasswordDialog client={authClient} email={userEmail} onClose={() => setShowSetPassword(false)} />
       ) : null}
-    </div>
+    </>
   );
 }

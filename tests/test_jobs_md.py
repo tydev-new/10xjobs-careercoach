@@ -169,6 +169,30 @@ def test_save_refuses_an_empty_company_or_title_after_cleaning():
     assert before == after
 
 
+def test_save_writes_back_an_untouched_legacy_row_byte_identical():
+    # LEAD ruling (S1 review, third pass): the empty-name refusal applies
+    # only to the row THIS call writes; a pre-existing row is written
+    # back exactly as it was read, even a legacy heading with no ` — `
+    # separator at all (so its "title" parses as empty) — an old row
+    # must never lock every write.
+    d = tempfile.mkdtemp()
+    seed = ("# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n"
+            "## To Review\n\n### Acme Staff Engineer\n- Seen: 2026-01-01T00:00:00+00:00\n\n")
+    with open(jm.path(d), "w", encoding="utf-8") as f:
+        f.write(seed)
+    rows = jm.load(d)
+    assert len(rows) == 1 and rows[0]["company"] == "Acme Staff Engineer" and rows[0]["title"] == ""
+    k = jm.key({"company": "Beta", "title": "PM"})
+    rows.append({"company": "Beta", "title": "PM", "stage": "To Review", "dismissed": False,
+                 "seen_at": "2026-01-02T00:00:00+00:00"})
+    jm.save(d, rows, write_key=k)  # exit 0: the legacy row is never the target
+    text = open(jm.path(d), encoding="utf-8").read()
+    assert "### Acme Staff Engineer\n- Seen: 2026-01-01T00:00:00+00:00" in text
+    assert "### Beta — PM" in text
+    back = {(r["company"], r["title"]) for r in jm.load(d)}
+    assert back == {("Acme Staff Engineer", ""), ("Beta", "PM")}
+
+
 def test_analysis_field_is_distinct_from_jd_and_round_trips():
     d = tempfile.mkdtemp()
     row = {"company": "Acme", "title": "PM", "stage": "To Review", "dismissed": False,

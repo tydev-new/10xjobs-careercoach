@@ -680,6 +680,19 @@ function addCase(c) {
     args: (ws) => ["--workspace", ws, "--company", "\t\n", "--title", "Role", "--verdict", "weak"],
     diffFiles: ["jobs.md"],
   });
+  addCase({
+    script, bin, name: "legacy-row-with-no-em-dash-untouched-by-an-unrelated-write",
+    covers: "design-web-search.md § 4.3 (S1 review, LEAD ruling, third pass): the empty-name refusal applies only to the row this call writes; a pre-existing row (here a legacy heading with no ' — ' separator, so its title parses as empty) is written back exactly as read",
+    setup: (ws) =>
+      writeFiles(ws, {
+        "jobs.md":
+          "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme Staff Engineer\n" +
+          "- Seen: 2026-01-01T00:00:00+00:00\n\n",
+      }),
+    args: (ws) => ["--workspace", ws, "--company", "Beta", "--title", "PM", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
 }
 
 // ---------------------------------------------------------------- update_job.py

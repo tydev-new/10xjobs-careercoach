@@ -85,7 +85,7 @@ def main():
     row["company_file"] = a.company_file or row.get("company_file")
     row["track"] = a.track or row.get("track")
     row["evaluated_at"] = row["updated_at"] = now
-    jm.save(a.workspace, rows)
+    jm.save(a.workspace, rows, write_key=k)
     how = "updated existing role" if existed else "created NEW role"
     print(f"recorded ({how}): {row['company']} — {row['title']} → {a.verdict} ({a.score})")
     return 0

@@ -196,6 +196,31 @@ test("save refuses an empty company or title after cleaning", async () => {
   assert.equal(before, after);
 });
 
+test("save writes back an untouched legacy row byte-identical", async () => {
+  // LEAD ruling (S1 review, third pass): the empty-name refusal applies
+  // only to the row THIS call writes; a pre-existing row is written back
+  // exactly as it was read, even a legacy heading with no ` — `
+  // separator at all (so its "title" parses as empty) — an old row must
+  // never lock every write.
+  const io = makeFakeIo();
+  const seed = "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n" +
+    "## To Review\n\n### Acme Staff Engineer\n- Seen: 2026-01-01T00:00:00+00:00\n\n";
+  await io.writeFile(jm.path("/ws"), seed);
+  const rows = await jm.load(io, "/ws");
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].company, "Acme Staff Engineer");
+  assert.equal(rows[0].title, "");
+  const k = jm.key({ company: "Beta", title: "PM" });
+  rows.push({ company: "Beta", title: "PM", stage: "To Review", dismissed: false, seen_at: "2026-01-02T00:00:00+00:00" });
+  await jm.save(io, "/ws", rows, { writeKey: k }); // no throw: the legacy row is never the target
+  const text = await io.readFile(jm.path("/ws"));
+  assert.ok(text.includes("### Acme Staff Engineer\n- Seen: 2026-01-01T00:00:00+00:00"));
+  assert.ok(text.includes("### Beta — PM"));
+  const back = new Set((await jm.load(io, "/ws")).map((r) => `${r.company}|${r.title}`));
+  assert.ok(back.has("Acme Staff Engineer|"));
+  assert.ok(back.has("Beta|PM"));
+});
+
 test("Analysis field is distinct from JD and round-trips", async () => {
   const io = makeFakeIo();
   const row = {

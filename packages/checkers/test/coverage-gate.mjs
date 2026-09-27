@@ -114,6 +114,7 @@ const MANIFEST = {
   test_analysis_field_is_distinct_from_jd_and_round_trips: { unit: "Analysis field is distinct from JD and round-trips", file: "jobs-md.test.mjs" },
   test_save_rewrites_a_trailing_em_dash_in_company_to_hyphen: { unit: "save rewrites a trailing em dash in company to a hyphen", file: "jobs-md.test.mjs" },
   test_save_refuses_an_empty_company_or_title_after_cleaning: { unit: "save refuses an empty company or title after cleaning", file: "jobs-md.test.mjs" },
+  test_save_writes_back_an_untouched_legacy_row_byte_identical: { unit: "save writes back an untouched legacy row byte-identical", file: "jobs-md.test.mjs" },
 
   // ---- test_check_closeout.py
   test_clean: { parity: "test_clean" },

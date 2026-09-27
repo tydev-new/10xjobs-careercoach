@@ -83,7 +83,7 @@ export async function run(argv, io, now = () => new Date()) {
   row.evaluated_at = row.updated_at = nowStr;
 
   try {
-    await jm.save(io, a.workspace, rows, { now });
+    await jm.save(io, a.workspace, rows, { now, writeKey: k });
   } catch (e) {
     if (e instanceof jm.DuplicateKeyError) return { stdout: "", stderr: e.message + "\n", exitCode: 1 };
     if (e instanceof jm.EmptyFieldError) return { stdout: "", stderr: e.message + "\n", exitCode: 2 };

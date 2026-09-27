@@ -137,10 +137,30 @@ export async function load(io, workspace) {
   const lines = text.split(/\r?\n/);
   let curStage = null;
   let row = null;
+  // LEAD ruling (S1 review, third pass): accumulates the CURRENT row's
+  // exact original lines, cached as `row._raw` so save() can echo an
+  // UNTOUCHED row byte for byte, even a legacy/hand-edited heading that
+  // would fail B2's cleaning (e.g. `### Acme Staff Engineer`, no ` — `
+  // separator at all) — an old row must never block, or even reformat,
+  // a write it isn't part of.
+  let rawLines = null;
+  const finalizeRaw = () => {
+    if (row !== null && rawLines !== null) {
+      while (rawLines.length && rawLines[rawLines.length - 1] === "") rawLines.pop();
+      // restoreLineSeparators: `text` (and so every line in `rawLines`)
+      // already went through `io.readFile`'s own `universalNewlines`, so
+      // any real U+2028/U+2029 the file held is a sentinel here — same
+      // reasoning as the per-field restore above, applied to the whole
+      // cached block at once.
+      row._raw = restoreLineSeparators(rawLines.join("\n"));
+    }
+    rawLines = null;
+  };
   for (const raw of lines) {
     const line = raw.replace(/\n$/, "");
     let m = line.match(HEADING2_RE);
     if (m && !line.startsWith("###")) {
+      finalizeRaw();
       const name = pyStrip(m[1]);
       if (name === NOTES) break;
       curStage = STAGES.includes(name) || name === DISMISSED ? name : null;
@@ -148,6 +168,7 @@ export async function load(io, workspace) {
     }
     m = line.match(HEADING3_RE);
     if (m && curStage) {
+      finalizeRaw();
       const head = m[1];
       const sepIdx = head.indexOf(" — ");
       const company = sepIdx === -1 ? head : head.slice(0, sepIdx);
@@ -163,8 +184,10 @@ export async function load(io, workspace) {
         dismissed: curStage === DISMISSED,
       };
       rows.push(row);
+      rawLines = [line];
       continue;
     }
+    if (row !== null && rawLines !== null) rawLines.push(line);
     m = line.match(FIELD_RE);
     if (m && row !== null) {
       const k = LABEL_TO_KEY.get(pyStrip(m[1]));
@@ -174,6 +197,7 @@ export async function load(io, workspace) {
       }
     }
   }
+  finalizeRaw();
   for (const r of rows) {
     if (r.dismissed) r.stage = r.was_stage || "To Review";
     if (!("fit_score" in r)) r.fit_score = null;
@@ -210,7 +234,15 @@ export class DuplicateKeyError extends Error {}
 // caller maps this to exit 2 (never DuplicateKeyError's own exit 1).
 export class EmptyFieldError extends Error {}
 
-export async function save(io, workspace, rows, { notes = undefined, now = () => new Date() } = {}) {
+// `writeKey` (LEAD ruling, S1 review, third pass): the canonical `key(row)`
+// of the ONE row this call is creating or updating — the writers
+// (record-verdict.mjs, update-job.mjs) always pass it. Every OTHER row is
+// written back exactly as it was read (`_block()`'s echo path below), so
+// a pre-existing row's legacy or hand-edited heading never blocks, or
+// reformats, a write it isn't part of. `writeKey` omitted (the default —
+// a bare library call, no single row identified) cleans and validates
+// every row, unchanged from before this ruling.
+export async function save(io, workspace, rows, { notes = undefined, now = () => new Date(), writeKey = null } = {}) {
   const seen = new Map();
   for (const r of rows) {
     const k = key(r);
@@ -249,7 +281,7 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
       if (ca !== cb) return codePointCompare(ca, cb);
       return codePointCompare(a.title.toLowerCase(), b.title.toLowerCase());
     });
-    for (const r of sorted) out.push(..._block(r, false));
+    for (const r of sorted) out.push(..._block(r, false, writeKey));
   }
   const gone = rows.filter((r) => r.dismissed);
   if (gone.length) {
@@ -263,7 +295,7 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
     });
     for (const r of sorted) {
       r.was_stage = r.stage || "To Review";
-      out.push(..._block(r, true));
+      out.push(..._block(r, true, writeKey));
     }
   }
   let finalNotes = notes;
@@ -283,11 +315,24 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
   await io.writeFile(path(workspace), text);
 }
 
-function _block(r, dismissed) {
+function _block(r, dismissed, writeKey = null) {
+  // LEAD ruling (S1 review, third pass): a row that ISN'T the one this
+  // call is writing, and still carries its `_raw` cache from load(), is
+  // echoed byte for byte — never cleaned, never validated, so its own
+  // legacy/hand-edited shape can't block or reformat someone else's
+  // write. `writeKey` omitted (no single row identified) always takes
+  // the clean-and-validate path below, unchanged from before.
+  const isTarget = writeKey !== null && key(r) === writeKey;
+  if (writeKey !== null && !isTarget && r._raw !== undefined && r._raw !== null) {
+    return [...r._raw.split("\n"), ""];
+  }
   const company = cleanCompany(r.company);
   const title = cleanValue(r.title);
-  // this check runs before any line of `out` is written to disk, so a
-  // throw here never touches the file — see EmptyFieldError's own comment.
+  // LEAD spec amendment (S1 review, finding 6; design-web-search.md § 4.3):
+  // a company or title that is empty after cleaning, IN THE ROW THIS
+  // CALL WRITES, is refused — this check runs before any line of `out`
+  // is written to disk, so a throw here never touches the file — see
+  // EmptyFieldError's own comment.
   if (!company || !title) {
     throw new EmptyFieldError("error: empty company or title after cleaning; nothing written");
   }

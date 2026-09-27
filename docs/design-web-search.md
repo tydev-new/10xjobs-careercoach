@@ -351,8 +351,9 @@ U+2028, U+2029. A company containing ` — ` (space, em dash, space),
 or ending in ` —`, has that em dash written as `-`, because a row's
 heading splits company from title on the first ` — `. Titles keep
 theirs; the split takes the first one. A company or title that is
-empty after cleaning is refused: the writer exits 2 and jobs.md is
-unchanged. It lives in `save()`, so every writer (the adds,
+empty after cleaning, in the row this call writes, is refused: the
+writer exits 2 and jobs.md is unchanged; rows already in the file are
+written back as read. It lives in `save()`, so every writer (the adds,
 `record_verdict.py`, `update_job.py`) is protected in both languages.
 **Prevents:** a posting title that carries a newline and `## Offer` or
 `- URL:` becoming a stage heading or a field of another row (a job post

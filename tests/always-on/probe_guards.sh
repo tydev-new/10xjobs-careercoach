@@ -127,6 +127,21 @@ pdf_ok() { [ "$harness_pdf" = OK ]; }
 check "an agent-style call (no explicit chrome=) renders via the fake" \
       "an agent-style call did not render via the harness fake: $harness_pdf" pdf_ok
 
+# The fake must let t10-over-budget express its failure: that case's base is
+# "measured at 2 rendered pages" (cases/t10-over-budget/expected.md), so an
+# agent-style render of it through the harness fake must report 2+ pages,
+# and its text layer must extract.
+ob_line="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/cases/t10-over-budget/base-resume.md' --pdf '$T/ob.pdf' --pages 1" 2>&1 | grep '^pages:')"
+ob_pages="$(printf '%s' "$ob_line" | sed -n 's/^pages: \([0-9]*\).*/\1/p')"
+two_pages() { [ "${ob_pages:-0}" -ge 2 ]; }
+check "t10-over-budget's 2-page base renders ${ob_pages} pages through the harness fake" \
+      "t10-over-budget's base (measured at 2 real pages) renders ${ob_pages:-?} page(s) through the harness fake — the case cannot express its failure" two_pages
+has_text() { [ -f "$T/ob.pdf" ] && [ "$(pdftotext "$T/ob.pdf" - 2>/dev/null | wc -w)" -gt 100 ]; }
+if command -v pdftotext >/dev/null; then
+  check "the fake's PDF has an extractable text layer (pdftotext)" \
+        "the fake's PDF has no extractable text (pdftotext) — apply's verify-by-extraction step fails" has_text
+fi
+
 echo "== render_resume.py to_pdf() timeout (a real candidate run, RENDER_RESUME_CHROME unset) =="
 cat > "$T/fakechrome" <<EOF
 #!/bin/bash

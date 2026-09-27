@@ -110,11 +110,28 @@ export RENDER_RESUME_CHROME="$ROOT/fixtures/fake-chrome"
 # pkill -f <x> has been denied." NOT independently verified (no further
 # spend): whether every pattern below matches every listed bypass form —
 # these are prefix matches (the documented shape is "Bash(git *)"), so
-# each dangerous STARTING word gets its own entry below; a leading `*`
-# wildcard is untested, so this list is deliberately redundant rather than
-# relying on one clever pattern. Every run_*.sh / judge_*.sh / check_env.sh
-# `claude -p` call gets this array spliced in right after
-# `--setting-sources project`.
+# each dangerous STARTING word gets its own entry below, deliberately
+# redundant rather than relying on one clever pattern.
+#
+# A leading `*` wildcard DOES work (VERIFIED LIVE, 2026-09-27 fix round 2,
+# one more Haiku call): `--disallowedTools "Bash(*Google Chrome*)"` denied
+# `echo "Google Chrome"` — a command that does not START with "Google
+# Chrome", it is a quoted argument to echo — so the pattern matches
+# ANYWHERE in the command line, not just as a prefix. NOT independently
+# re-verified per pattern below (no further spend): the Chromium/open -a/
+# sh -c/bash -c entries use the identical `Bash(...)` glob syntax, so the
+# same infix-match behavior is expected to extend to them, but only the
+# one form above was actually exercised against a live denial.
+#
+# Second finding this round: real Chrome must never be launched DIRECTLY
+# either, even with the incident's actual trigger removed (render_resume.py
+# now never reaches for a real browser inside this harness — see
+# RENDER_RESUME_CHROME below). An agent under test could still try to open
+# Chrome itself, outside render_resume.py entirely, or route a kill/pkill
+# through a `sh -c`/`bash -c` wrapper — the reviewer's own probe found
+# CLAUDE_KILL_GUARD_ARGS's first cut did not deny `sh -c "/usr/bin/pkill
+# ..."`. Every run_*.sh / judge_*.sh / check_env.sh `claude -p` call gets
+# this whole array spliced in right after `--setting-sources project`.
 CLAUDE_KILL_GUARD_ARGS=(
   --disallowedTools
   "Bash(pkill*)" "Bash(killall*)" "Bash(kill*)" "Bash(pgrep*)"
@@ -123,6 +140,9 @@ CLAUDE_KILL_GUARD_ARGS=(
   "Bash(env kill*)" "Bash(env pkill*)" "Bash(env killall*)"
   "Bash(command kill*)" "Bash(command pkill*)" "Bash(command killall*)"
   "Bash(xargs kill*)"
+  "Bash(*Google Chrome*)" "Bash(*Chromium*)" "Bash(*chromium*)"
+  "Bash(*google-chrome*)" "Bash(open -a*Chrome*)" "Bash(open -a*chrome*)"
+  "Bash(sh -c*)" "Bash(bash -c*)" "Bash(*sh -c*)" "Bash(*bash -c*)"
 )
 
 # --- Clean environment (2026-09-26; widened 2026-09-27) --------------------
@@ -172,7 +192,18 @@ _vault_key() {
   real="$(cd "$REALJS" 2>/dev/null && pwd -P)" || real="$REALJS"
   printf '%s' "$real" | shasum -a 256 | cut -c1-16
 }
-_VAULT_STATE_DIR="${TMPDIR:-/tmp}/.careercoach-vault-$(_vault_key)"
+# NOT under $TMPDIR (fix round 3, reviewer's probe): a per-user macOS
+# TMPDIR is process-environment-scoped, so the owner's own terminal and a
+# sandboxed session can each see a DIFFERENT TMPDIR even for the SAME real
+# user — probe_guards.sh's own "two runners, different TMPDIRs" check
+# showed the vault going unprotected under exactly that split. $HOME does
+# not have that problem: REALJS itself defaults to "$HOME/job-search", so
+# anyone who can even SEE the same vault by default already shares the
+# same $HOME — the lock's bookkeeping just rides alongside it, under the
+# ordinary ~/.cache convention (never inside the vault directory itself,
+# which is the candidate's real workspace, never a place for our
+# bookkeeping).
+_VAULT_STATE_DIR="${HOME:-/tmp}/.cache/.careercoach-vault-$(_vault_key)"
 _VAULT_LOCKDIR="$_VAULT_STATE_DIR/mutex"
 _VAULT_HOLDERS="$_VAULT_STATE_DIR/holders"
 _VAULT_HELD=0

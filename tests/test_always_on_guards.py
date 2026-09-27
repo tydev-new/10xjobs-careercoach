@@ -22,11 +22,14 @@ def _vault_state_dir_for(vault_path):
     run) can remove their own state dir afterward — production's one real
     vault ($HOME/job-search) keeping ONE small, permanent state dir is
     fine; a test generating a NEW never-reused one every run and never
-    cleaning it up is not (leaves no temp files, always-on rule)."""
+    cleaning it up is not (leaves no temp files, always-on rule). Fix
+    round 3: the state dir moved from $TMPDIR to $HOME/.cache — a
+    per-process TMPDIR meant the owner's own terminal and a sandboxed
+    session could see a DIFFERENT vault lock for the SAME real vault."""
     real = os.path.realpath(vault_path)
     key = hashlib.sha256(real.encode()).hexdigest()[:16]
-    tmpdir = os.environ.get("TMPDIR") or "/tmp"
-    return os.path.join(tmpdir, f".careercoach-vault-{key}")
+    home = os.environ.get("HOME") or "/tmp"
+    return os.path.join(home, ".cache", f".careercoach-vault-{key}")
 
 
 def test_guard_bin_shims_exist_and_are_executable():
@@ -223,7 +226,9 @@ def test_kill_guard_args_array_is_populated_behaviourally():
     lines = [l for l in r.stdout.splitlines() if l]
     assert "--disallowedTools" in lines, (lines, r.stderr)
     for must in ("Bash(pkill*)", "Bash(killall*)", "Bash(/usr/bin/pkill*)",
-                 "Bash(/usr/bin/killall*)", "Bash(kill*)", "Bash(pgrep*)"):
+                 "Bash(/usr/bin/killall*)", "Bash(kill*)", "Bash(pgrep*)",
+                 "Bash(*Google Chrome*)", "Bash(*Chromium*)",
+                 "Bash(sh -c*)", "Bash(bash -c*)"):
         assert must in lines, (must, lines)
 
 

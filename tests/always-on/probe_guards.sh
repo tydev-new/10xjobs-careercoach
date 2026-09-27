@@ -28,7 +28,7 @@ vault_state_dir() {  # the state dir lib_env.sh derives for vault $1
 }
 cleanup() {
   /usr/bin/pkill -f "$T/zz" 2>/dev/null
-  for v in "$T/v1" "$T/v2" "$T/v3"; do [ -d "$v" ] && rm -rf "$(vault_state_dir "$v")"; done
+  for v in "$T/v1" "$T/v2" "$T/v3" "$T/v4"; do [ -d "$v" ] && rm -rf "$(vault_state_dir "$v")"; done
   chflags -R nouchg "$T" 2>/dev/null; rm -rf "$T"
 }
 trap cleanup EXIT

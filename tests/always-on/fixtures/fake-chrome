@@ -12,66 +12,190 @@ tests/always-on/guard-bin/pkill) — an agent under test then tried to
 unblock itself with `pkill -f "Google Chrome"`, killing every Chrome
 process on the machine, including the owner's own open browser. The fix
 here is simpler than isolating the OS user: give a harness run no real
-browser to hang in the first place. This script writes a small, valid,
-realistically-sized PDF immediately and exits 0 — there is nothing for a
-test session to "fix".
+browser to hang in the first place. This script writes a REAL, valid PDF
+immediately and exits 0 — there is nothing for a test session to "fix".
 
 Invoked with the exact same argv shape to_pdf() gives real Chrome:
     fake-chrome --headless --disable-gpu --no-pdf-header-footer
                 --user-data-dir=<tmp> --print-to-pdf=<pdf_path> <html_path>
-Only --print-to-pdf=<path> is read; everything else is accepted and
+--print-to-pdf=<path> and the trailing <html_path> (the one argv token that
+doesn't start with "--") are read; everything else is accepted and
 ignored, same as a real headless Chrome would accept flags this script
 doesn't care about.
 
-Size is realistic-but-fixed, not derived from the source HTML — this is a
-stand-in, not a renderer, so a page-count claim would not be honest either.
-FAKE_CHROME_PDF_BYTES overrides the size for a case that specifically wants
-to exercise render_resume.py's "over the ~100KB upload limit" line.
+BLOCKING finding (independent review, 2026-09-27): the first version of
+this fixture wrote three PDF objects and a trailer with NO cross-reference
+table and no startxref — not a valid PDF. `pdftotext` failed with "No
+valid XRef size in trailer", `pypdf` with "startxref not found", and it
+always reported a fixed 1 page / 45KB regardless of input. apply's
+patterns.md tells the agent to verify the PDF's text with a REAL extractor
+every time; a verification failure sends the agent down the conversion
+ladder to running headless Chrome DIRECTLY — the original incident's
+trigger, reintroduced by the fixture meant to remove it.
+
+Fixed here: a real xref table + trailer + startxref (every offset computed
+from what was actually written, not guessed), and a text layer built from
+the INPUT HTML's own visible text — <head> (title/meta/style, never shown
+on screen) is dropped, remaining tags are stripped, HTML entities are
+decoded, and what's left is word-wrapped and paginated. This is a
+STAND-IN, not a layout engine: the wrap width and lines-per-page below are
+a fixed, documented rule, not real_resume.py's own CSS page metrics — the
+INTENT is only that more input text means more output pages, so a 2-page
+base predictably renders 2 pages and a short one renders 1, not that the
+page break falls in the same place a real render would choose.
+
+Size is derived from what the content actually needs (no artificial
+padding by default). FAKE_CHROME_PDF_BYTES still overrides/pads the size
+up (never down — it never truncates below what real content requires) for
+the one case that specifically wants to exercise render_resume.py's "over
+the ~100KB upload limit" line; the padding is a PDF comment appended after
+the last real object and before the xref table, so it changes the file's
+size without touching any object's own bytes or the offsets already
+computed for them.
 """
+import html as html_module
 import os
+import re
 import sys
 
-DEFAULT_SIZE = 45_000  # a realistic single/two-page résumé PDF, in bytes
-
-# A minimal, valid one-page PDF. pdf_pages() (render_resume.py) counts raw
-# occurrences of b"/Type /Page" minus b"/Type /Pages" — the spacing here
-# matches that exactly, so this reports as a real 1-page PDF, not zero.
-_HEADER = b"%PDF-1.4\n"
-_BODY = (
-    b"1 0 obj<</Type /Catalog/Pages 2 0 R>>endobj\n"
-    b"2 0 obj<</Type /Pages/Kids[3 0 R]/Count 1>>endobj\n"
-    b"3 0 obj<</Type /Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\n"
-    b"trailer<</Root 1 0 R>>\n"
-    b"%%EOF\n"
-)
+WRAP_WIDTH = 95      # characters per wrapped line — a fixed stand-in rule,
+LINES_PER_PAGE = 50  # not real_resume.py's own font metrics/CSS page math.
 
 
-def build_pdf_bytes(size):
-    """A valid PDF (header, three objects, trailer) padded to `size` bytes
-    with a PDF comment line (a '%'-leading line) — comments are inert to any
-    parser, so padding changes the file's size without disturbing the
-    object structure pdf_pages() scans."""
-    base = _HEADER + _BODY
-    pad_needed = size - len(base)
-    if pad_needed <= 0:
-        return base
-    # "%" + filler + "\n", so it stays a single well-formed comment line
-    padding = b"%" + (b"0" * (pad_needed - 2)) + b"\n"
-    return _HEADER + padding + _BODY
+def html_to_visible_text(html_text):
+    """Strips <head> (title/meta/style — never shown on screen) whole,
+    then remaining tags, then decodes entities. What's left is what a
+    reader would actually see, in source order."""
+    no_head = re.sub(r"(?is)<head\b.*?</head>", " ", html_text)
+    no_tags = re.sub(r"(?s)<[^>]+>", " ", no_head)
+    return html_module.unescape(no_tags)
+
+
+def wrap_lines(text, width=WRAP_WIDTH):
+    """Word-wrap into lines of at most `width` characters. Never splits a
+    word. An empty/whitespace-only text still yields one blank line, so a
+    page always has at least one line."""
+    words = text.split()
+    if not words:
+        return [""]
+    lines, cur = [], words[0]
+    for w in words[1:]:
+        if len(cur) + 1 + len(w) <= width:
+            cur += " " + w
+        else:
+            lines.append(cur)
+            cur = w
+    lines.append(cur)
+    return lines
+
+
+def paginate(lines, per_page=LINES_PER_PAGE):
+    """Groups wrapped lines into pages of `per_page` lines each. At least
+    one page always comes back, even for empty text."""
+    if not lines:
+        lines = [""]
+    pages = [lines[i:i + per_page] for i in range(0, len(lines), per_page)]
+    return pages or [[""]]
+
+
+def escape_pdf_literal(s):
+    """PDF literal-string escaping: backslash and parens. WinAnsiEncoding
+    (declared on the font below) covers Latin-1-range accented characters
+    directly as single bytes — cp1252 is the closest stdlib codec to it —
+    so most résumé text (names, accents) round-trips; anything further
+    outside that range becomes '?' rather than producing invalid bytes."""
+    return (s.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+             .encode("cp1252", errors="replace").decode("cp1252"))
+
+
+def build_pdf_bytes(pages_of_lines, pad_to=None):
+    """A real, minimal PDF: one Catalog, one Pages tree, one shared
+    Helvetica font, one Page + one content-stream object per page — with a
+    real xref table, trailer, and startxref computed from what was
+    actually written (never hand-typed offsets)."""
+    n_pages = len(pages_of_lines)
+    # Object numbers: 1 Catalog, 2 Pages, 3 Font, then N Pages, then N
+    # content streams — fixed layout, computed once so every reference
+    # below (Kids, Parent, Contents, Font) points at the right number.
+    CATALOG, PAGES, FONT = 1, 2, 3
+    page_obj = lambda i: 4 + i               # i = 0..n_pages-1
+    content_obj = lambda i: 4 + n_pages + i
+
+    objects = {}  # obj number -> body bytes (without "N 0 obj\n"/"endobj")
+    objects[CATALOG] = f"<< /Type /Catalog /Pages {PAGES} 0 R >>".encode()
+    kids = " ".join(f"{page_obj(i)} 0 R" for i in range(n_pages))
+    objects[PAGES] = f"<< /Type /Pages /Kids [{kids}] /Count {n_pages} >>".encode()
+    objects[FONT] = (b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
+                      b"/Encoding /WinAnsiEncoding >>")
+    for i, lines in enumerate(pages_of_lines):
+        objects[page_obj(i)] = (
+            f"<< /Type /Page /Parent {PAGES} 0 R "
+            f"/Resources << /Font << /F1 {FONT} 0 R >> >> "
+            f"/MediaBox [0 0 612 792] /Contents {content_obj(i)} 0 R >>"
+        ).encode()
+        body = ["BT", "/F1 10 Tf", "12 TL", "72 750 Td"]
+        for j, line in enumerate(lines):
+            if j:
+                body.append("T*")
+            body.append(f"({escape_pdf_literal(line)}) Tj")
+        body.append("ET")
+        # cp1252, not the default utf-8: escape_pdf_literal already reduced
+        # every character to a codepoint 0-255 that IS its cp1252/WinAnsi
+        # byte value — encoding as utf-8 here would re-widen anything
+        # outside plain ASCII (e.g. 'é') into two bytes and read back as
+        # mojibake through WinAnsiEncoding.
+        stream = ("\n".join(body) + "\n").encode("cp1252")
+        objects[content_obj(i)] = (
+            f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"endstream"
+        )
+
+    n_objs = max(objects) + 1  # xref's object 0 is the free-list head
+    buf = bytearray(b"%PDF-1.4\n")
+    offsets = [0] * n_objs
+    for num in sorted(objects):
+        offsets[num] = len(buf)
+        buf += f"{num} 0 obj\n".encode() + objects[num] + b"\nendobj\n"
+
+    if pad_to is not None and pad_to > len(buf):
+        # A PDF comment ('%'-leading line) between the last object and the
+        # xref table — inert to any parser, and appended AFTER every
+        # offset above was already computed, so it can never shift them.
+        pad_needed = pad_to - len(buf) - 2  # room for the leading '%' and trailing '\n'
+        if pad_needed > 0:
+            buf += b"%" + (b"0" * pad_needed) + b"\n"
+
+    xref_offset = len(buf)
+    buf += f"xref\n0 {n_objs}\n".encode()
+    buf += b"0000000000 65535 f \n"
+    for num in range(1, n_objs):
+        buf += f"{offsets[num]:010d} 00000 n \n".encode()
+    buf += f"trailer\n<< /Size {n_objs} /Root {CATALOG} 0 R >>\n".encode()
+    buf += f"startxref\n{xref_offset}\n%%EOF".encode()
+    return bytes(buf)
 
 
 def main(argv):
     pdf_path = None
+    html_path = None
     for a in argv:
         if a.startswith("--print-to-pdf="):
             pdf_path = a.split("=", 1)[1]
+        elif not a.startswith("-"):
+            html_path = a  # the one bare (non-flag) argv token
     if not pdf_path:
         print("fake-chrome: no --print-to-pdf=<path> in argv — nothing to write",
               file=sys.stderr)
         return 1
-    size = int(os.environ.get("FAKE_CHROME_PDF_BYTES", DEFAULT_SIZE))
+    html_text = ""
+    if html_path and os.path.exists(html_path):
+        with open(html_path, encoding="utf-8") as f:
+            html_text = f.read()
+    text = html_to_visible_text(html_text)
+    pages = paginate(wrap_lines(text))
+    pad_to = os.environ.get("FAKE_CHROME_PDF_BYTES")
+    pdf_bytes = build_pdf_bytes(pages, pad_to=int(pad_to) if pad_to else None)
     with open(pdf_path, "wb") as f:
-        f.write(build_pdf_bytes(size))
+        f.write(pdf_bytes)
     return 0
 
 

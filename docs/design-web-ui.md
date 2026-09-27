@@ -140,8 +140,9 @@ sign-in and the membership check stay as written above.
   own design (owner, 2026-09-26, in chat: add on-demand web job search
   before the beta).
 - **The three proof points**, each checked against the skills. The
-  mockup's text is kept where it is true; two phrases are changed, and
-  the owner confirms the changed wording before stage 3f ships (§ 5.9).
+  mockup's text is kept where it is true; two phrases are changed. The
+  owner approved the changed wording and the lead paragraph on
+  2026-09-26 (§ 5.10, owner question 1).
   1. **"A verdict on every role, with the reasons."** "Paste a posting.
      Ten researches the company, scores the fit out of 100, and says why
      in plain words." True in the web app: a role enters `jobs.md` there
@@ -705,8 +706,12 @@ say more than its file, it is cut or changed, and the place says why:
   detail shows those words wherever the brief wrote them, because each
   section is shown word for word. Evaluate's schema gives a tier no
   written form a page can read, so a tag would be the page guessing which
-  words are a tier (rule 8). Tags can come back the way the minutes pill
-  did, once evaluate's schema declares a form (§ 5.10, owner question 4).
+  words are a tier (rule 8). The owner approved adopting a written form,
+  with a fourth tier, Reported, for facts read outside the company's own
+  pages and the posting (2026-09-26, § 5.10, owner question 4 and its
+  follow-up ruling). Tags come back once evaluate's
+  schema declares it, through `docs/design-page-forms.md`; until then
+  this bullet holds.
 - The Found → Decided → Applying → Interview → Offer step names:
   **the steps use `jobs.md`'s own stage words.** "Applying" would call a
   submitted application unfinished, because a row moves to Applied only
@@ -1089,9 +1094,11 @@ bottom, only the parts whose source exists:
    these sections show those words wherever the brief wrote them,
    because each section is shown word for word. Evaluate's schema gives
    a tier no written form a page can read, so a tag would be the page
-   guessing which words are a tier (rule 8). Tags can come back the way
-   the minutes pill did, once evaluate's schema declares a form (§ 5.10,
-   owner question 4).
+   guessing which words are a tier (rule 8). The owner approved adopting
+   a written form, with a fourth tier, Reported (2026-09-26, § 5.10,
+   owner question 4 and its follow-up ruling). Tags come back
+   once evaluate's schema declares it, through `docs/design-page-forms.md`;
+   until then this paragraph holds.
 6. **Controls:** Open analysis (as on the row); **Open company notes**
    when the row has a `Company file`; **Open application** when an
    Applications entry links to this row (it opens Applications with that
@@ -1300,7 +1307,8 @@ Home's counts use, so one stage has one name everywhere (rule 18).
   the `jobs.md` bullet; apply `SKILL.md:58`). A role whose materials are
   ready but not sent still sits at To Review or Interested, and the
   steps say so. The other three renames would give one stage two names.
-  Owner question 3 in § 5.10 asks whether to keep this.
+  The owner kept `jobs.md`'s words on 2026-09-26 (§ 5.10, owner
+  question 3).
 *Prevents:* a step that says more than the row records (rule 8).
 *Proved by:* a table test over each stage and a dismissed row: exactly
 one current step, every other step drawn alike, no check mark, no date
@@ -2438,8 +2446,9 @@ first):
   page-to-page links, one e2e case each, on the spy store and spy
   transport.
 - **3f Sign-in.** No reader. The lead paragraph, the three proof
-  points and the preview (§ 1.4, amended). **Waits for** the owner's
-  yes on § 1.4's two changed phrases (§ 5.10, owner question 1).
+  points and the preview (§ 1.4, amended). **Unblocked:** the owner
+  approved § 1.4's two changed phrases and its lead paragraph on
+  2026-09-26 (§ 5.10, owner question 1).
   *Exit:* § 1.4's proofs: zero store and transport calls on the sign-in
   page; the preview's props equal Home's readers run over
   `signin-preview.json`'s files and messages; the preview's fixture text
@@ -2477,7 +2486,8 @@ brought up to date.
 | A3 | Markdown stays the right record at this size | `jobs.md` past a few hundred rows (goals doc, goal 3's named escape hatch) |
 | A4 | Nobody needs to edit from a page | two independent asks to edit a file from a page (rule 17) |
 | A5 | The pages carry the state, so the candidate stops asking for it | in two weeks of the owner's use, asks like "what's in my pipeline" or "what's on my list" still happen |
-| A6 | Coach writes To do lines in C § 18.1's minutes form often enough for the pills and the sum to show | on the owner's live run, fewer than half the To do lines carry a pill (a count, numbers only), or the minutes sum shows on none of the owner's plan versions in the run. Then the chain fix below hasn't taken hold; the answer is coach's writing, never a looser parse |
+| A6 | Coach writes To do lines in C § 18.1's minutes form often enough for the pills and the sum to show. On the web, other skills write To do lines too, through the host note (`skills/profile/templates/web-host-note.md:5`), and are counted the same way | on the owner's live run, among plan versions written after the change lands, fewer than half the To do lines carry a pill (a count, numbers only), or, when the owner's `Budget:` line is per day (C § 18.1; a per-session budget never shows a sum, by design), the minutes sum shows on none of those plan versions. Then the chain fix below hasn't taken hold; the answer is coach's writing, never a looser parse |
+| A7 | Evaluate writes the claim-tier form (`docs/design-page-forms.md` § 3) on company briefs often enough for the tags to show, and a written "verified" tag stays honest | on the owner's live run, among company briefs written after the change lands, fewer than half the bullets in `## Snapshot` and `## Culture & hiring signals` carry a tag, a missing or bullet-less section counting as untagged (a count, numbers only); or any `(verified: …)` tag whose source doesn't say what the line claims, or isn't the company's own pages or the posting (the owner's spot check, a count). The first is answered by evaluate's writing, never a looser parse; the second means the tag is doing harm, and the answer is showing the tier words as written again |
 
 **Resolved (owner, 2026-09-26, in chat; relayed by the lead):**
 
@@ -2489,17 +2499,55 @@ brought up to date.
   goal post (`plan-portable-skills-and-web-agent.md`, "Goal post - Beta
   on Vercel")? **Answer: before.**
 
+**Resolved: the restore ruling's owner questions** (owner, 2026-09-26,
+in chat: "the four workspace decisions … approved"; relayed by the
+lead). The numbers are the ones this section's other paragraphs cite as
+"owner question N".
+
+1. **Two sign-in phrases changed** (§ 1.4): "Nothing spent without your
+   yes" → "No big run without your yes", and "Ten never sends or
+   submits as you" → "In this app, you send and submit, not Ten". The
+   lead paragraph drops "finds". **Answer: approved.** Stage 3f is
+   unblocked (§ 5.9).
+2. **The coach minutes-form chain fix** (below, "Chain fixes"): coach's
+   schema adopts `<action> — <n> min — <why>` for To do lines, checked
+   at WARN. **Answer: approved.** Its design gate is
+   `docs/design-page-forms.md` § 2. Until it lands, a live plan line may
+   carry minutes in another form and show no pill: safe, but possibly
+   sparse (A6).
+3. **The stage steps use `jobs.md`'s words**, not the mockup's Found,
+   Decided, Applying, Interview (§ 5.3, "The stage steps"). **Answer:
+   approved: keep `jobs.md`'s words.** None of the mockup's four names
+   is taken.
+4. **Claim tiers on company facts.** Evaluate tiers every company claim
+   (Verified / General knowledge / Unknown; evaluate
+   `references/patterns.md:179-184`, `references/eval.md:35-37`), but its
+   schema gave a tier no written form a page can read. **Answer:
+   approved: adopt a written form** in evaluate's schema, and show tags
+   through a strict reader like C § 18.1's, only where the form matches.
+   Its design gate is `docs/design-page-forms.md` § 3. Until it lands,
+   the Jobs detail shows the tier words as the brief wrote them (§ 5.3).
+   **Follow-up ruling** (owner, 2026-09-26, in chat, on the gate's
+   independent review, option (b)): a fourth ending, `(reported:
+   <where>)`, for facts read anywhere other than the company's own site,
+   careers page or blog, or the posting (news, Glassdoor or Blind,
+   employee posts); the pages show it as its own tag, "Reported".
+   `verified` stays strictly the company's own pages or the posting.
+
 **Chain fixes** (found in review; separate from the stages, each
-through its own review; skill changes go through PROCESS):
+through its own review; skill changes go through PROCESS). Status as of
+2026-09-26:
 
 - apply's application-file name: `skills/apply/SKILL.md:16` says
   `<key>-application.md`, `skills/apply/references/schema.md` says
   `<key>.md`, and `fixtures/mvp-journey.json` uses the first.
+  **Status: open.**
 - The comments at `packages/agent/src/helpers.ts:154-155` and
   `tests/web/helpers.test.ts:110-111` (tester-owned: the tester edits
   it) repeat the false claim that `apps/workspace-ui`'s `parsePlan` maps
-  from `parsePlanTodo` (corrected in C § 6.2).
-- **Coach's minutes form** (restore ruling; pending the owner's yes, Q2). Coach's schema says only
+  from `parsePlanTodo` (corrected in C § 6.2). **Status: open.**
+- **Coach's minutes form** (restore ruling; approved, owner question 2).
+  Coach's schema says only
   "each with its why + minutes" (`skills/coach/references/schema.md`,
   To do), which names the minutes in no form a page can read. The one
   form C § 18.1 reads is `<action> — <n> min — <why>`. Coach's schema
@@ -2509,29 +2557,18 @@ through its own review; skill changes go through PROCESS):
   `references/schema.md`, "WARN until an incident promotes it"). This is a skill
   change and goes through `docs/PROCESS.md`'s ritual. It lands before
   Stage 5's acceptance run, so A6 measures the real writer.
-
-**Open for the owner (restore ruling, 2026-09-26):**
-
-1. **Two sign-in phrases changed** (§ 1.4): "Nothing spent without your
-   yes" → "No big run without your yes", and "Ten never sends or
-   submits as you" → "In this app, you send and submit, not Ten". The
-   lead paragraph drops "finds". Stage 3f waits for a yes on this
-   wording.
-2. **Approve the coach minutes-form chain fix** (above, "Chain fixes"):
-   coach's schema adopts `<action> — <n> min — <why>` for To do lines,
-   checked at WARN. Until it lands, a live plan line may carry minutes
-   in another form and show no pill: safe, but possibly sparse (A6).
-3. **The stage steps use `jobs.md`'s words**, not the mockup's Found,
-   Decided, Applying, Interview (§ 5.3, "The stage steps"). "Applying"
-   is refused as untrue for a submitted role. The other three renames
-   are refused only because they give one stage two names; the owner
-   may overrule those three.
-4. **Claim tiers on company facts.** Evaluate tiers every company claim
-   (Verified / General knowledge / Unknown; evaluate
-   `references/patterns.md:179-182`, `references/eval.md:35-37`), but its
-   schema gives a tier no written form a page can read. Either adopt a
-   form in evaluate's schema (a skill change, through `docs/PROCESS.md`'s
-   ritual) and then show tags through a strict reader like C § 18.1's,
-   showing a tag only where the form matches; or keep the tier words as
-   the brief wrote them, inside each section, as the Jobs detail does
-   now.
+  **Status: design gate revised after its first independent review
+  (`docs/design-page-forms.md` § 2); waiting for the second; not
+  built.**
+- **Evaluate's claim-tier form** (restore ruling; approved, owner
+  question 4). Evaluate's schema declares one written form per tier, at
+  the end of each company claim's line: `(verified: <where>)`,
+  `(reported: <where>)`, `(general knowledge)` or `(unknown)` (the
+  fourth by the follow-up ruling under owner question 4). The Jobs
+  detail shows a tag only where a line ends exactly so.
+  `record_verdict.py` WARNs on the brief it is given, at WARN because
+  the rule is born of a spec, and the checker and the page share one
+  reader (`docs/design-page-forms.md` § 3). It lands before Stage 5's
+  acceptance run, so A7 measures the real writer. **Status: design gate
+  revised after its first independent review (FAIL, 3 blocking, all
+  applied); waiting for the second; not built.**

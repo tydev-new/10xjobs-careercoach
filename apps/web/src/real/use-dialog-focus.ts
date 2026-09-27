@@ -13,6 +13,15 @@ const FOCUSABLE =
  *  whatever had it when the dialog opened (the opener). */
 export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
   const ref = useRef<T>(null);
+  // RealChatShell (and others) pass a new inline `onClose` on every
+  // render. Reading it through a ref, updated on every render but never
+  // itself in the main effect's deps, means that effect only has to run
+  // once per mount — so it captures "the opener" a single time, at the
+  // moment the dialog actually opened, rather than recomputing it (and
+  // getting it wrong — see below) on every parent re-render while the
+  // dialog is still open.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     // A dialog opened from a ⋯-menu item (Delete my beta data, Set a new
@@ -38,7 +47,7 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !container) return;
@@ -71,8 +80,11 @@ export function useDialogFocus<T extends HTMLElement>(onClose: () => void) {
         if (!ref.current) opener?.focus?.();
       });
     };
+    // Deliberately []: onClose is read through onCloseRef so this effect
+    // (and the opener it captures) runs once per mount, not once per
+    // render — see the comment on onCloseRef above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose]);
+  }, []);
 
   return ref;
 }

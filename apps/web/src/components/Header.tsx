@@ -189,7 +189,14 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
-                <Icon name="folderDown" size={16} />
+                {/* § 5.6 names folder-down for "export workspace" but no
+                    icon for import — rather than add a new glyph outside
+                    its closed list (and outside the reviewer's icon-parity
+                    fixture, which has no digest for one), this is the same
+                    vendored folder-down path, turned 180°: the same
+                    precedent as the activity line's caret rotating for
+                    expand/collapse. Reads as "up" against Export's "down". */}
+                <Icon name="folderDown" size={16} className="menu-item-icon--flip" />
                 Import workspace
               </button>
               {/* No per-candidate key to manage: one shared app key sits
@@ -270,7 +277,7 @@ export function Header(props: HeaderProps): ReactElement {
                   in real AND mock mode — plain, honest copy in the house
                   voice lives at the page itself, never restated here. */}
               <a className="menu-item-link" role="menuitem" href="/privacy.html" target="_blank" rel="noreferrer">
-                <Icon name="link" size={16} />
+                <Icon name="externalLink" size={16} />
                 Privacy
               </a>
               {/* § 13.3: plain text, not a button — never focusable as an

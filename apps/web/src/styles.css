@@ -150,13 +150,16 @@ button {
    hover, not just a repeat of it (§ 5.6, "Every control has these five
    states"). Variants with their own --bg-press swap (buttons, pills,
    rows) already differ on their own; this is the floor for everything
-   else — an outlined link, an icon-only close, a menu row. A static
-   size change on press, not an animated one, so it needs no
-   reduced-motion override (nothing here transitions or keyframes). */
-button:not(:disabled):active,
-a:active,
-[role="menuitem"]:active {
-  transform: scale(0.97);
+   else — an outlined link, an icon-only close, a menu row. It's a size
+   change, so — same as every other motion in this file — it only runs
+   with no-preference; under reduce the control still gets its distinct
+   pressed look from color/shadow alone, just never resizes. */
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):active,
+  a:active,
+  [role="menuitem"]:active {
+    transform: scale(0.97);
+  }
 }
 
 /* ---- Focus ring (design-web-ui.md § 5.6, "Focus, motion, breakpoint,
@@ -502,6 +505,13 @@ select:focus-visible {
 
 .menu-panel button.menu-item-danger svg {
   color: var(--red);
+}
+
+/* Import workspace: the same vendored folder-down glyph as Export, turned
+   180° so it reads as "up" against Export's "down" (§ 5.6 names no icon
+   of its own for import — see the comment at its call site). */
+.menu-item-icon--flip {
+  transform: rotate(180deg);
 }
 
 .menu-panel button:hover:not(:disabled) {
@@ -996,6 +1006,14 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   padding: 0 var(--space-2);
+  /* pre-existing bug (predates Stage 1): the label is a single word with
+     no space to break at, but the 44px tap target only leaves ~28px of
+     content width for it at 12.5px — without this, Chromium's flex
+     layout still lets the anonymous text item shrink below its own
+     min-content and splits the word ("open" -> "op"/"en"). The tap
+     target itself never resizes for this; the label may overflow it by
+     a pixel or two rather than ever break mid-word. */
+  white-space: nowrap;
 }
 
 .card-open-link:hover {
@@ -1238,11 +1256,14 @@ select:focus-visible {
 }
 
 .gate-instruction {
+  /* Plain inline text on purpose: an inline-flex row with a gap treats
+     "Type", the key cap and the rest of the sentence as flex items that
+     never wrap against each other, so the browser was forced to wrap
+     WITHIN one of them instead — breaking "Type"/"yes" mid-word at
+     375px. A <p> with an inline-block key cap wraps the ordinary way,
+     only ever at a space, while still keeping the key-cap look. */
   color: var(--amber);
   font: var(--type-body-sm);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 .gate-instruction strong {
@@ -1252,8 +1273,8 @@ select:focus-visible {
   border-radius: var(--radius-xs);
   padding: 0 var(--space-2);
   height: 22px;
-  display: inline-flex;
-  align-items: center;
+  line-height: 22px;
+  display: inline-block;
   color: var(--fg);
 }
 

@@ -77,7 +77,7 @@ for reply in "$RESULTS"/*.md; do
     echo "quote, credential, or fact about the candidate or their work; soft ="
     echo "embellished framing of something the candidate did say."
   } > "$P"
-  claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+  claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
     > "$verdict" 2> "$verdict.err"
   rm -f "$P"
 done

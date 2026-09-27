@@ -46,7 +46,7 @@ for case_name in $REPLAY_CASES; do
     # the final block, silently dropping prose emitted between tool calls
     ( cd "$WS" && claude -p "$(cat "$case_dir/prompt.md")" \
         --model "$MODEL" --permission-mode acceptEdits \
-        --setting-sources project \
+        --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
         --output-format stream-json --verbose \
       ) > "$out.stream.json" 2> "$out.err"
     python3 "$ROOT/extract_text.py" "$out.stream.json" > "$out.md"

@@ -75,86 +75,197 @@ set -u
 # thing. See tests/always-on/guard-bin/pkill for the full reasoning.
 export PATH="$ROOT/guard-bin:$PATH"
 
-# --- Clean environment (2026-09-26) ----------------------------------------
+# --- Kill-command permission guard, second layer (2026-09-27 review) ------
+# Independent review of the PATH guard above (0b748cb, probe_guards.sh)
+# found it bypassable: an absolute path (/usr/bin/pkill), a numeric kill of
+# a name LOOKUP (`kill $(pgrep -f X)`), or a pipe into xargs
+# (`pgrep -f X | xargs kill`) all reach the REAL binary — PATH order only
+# helps when the agent types the bare command name. None of that is fixable
+# with more PATH shims (an absolute path skips PATH search entirely); it
+# needs process isolation (a separate OS user or a cloud sandbox), which is
+# the owner's call, not this fix's.
+#
+# This is a SECOND, independent layer in the meantime: Claude Code's own
+# --disallowedTools. VERIFIED LIVE (2026-09-27, one Haiku call, $0.14):
+# `--disallowedTools "Bash(pkill*)"` still applies even under
+# --dangerously-skip-permissions — the tool call never reaches a shell at
+# all; the tool_result is literally "Permission to use Bash with command
+# pkill -f <x> has been denied." NOT independently verified (no further
+# spend): whether every pattern below matches every listed bypass form —
+# these are prefix matches (the documented shape is "Bash(git *)"), so
+# each dangerous STARTING word gets its own entry below; a leading `*`
+# wildcard is untested, so this list is deliberately redundant rather than
+# relying on one clever pattern. Every run_*.sh / judge_*.sh / check_env.sh
+# `claude -p` call gets this array spliced in right after
+# `--setting-sources project`.
+CLAUDE_KILL_GUARD_ARGS=(
+  --disallowedTools
+  "Bash(pkill*)" "Bash(killall*)" "Bash(kill*)" "Bash(pgrep*)"
+  "Bash(/bin/pkill*)" "Bash(/bin/killall*)" "Bash(/bin/kill*)"
+  "Bash(/usr/bin/pkill*)" "Bash(/usr/bin/killall*)" "Bash(/usr/bin/kill*)"
+  "Bash(env kill*)" "Bash(env pkill*)" "Bash(env killall*)"
+  "Bash(command kill*)" "Bash(command pkill*)" "Bash(command killall*)"
+  "Bash(xargs kill*)"
+)
+
+# --- Clean environment (2026-09-26; widened 2026-09-27) --------------------
 # A trial found that ambient CLAUDE_CODE_* vars from the CALLING desktop
 # session (CLAUDE_CODE_ENTRYPOINT, CLAUDE_CODE_TERMINAL_MCP_TOOLS, etc.)
 # leak into every `claude -p` the runner starts and change what tools/mode
 # the agent under test gets — a condition's behaviour must come from what
 # that condition provides and nothing else (README, "the environment
-# contract"). Scrubbed here, once, before anything in this file or a
-# caller runs a `claude` command. A script that needs to hand ONE var to a
-# specific call still can (run_t19.sh sets CLAUDE_CODE_OAUTH_TOKEN inline,
-# right on the `claude` invocation itself, same as it always has —
-# assigning it there re-adds just that one var to just that one command).
-for _v in $(env | grep -oE '^CLAUDE_CODE_[A-Za-z0-9_]*' 2>/dev/null || true); do
+# contract"). Review found the first cut too narrow: a live session also
+# carries CLAUDE_EFFORT, CLAUDE_PID, CLAUDE_AGENT_SDK_VERSION,
+# CLAUDE_PREVIEW_CLASSIFIER_FLOOR, and the bare CLAUDECODE (no underscore)
+# — none of those match `^CLAUDE_CODE_`. The rule is now: every env var
+# whose name starts with CLAUDE, scrubbed, no exceptions carved out by
+# name — except what THIS harness itself sets, which happens AFTER this
+# scrub runs, inline on the one `claude` invocation that needs it
+# (run_t19.sh sets CLAUDE_CODE_OAUTH_TOKEN right on the command itself,
+# same as it always has — assigning it there re-adds just that one var to
+# just that one command, later than this loop).
+for _v in $(env | grep -oE '^CLAUDE[A-Za-z0-9_]*' 2>/dev/null || true); do
   unset "$_v"
 done
 unset _v
 
-# --- Vault lock, reference-counted (2026-09-26) ----------------------------
+# --- Vault lock, reference-counted, keyed by VAULT (2026-09-26; fixed 2026-09-27) ---
 # The founder's real ~/job-search is locked immutable (chflags uchg) for
 # the whole duration ANY run needs it untouched. Every run_*.sh used to
 # carry its own private vault_lock/vault_unlock pair and its own
 # `trap vault_unlock EXIT` — so two SIBLING runners (two run_*.sh processes
 # alive at once, e.g. two suites launched in parallel terminals) raced: the
 # first one to exit unlocked the vault while the second was still relying
-# on it staying locked. Fixed by making lock/unlock reference-counted
-# across ALL run_*.sh processes, not per-script: a shared refcount file
-# under results/ (never in the repo, never in the vault itself) says how
-# many holders are currently alive; the vault only actually (un)locks on
-# the 0->1 and 1->0 transitions. A plain `mkdir` is the mutex — atomic on
-# any POSIX filesystem, and portable (no `flock(1)` on macOS).
+# on it staying locked. First fix (2026-09-26) made lock/unlock reference-
+# counted, but kept the refcount under THIS CHECKOUT's own results/ dir —
+# independent review (0b748cb, probe_guards.sh) found that a SECOND
+# checkout (a different git worktree, same real vault) computes a
+# DIFFERENT results/ path and so keeps its OWN, unrelated refcount: one
+# checkout's runner can still unlock the vault while a runner in the OTHER
+# checkout is relying on it staying locked. Fixed by keying the lock and
+# the holder list off the VAULT's own resolved path (a hash of it), stored
+# in a FIXED location outside every checkout (never inside the vault
+# itself — that is the candidate's real workspace, never a place for our
+# bookkeeping) — so every checkout on the machine agrees on where the
+# bookkeeping lives, however many of them there are.
 REALJS="${REALJS:-$HOME/job-search}"
-_VAULT_LOCKDIR="${_VAULT_LOCKDIR:-$ROOT/results/.vault-lockdir}"
-_VAULT_COUNT="${_VAULT_COUNT:-$ROOT/results/.vault-refcount}"
-_VAULT_HELD=0
 
+_vault_key() {
+  local real
+  real="$(cd "$REALJS" 2>/dev/null && pwd -P)" || real="$REALJS"
+  printf '%s' "$real" | shasum -a 256 | cut -c1-16
+}
+_VAULT_STATE_DIR="${TMPDIR:-/tmp}/.careercoach-vault-$(_vault_key)"
+_VAULT_LOCKDIR="$_VAULT_STATE_DIR/mutex"
+_VAULT_HOLDERS="$_VAULT_STATE_DIR/holders"
+_VAULT_HELD=0
+# $$ is unreliable as a holder id: inside a `( ... )` subshell, bash's $$
+# still reports the TOP-LEVEL script's pid, not the subshell's own real
+# one — two DIFFERENT concurrent subshells (exactly how this file's own
+# vault-lock tests simulate two sibling runners) then collide on the SAME
+# "$$" and corrupt each other's holder rows (found live: a 2-holder race
+# test showed the second holder's release deleting BOTH rows at once,
+# unlocking the vault out from under the first). `sh -c 'echo $PPID'`
+# reports the ACTUAL calling (sub)shell's own real OS pid — portable, and
+# correct on bash 3.2 too (no $BASHPID there) — but only written to a FILE
+# by that plain command, then read back with a separate, ordinary
+# `$(cat ...)`: wrapping the `sh -c` call itself in `$(...)` was tried
+# first and found to sometimes report an already-dead transient pid
+# instead (an extra fork bash takes for THAT construct specifically, in
+# this sourced context, on this bash — reproduced live, not theoretical).
+# Computed once per sourcing, so it is stable across every vault_lock/
+# vault_unlock call this same process makes.
+_vault_pid_tmp="$(mktemp 2>/dev/null || echo "/tmp/.vault-pid-$$-$RANDOM")"
+sh -c 'echo $PPID' > "$_vault_pid_tmp" 2>/dev/null
+_VAULT_MY_PID="$(cat "$_vault_pid_tmp" 2>/dev/null)"
+rm -f "$_vault_pid_tmp"
+unset _vault_pid_tmp
+
+# The mutex around read-modify-write of $_VAULT_HOLDERS. A plain `mkdir` is
+# atomic on any POSIX filesystem and portable (no `flock(1)` on macOS). The
+# creator's own PID is recorded inside it so a mutex abandoned by a process
+# that crashed INSIDE the critical section (between mkdir and rmdir) can be
+# told apart from one a live holder still has: reviewer's finding — "a
+# stale lock dir doesn't silently proceed unprotected" — so a dead
+# creator's mutex is recovered and retried immediately, and a LIVE
+# creator's mutex is waited out for as long as it takes, never bypassed on
+# a timeout.
 _vault_mutex_acquire() {
-  mkdir -p "$(dirname "$_VAULT_COUNT")" 2>/dev/null
-  local tries=0
-  until mkdir "$_VAULT_LOCKDIR" 2>/dev/null; do
+  mkdir -p "$_VAULT_STATE_DIR" 2>/dev/null
+  local tries=0 holder_pid
+  while ! mkdir "$_VAULT_LOCKDIR" 2>/dev/null; do
+    holder_pid="$(cat "$_VAULT_LOCKDIR/pid" 2>/dev/null || echo "")"
+    if [ -n "$holder_pid" ] && ! kill -0 "$holder_pid" 2>/dev/null; then
+      rm -rf "$_VAULT_LOCKDIR" 2>/dev/null
+      continue
+    fi
     tries=$((tries + 1))
-    if [ "$tries" -gt 200 ]; then
-      echo "WARN: vault mutex ($_VAULT_LOCKDIR) held over ~20s — a prior run" >&2
-      echo "      may have died without releasing it. Proceeding anyway." >&2
-      break
+    if [ "$tries" -eq 200 ]; then
+      echo "WARN: vault mutex ($_VAULT_LOCKDIR) held over ~20s by live pid ${holder_pid:-?} — still waiting (never proceeding unprotected)." >&2
     fi
     sleep 0.1
   done
+  echo "$_VAULT_MY_PID" > "$_VAULT_LOCKDIR/pid" 2>/dev/null
 }
-_vault_mutex_release() { rmdir "$_VAULT_LOCKDIR" 2>/dev/null; }
+_vault_mutex_release() { rm -rf "$_VAULT_LOCKDIR" 2>/dev/null; }
+
+# Drops any holder PID that is no longer alive. Called with the mutex
+# already held. Reviewer's stale-refcount finding: a holder killed with
+# SIGKILL never reaches its own vault_unlock, so a plain integer count
+# stays stuck above 0 forever — the vault then gets unlocked by hand (the
+# only way to recover it) and the NEXT runner holds it with the vault
+# UNPROTECTED, trusting a count that no longer describes anyone real.
+# Pruning by LIVENESS, not by trusting the number, means the very next
+# vault_lock or vault_unlock call self-heals: no live holders left means
+# no one is actually relying on the lock, whatever a stale count said.
+_vault_prune_holders() {
+  [ -f "$_VAULT_HOLDERS" ] || return 0
+  local pid live=""
+  while IFS= read -r pid; do
+    [ -n "$pid" ] || continue
+    kill -0 "$pid" 2>/dev/null && live="$live$pid
+"
+  done < "$_VAULT_HOLDERS"
+  printf '%s' "$live" > "$_VAULT_HOLDERS"
+}
 
 # Call once, right after checking $REALJS exists (or unconditionally — both
-# are no-ops when it doesn't). Increments the shared refcount; only the
-# holder that takes it from 0 actually flips the immutable flag.
+# are no-ops when it doesn't). Registers this process (its real pid, see
+# $_VAULT_MY_PID above) as a holder; only the call that finds NO live
+# holder actually flips the immutable flag — so this is correct whether
+# the "previous" state came from a sibling process in this checkout, a
+# sibling in a DIFFERENT checkout, or a stale/dead holder being pruned.
 vault_lock() {
   [ -d "$REALJS" ] || return 0
   _vault_mutex_acquire
-  local n; n="$(cat "$_VAULT_COUNT" 2>/dev/null || echo 0)"
-  case "$n" in ''|*[!0-9]*) n=0 ;; esac
-  if [ "$n" -le 0 ]; then
+  _vault_prune_holders
+  if [ ! -s "$_VAULT_HOLDERS" ]; then
     find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null
   fi
-  n=$((n + 1))
-  echo "$n" > "$_VAULT_COUNT"
+  echo "$_VAULT_MY_PID" >> "$_VAULT_HOLDERS"
   _VAULT_HELD=1
   _vault_mutex_release
 }
 # Safe to call from a trap even if vault_lock was never reached (e.g. an
-# early exit) — a holder that never actually incremented the count
-# (_VAULT_HELD=0) decrements nothing, so it can never drive the shared
-# count negative or unlock on someone else's behalf.
+# early exit) — a holder that never actually registered (_VAULT_HELD=0)
+# removes nothing, so it can never unlock on someone else's behalf.
 vault_unlock() {
   [ -d "$REALJS" ] || return 0
   [ "$_VAULT_HELD" = 1 ] || return 0
   _vault_mutex_acquire
-  local n; n="$(cat "$_VAULT_COUNT" 2>/dev/null || echo 1)"
-  case "$n" in ''|*[!0-9]*) n=1 ;; esac
-  n=$((n - 1))
-  [ "$n" -lt 0 ] && n=0
-  echo "$n" > "$_VAULT_COUNT"
-  if [ "$n" -eq 0 ]; then
+  if [ -f "$_VAULT_HOLDERS" ]; then
+    grep -v -x "$_VAULT_MY_PID" "$_VAULT_HOLDERS" > "$_VAULT_HOLDERS.tmp" 2>/dev/null
+    mv "$_VAULT_HOLDERS.tmp" "$_VAULT_HOLDERS" 2>/dev/null
+  fi
+  _vault_prune_holders
+  if [ ! -s "$_VAULT_HOLDERS" ]; then
     find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null
+    # $_VAULT_STATE_DIR itself is left in place (just an empty holders
+    # file) rather than rm -rf'd here — removing the whole state dir while
+    # a concurrent vault_lock's _vault_mutex_acquire is mid-retry would
+    # delete the very parent directory its `mkdir` needs, which only
+    # re-creates that parent at the START of _vault_mutex_acquire, not on
+    # every retry. Callers that want it gone (tests) remove it themselves.
   fi
   _VAULT_HELD=0
   _vault_mutex_release

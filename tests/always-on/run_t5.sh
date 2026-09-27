@@ -38,7 +38,7 @@ vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT 
 run_turn() { # ws prompt-file out-stream
   ( cd "$1" && claude -p "$(cat "$2")" \
       --model "$MODEL" --dangerously-skip-permissions \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$3" 2>> "$3.err"
 }
 
@@ -62,7 +62,7 @@ for case_name in $CASES; do
       run_turn "$WS" "$CASE/turn1.md" "$out.turn1.stream.json"
       ( cd "$WS" && claude -p --continue "$(cat "$CASE/turn2.md")" \
           --model "$MODEL" --dangerously-skip-permissions \
-          --setting-sources project --output-format stream-json --verbose \
+          --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
         ) > "$out.turn2.stream.json" 2>> "$out.err"
       {
         echo "===== TURN 1 (any new roles?) ====="

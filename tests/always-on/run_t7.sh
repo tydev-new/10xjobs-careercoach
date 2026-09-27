@@ -25,7 +25,7 @@ run_turn() { # ws prompt-file out-stream err-file continue?
   [ "${5:-}" = "continue" ] && cont="--continue"
   ( cd "$1" && claude -p $cont "$(cat "$2")" \
       --model "$MODEL" --dangerously-skip-permissions \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$3" 2>> "$4"
 }
 

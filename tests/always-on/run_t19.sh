@@ -99,7 +99,7 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
     # fingerprint tripwire below is defense 1.
     ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p $cont "$CAND_MSG" \
         --model "$MODEL" --dangerously-skip-permissions \
-        --setting-sources project --output-format stream-json --verbose \
+        --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
       ) > "$out.turn$turn.stream.json" 2>> "$out.err"
     AGENT_REPLY="$(python3 "$ROOT/extract_text.py" "$out.turn$turn.stream.json")"
     printf '\n## Agent (turn %s)\n%s\n' "$turn" "$AGENT_REPLY" >> "$out.transcript.md"
@@ -119,7 +119,7 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
       echo "the candidate's message."
     } > "$SIMP"
     CAND_MSG="$( cd "$SIMD" && claude -p "$(cat "$SIMP")" --model "$SIM_MODEL" \
-        --setting-sources project 2>> "$out.err" )"
+        --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" 2>> "$out.err" )"
     rm -f "$SIMP"
     [ -z "$CAND_MSG" ] && { echo "sim returned empty at turn $turn" >> "$out.err"; break; }
   done

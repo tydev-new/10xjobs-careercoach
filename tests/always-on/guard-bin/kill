@@ -56,7 +56,9 @@ if [ -n "$bad" ]; then
   echo "kill is guarded in this test harness (tests/always-on/guard-bin):" >&2
   echo "  refusing target \"$bad\" — it is not a numeric PID/process-group or a" >&2
   echo "  job spec, so this looks like a name routed through kill rather than a" >&2
-  echo "  real kill(2) target. Kill your own child by its PID instead." >&2
+  echo "  real kill(2) target. This session must not stop a process it did" >&2
+  echo "  not itself start — if a step is hung, report it as hung instead" >&2
+  echo "  of trying to kill it, by name or by PID." >&2
   exit 1
 fi
 

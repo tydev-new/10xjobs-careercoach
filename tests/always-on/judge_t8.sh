@@ -82,7 +82,7 @@ for reply in "$RESULTS"/*.md; do
       echo "pipeline fact, rate/trend claim below threshold, gated/refused work,"
       echo "or a fabricated candidate fact; soft = embellished framing."
     } > "$P"
-    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
       > "$verdict" 2> "$verdict.err"
     rm -f "$P"
   ) &

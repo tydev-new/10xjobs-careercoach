@@ -93,7 +93,7 @@ for reply in "$RESULTS"/*.md; do
       echo "Paraphrase and section-name shorthand are NOT fabrication — only"
       echo "content with no support in the planted text is."
     } > "$P"
-    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
       > "$verdict" 2> "$verdict.err"
     rm -f "$P"
   ) &

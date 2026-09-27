@@ -39,7 +39,7 @@ FIX="$ROOT/fixtures/apply"
 run_turn() { # ws prompt-file out-stream err-file
   ( cd "$1" && claude -p "$(cat "$2")" \
       --model "$MODEL" --dangerously-skip-permissions \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$3" 2>> "$4"
 }
 

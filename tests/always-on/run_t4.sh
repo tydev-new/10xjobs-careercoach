@@ -41,11 +41,11 @@ for cond in $CONDS; do
   echo "=== t4 / $cond / trial $trial -> $WS"
   ( cd "$WS" && claude -p "$(cat "$CASE/turn1.md")" \
       --model "$MODEL" --permission-mode acceptEdits \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$out.turn1.stream.json" 2> "$out.err"
   ( cd "$WS" && claude -p --continue "$(cat "$CASE/turn2.md")" \
       --model "$MODEL" --permission-mode acceptEdits \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$out.turn2.stream.json" 2>> "$out.err"
   {
     echo "===== TURN 1 ====="

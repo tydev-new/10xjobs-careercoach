@@ -57,7 +57,7 @@ for case_name in $(ls "$FIX/cases"); do
   for n in $(seq 1 "$TRIALS"); do
     out="$RESULTS/$case_name.agent.$n.json"
     [ -s "$out" ] && { echo "skip agent $n"; continue; }
-    claude -p "$(cat "$P")" --model "$MODEL" --setting-sources project \
+    claude -p "$(cat "$P")" --model "$MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
       > "$out" 2> "$out.err"
   done
   rm -f "$P"; rm -rf "$WS"

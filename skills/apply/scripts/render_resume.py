@@ -24,7 +24,7 @@ target is a decision for the candidate, not a silent trim. This script reports
 words and rendered pages; the skill turns an overflow into a proposed cut list.
 Exit 0 always for measurement; --strict makes an over-target render exit 1.
 """
-import argparse, html, os, re, shutil, subprocess, sys, tempfile
+import argparse, html, os, re, shutil, signal, subprocess, sys, tempfile
 
 CHROME = ("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
           "/Applications/Chromium.app/Contents/MacOS/Chromium",
@@ -121,7 +121,7 @@ def find_chrome():
     return None
 
 
-def to_pdf(html_path, pdf_path, chrome=None, timeout=120):
+def to_pdf(html_path, pdf_path, chrome=None, timeout=90):
     """Render html_path to pdf_path with headless Chrome.
 
     Earned 2026-09-26 (the Chrome-hang incident): headless Chrome with no
@@ -132,12 +132,26 @@ def to_pdf(html_path, pdf_path, chrome=None, timeout=120):
     uncaught TimeoutExpired crashed this script with a traceback instead
     of a plain message, and left the agent under test to freelance its own
     fix; it chose `pkill -f "Google Chrome"`, which killed every Chrome
-    process on the machine, including the owner's own browser. Two fixes,
-    both here: (1) a fresh, throwaway --user-data-dir per call, so this
-    run never touches (or waits on) anyone's real profile; (2) a real
-    subprocess handle so a timeout kills ONLY this call's own Chrome PID
-    (never a name-based pkill/killall) and is reported as plain text, not
-    an exception.
+    process on the machine, including the owner's own browser.
+
+    Independent review (2026-09-27) of that first fix found two more
+    holes, both closed here: (1) killing only Chrome's own top PID leaves
+    ITS OWN helper/renderer children orphaned and still running — Chrome
+    is started in its own session (`start_new_session=True`, i.e. its own
+    process group) so a timeout can kill the WHOLE group, not one PID;
+    (2) the default timeout (120s) was NOT under the agent Bash tool's own
+    120s default, so the tool could cut this script off before its own
+    plain message ever printed — default dropped to 90s, safely under it.
+    The message also no longer hints that a DIFFERENT, already-open
+    browser window might be the cause: this call never shares a profile
+    with anything else, so that hint pointed at the wrong culprit (and,
+    before the PATH/permission guards, invited exactly the wrong fix).
+
+    Fixes, all here: (1) a fresh, throwaway --user-data-dir per call, so
+    this run never touches (or waits on) anyone's real profile; (2) its
+    own process group, killed as a group on timeout — never a name-based
+    pkill/killall of anything else on the machine; (3) a real subprocess
+    handle so a timeout is reported as plain text, never an exception.
     """
     chrome = chrome or find_chrome()
     if not chrome:
@@ -149,20 +163,24 @@ def to_pdf(html_path, pdf_path, chrome=None, timeout=120):
             [chrome, "--headless", "--disable-gpu", "--no-pdf-header-footer",
              f"--user-data-dir={profile_dir}",
              f"--print-to-pdf={pdf_path}", html_path],
-            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            start_new_session=True)  # its own process group, so a timeout can kill the WHOLE group
         try:
             _, stderr = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
-            # Kill only THIS process, by its own PID — never a broader,
-            # name-based kill of anything else on the machine.
-            proc.kill()
+            # Kill THIS call's whole process group — Chrome's own helper/
+            # renderer children die with it — never a broader, name-based
+            # kill of anything else on the machine.
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except ProcessLookupError:
+                pass  # it exited on its own between the timeout and here
             try:
                 proc.communicate(timeout=10)
             except subprocess.TimeoutExpired:
                 pass  # best-effort reap; we still report the timeout plainly below
             return False, (f"Chrome did not finish within {timeout}s and was stopped "
-                            "(its own process only) — no PDF was produced. Try again, "
-                            "or check whether another Chrome window is open.")
+                            "(its own process group only) — no PDF was produced. Try again.")
     finally:
         shutil.rmtree(profile_dir, ignore_errors=True)
     if proc.returncode not in (0, None) and not os.path.exists(pdf_path):

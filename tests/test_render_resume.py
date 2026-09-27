@@ -103,8 +103,9 @@ def test_to_pdf_timeout_kills_only_its_own_child_and_reports_plainly():
     """The incident: an uncaught subprocess.TimeoutExpired crashed the
     script with a traceback, and the agent under test improvised its own
     fix (pkill'd every Chrome on the machine). Now a timeout is caught,
-    reported as plain text, and only THIS call's own Chrome PID is ever
-    targeted (Popen.kill() on our own handle — never a name-based kill)."""
+    reported as plain text, and only THIS call's own Chrome process GROUP
+    is ever targeted (os.killpg on our own handle's pgid — never a
+    name-based kill of anything else on the machine)."""
     chrome = _fake_chrome("sleep 30\n")
     html = tempfile.mktemp(suffix=".html")
     open(html, "w").write("<html></html>")
@@ -117,6 +118,49 @@ def test_to_pdf_timeout_kills_only_its_own_child_and_reports_plainly():
     assert "stopped" in err
     assert elapsed < 15, f"took {elapsed}s — the timeout did not actually cut the wait short"
     assert not os.path.exists(pdf), "no PDF should exist after a timeout"
+
+
+def test_to_pdf_timeout_kills_the_whole_process_group_not_just_chrome():
+    """Independent review (2026-09-27): killing only Chrome's own top PID
+    on timeout left ITS OWN helper/renderer children orphaned and still
+    running. A fake "chrome" that itself spawns a child sleeper — the
+    child must be dead too after the timeout, not just the top process."""
+    d = tempfile.mkdtemp(prefix="fake-chrome-group-")
+    helper = os.path.join(d, "helper")
+    os.symlink("/bin/sleep", helper)
+    chrome = _fake_chrome(f'"{helper}" 60 &\nHELPER_PID=$!\necho "$HELPER_PID" > "{d}/helper.pid"\nwait\n')
+    html = tempfile.mktemp(suffix=".html")
+    open(html, "w").write("<html></html>")
+    pdf = tempfile.mktemp(suffix=".pdf")
+    rr.to_pdf(html, pdf, chrome=chrome, timeout=1)
+    time.sleep(0.3)
+    helper_pid_file = os.path.join(d, "helper.pid")
+    assert os.path.exists(helper_pid_file), "the fake chrome never recorded its helper's pid"
+    helper_pid = int(open(helper_pid_file).read().strip())
+    try:
+        os.kill(helper_pid, 0)
+        alive = True
+    except ProcessLookupError:
+        alive = False
+    assert not alive, f"helper pid {helper_pid} is still alive — timeout only killed Chrome's own top PID"
+
+
+def test_to_pdf_default_timeout_is_under_the_agent_bash_tools_120s():
+    """Independent review: the old 120s default was NOT under the agent
+    Bash tool's own 120s default, so the TOOL could cut this script off
+    before its own plain timeout message ever printed."""
+    import inspect
+    default = inspect.signature(rr.to_pdf).parameters["timeout"].default
+    assert default < 120, default
+
+
+def test_to_pdf_timeout_message_does_not_blame_another_chrome_window():
+    """Independent review: this call never shares a profile with anything
+    else (its own --user-data-dir), so 'another Chrome window' pointed at
+    the wrong culprit — and invited exactly the wrong kind of fix."""
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "skills", "apply", "scripts", "render_resume.py")).read()
+    assert "another Chrome window" not in src, src
 
 
 def test_to_pdf_no_chrome_found_is_unchanged():

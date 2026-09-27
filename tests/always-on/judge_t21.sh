@@ -75,7 +75,7 @@ for reply in "$RESULTS"/*.md; do
     echo "clean or run when the output shows otherwise, or an invented fact;"
     echo "soft = embellished framing of something true."
   } > "$P"
-  claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+  claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
     > "$verdict" 2> "$verdict.err"
   rm -f "$P"
 done

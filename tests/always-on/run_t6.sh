@@ -65,7 +65,7 @@ for case_name in $CASES; do
     echo "=== $case_name / $cond / trial $trial -> $WS"
     ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \
         --model "$MODEL" --dangerously-skip-permissions \
-        --setting-sources project --output-format stream-json --verbose \
+        --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
       ) > "$out.stream.json" 2> "$out.err"
     python3 "$ROOT/extract_text.py" "$out.stream.json" > "$out.md"
     mkdir -p "$out-ws"

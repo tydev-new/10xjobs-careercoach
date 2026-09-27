@@ -24,7 +24,7 @@ fi
 #    excludes ~/.claude/skills; confirm no coaching skill survives it.
 WS="$(mktemp -d)"
 seen=$(cd "$WS" && claude -p "List every skill available to you, comma-separated names only. If none, say NONE." \
-        --model sonnet --setting-sources project 2>/dev/null | tr 'A-Z' 'a-z')
+        --model sonnet --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" 2>/dev/null | tr 'A-Z' 'a-z')
 rm -rf "$WS"
 leaked=""
 for s in profile coach search apply prep practice storybank evaluate outreach negotiate positioning pipeline-board interview-coach; do
@@ -68,12 +68,14 @@ else
   say FAIL "lib_env.sh does not reference guard-bin — the kill guards are not wired in"; fail=1
 fi
 
-# 6. Clean environment: lib_env.sh must scrub inherited CLAUDE_CODE_* vars
-#    (a desktop session's own vars were found to change the agent's tools).
-if grep -q 'CLAUDE_CODE_' "$ROOT/lib_env.sh" && grep -q 'unset "\$_v"' "$ROOT/lib_env.sh"; then
-  say ok "lib_env.sh scrubs ambient CLAUDE_CODE_* vars"
+# 6. Clean environment: lib_env.sh must scrub every ambient CLAUDE* var
+#    (a desktop session's own vars — not just CLAUDE_CODE_* — were found
+#    to change the agent's tools; review widened the pattern 2026-09-27
+#    after CLAUDE_EFFORT/CLAUDE_PID/CLAUDECODE etc. were also found set).
+if grep -qF '^CLAUDE[A-Za-z0-9_]*' "$ROOT/lib_env.sh" && grep -q 'unset "\$_v"' "$ROOT/lib_env.sh"; then
+  say ok "lib_env.sh scrubs every ambient CLAUDE* var"
 else
-  say FAIL "lib_env.sh does not scrub ambient CLAUDE_CODE_* vars"; fail=1
+  say FAIL "lib_env.sh does not scrub every ambient CLAUDE* var"; fail=1
 fi
 
 # 7. Vault lock must be the ONE shared, reference-counted copy in

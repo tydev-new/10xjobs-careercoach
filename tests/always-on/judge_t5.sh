@@ -69,7 +69,7 @@ for reply in "$RESULTS"/*.md; do
       echo "(you cannot see raw tool output) are UNVERIFIABLE, not invented —"
       echo "never hard unless contradicted by the files shown above."
     } > "$P"
-    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
       > "$verdict" 2> "$verdict.err"
     rm -f "$P"
   ) &

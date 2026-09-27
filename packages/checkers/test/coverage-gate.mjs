@@ -113,6 +113,19 @@ const MANIFEST = {
   test_to_pdf_no_chrome_found_is_unchanged: {
     na: "asserts the pre-existing 'no Chrome/Chromium found' message and return shape are unchanged by the incident fix — the JS port's --pdf path already never looks for a Chrome binary (see the 'PDF: NOT RENDERED' divergence above).",
   },
+  // Independent review, 2026-09-27 fix round: all three still exercise the
+  // Python script's Chrome SUBPROCESS path (process-group start/kill, the
+  // timeout default, and the timeout message's wording) — same N/A class
+  // as the three rows above.
+  test_to_pdf_timeout_kills_the_whole_process_group_not_just_chrome: {
+    na: "asserts a timeout kills Chrome's WHOLE process group (its own helper/renderer children too), not just its top PID — the JS port never invokes Chrome (or any subprocess) at all.",
+  },
+  test_to_pdf_default_timeout_is_under_the_agent_bash_tools_120s: {
+    na: "asserts to_pdf()'s own default timeout is under the agent Bash tool's 120s default — a fact about the Python function's own signature; the JS port never invokes Chrome (or any subprocess), so it has no analogous timeout to default.",
+  },
+  test_to_pdf_timeout_message_does_not_blame_another_chrome_window: {
+    na: "asserts a literal phrase is absent from the Python script's source text — the JS port never prints a Chrome timeout message at all (see the 'PDF: NOT RENDERED' divergence above).",
+  },
 
   // ---- test_jobs_md.py
   test_roundtrip_preserves_everything: { unit: "roundtrip preserves everything", file: "jobs-md.test.mjs" },

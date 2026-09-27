@@ -1,5 +1,5 @@
 """The renderer owns the markup — both bugs that shipped to the founder."""
-import os, stat, sys, tempfile, time
+import atexit, os, stat, sys, shutil, tempfile, time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                                 "skills", "apply", "scripts"))
 import render_resume as rr
@@ -7,13 +7,28 @@ import render_resume as rr
 
 def _fake_chrome(script_body):
     """Writes an executable shell script standing in for Chrome and
-    returns its path — never shells out to a real browser in a test."""
+    returns its path — never shells out to a real browser in a test.
+    Its containing tempdir is cleaned up at process exit (leaves no temp
+    files, always-on rule) rather than by each caller, since some callers
+    (the timeout tests) intentionally leave the fake's own process running
+    past the point where a normal try/finally would fire."""
     d = tempfile.mkdtemp(prefix="fake-chrome-")
+    atexit.register(shutil.rmtree, d, ignore_errors=True)
     p = os.path.join(d, "chrome")
     with open(p, "w", encoding="utf-8") as f:
         f.write("#!/bin/bash\n" + script_body)
     os.chmod(p, os.stat(p).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
     return p
+
+
+def _tmp_path(suffix=""):
+    """A tempfile.mktemp()-shaped path (the file itself is created later,
+    by to_pdf() or the test), cleaned up at process exit whether or not
+    anything ever got written there — leaves no temp files."""
+    p = tempfile.mktemp(suffix=suffix)
+    atexit.register(lambda: os.path.exists(p) and os.remove(p))
+    return p
+
 
 WRAPPED = """# ALEX CHEN
 
@@ -75,10 +90,10 @@ def test_to_pdf_gives_chrome_its_own_temporary_profile_dir():
     """A real Chrome window holding the DEFAULT profile's lock is what made
     headless Chrome hang in the incident — to_pdf must never reach for the
     caller's own profile."""
-    seen = tempfile.mktemp(prefix="seen-argv-")
-    html = tempfile.mktemp(suffix=".html")
+    seen = _tmp_path()
+    html = _tmp_path(".html")
     open(html, "w").write("<html></html>")
-    pdf = tempfile.mktemp(suffix=".pdf")
+    pdf = _tmp_path(".pdf")
     # a fake "chrome" that records its own argv, then writes the PDF path
     # (its last argv element) so to_pdf's success check passes
     chrome_argv_writer = _fake_chrome(
@@ -107,9 +122,9 @@ def test_to_pdf_timeout_kills_only_its_own_child_and_reports_plainly():
     is ever targeted (os.killpg on our own handle's pgid — never a
     name-based kill of anything else on the machine)."""
     chrome = _fake_chrome("sleep 30\n")
-    html = tempfile.mktemp(suffix=".html")
+    html = _tmp_path(".html")
     open(html, "w").write("<html></html>")
-    pdf = tempfile.mktemp(suffix=".pdf")
+    pdf = _tmp_path(".pdf")
     start = time.time()
     ok, err = rr.to_pdf(html, pdf, chrome=chrome, timeout=1)
     elapsed = time.time() - start
@@ -126,12 +141,13 @@ def test_to_pdf_timeout_kills_the_whole_process_group_not_just_chrome():
     running. A fake "chrome" that itself spawns a child sleeper — the
     child must be dead too after the timeout, not just the top process."""
     d = tempfile.mkdtemp(prefix="fake-chrome-group-")
+    atexit.register(shutil.rmtree, d, ignore_errors=True)
     helper = os.path.join(d, "helper")
     os.symlink("/bin/sleep", helper)
     chrome = _fake_chrome(f'"{helper}" 60 &\nHELPER_PID=$!\necho "$HELPER_PID" > "{d}/helper.pid"\nwait\n')
-    html = tempfile.mktemp(suffix=".html")
+    html = _tmp_path(".html")
     open(html, "w").write("<html></html>")
-    pdf = tempfile.mktemp(suffix=".pdf")
+    pdf = _tmp_path(".pdf")
     rr.to_pdf(html, pdf, chrome=chrome, timeout=1)
     time.sleep(0.3)
     helper_pid_file = os.path.join(d, "helper.pid")
@@ -171,8 +187,8 @@ def test_to_pdf_no_chrome_found_is_unchanged():
     # never again — chrome=None alone isn't enough, since to_pdf falls
     # back to RENDER_RESUME_CHROME, then the real find_chrome(), when no
     # explicit chrome is given).
-    html = tempfile.mktemp(suffix=".html")
-    pdf = tempfile.mktemp(suffix=".pdf")
+    html = _tmp_path(".html")
+    pdf = _tmp_path(".pdf")
     real_find_chrome = rr.find_chrome
     rr.find_chrome = lambda: None
     had_env = "RENDER_RESUME_CHROME" in os.environ

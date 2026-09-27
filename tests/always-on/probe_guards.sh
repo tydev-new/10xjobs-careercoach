@@ -64,7 +64,42 @@ unset REALJS _VAULT_LOCKDIR _VAULT_COUNT
 [ "$(cat "$T/xs")" = held ] && say CLOSED "a stale refcount never leaves a new runner unprotected" \
   || say OPEN "stale refcount (holder SIGKILLed, vault unlocked by hand): the next runner holds with the vault UNLOCKED"
 
-echo "== render_resume.py to_pdf() timeout =="
+echo "== render_resume.py never launches a real browser in this harness =="
+# Owner ruling 2026-09-26 (replacing the test-user isolation plan this whole
+# file was originally written to demand): a harness run should have no REAL
+# Chrome to hang in the first place. This does not remove the checks below
+# (render_resume.py's own timeout/process-group/message safety still matters
+# for a REAL candidate run, where RENDER_RESUME_CHROME is unset) — it closes
+# the specific incident's TRIGGER inside this harness, which the checks
+# below can no longer exercise here by construction (they call to_pdf()
+# directly with an explicit chrome=, bypassing the harness's own env var —
+# this section is what proves an AGENT under test, which never passes an
+# explicit chrome=, gets the fake).
+# NOTE on the && / || shape below: `say`'s own exit status is 0 for OPEN,
+# 1 for CLOSED (its `[ "$1" = OPEN ] && open=1` tail) — so `cond && say
+# CLOSED ... || say OPEN ...` spuriously ALSO prints the OPEN line whenever
+# CLOSED fires (found live, resolving this same file's pre-existing vault
+# checks above, which show the identical double-print when truly CLOSED).
+# Every check added here puts the OPEN branch first instead, which does
+# not have that problem.
+harness_chrome="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; echo \"\$RENDER_RESUME_CHROME\"")"
+[ "$harness_chrome" != "$ROOT/fixtures/fake-chrome" ] && say OPEN "RENDER_RESUME_CHROME is not wired to the harness fake (got: ${harness_chrome:-<empty>})" \
+  || say CLOSED "lib_env.sh points RENDER_RESUME_CHROME at the harness fake"
+[ ! -x "$ROOT/fixtures/fake-chrome" ] && say OPEN "fixtures/fake-chrome is missing or not executable" \
+  || say CLOSED "fixtures/fake-chrome exists and is executable"
+harness_pdf="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; python3 - '$REPO' '$T' <<'EOF'
+import sys, os
+sys.path.insert(0, os.path.join(sys.argv[1], 'skills', 'apply', 'scripts'))
+import render_resume as rr
+t = sys.argv[2]
+open(os.path.join(t, 'harness.html'), 'w').write('<html></html>')
+ok, err = rr.to_pdf(os.path.join(t, 'harness.html'), os.path.join(t, 'harness.pdf'))
+print('OK' if ok else 'FAIL:' + str(err))
+EOF")"
+[ "$harness_pdf" != "OK" ] && say OPEN "an agent-under-test call (no explicit chrome=) did not resolve to the harness fake: $harness_pdf" \
+  || say CLOSED "an agent-under-test call (no explicit chrome=) renders via the fake, never real Chrome, and never hangs"
+
+echo "== render_resume.py to_pdf() timeout (production safety — RENDER_RESUME_CHROME is unset for a real candidate run, so these still apply there) =="
 cat > "$T/fakechrome" <<EOF
 #!/bin/bash
 # stands in for Chrome: a browser process with a helper child of its own

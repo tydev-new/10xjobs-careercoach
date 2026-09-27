@@ -1,17 +1,9 @@
-import { useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type ReactElement } from "react";
+import { forwardRef, useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type ReactElement } from "react";
 import { Icon } from "../icons.tsx";
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
-export function Composer({
-  value,
-  onChange,
-  onSend,
-  disabled,
-  onAttach,
-  attaching,
-  attachError,
-}: {
+export interface ComposerProps {
   value: string;
   onChange: (value: string) => void;
   onSend: (text: string) => void;
@@ -28,7 +20,16 @@ export function Composer({
   /** A plain, candidate-facing message from the last attach attempt's
    *  failure (src/backend/upload-errors.ts) — never a raw error. */
   attachError?: string;
-}): ReactElement {
+}
+
+/** forwardRef so the frame (design-web-ui.md § 5.4, "Continue with Ten...
+ *  composer focused") can focus the input after switching to Talk to Ten —
+ *  the only thing that ref is used for; it never sends anything itself
+ *  (§ 5.2 rule 2 stays a page/rail concern, not a composer one). */
+export const Composer = forwardRef<HTMLTextAreaElement, ComposerProps>(function Composer(
+  { value, onChange, onSend, disabled, onAttach, attaching, attachError },
+  inputRef,
+): ReactElement {
   const [pastedLink, setPastedLink] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,6 +94,7 @@ export function Composer({
           <Icon name={attaching ? "loaderCircle" : "paperclip"} size={16} className={attaching ? "spin" : undefined} />
         </button>
         <textarea
+          ref={inputRef}
           className="composer-input"
           placeholder="Message Ten…"
           value={value}
@@ -116,4 +118,4 @@ export function Composer({
       </div>
     </div>
   );
-}
+});

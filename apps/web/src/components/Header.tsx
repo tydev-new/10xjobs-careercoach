@@ -1,6 +1,5 @@
 import { useState, type ReactElement } from "react";
 import { Avatar } from "./Avatar";
-import { BrandMark } from "./BrandMark";
 import { Icon } from "../icons.tsx";
 import { formatBalanceUsd } from "../format.ts";
 import type { CoachModel } from "../backend/coach-model.ts";
@@ -9,6 +8,11 @@ import type { Status } from "../types";
 
 export interface HeaderProps {
   status: Status;
+  /** design-web-ui.md § 5.6, "Frame header (Stage 2)": the page title on
+   *  the left. Optional/defaults to "Ten" only for a caller that predates
+   *  Stage 2 (tests/web/stage1/harness.tsx mounts Header directly, with
+   *  no page concept) — Frame.tsx always supplies it. */
+  pageTitle?: string;
   /** Only ever a number a part or the store provided; undefined renders
    *  "—" (L1 — never an invented balance). */
   balanceUsd: number | undefined;
@@ -51,14 +55,6 @@ export interface HeaderProps {
   coachModel?: CoachModel;
 }
 
-const STATE_LABEL: Record<Status["state"], string> = {
-  idle: "idle",
-  thinking: "thinking",
-  working: "working",
-  "needs-you": "needs you",
-  done: "done",
-};
-
 // The fixture picker and Autoplay are dev/preview-only controls (H2): a
 // real deployed build must not ship a way to switch fixtures or auto-type
 // a candidate's replies. `import.meta.env.DEV` covers `npm run dev`;
@@ -83,6 +79,7 @@ export const SHOW_MOCK_CONTROLS =
 export function Header(props: HeaderProps): ReactElement {
   const {
     status,
+    pageTitle = "Ten",
     balanceUsd,
     fixtures,
     currentFixtureId,
@@ -104,13 +101,16 @@ export function Header(props: HeaderProps): ReactElement {
   return (
     <header className="app-header">
       <div className="app-header-left">
-        <Avatar status={status} />
-        <span className="app-header-title">
-          <span aria-hidden="true">
-            <BrandMark size={28} />
-          </span>{" "}
-          Ten <span className="app-header-status">· {STATE_LABEL[status.state]}</span>
-        </span>
+        {/* design-web-ui.md § 5.6, "Frame header (Stage 2)": the page
+            title on the left, in --type-header, and NOTHING else — § 5.6's
+            own list is "the page title... on the right... avatar, balance
+            chip, ⋯", no brand mark (lead ruling: the rail carries the one
+            wordmark; § 5.5 says "No wordmark on the phone" explicitly). No
+            visible state word beside the avatar either (moved to
+            app-header-right, below); that state still surfaces as the
+            avatar's own hover/aria-label (Avatar.tsx), never as page-title
+            prose. */}
+        <span className="app-header-title">{pageTitle}</span>
         {status.action ? <span className="app-header-action">{status.action}</span> : null}
       </div>
       <div className="app-header-right">
@@ -138,6 +138,11 @@ export function Header(props: HeaderProps): ReactElement {
             Autoplay
           </button>
         ) : null}
+        {/* design-web-ui.md § 5.6, "Frame header (Stage 2)": avatar,
+            balance chip, then the ⋯ menu, in that order — the avatar
+            carries its own hover/aria-label state text (§ 1.3, Avatar.tsx),
+            never a visible word beside it. */}
+        <Avatar status={status} />
         {/* deps.balance() (design-web-agent.md § 8) rounds DOWN to the
             cent and never shows below $0.00 — formatBalanceUsd, not
             formatUsd (S2/N3, docs/reviews/proxy-change-review.md).

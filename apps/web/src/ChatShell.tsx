@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { latestGateStatuses, statusOf } from "./agent-helpers.ts";
 import { Composer } from "./components/Composer";
-import { Header } from "./components/Header";
+import { Frame } from "./components/Frame";
 import { SidePanel } from "./components/SidePanel";
 import { Transcript } from "./components/Transcript";
 import type { FixtureEntry } from "./fixtures";
@@ -76,6 +76,7 @@ export function ChatShell({
   const [panelOpenOnPhone, setPanelOpenOnPhone] = useState(false);
   const [balanceUsd, setBalanceUsd] = useState<number | undefined>(undefined);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const statusRef = useRef(status);
   statusRef.current = status;
   const messagesRef = useRef(messages);
@@ -226,42 +227,47 @@ export function ChatShell({
   const isFirstRun = messages.length === 0 && storeEmpty;
 
   return (
-    <div className="app-shell">
-      <div className="main-pane">
-        <Header
-          status={currentStatus}
-          balanceUsd={balanceUsd}
-          fixtures={fixtures}
-          currentFixtureId={id}
-          onFixtureChange={onFixtureChange}
-          autoplay={autoplay}
-          onAutoplayToggle={() => setAutoplay((v) => !v)}
-          theme={theme}
-          onThemeToggle={onThemeToggle}
+    <Frame
+      messages={messages}
+      status={currentStatus}
+      onFocusComposer={() => composerRef.current?.focus()}
+      balanceUsd={balanceUsd}
+      fixtures={fixtures}
+      currentFixtureId={id}
+      onFixtureChange={onFixtureChange}
+      autoplay={autoplay}
+      onAutoplayToggle={() => setAutoplay((v) => !v)}
+      theme={theme}
+      onThemeToggle={onThemeToggle}
+      talkToTen={
+        <>
+          {isFirstRun ? (
+            <div className="empty-state">
+              <p>
+                Ten: I don't have anything of yours yet. Drop in a résumé, or tell me the job
+                you're going for, and I'll start your workspace.
+              </p>
+            </div>
+          ) : (
+            <Transcript messages={messages} onOpen={handleOpen} onPrint={handlePrint} />
+          )}
+          <Composer
+            ref={composerRef}
+            value={composerValue}
+            onChange={setComposerValue}
+            onSend={send}
+            disabled={status === "submitted" || status === "streaming" || autoplay}
+          />
+        </>
+      }
+      sidePanel={
+        <SidePanel
+          ref={iframeRef}
+          file={openFile}
+          open={panelOpenOnPhone}
+          onClose={() => setPanelOpenOnPhone(false)}
         />
-        {isFirstRun ? (
-          <div className="empty-state">
-            <p>
-              Ten: I don't have anything of yours yet. Drop in a résumé, or tell me the job
-              you're going for, and I'll start your workspace.
-            </p>
-          </div>
-        ) : (
-          <Transcript messages={messages} onOpen={handleOpen} onPrint={handlePrint} />
-        )}
-        <Composer
-          value={composerValue}
-          onChange={setComposerValue}
-          onSend={send}
-          disabled={status === "submitted" || status === "streaming" || autoplay}
-        />
-      </div>
-      <SidePanel
-        ref={iframeRef}
-        file={openFile}
-        open={panelOpenOnPhone}
-        onClose={() => setPanelOpenOnPhone(false)}
-      />
-    </div>
+      }
+    />
   );
 }

@@ -3,10 +3,7 @@
 // part's literal input and output/errorText, word for word — never a
 // restated description.
 import { useState, type ReactElement } from "react";
-// No icons.tsx import here on purpose: tests/web/cut-off-ui.test.ts renders
-// this file through a standalone require-based harness that only resolves
-// "react" — a second relative import would break it (tester-owned harness,
-// not this stage's to change). The caret stays a plain glyph, retokenized.
+import { Icon } from "../icons.tsx";
 
 export interface ToolPartLike {
   type: string; // "tool-<name>"
@@ -66,17 +63,43 @@ function writeReceipt(part: ToolPartLike): WriteReceipt | null {
   return { path, lines: input.content.split("\n").length };
 }
 
+// A part is done once its state resolves to output-available/output-error
+// (mock-transport.ts's own naming); a part with no state at all (a fixture
+// shorthand) counts as done only once it actually carries output or an
+// error — never guessed done from just existing.
+function isDone(part: ToolPartLike): boolean {
+  if (part.state) return part.state === "output-available" || part.state === "output-error";
+  return part.output !== undefined || part.errorText !== undefined;
+}
+
 export function ToolRun({ parts }: { parts: ToolPartLike[] }): ReactElement {
   const [open, setOpen] = useState(false);
+  const live = parts.some((p) => !isDone(p));
   return (
     <div className="tool-run">
       <button
         type="button"
-        className="tool-run-toggle"
+        className={`tool-run-toggle${live ? " tool-run-toggle--live" : ""}`}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <span className="tool-run-caret">{open ? "▾" : "▸"}</span> ran {summarize(parts)}
+        {/* A fixed-size slot: swapping the spinner for the check icon as a
+            part resolves mid-stream must never nudge anything next to it
+            (measured CLS otherwise, § 5.9's "no layout shift"). */}
+        <span className="tool-run-status-icon">
+          {live ? <Icon name="loaderCircle" size={15} className="spin" /> : <Icon name="circleCheck" size={15} className="tool-run-done-icon" />}
+        </span>
+        {/* § 5.6 places the chevron AFTER the label; it sits before it
+            here instead. As parts stream in, `summarize(parts)` grows
+            (e.g. "write file" -> "write file ×2") — a TRAILING chevron's
+            own position would shift every time (measured: real CLS from
+            this exact cause, sources = .tool-run-caret svg moving as the
+            label beside it resized). A caret before the label never
+            moves when only the text after it changes width. */}
+        <span className="tool-run-caret">
+          <Icon name="chevronRight" size={14} />
+        </span>
+        <span className={`tool-run-label${live ? " tool-run-label--shimmer" : ""}`}>ran {summarize(parts)}</span>
       </button>
       {open ? (
         <div className="tool-run-detail">

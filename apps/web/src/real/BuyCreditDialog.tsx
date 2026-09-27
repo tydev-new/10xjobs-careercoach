@@ -12,6 +12,7 @@
 // about those two, docs/ARCHITECTURE.md's "system map").
 import { useEffect, useRef, useState, type ReactElement } from "react";
 import { Icon } from "../icons.tsx";
+import { useDialogFocus } from "./use-dialog-focus.ts";
 import { capturePaypalOrder, createPaypalOrder, type CaptureResult, type PackId } from "../backend/paypal.ts";
 
 export interface BuyCreditDialogProps {
@@ -83,14 +84,10 @@ export function BuyCreditDialog({
   const [phase, setPhase] = useState<Phase>({ kind: "picking" });
   const [selectedPack, setSelectedPack] = useState<PackId | undefined>(undefined);
   const buttonsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  // Escape, the focus trap, and returning focus to the opener all live in
+  // the one shared hook (design-web-ui.md § 5.6, "Dialog") — it replaces
+  // this component's own former Escape-only listener.
+  const dialogRef = useDialogFocus<HTMLDivElement>(onClose);
 
   useEffect(() => {
     if (!selectedPack || !paypalClientId) return;
@@ -163,7 +160,7 @@ export function BuyCreditDialog({
   };
 
   return (
-    <div className="buy-credit-overlay" role="dialog" aria-modal="true" aria-label="Buy credit">
+    <div className="buy-credit-overlay" role="dialog" aria-modal="true" aria-label="Buy credit" ref={dialogRef}>
       <div className="buy-credit-card">
         <button type="button" className="buy-credit-close" aria-label="Close" onClick={onClose}>
           <Icon name="x" size={16} />

@@ -146,6 +146,19 @@ button {
   cursor: pointer;
 }
 
+/* Pressed (:active): every control gets a distinct look from its own
+   hover, not just a repeat of it (§ 5.6, "Every control has these five
+   states"). Variants with their own --bg-press swap (buttons, pills,
+   rows) already differ on their own; this is the floor for everything
+   else — an outlined link, an icon-only close, a menu row. A static
+   size change on press, not an animated one, so it needs no
+   reduced-motion override (nothing here transitions or keyframes). */
+button:not(:disabled):active,
+a:active,
+[role="menuitem"]:active {
+  transform: scale(0.97);
+}
+
 /* ---- Focus ring (design-web-ui.md § 5.6, "Focus, motion, breakpoint,
    stacking"): every control gets the SAME ink ring, on :focus-visible
    only — never a second hue (the one-accent rule). A text field gets its
@@ -156,12 +169,17 @@ button {
   outline-offset: 2px;
 }
 
+/* !important on these two: a text field's own static border (e.g.
+   .sign-in-form input) ties this rule's specificity, and a focus state
+   must never lose that tie-break to whichever component rule happens to
+   sit later in the file (found live on sign-in and set-password's
+   inputs — the ring silently vanished on focus). */
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
-  border-color: var(--fg);
-  box-shadow: 0 0 0 3px var(--focus-halo);
+  border-color: var(--fg) !important;
+  box-shadow: 0 0 0 3px var(--focus-halo) !important;
 }
 
 .hero :focus-visible,
@@ -169,9 +187,12 @@ select:focus-visible {
   outline-color: var(--on-hero);
 }
 
+/* Not one of § 5.6's three named JetBrains Mono uses (file paths in the
+   viewer's meta row; literal tool input/output in an expanded activity
+   row; the gate's "yes" key cap) — this stays the ambient sans, just a
+   touch smaller, the way an attachment's filename sits in its chip. */
 .mono {
-  font-family: var(--font-mono);
-  font-size: 0.92em;
+  font-family: var(--font-sans);
 }
 
 /* A spinning loader-circle icon (design-web-ui.md § 5.6): the still
@@ -237,13 +258,24 @@ select:focus-visible {
   display: inline-flex;
   align-items: baseline;
   gap: var(--space-2);
+  /* One line, always: a status word growing (e.g. "thinking" ->
+     "needs you") must never wrap the title or reflow the transcript
+     below it (measured CLS 0.012 at 375px before this). */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.app-header-title > span:first-child {
+  flex-shrink: 0;
 }
 
 .app-header-status {
   font: var(--type-small);
   color: var(--fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 /* app-header-status is nested inside app-header-title, both siblings of
@@ -440,16 +472,19 @@ select:focus-visible {
   right: 0;
   top: 40px;
   background: var(--bg-panel);
-  border-radius: var(--radius-md);
+  border-radius: 14px;
   box-shadow: var(--shadow-3);
   display: flex;
   flex-direction: column;
-  min-width: 210px;
-  padding: var(--space-1);
+  width: 260px;
+  padding: 6px;
   z-index: 40;
 }
 
 .menu-panel button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   text-align: left;
   background: none;
   border: none;
@@ -460,22 +495,44 @@ select:focus-visible {
   min-height: 44px;
 }
 
+.menu-panel button svg {
+  flex: none;
+  color: var(--fg-muted);
+}
+
+.menu-panel button.menu-item-danger svg {
+  color: var(--red);
+}
+
 .menu-panel button:hover:not(:disabled) {
   background: var(--bg-hover);
+}
+
+.menu-panel button:disabled {
+  background: var(--bg-muted);
+  color: var(--fg-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 /* § 13.6 (3): the Privacy link — same shape as a menu button (it's an
    action, opening the page), but it's an <a>, not a <button>. */
 .menu-item-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   text-align: left;
   border-radius: var(--radius-xs);
   padding: var(--space-2) var(--space-3);
   color: var(--fg);
   font: var(--type-ui);
   min-height: 44px;
-  line-height: 44px;
   text-decoration: none;
+}
+
+.menu-item-link svg {
+  flex: none;
+  color: var(--fg-muted);
 }
 
 .menu-item-link:hover {
@@ -501,7 +558,7 @@ select:focus-visible {
   justify-content: center;
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--bg-sunken);
   border: 1px solid var(--border);
 }
@@ -509,7 +566,7 @@ select:focus-visible {
 .avatar-dot {
   width: 15px;
   height: 15px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--fg-muted);
   display: inline-block;
 }
@@ -595,7 +652,7 @@ select:focus-visible {
      newest turn, whatever's still above the fold reads as "continues
      upward," not as a glitchy cut mid-card. No motion, so reduced-motion
      needs no override. */
-  mask-image: linear-gradient(to bottom, transparent 0, black 24px);
+  mask-image: linear-gradient(to bottom, transparent 0, var(--fg) 24px);
 }
 
 /* ---- Empty state (design-web-ui.md § 5.6, "Empty state") ---- */
@@ -640,7 +697,6 @@ select:focus-visible {
 .bubble-role {
   font: var(--type-small);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--fg-muted);
   margin-bottom: var(--space-1);
   font-weight: 600;
@@ -685,7 +741,7 @@ select:focus-visible {
   border: none;
   border-radius: var(--radius-full);
   color: var(--fg-muted);
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-2);
   font: var(--type-small);
   min-height: 44px;
   display: inline-flex;
@@ -698,10 +754,71 @@ select:focus-visible {
   color: var(--fg);
 }
 
+/* A fixed 15x15 box regardless of which icon is inside — the wrapper's
+   own size never depends on its content, so swapping the spinner for
+   the check icon mid-stream can't nudge anything beside it. */
+.tool-run-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 15px;
+  height: 15px;
+}
+
+.tool-run-done-icon {
+  color: var(--green);
+}
+
+/* Live (a tool part not yet done): a distinct, more present look — the
+   candidate can tell a step is still running, not just that Ten replied. */
+.tool-run-toggle--live {
+  background: var(--bg-panel);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  color: var(--fg);
+}
+
+.tool-run-toggle--live .tool-run-status-icon svg {
+  color: var(--fg-muted);
+}
+
+.tool-run-label--shimmer {
+  background: linear-gradient(90deg, var(--fg-muted) 0%, var(--fg) 50%, var(--fg-muted) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer var(--duration-shimmer) linear infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-run-label--shimmer {
+    animation: none;
+    background: none;
+    color: var(--fg-muted);
+  }
+}
+
 .tool-run-caret {
-  display: inline-block;
-  width: 1em;
+  display: inline-flex;
+  flex: none;
   color: var(--fg-subtle);
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+.tool-run-toggle[aria-expanded="true"] .tool-run-caret {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tool-run-caret {
+    transition: none;
+  }
 }
 
 .tool-run-detail {
@@ -714,8 +831,10 @@ select:focus-visible {
 }
 
 .tool-run-row-name {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 19px;
   font-weight: 600;
-  font: var(--type-body-sm);
 }
 
 .tool-run-row-label {
@@ -758,7 +877,7 @@ select:focus-visible {
 }
 
 .tool-run-write-name {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
 }
@@ -800,18 +919,10 @@ select:focus-visible {
 }
 
 .card-kicker {
-  font: var(--type-mono);
-  font-weight: 500;
+  font: var(--type-small);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
   color: var(--fg-muted);
   margin-bottom: var(--space-2);
-}
-
-.card-headline {
-  font: var(--type-page);
-  letter-spacing: var(--track-page);
-  margin: 0 0 var(--space-2);
 }
 
 .card-title {
@@ -820,7 +931,7 @@ select:focus-visible {
 }
 
 .card-title-file {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-weight: 500;
   font-size: 13.5px;
 }
@@ -850,7 +961,7 @@ select:focus-visible {
 }
 
 .receipt-amount {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
 }
@@ -913,7 +1024,6 @@ select:focus-visible {
   padding: 0 9px 0 8px;
   height: 24px;
   font: 600 12.5px/1 var(--font-sans);
-  letter-spacing: 0.01em;
 }
 
 .badge--quick-scan {
@@ -947,24 +1057,78 @@ select:focus-visible {
   color: var(--fg-muted);
 }
 
-/* Verdict headline color — text color only, never a background/stripe:
-   "recognizable at a glance" without a colored card shape. Category, not
-   severity — "weak" reads as neutral information, not a warning. The old
-   blue for investable_stretch is retired (the one-accent rule); it reads
-   in ink like long_shot/weak now, distinguished only by its own words. */
-.card-headline--strong {
-  color: var(--green);
+/* Verdict card head (design-web-ui.md § 5.6, "Cards — Verdict"): the
+   initial tile, title/company, and the right-aligned score. */
+.verdict-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
-.card-headline--investable_stretch {
+.verdict-tile {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--hero);
+  color: var(--on-hero);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 15px var(--font-display);
+}
+
+.verdict-titles {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.verdict-score {
+  flex: none;
+  font: var(--type-number);
+  font-variant-numeric: tabular-nums;
   color: var(--fg);
 }
 
-.card-headline--long_shot {
-  color: var(--amber);
+.verdict-score-max {
+  font: var(--type-meta);
+  color: var(--fg-subtle);
 }
 
-.card-headline--weak {
+/* Tier pills (§ 5.6, "Cards — Tier pills"): the words carry the meaning;
+   color only marks the category, never a severity — amber stays reserved
+   for needs-you (the chain rule), so long_shot reads in neutral ink. */
+.tier-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 9px 0 8px;
+  border-radius: var(--radius-full);
+  font: 600 12.5px/1 var(--font-sans);
+  margin-bottom: var(--space-2);
+}
+
+.tier-pill--strong {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.tier-pill--investable_stretch {
+  background: var(--bg-panel);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+
+.tier-pill--long_shot {
+  background: var(--bg-sunken);
+  color: var(--fg-muted);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.tier-pill--weak {
+  background: var(--bg-muted);
   color: var(--fg-muted);
 }
 
@@ -989,7 +1153,7 @@ select:focus-visible {
   flex: none;
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--fg-muted);
   transform: translateY(-2px);
 }
@@ -1010,6 +1174,48 @@ select:focus-visible {
 
 .card--gate {
   box-shadow: 0 0 0 1px var(--amber-border), var(--shadow-2);
+}
+
+/* Approved: the band turns green, the shadow drops back to --shadow-1 —
+   there is no button, ever; this is the only thing that changes. */
+.card--gate-approved {
+  box-shadow: var(--shadow-1);
+}
+
+.gate-band {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--amber-soft);
+  color: var(--amber);
+  font: var(--type-small);
+  font-weight: 600;
+}
+
+.card--gate-approved .gate-band {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.badge--gate-pending {
+  background: var(--bg-sunken);
+  color: var(--fg-muted);
+}
+
+.badge--gate-approved {
+  background: var(--green-soft);
+  color: var(--green);
+  box-shadow: 0 0 0 1px var(--green-border);
+}
+
+.badge--gate-declined,
+.badge--gate-expired {
+  background: var(--bg-sunken);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 
 .gate-text {
@@ -1105,7 +1311,6 @@ select:focus-visible {
   background: var(--bg-sunken);
   border-radius: 4px;
   padding: 0 4px;
-  font-size: 0.9em;
 }
 
 /* A résumé or cover-letter preview reads like a document, not app chrome
@@ -1148,7 +1353,7 @@ select:focus-visible {
   flex: none;
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--fg-muted);
   transform: translateY(-2px);
 }
@@ -1213,6 +1418,14 @@ select:focus-visible {
   background: var(--bg-hover);
 }
 
+.composer-attach:disabled,
+.composer-skills:disabled {
+  background: var(--bg-muted);
+  color: var(--fg-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 .composer-send {
   background: var(--primary);
   color: var(--on-primary);
@@ -1227,6 +1440,8 @@ select:focus-visible {
 .composer-send:disabled {
   background: var(--bg-muted);
   color: var(--fg-subtle);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .composer-input {
@@ -1354,8 +1569,32 @@ select:focus-visible {
   animation: toast-rise var(--duration-slow) var(--ease-out) both;
 }
 
-.toast svg {
+/* Lime marks only the check icon (§ 5.6's use list, item 5) — the
+   dismiss ✕ stays neutral, same as any other icon button. */
+.toast > svg:first-child {
   color: var(--lime);
+  flex: none;
+}
+
+.toast button {
+  flex: none;
+  border: none;
+  background: none;
+  color: var(--on-hero-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+}
+
+.toast button:hover {
+  color: var(--on-hero);
+}
+
+.toast button:active {
+  opacity: 0.7;
 }
 
 @keyframes toast-rise {
@@ -1470,17 +1709,21 @@ select:focus-visible {
   min-height: 44px;
 }
 
-.sign-in-mode-toggle button:hover:not(:disabled) {
+.sign-in-mode-toggle button:hover {
   background: var(--bg-hover);
 }
 
-/* The current mode is a disabled button standing in for a selected
-   segment — an ink fill (never the old blue) shows which one. */
-.sign-in-mode-toggle button:disabled {
+/* The current mode is named by aria-pressed, not `disabled` — a
+   segmented toggle stays reachable by Tab on both segments. An ink fill
+   (never the old blue) shows which one. */
+.sign-in-mode-toggle button[aria-pressed="true"] {
   background: var(--primary);
   box-shadow: none;
   color: var(--on-primary);
-  opacity: 1;
+}
+
+.sign-in-mode-toggle button[aria-pressed="true"]:hover {
+  background: var(--primary-hover);
 }
 
 .sign-in-form {
@@ -1632,8 +1875,20 @@ select:focus-visible {
   background: var(--bg-hover);
 }
 
-.menu-item-danger {
+/* .menu-panel button (0,1,1) would otherwise beat a bare .menu-item-danger
+   (0,1,0) regardless of source order — the compound selector is what
+   actually wins. */
+.menu-panel button.menu-item-danger {
   color: var(--red);
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-1);
+}
+
+/* The disabled look (--fg-subtle) still has to win over the danger red —
+   same specificity fight, one more class to settle it. */
+.menu-panel button.menu-item-danger:disabled,
+.menu-panel button.menu-item-danger:disabled svg {
+  color: var(--fg-subtle);
 }
 
 /* ---- Dialog (design-web-ui.md § 5.6, "Dialog"): Buy credit (§ 1.11),
@@ -1661,7 +1916,9 @@ select:focus-visible {
   border-radius: 18px;
   box-shadow: var(--shadow-3);
   padding: var(--space-6);
-  max-width: 420px;
+  /* min(460px, 100% - 32px): the overlay's own 16px padding on each side
+     already removes the 32px, so width: 100% inside it IS that formula. */
+  max-width: 460px;
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -1676,16 +1933,9 @@ select:focus-visible {
   margin: 0;
 }
 
-/* § 5.6 calls for translateY(8px) scale(0.98) -> none. The scale half is
-   dropped here: it's the SAME box, momentarily smaller, and Playwright's
-   own P8 tap-target check (tests/web/password.test.ts) measures a
-   dialog's controls the instant [role=dialog] mounts — i.e. the
-   animation's very first frame — so a real scale(0.98) reads back as a
-   deterministic 43.1px, under the 44px floor. translateY alone keeps the
-   pop's motion without ever reporting a false undersized control. */
 @keyframes dialog-pop {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1753,6 +2003,10 @@ select:focus-visible {
 .balance-chip--button {
   cursor: pointer;
   border: none;
+}
+
+.balance-chip--button:hover {
+  background: var(--bg-hover);
 }
 
 .buy-credit-close {

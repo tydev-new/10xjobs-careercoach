@@ -143,11 +143,14 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
         <h1 className="sign-in-logo"><Wordmark size={30} /></h1>
         <p className="sign-in-tagline">Help you get a job offer you actually want.</p>
 
+        {/* aria-pressed names the SELECTED segment — neither button is ever
+            `disabled` (a segmented toggle stays reachable by Tab either
+            way; `disabled` would drop the current segment from it). */}
         <div className="sign-in-mode-toggle">
-          <button type="button" disabled={mode === "magic-link"} onClick={() => setMode("magic-link")}>
+          <button type="button" aria-pressed={mode === "magic-link"} onClick={() => setMode("magic-link")}>
             Email link
           </button>
-          <button type="button" disabled={mode === "password"} onClick={() => setMode("password")}>
+          <button type="button" aria-pressed={mode === "password"} onClick={() => setMode("password")}>
             Email + password
           </button>
         </div>

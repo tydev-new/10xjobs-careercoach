@@ -106,7 +106,10 @@ export function Header(props: HeaderProps): ReactElement {
       <div className="app-header-left">
         <Avatar status={status} />
         <span className="app-header-title">
-          <BrandMark size={20} /> Ten <span className="app-header-status">· {STATE_LABEL[status.state]}</span>
+          <span aria-hidden="true">
+            <BrandMark size={28} />
+          </span>{" "}
+          Ten <span className="app-header-status">· {STATE_LABEL[status.state]}</span>
         </span>
         {status.action ? <span className="app-header-action">{status.action}</span> : null}
       </div>
@@ -174,6 +177,7 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="folderDown" size={16} />
                 Export workspace
               </button>
               <button
@@ -185,6 +189,7 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="folderDown" size={16} />
                 Import workspace
               </button>
               {/* No per-candidate key to manage: one shared app key sits
@@ -203,6 +208,7 @@ export function Header(props: HeaderProps): ReactElement {
                     setMenuOpen(false);
                   }}
                 >
+                  <Icon name="wallet" size={16} />
                   Buy credit
                 </button>
               ) : null}
@@ -230,6 +236,7 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="trash2" size={16} />
                 Delete my beta data
               </button>
               {/* design-web-ui.md § 1.10 — "Set a new password" or "Change
@@ -244,6 +251,7 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="keyRound" size={16} />
                 Set a new password
               </button>
               <button
@@ -255,12 +263,14 @@ export function Header(props: HeaderProps): ReactElement {
                   setMenuOpen(false);
                 }}
               >
+                <Icon name="logOut" size={16} />
                 Sign out
               </button>
               {/* § 13.6 (3): the Privacy link, just above the model line,
                   in real AND mock mode — plain, honest copy in the house
                   voice lives at the page itself, never restated here. */}
               <a className="menu-item-link" role="menuitem" href="/privacy.html" target="_blank" rel="noreferrer">
+                <Icon name="link" size={16} />
                 Privacy
               </a>
               {/* § 13.3: plain text, not a button — never focusable as an

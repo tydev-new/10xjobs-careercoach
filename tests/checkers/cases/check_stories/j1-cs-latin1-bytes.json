@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): invalid UTF-8: Python crashes (first line compared)",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "storybank.md": {
+   "base64": "IyBTdG9yeWJhbmsKCiMjIENvdmVyYWdlCgp8IENvbXBldGVuY3kgfCBTb3VyY2UgfCBDb3ZlcmVkIGJ5IHwKfC0tLXwtLS18LS0tfAp8IFggfCBbaW5mZXJyZWRdIHwgUzAwMSB8CgojIyBTdG9yaWVzCgp8IElEIHwgVGl0bGUgfCBTdHJlbmd0aCB8IFN0YXR1cyB8IE5vdGVzIHwKfC0tLXwtLS18LS0tfC0tLXwtLS18CnwgUzAwMSB8IGNhZukgfCA0IHwgY29uZmlybWVkIHwgfAo="
+  }
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "Traceback (most recent call last):",
+   "stderrMatch": "first-line",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

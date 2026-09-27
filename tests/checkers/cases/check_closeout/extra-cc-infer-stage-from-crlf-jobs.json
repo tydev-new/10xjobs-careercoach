@@ -1,0 +1,27 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cc-infer-stage-from-crlf-jobs",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "| Acme | Interviewing |\r\n",
+  "plan.md": "Goal: x\n\n## Board\nWaiting on you\n- the comp floor — criteria.md\n- café visit to Montréal\nTo do\n- review the letter\n"
+ },
+ "expect": [
+  {
+   "stdout": "close-out clean: stage interviewing; plan.md written; 0 question(s) each have a row\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

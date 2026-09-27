@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: pb-duplicate-rows",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--application",
+    "applications/a.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/a.md": "## Coverage\n\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| Python | have | x | answered |\n| Python | have | x | answered |\n\n## Selection\n\n| # | role | bullet | in/out | source | words | why |\n|---|---|---|---|---|---|---|\n| 1 | Acme | same | out | base | 12 | weak |\n| 1 | Acme | same | out | base | 12 | weak |\n"
+ },
+ "expect": [
+  {
+   "stdout": "**Cut — 2 of 2 bullets, weakest first.** Say \"keep\" and the bullet's name or number to bring one back.\n1. Acme — same — *weak*\n2. Acme — same — *weak*\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nclean: proposal block printed; no FAIL, no WARN\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

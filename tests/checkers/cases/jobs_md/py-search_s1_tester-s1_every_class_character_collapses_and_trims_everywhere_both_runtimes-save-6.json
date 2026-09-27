@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_every_class_character_collapses_and_trims_everywhere_both_runtimes (jobs_md.save, as _both_save calls it)",
+ "steps": [
+  {
+   "script": "search/scripts/jobs_md.py",
+   "argv": [
+    "save",
+    "<ws>",
+    "[{\"company\": \"\\u000bAcme\\u000b\\u000bCo\\u000b\", \"title\": \"\\u000b\\u000bStaff\\u000b\\u000bEngineer\\u000b\", \"stage\": \"To Review\", \"dismissed\": false, \"url\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"location\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"posted_at\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"seen_at\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"updated_at\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"fit_verdict\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"fit_reason\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"dealbreakers\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"track\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"flags\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"jd_sim\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"jd_file\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"analysis_file\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"company_file\": \"\\u000ba\\u000b\\u000bb\\u000b\", \"evaluated_at\": \"\\u000ba\\u000b\\u000bb\\u000b\"}]",
+    "null"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme Co — Staff Engineer\n- URL: a b\n- Location: a b\n- Posted: a b\n- Seen: a b\n- Updated: a b\n- Verdict: a b\n- Reason: a b\n- Dealbreakers: a b\n- Track: a b\n- Flags: a b\n- Sim: a b\n- JD: a b\n- Analysis: a b\n- Company file: a b\n- Evaluated: a b\n"
+ }
+}

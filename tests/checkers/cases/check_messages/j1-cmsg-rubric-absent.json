@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): covers: tests/test_check_messages.py::test_rubric_pinned_probe (no pitch.md: WARN)",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "contacts/acme.md": "> Hi Sam, saw your eval write-up. Would love to connect.\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: pass (0 fail, 1 warn, 1 drafts)\n  [WARN] pitch.md Messages rubric is PROPOSED/absent — drafts need the candidate's pin before finalizing (WATCH forms enforced anyway)\n  [INFO] draft 1: 54 chars / 10 words\n✔ message floor clean\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

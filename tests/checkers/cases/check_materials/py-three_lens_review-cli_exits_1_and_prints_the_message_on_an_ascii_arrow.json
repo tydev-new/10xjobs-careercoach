@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_three_lens_review.py::test_cli_exits_1_and_prints_the_message_on_an_ascii_arrow",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--resume",
+    "<ws>/resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "resume.md": "# Alex Chen\n\n## Summary\n\n- Moved deploys weekly->daily.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: FAIL (1 fail, 0 warn)\n  [FAIL] arrow chain \"->\" — write it in words (\"from 80% to under 1%\"); a reader sees an arrow as notes, not a sentence\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

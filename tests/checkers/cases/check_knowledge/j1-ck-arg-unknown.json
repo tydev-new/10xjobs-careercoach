@@ -1,0 +1,25 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): argparse: unrecognized arguments",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--bogus"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_knowledge.py [-h] --workspace WORKSPACE\ncheck_knowledge.py: error: unrecognized arguments: --bogus\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

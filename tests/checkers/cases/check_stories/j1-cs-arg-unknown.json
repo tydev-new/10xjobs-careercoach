@@ -1,0 +1,25 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): argparse: unrecognized arguments",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--fix"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_stories.py [-h] --workspace WORKSPACE\ncheck_stories.py: error: unrecognized arguments: --fix\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

@@ -1,0 +1,30 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-cf-application-order-astral",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/z.md": "## Coverage\n\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| z | bad |\n",
+  "applications/😀.md": "## Coverage\n\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| x | bad |\n",
+  "applications/￠.md": "## Coverage\n\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| y | bad |\n"
+ },
+ "expect": [
+  {
+   "stdout": "WARN  applications/z.md: row has 2 cells, the header has 4: \"| z | bad |\"\nWARN  applications/￠.md: row has 2 cells, the header has 4: \"| y | bad |\"\nWARN  applications/😀.md: row has 2 cells, the header has 4: \"| x | bad |\"\n\n3 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

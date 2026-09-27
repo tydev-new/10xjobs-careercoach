@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): missing contacts file: Python crashes (first line compared)",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "pitch.md": "# P\n\n## Messages rubric\n\nPINNED 2026-08-17\n| tier | claim |\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "Traceback (most recent call last):",
+   "stderrMatch": "first-line",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

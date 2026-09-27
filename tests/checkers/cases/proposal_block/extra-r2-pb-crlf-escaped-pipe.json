@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-pb-crlf-escaped-pipe",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--application",
+    "a.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "a.md": "## Coverage\r\n\r\n| requirement | status | evidence | decision |\r\n|---|---|---|---|\r\n| C\\|C++ | gap | none | open |\r\n\r\n## Selection\r\n\r\n| # | role | bullet | in/out | source | words | why |\r\n|---|---|---|---|---|---|---|\r\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n**Gaps — evidence you might have?** (\"no\" is a fine answer)\n- CC++ — none\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nclean: proposal block printed; no FAIL, no WARN\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

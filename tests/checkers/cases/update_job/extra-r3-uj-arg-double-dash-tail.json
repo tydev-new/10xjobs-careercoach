@@ -1,0 +1,34 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r3-uj-arg-double-dash-tail",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Café",
+    "--title",
+    "Staff",
+    "--stage",
+    "Offer",
+    "--",
+    "extra"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Café — Staff\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: update_job.py [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.py: error: unrecognized arguments: -- extra\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

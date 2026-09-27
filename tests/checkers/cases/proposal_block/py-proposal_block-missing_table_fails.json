@@ -1,0 +1,29 @@
+{
+ "note": "tests/test_proposal_block.py::test_missing_table_fails",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--application",
+    "applications/x.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/x.md": "## Coverage\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| Orchestrate scheduled data workflows | have | monitoring bullet | answered |\n| Tested dbt models | have | dbt bullet | answered |\n| A/B testing | gap | none | open |\n",
+  "base-resume.md": "# Base\n## Experience\n- Set up scheduled job monitoring with alerting on failed overnight loads.\n- Built tested dbt models with peer review.\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n**Gaps — evidence you might have?** (\"no\" is a fine answer)\n- A/B testing — none\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nFAIL  no selection table under the declared header — write it to the file first\nWARN  `have` row \"Orchestrate scheduled data workflows\": their word(s) ['Orchestrate', 'workflows'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

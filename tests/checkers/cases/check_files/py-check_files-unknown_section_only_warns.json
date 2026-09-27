@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_check_files.py::test_unknown_section_only_warns",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "profile.md": "# P\n## Snapshot\n## Experience\n## Intake findings\n### Positioning strengths\n### Likely interviewer concerns\n### Career-narrative gaps\n### Story seeds\n## Interview history\n## Constraints\n## Application defaults\n## Wildcard\n"
+ },
+ "expect": [
+  {
+   "stdout": "WARN  profile.md: unrecognised section \"Wildcard\" — put novel material under `## Other notes`\n\n1 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

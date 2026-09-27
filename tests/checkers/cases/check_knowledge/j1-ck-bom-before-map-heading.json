@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): a BOM before the first heading hides it",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "﻿## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| X | bad | s | gap |\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n0 map row(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

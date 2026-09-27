@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-review-arrow-inline-code-lone-cr",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--letter",
+    "letter.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "letter.md": "# Letter\n\nDear Hiring Manager,\n\nThe macro `a\r->b` stayed internal, never shipped to any customer at all.\n\nAlex Chen\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nLETTER letter.md: FAIL (1 fail, 1 warn)\n  [WARN] letter is 18 words — patterns.md § Cover letter wants 250-400\n  [FAIL] arrow chain \"->\" — write it in words (\"from 80% to under 1%\"); a reader sees an arrow as notes, not a sentence\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_characters_outside_the_class_are_kept_both_runtimes (jobs_md.save, as _both_save calls it)",
+ "steps": [
+  {
+   "script": "search/scripts/jobs_md.py",
+   "argv": [
+    "save",
+    "<ws>",
+    "[{\"company\": \"Acme\", \"title\": \"Staff\\u001cEngineer\", \"stage\": \"To Review\", \"dismissed\": false, \"location\": \"San\\u001c\\u001cFrancisco\"}]",
+    "null"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff\u001cEngineer\n- Location: San\u001c\u001cFrancisco\n"
+ }
+}

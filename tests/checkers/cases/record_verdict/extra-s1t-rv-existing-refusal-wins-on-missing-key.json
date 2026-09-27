@@ -1,0 +1,35 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: s1t-rv-existing-refusal-wins-on-missing-key",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Gamma",
+    "--title",
+    "X",
+    "--verdict",
+    "weak",
+    "--existing",
+    "--url",
+    "u"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 2** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n- URL: https://boards.greenhouse.io/acme/jobs/1\n- Location: Remote\n- Posted: 2026-01-02\n- Seen: 2026-01-01T00:00:00+00:00\n- Verdict: weak\n- Score: 10\n- Reason: old\n- Track: B\n- JD: jd-inbox/acme.md\n- Analysis: jd-analysis/acme-old.md\n- Company file: company/acme.md\n- Evaluated: 2026-01-01T00:00:00+00:00\n\n## Interested\n\n### Beta — PM\n- URL: https://b/1\n- Seen: 2026-01-01T00:00:00+00:00\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: --existing refuses --url/--location/--jd-file\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

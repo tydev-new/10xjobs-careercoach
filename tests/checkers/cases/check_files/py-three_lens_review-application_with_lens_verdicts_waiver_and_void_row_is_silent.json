@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_three_lens_review.py::test_application_with_lens_verdicts_waiver_and_void_row_is_silent",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/acme-staff.md": "# Acme — Staff Engineer\n\n## Rounds\n\n| date | round | driver | scored | what changed |\n|---|---|---|---|---|\n| 2026-09-25 | 1 | self | 5/7 held; unmet: page target, Skills line; panel not run | first draft |\n| 2026-09-25 | 2 | panel | 6/7 held; unmet: page target; ats Pass · recruiter Revise · hiring manager Pass | cut two Earlier roles |\n\n## Panel\n\n| lens | finding | outcome |\n|---|---|---|\n| ats | Kubernetes missing from prose | fixed |\n| recruiter | title stack confusing in the header | discarded — candidate waived in chat 2026-09-25 |\n| hiring manager | VOID — returned prose twice | — |\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n1 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

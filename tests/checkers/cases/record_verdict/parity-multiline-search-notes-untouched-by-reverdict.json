@@ -1,0 +1,36 @@
+{
+ "note": "packages/checkers/test/parity.mjs: multiline-search-notes-untouched-by-reverdict (covers: design-web-search.md § 4.3: a multi-line Search notes block round-trips byte-identical through save())",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--score",
+    "70"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n- Seen: 2026-01-01T00:00:00+00:00\n\n## Search notes\n\nline one\n\n  line two, indented\nline three\n"
+ },
+ "expect": [
+  {
+   "stdout": "recorded (updated existing role): Acme — Staff Engineer → strong (70)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- Seen: 2026-01-01T00:00:00+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- Score: 70\n- Evaluated: 2026-09-23T12:34:56+00:00\n\n## Search notes\n\nline one\n\n  line two, indented\nline three\n"
+ }
+}

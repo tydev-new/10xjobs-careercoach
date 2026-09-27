@@ -1,0 +1,30 @@
+{
+ "note": "packages/checkers/test/parity.mjs: argparse-invalid-stage-choice (covers: argparse: --stage choices)",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "A",
+    "--title",
+    "B",
+    "--stage",
+    "Bogus"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: update_job.py [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.py: error: argument --stage: invalid choice: 'Bogus' (choose from To Review, Interested, Applied, Interviewing, Offer)\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

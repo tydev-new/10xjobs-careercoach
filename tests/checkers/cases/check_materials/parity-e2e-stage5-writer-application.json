@@ -1,0 +1,32 @@
+{
+ "note": "packages/checkers/test/parity.mjs: e2e-stage5-writer-application (covers: test_e2e_lifecycle (Stage 5))",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--resume",
+    "<ws>/applications/writer-staff-infra-resume.md",
+    "--letter",
+    "<ws>/applications/writer-staff-infra-cover-letter.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/writer-staff-infra-application.md": "# Application: Writer\n\n## Standard\n- S001 cited\n",
+  "applications/writer-staff-infra-cover-letter.md": "# Cover Letter — Writer\n\nDear Hiring Team,\n\nI am writing to express my strong interest in the Staff Infrastructure Engineer role at Writer.\n",
+  "applications/writer-staff-infra-resume.md": "# Alex Chen — Staff Systems Engineer\n\n## Experience\n### Principal Infrastructure Engineer — CloudScale Inc (2021–Present)\n- Architected distributed event stream processing 50M events/day with 99.99% availability.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME writer-staff-infra-resume.md: pass (0 fail, 0 warn)\n\nLETTER writer-staff-infra-cover-letter.md: pass (0 fail, 1 warn)\n  [WARN] letter is 19 words — patterns.md § Cover letter wants 250-400\n\n✔ mechanical checks clean\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

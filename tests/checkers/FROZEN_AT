@@ -1,0 +1,5 @@
+python: Python 3.14.0
+commit: 051a529dbddd4fab0c9f54e0eda1541c64a123fa
+date: 2026-09-27
+platform: darwin-arm64
+clock: 2026-09-23T12:34:56+00:00 (writers; datetime frozen as tests/checkers-parity/extra.mjs does)

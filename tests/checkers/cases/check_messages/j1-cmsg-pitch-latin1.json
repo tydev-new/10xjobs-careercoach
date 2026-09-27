@@ -1,0 +1,31 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): invalid UTF-8 in pitch.md: Python crashes",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "contacts/acme.md": "> Hi Sam, saw your eval write-up. Would love to connect.\n",
+  "pitch.md": {
+   "base64": "IyMgTWVzc2FnZXMgcnVicmljCmNhZukK"
+  }
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "Traceback (most recent call last):",
+   "stderrMatch": "first-line",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

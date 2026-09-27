@@ -346,7 +346,7 @@ async function context(opts: { width?: number; height?: number; reducedMotion?: 
         for (const e of list.getEntries() as any[]) {
           if (e.hadRecentInput) continue;
           w.__cls += e.value;
-          w.__shifts.push(`${e.value.toFixed(4)} ${(e.sources ?? []).map((s: any) => s.node?.className || s.node?.nodeName).join(",")}`);
+          w.__shifts.push(`${e.value.toFixed(4)} ${(e.sources ?? []).map((s: any) => s.node?.getAttribute?.("class") || s.node?.nodeName).join(",")}`);
         }
       }).observe({ type: "layout-shift", buffered: true });
     } catch {
@@ -422,6 +422,20 @@ function screens(): { name: string; open: (ctx: BrowserContext) => Promise<Page>
         return p;
       },
     });
+  // The gate while it still waits for the typed yes (every fixture above is
+  // played to its end, where gate-moment's gate is already approved).
+  out.push({
+    name: "fixture:gate-moment-pending",
+    open: async (ctx) => {
+      const p = await openApp(ctx, "gate-moment");
+      const first = fx("gate-moment").messages.find((m: any) => m.role === "user").parts.find((x: any) => x.type === "text").text;
+      await p.locator(".composer-input").fill(first);
+      await p.locator(".composer-input").press("Enter");
+      await p.waitForFunction(() => /needs-you/.test(document.querySelector(".avatar")?.className ?? ""), null, { timeout: 60000 });
+      await p.waitForTimeout(300);
+      return p;
+    },
+  });
   for (const k of PREVIEWS) out.push({ name: `preview:${k}`, open: (ctx) => openPreview(ctx, k) });
   out.push({
     name: "mock:menu-open",
@@ -567,6 +581,17 @@ async function styleUnder(page: Page, id: string, forced: string[]) {
   return s;
 }
 const differs = (a: Record<string, string>, b: Record<string, string>) => ["bg", "color", "shadow", "border", "deco", "opacity", "transform"].some((k) => a[k] !== b[k]);
+
+/** Wait until every finite animation has finished (a dialog's § 5.6
+ *  entrance, translateY(8px) scale(0.98)), so a box is measured at its end
+ *  state, not mid-entrance. Infinite ones (a spinner) never settle and never
+ *  resize a box, so they're skipped. Same posture as P8's phoneCheck. */
+async function settle(page: Page) {
+  await page.evaluate(async () => {
+    const finite = () => document.getAnimations().filter((a) => a.playState !== "finished" && Number(a.effect?.getComputedTiming().endTime) !== Infinity);
+    for (let i = 0; i < 5 && finite().length; i++) await Promise.all(finite().map((a) => a.finished.catch(() => undefined)));
+  });
+}
 
 async function shot(page: Page, name: string) {
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${name}.png`), fullPage: false });
@@ -722,6 +747,37 @@ test("375px: no horizontal scroll on any screen (every fixture played, the previ
   assert.deepEqual(bad, []);
 });
 
+test("375px: no word is broken across two lines on any screen (§ 1.2: everything renders and is usable at 375px) — e.g. the gate's 'Type yes below'", async () => {
+  const bad: string[] = [];
+  for (const s of screens()) {
+    const ctx = await context({ width: 375, height: 812 });
+    const page = await s.open(ctx);
+    await settle(page);
+    const broken = await page.evaluate(() => {
+      const out: string[] = [];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        const el = n.parentElement!;
+        // long tokens (URLs, paths, raw tool output) may break by design (rule 11)
+        if (el.closest("pre, script, style, .fixture-picker, [aria-hidden=true]")) continue;
+        const cs = getComputedStyle(el);
+        if (cs.visibility !== "visible" || !el.getClientRects().length) continue;
+        for (const m of (n.textContent ?? "").matchAll(/[A-Za-z]{2,20}/g)) {
+          const r = document.createRange();
+          r.setStart(n, m.index!);
+          r.setEnd(n, m.index! + m[0].length);
+          const tops = new Set(Array.from(r.getClientRects()).filter((x) => x.width > 0).map((x) => Math.round(x.top)));
+          if (tops.size > 1) out.push(`"${m[0]}" in ${el.tagName.toLowerCase()}.${(el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean).join(".")}`);
+        }
+      }
+      return out;
+    });
+    for (const b of new Set(broken)) bad.push(`${s.name}: ${b}`);
+    await ctx.close();
+  }
+  assert.deepEqual(bad, []);
+});
+
 test(":focus-visible on every control: keyboard focus shows § 5.6's ring (2px solid --focus, offset 2px) or, on a text field, the --fg edge plus the halo", async () => {
   const focusRgb = Object.values(rgbOf(hex("--focus"))).join(", ");
   const bad: string[] = [];
@@ -816,10 +872,12 @@ test("loading buttons keep their size and their label (§ 5.6: 'A button never c
   await page.locator(".menu-trigger").click();
   await page.getByRole("menuitem", { name: /Delete my beta data/ }).click();
   const del = page.locator(".delete-confirm-actions button[type=submit]");
+  await settle(page);
   const b0 = { box: await del.boundingBox(), text: (await del.textContent())?.trim() };
   await page.locator("[role=dialog] input").fill("yes");
   await del.click();
   await page.waitForTimeout(200);
+  await settle(page);
   const b1 = { box: await del.boundingBox(), text: (await del.textContent())?.trim(), busy: await del.getAttribute("aria-busy") };
   if (b0.text !== b1.text) bad.push(`delete submit label "${b0.text}" -> "${b1.text}"`);
   if (Math.round(b0.box!.width) !== Math.round(b1.box!.width) || Math.round(b0.box!.height) !== Math.round(b1.box!.height)) bad.push(`delete submit size ${b0.box!.width}x${b0.box!.height} -> ${b1.box!.width}x${b1.box!.height}`);
@@ -830,10 +888,12 @@ test("loading buttons keep their size and their label (§ 5.6: 'A button never c
   await page.locator(".menu-trigger").click();
   await page.getByRole("menuitem", { name: /password/i }).click();
   const save = page.locator(".delete-confirm-actions button[type=submit]");
+  await settle(page);
   const p0 = { box: await save.boundingBox(), text: (await save.textContent())?.trim() };
   for (const i of await page.locator("[role=dialog] input[type=password]").all()) await i.fill("correct-horse-battery");
   await save.click();
   await page.waitForTimeout(200);
+  await settle(page);
   const p1 = { box: await save.boundingBox(), text: (await save.textContent())?.trim(), busy: await save.getAttribute("aria-busy") };
   if (p0.text !== p1.text) bad.push(`password save label "${p0.text}" -> "${p1.text}"`);
   if (Math.round(p0.box!.width) !== Math.round(p1.box!.width)) bad.push(`password save width ${p0.box!.width} -> ${p1.box!.width}`);
@@ -884,6 +944,31 @@ test("dialogs: z-index 50 over --scrim, radius 18px, min(460px, 100% - 32px) wid
       }
       await ctx.close();
     }
+  assert.deepEqual(bad, []);
+});
+
+test("dialogs: focus still returns to the opener when the page re-renders while the dialog is open (RealChatShell passes a new inline onClose each render)", async () => {
+  const bad: string[] = [];
+  for (const [d, opener, openIt] of [
+    ["buy-credit", ".balance-chip--button", async (p: Page) => p.locator(".balance-chip--button").press("Enter")],
+    ["delete", ".menu-trigger", async (p: Page) => (await p.locator(".menu-trigger").press("Enter"), p.getByRole("menuitem", { name: /Delete my beta data/ }).press("Enter"))],
+    ["password", ".menu-trigger", async (p: Page) => (await p.locator(".menu-trigger").press("Enter"), p.getByRole("menuitem", { name: /password/i }).press("Enter"))],
+  ] as const) {
+    const ctx = await context();
+    const page = await openHarness(ctx, "scene=shell&rerender=1");
+    await page.locator(opener).focus();
+    await openIt(page);
+    await page.locator("[role=dialog]").waitFor();
+    await page.waitForTimeout(800); // several parent re-renders while open
+    for (let i = 0; i < 12; i++) await page.keyboard.press("Tab");
+    if (!(await page.evaluate(() => !!document.activeElement?.closest("[role=dialog]")))) bad.push(`${d}: focus left the dialog after re-renders`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(150);
+    if ((await page.locator("[role=dialog]").count()) !== 0) bad.push(`${d}: Escape does not close it after re-renders`);
+    else if (!(await page.evaluate((sel) => document.activeElement === document.querySelector(sel), opener)))
+      bad.push(`${d}: focus went to ${await page.evaluate(() => { const a = document.activeElement; return a ? `${a.tagName.toLowerCase()}.${a.getAttribute("class") ?? ""}` : "none"; })}, not the opener ${opener}`);
+    await ctx.close();
+  }
   assert.deepEqual(bad, []);
 });
 

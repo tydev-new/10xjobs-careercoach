@@ -14,7 +14,7 @@
 //                 resolves (so "save" stays in its loading state).
 //   ?scene=kit    the shared § 5.6 shapes Stage 1 defines for reuse (.btn
 //                 variants, toast, skeleton, badges, brand mark, wordmark).
-import { StrictMode, useState, type ReactElement } from "react";
+import { StrictMode, useEffect, useState, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 import "@fontsource-variable/bricolage-grotesque";
 import "@fontsource-variable/inter";
@@ -51,6 +51,16 @@ const params = new URLSearchParams(location.search);
 function Shell(): ReactElement {
   const [dialog, setDialog] = useState<"buy" | "delete" | "password" | null>(null);
   const balance = params.get("balance") === "0" ? 0 : 4.2;
+  // `&rerender=1`: the shell re-renders every 250ms while mounted, as
+  // RealChatShell does while a dialog is open (a balance refresh, a save
+  // status, a version check). Each dialog gets a NEW inline onClose on
+  // every render, exactly as RealChatShell.tsx passes them.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (params.get("rerender") !== "1") return;
+    const id = setInterval(() => setTick((t) => t + 1), 250);
+    return () => clearInterval(id);
+  }, []);
   return (
     <div className="app-root" data-theme="light">
       <div className="app-shell">

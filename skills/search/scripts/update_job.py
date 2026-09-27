@@ -46,7 +46,7 @@ def main():
     else:
         r["dismissed"] = False
         action = "restored"
-    jm.save(a.workspace, rows)
+    jm.save(a.workspace, rows, write_key=jm.key(r))
     print(f"updated: {r['company']} — {r['title']} — {action}")
     return 0
 

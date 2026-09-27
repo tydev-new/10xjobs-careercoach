@@ -96,6 +96,21 @@ else
   say FAIL "still define their own vault_lock/vault_unlock (the race this fixed):$stray"; fail=1
 fi
 
+# 8. No real browser in a harness run (owner ruling 2026-09-26): lib_env.sh
+#    points RENDER_RESUME_CHROME at the harness's own fake, and that fake
+#    exists and is executable — a runner without this wired in would let
+#    render_resume.py's to_pdf() reach for a REAL headless Chrome again.
+if grep -q 'RENDER_RESUME_CHROME=' "$ROOT/lib_env.sh"; then
+  say ok "lib_env.sh points RENDER_RESUME_CHROME at the harness fake"
+else
+  say FAIL "lib_env.sh does not export RENDER_RESUME_CHROME — a runner will launch REAL Chrome"; fail=1
+fi
+if [ -x "$ROOT/fixtures/fake-chrome" ]; then
+  say ok "fixtures/fake-chrome present and executable"
+else
+  say FAIL "fixtures/fake-chrome is missing or not executable"; fail=1
+fi
+
 echo
 [ "$fail" = 0 ] && echo "PREFLIGHT CLEAN" || echo "PREFLIGHT FAILED — fix before trusting results"
 exit $fail

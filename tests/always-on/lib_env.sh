@@ -75,6 +75,23 @@ set -u
 # thing. See tests/always-on/guard-bin/pkill for the full reasoning.
 export PATH="$ROOT/guard-bin:$PATH"
 
+# --- No real browser in a harness run (owner ruling 2026-09-26) ------------
+# The incident above started because render_resume.py's PDF step launched a
+# REAL headless Chrome even inside a test session, and that Chrome hung
+# (see its docstring). An earlier plan isolated the whole harness under a
+# separate macOS user so a hang could be killed without touching the
+# owner's own processes; the owner replaced that plan with a simpler fix:
+# give a harness run no real browser to hang in the first place.
+# render_resume.py's to_pdf() reads RENDER_RESUME_CHROME ONLY when its
+# caller passes no explicit `chrome=` argument, so this is a no-op outside
+# this harness (the var is unset in production). fixtures/fake-chrome
+# writes a small, realistically-sized PDF immediately and exits 0 — there
+# is nothing left for an agent under test to "fix" with a kill. This
+# removes the TRIGGER; the guards below (PATH shims, then the permission
+# layer) are defense in depth for anything else an agent under test might
+# still try, real Chrome or not.
+export RENDER_RESUME_CHROME="$ROOT/fixtures/fake-chrome"
+
 # --- Kill-command permission guard, second layer (2026-09-27 review) ------
 # Independent review of the PATH guard above (0b748cb, probe_guards.sh)
 # found it bypassable: an absolute path (/usr/bin/pkill), a numeric kill of

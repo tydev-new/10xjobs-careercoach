@@ -169,15 +169,20 @@ def test_to_pdf_no_chrome_found_is_unchanged():
     # have this test silently launch it against tmp paths that don't
     # exist (that produced a stray real PDF in the repo worktree once;
     # never again — chrome=None alone isn't enough, since to_pdf falls
-    # back to the real find_chrome() when no explicit chrome is given).
+    # back to RENDER_RESUME_CHROME, then the real find_chrome(), when no
+    # explicit chrome is given).
     html = tempfile.mktemp(suffix=".html")
     pdf = tempfile.mktemp(suffix=".pdf")
     real_find_chrome = rr.find_chrome
     rr.find_chrome = lambda: None
+    had_env = "RENDER_RESUME_CHROME" in os.environ
+    saved_env = os.environ.pop("RENDER_RESUME_CHROME", None)
     try:
         ok, err = rr.to_pdf(html, pdf, chrome=None)
     finally:
         rr.find_chrome = real_find_chrome
+        if had_env:
+            os.environ["RENDER_RESUME_CHROME"] = saved_env
     assert ok is False
     assert "no Chrome/Chromium found" in err
     assert not os.path.exists(pdf)

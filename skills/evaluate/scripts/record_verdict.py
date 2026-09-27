@@ -11,10 +11,21 @@ AI" != "Baseten" — canon() strips inc/llc/labs, not "AI").
 Storage moved from jobs.db to jobs.md 2026-08-14; the shared record library
 lives with the search skill (the pipeline's writer of first entry).
 
+`--analysis-file` records the evaluate decode (`jd-analysis/`); the LATEST
+value given wins, unlike `--jd-file` (the raw posting), which keeps the
+first. `--existing` is the search quick pass's write: the role must
+already be a row with the same (company, title) key — nothing is created,
+and `--url`/`--location`/`--jd-file` are refused, so a quick pass can never
+create a second, model-typed row or replace the link/location the board
+supplied.
+
   python3 record_verdict.py --workspace . --company "Writer" \
     --title "Director, solutions architecture" --verdict investable_stretch \
     --score 85 --reasons "..." --dealbreakers "..." --url "..." \
     --jd-file "jd-analysis/..." --company-file "company/writer.md"
+  python3 record_verdict.py --workspace . --company "Writer" \
+    --title "Director, solutions architecture" --verdict long_shot \
+    --score 40 --reasons "quick-scan: ..." --existing
 """
 import argparse, os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -40,11 +51,16 @@ def main():
     p.add_argument("--url")
     p.add_argument("--location")
     p.add_argument("--jd-file", dest="jd_file")
+    p.add_argument("--analysis-file", dest="analysis_file")
     p.add_argument("--company-file", dest="company_file")
     p.add_argument("--track", choices=TRACKS)
+    p.add_argument("--existing", action="store_true")
     a = p.parse_args()
     if a.score is not None and not (0 <= a.score <= 100):
         print("error: --score must be 0-100", file=sys.stderr)
+        return 2
+    if a.existing and (a.url is not None or a.location is not None or a.jd_file is not None):
+        print("error: --existing refuses --url/--location/--jd-file", file=sys.stderr)
         return 2
 
     rows = jm.load(a.workspace)
@@ -52,6 +68,9 @@ def main():
     k = (jm.canon(a.company), jm.canon(a.title))
     row = next((r for r in rows if jm.key(r) == k), None)
     existed = row is not None
+    if a.existing and not existed:
+        print(f"error: no role {a.company} — {a.title} in jobs.md; nothing written", file=sys.stderr)
+        return 2
     if not existed:
         row = {"company": a.company, "title": a.title, "stage": "To Review",
                "dismissed": False, "seen_at": now}
@@ -62,10 +81,11 @@ def main():
     row["url"] = a.url or row.get("url")
     row["location"] = a.location or row.get("location")
     row["jd_file"] = row.get("jd_file") or a.jd_file
+    row["analysis_file"] = a.analysis_file or row.get("analysis_file")
     row["company_file"] = a.company_file or row.get("company_file")
     row["track"] = a.track or row.get("track")
     row["evaluated_at"] = row["updated_at"] = now
-    jm.save(a.workspace, rows)
+    jm.save(a.workspace, rows, write_key=k)
     how = "updated existing role" if existed else "created NEW role"
     print(f"recorded ({how}): {row['company']} — {row['title']} → {a.verdict} ({a.score})")
     return 0

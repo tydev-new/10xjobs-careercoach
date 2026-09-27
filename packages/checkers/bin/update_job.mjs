@@ -9,4 +9,9 @@ const now = frozen ? () => new Date(frozen) : undefined;
 const { stdout, stderr, exitCode } = await run(process.argv.slice(2), nodeIo, now);
 if (stdout) process.stdout.write(stdout);
 if (stderr) process.stderr.write(stderr);
-process.exit(exitCode);
+// process.exitCode (never process.exit()): exit() can cut a piped
+// stdout/stderr write off mid-flush before the pipe drains (a real
+// hazard the parity harness and any shell pipeline both hit) —
+// setting exitCode lets Node finish flushing, then exit naturally
+// once the event loop empties.
+process.exitCode = exitCode;

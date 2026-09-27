@@ -152,8 +152,22 @@ def to_pdf(html_path, pdf_path, chrome=None, timeout=90):
     own process group, killed as a group on timeout — never a name-based
     pkill/killall of anything else on the machine; (3) a real subprocess
     handle so a timeout is reported as plain text, never an exception.
+
+    RENDER_RESUME_CHROME (owner ruling 2026-09-26, replacing the test-user
+    isolation plan): the always-on harness must never launch a REAL browser
+    at all — that's what hung in the first place, and a live test session
+    "fixing" a hang is the incident above. A harness runner sets this env
+    var to point at its own fake (tests/always-on/fixtures/fake-chrome),
+    which writes a small, realistically-sized PDF immediately and never
+    hangs — so the timeout/process-group fixes above are what protect a
+    REAL candidate run (RENDER_RESUME_CHROME unset), never exercised in
+    the harness by design. It is read ONLY when the caller does not pass
+    an explicit `chrome=` argument — an explicit argument (e.g. a script's
+    own test, or a future caller with a specific need) always wins, and
+    this whole branch is a no-op in production (the var is unset outside
+    the harness), so this never changes behaviour for a real candidate run.
     """
-    chrome = chrome or find_chrome()
+    chrome = chrome or os.environ.get("RENDER_RESUME_CHROME") or find_chrome()
     if not chrome:
         return False, "no Chrome/Chromium found — see references/patterns.md § The PDF (the conversion ladder)"
     profile_dir = tempfile.mkdtemp(prefix="render-resume-chrome-profile-")

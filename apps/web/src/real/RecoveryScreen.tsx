@@ -75,8 +75,10 @@ export function RecoveryScreen({ client, email, onSignOut, onContinue }: Recover
           ) : null}
           {form.info ? <p className="sign-in-sent">{form.info}</p> : null}
           {form.error ? <p className="sign-in-error">{form.error}</p> : null}
-          <button type="submit" disabled={form.saving}>
-            {form.saving ? "Saving…" : "Save password"}
+          {/* design-web-ui.md § 5.6, "Buttons — Loading": never a size or
+              label change while loading — aria-busy carries it. */}
+          <button type="submit" disabled={form.saving} aria-busy={form.saving ? "true" : undefined}>
+            Save password
           </button>
           {form.phase === "code" ? (
             <button

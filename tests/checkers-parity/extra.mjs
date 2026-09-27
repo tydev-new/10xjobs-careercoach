@@ -537,6 +537,125 @@ const LONG = ("word ".repeat(4000)).trim();
   add({ s, id: "r4-cc-waiting-then-h1-title-leak-fails", files: { "plan.md": TITLE_AFTER }, args: ["--workspace", ".", "--stage", "applying", "--asked", "follow up on the timer"] });
 }
 
+// ------------------------------------------------------------------ round 6 (coder, design-web-search.md § 4.3 / S1)
+// jobs_md's B2 sanitising, the new `Analysis` field, and record_verdict's
+// `--existing` — proved end to end through the real CLI, across all three
+// engines (py, jsbin, jsbash).
+{
+  const s = "record_verdict";
+  const RV = (extra) => ["--workspace", ".", "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong", ...extra];
+  const JOBS_WITH_ROW = (extraFields = "") =>
+    "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n" +
+    "## To Review\n\n### Acme — Staff Engineer\n- URL: https://board/acme\n- Location: Remote\n" +
+    "- Seen: 2026-01-01T00:00:00+00:00\n" + extraFields + "\n";
+
+  add({ s, id: "s1-rv-em-dash-company-rewritten", files: {},
+    args: ["--workspace", ".", "--company", "A — B", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-newline-and-fake-heading-in-title-collapses", files: {},
+    args: ["--workspace", ".", "--company", "RealCo", "--title", "Engineer\n## Offer\n### Evil Co — Row\n- URL: https://evil.example", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-analysis-file-latest-wins-jd-file-keeps-first",
+    files: { "jobs.md": JOBS_WITH_ROW("- JD: jd-inbox/old.md\n- Analysis: jd-analysis/old.md\n") },
+    args: RV(["--jd-file", "jd-inbox/new.md", "--analysis-file", "jd-analysis/new.md"]) });
+  add({ s, id: "s1-rv-existing-on-missing-key-exits-2", files: {}, args: [...RV([]), "--existing"] });
+  add({ s, id: "s1-rv-existing-with-url-refused", files: { "jobs.md": JOBS_WITH_ROW() }, args: [...RV(["--url", "http://x"]), "--existing"] });
+  add({ s, id: "s1-rv-existing-with-location-refused", files: { "jobs.md": JOBS_WITH_ROW() }, args: [...RV(["--location", "SF"]), "--existing"] });
+  add({ s, id: "s1-rv-existing-with-jd-file-refused", files: { "jobs.md": JOBS_WITH_ROW() }, args: [...RV(["--jd-file", "jd-inbox/x.md"]), "--existing"] });
+  add({ s, id: "s1-rv-existing-on-present-key-changes-only-verdict-and-timestamps",
+    files: { "jobs.md": JOBS_WITH_ROW("- Company file: company/acme.md\n- Track: A\n") },
+    args: [...RV(["--score", "62", "--reasons", "quick-scan: fits"]), "--existing"] });
+  add({ s, id: "s1-rv-multiline-search-notes-untouched-by-reverdict",
+    files: { "jobs.md": JOBS_WITH_ROW() + "## Search notes\n\nline one\n\n  line two, indented\nline three\n" },
+    args: RV(["--score", "70"]) });
+
+  // LEAD spec amendments (S1 review, findings 6 and 8; design-web-search.md § 4.3)
+  add({ s, id: "s1-rv-company-ending-in-em-dash-rewritten", files: {},
+    args: ["--workspace", ".", "--company", "Acme —", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-company-two-em-dashes-one-trailing", files: {},
+    args: ["--workspace", ".", "--company", "A — B —", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-refuses-empty-title-after-cleaning", files: {},
+    args: ["--workspace", ".", "--company", "Acme", "--title", "   ", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-refuses-empty-company-after-cleaning", files: {},
+    args: ["--workspace", ".", "--company", "\t\n", "--title", "Role", "--verdict", "weak"] });
+  add({ s, id: "s1-rv-refuses-empty-company-with-existing-file-present", files: { "jobs.md": JOBS_WITH_ROW() },
+    args: ["--workspace", ".", "--company", " ", "--title", "New Role", "--verdict", "weak"] });
+
+  // LEAD ruling (S1 review, third pass): the empty-name refusal applies
+  // only to the row this call writes; a pre-existing row (here a legacy
+  // heading with no ` — ` separator, so its title parses as empty) is
+  // written back exactly as read — an old row must never lock every write.
+  add({ s, id: "s1-rv-legacy-row-with-no-em-dash-untouched-by-unrelated-write",
+    files: {
+      "jobs.md":
+        "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme Staff Engineer\n" +
+        "- Seen: 2026-01-01T00:00:00+00:00\n\n",
+    },
+    args: ["--workspace", ".", "--company", "Beta", "--title", "PM", "--verdict", "weak"] });
+}
+
+// ------------------------------------------------------------------ round 7 (tester, design-web-search.md § 4.3 / S1)
+// Written from the design, not the code: every character of § 4.3's
+// whitespace class in a title fresh off argv; characters OUTSIDE the class
+// (the `\s` gaps § 4.4 names) kept; the class again after a load() round
+// trip (a jobs.md already holding U+2028/U+2029/NEL/VT/FF); CRLF; the
+// company em dash variants; a Search notes block with every awkward byte;
+// and the --existing edges (empty values refused, a canonical variant of
+// the key, the abbreviation argparse accepts). Engine parity on each,
+// including jsbash, the path the web ships.
+{
+  const s = "record_verdict";
+  const HEAD = "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\n" +
+    "record_verdict.py judges) \u2014 read it anywhere; change it via chat so\n" +
+    "the duplicate-key check can protect it. Dismissed roles keep their\n" +
+    "history at the bottom; nothing is ever deleted.*\n\n**Active: 2** \u00b7 dismissed: 0 \u00b7 updated 2026-01-01\n\n";
+  const ROWS = "## To Review\n\n### Acme \u2014 Staff Engineer\n- URL: https://boards.greenhouse.io/acme/jobs/1\n" +
+    "- Location: Remote\n- Posted: 2026-01-02\n- Seen: 2026-01-01T00:00:00+00:00\n- Verdict: weak\n- Score: 10\n" +
+    "- Reason: old\n- Track: B\n- JD: jd-inbox/acme.md\n- Analysis: jd-analysis/acme-old.md\n" +
+    "- Company file: company/acme.md\n- Evaluated: 2026-01-01T00:00:00+00:00\n\n" +
+    "## Interested\n\n### Beta \u2014 PM\n- URL: https://b/1\n- Seen: 2026-01-01T00:00:00+00:00\n";
+  const SEED = HEAD + ROWS;
+  const RV = (extra) => ["--workspace", ".", "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong", ...extra];
+  const CLASS = { sp: " ", tab: "\t", lf: "\n", cr: "\r", ff: "\f", vt: "\v", nel: "\u0085", nbsp: "\u00a0", u2028: "\u2028", u2029: "\u2029" };
+  for (const [n, ch] of Object.entries(CLASS)) {
+    add({ s, id: `s1t-rv-class-${n}-in-title-and-reason`, files: {},
+      args: ["--workspace", ".", "--company", `${ch}Acme${ch}${ch}Co${ch}`, "--title", `${ch}Staff${ch}${ch}Engineer${ch}`,
+        "--verdict", "weak", "--reasons", `${ch}a${ch}${ch}b${ch}`] });
+  }
+  const OUTSIDE = { x1c: "\x1c", x1f: "\x1f", u1680: "\u1680", u2000: "\u2000", u202f: "\u202f", u3000: "\u3000", ufeff: "\ufeff", u200b: "\u200b" };
+  for (const [n, ch] of Object.entries(OUTSIDE)) {
+    add({ s, id: `s1t-rv-outside-class-${n}-kept`, files: {},
+      args: ["--workspace", ".", "--company", "Acme", "--title", `Staff${ch}Engineer`, "--verdict", "weak", "--reasons", `a${ch}${ch}b`] });
+  }
+  add({ s, id: "s1t-rv-line-separators-after-load-round-trip", files: {
+      "jobs.md": SEED.replace("### Acme \u2014 Staff Engineer", "### Acme \u2014 Staff\u2028Engineer\u0085Lead")
+        .replace("- Location: Remote", "- Location: San\u2028\u2029Francisco\vCA\fUS") },
+    args: ["--workspace", ".", "--company", "Acme", "--title", "Staff Engineer Lead", "--verdict", "weak"] });
+  add({ s, id: "s1t-rv-crlf-file-round-trip", files: { "jobs.md": SEED.split("\n").join("\r\n") }, args: RV([]) });
+  for (const [n, company] of Object.entries({ spaced: "A \u2014 B", runs: "A \t\u2014\n B", nbsp: "A\u00a0\u2014\u00a0B", two: "A \u2014 B \u2014 C", nospace: "A\u2014B" })) {
+    add({ s, id: `s1t-rv-company-em-dash-${n}`, files: {}, args: ["--workspace", ".", "--company", company, "--title", "Director \u2014 Platform", "--verdict", "weak"] });
+  }
+  add({ s, id: "s1t-rv-search-notes-awkward-bytes-untouched", files: {
+      "jobs.md": SEED + "\n## Search notes\n\n### 2026-01-01\n\nline one  \n\ttabbed\n\n\n  indented\n" +
+        "- a bullet: with a colon\n### Evil Co \u2014 Row\nsep\u2028inside\u2029here \u0085nel\n\nlast line\n" },
+    args: RV(["--score", "70"]) });
+  add({ s, id: "s1t-rv-existing-missing-key-file-present", files: { "jobs.md": SEED },
+    args: ["--workspace", ".", "--company", "Gamma", "--title", "Data Lead", "--verdict", "weak", "--existing"] });
+  for (const flag of ["--url", "--location", "--jd-file"]) {
+    add({ s, id: `s1t-rv-existing-refuses-empty${flag}`, files: { "jobs.md": SEED }, args: [...RV([flag, ""]), "--existing"] });
+  }
+  add({ s, id: "s1t-rv-existing-refusal-wins-on-missing-key", files: { "jobs.md": SEED },
+    args: ["--workspace", ".", "--company", "Gamma", "--title", "X", "--verdict", "weak", "--existing", "--url", "u"] });
+  add({ s, id: "s1t-rv-existing-canonical-variant-of-key", files: { "jobs.md": SEED },
+    args: ["--workspace", ".", "--company", "ACME, Inc", "--title", "staff  engineer", "--verdict", "long_shot",
+      "--score", "40", "--reasons", "quick-scan: fits", "--dealbreakers", "none", "--existing"] });
+  add({ s, id: "s1t-rv-existing-abbreviated-flag", files: { "jobs.md": SEED }, args: [...RV(["--score", "40"]), "--exist"] });
+  add({ s, id: "s1t-rv-existing-with-explicit-value-is-usage-error", files: { "jobs.md": SEED }, args: [...RV([]), "--existing=1"] });
+  add({ s, id: "s1t-rv-analysis-file-twice-in-one-call-last-wins", files: { "jobs.md": SEED },
+    args: RV(["--analysis-file", "jd-analysis/a.md", "--analysis-file", "jd-analysis/b.md"]) });
+  add({ s, id: "s1t-rv-analysis-file-empty-keeps-old", files: { "jobs.md": SEED }, args: RV(["--analysis-file", ""]) });
+  add({ s, id: "s1t-rv-long-title-with-whitespace-runs", files: {},
+    args: ["--workspace", ".", "--company", "Acme", "--title", "Principal \n\t Engineer ".repeat(1500), "--verdict", "weak"] });
+}
+
 // ------------------------------------------------------------------ engines
 function seed(ws, c) {
   rmSync(ws, { recursive: true, force: true });

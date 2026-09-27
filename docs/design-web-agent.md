@@ -255,15 +255,22 @@ Nothing is thrown into the stream.
 
 | tool | input | output |
 |---|---|---|
-| `load_skill` | `{ name: "profile" \| "evaluate" \| "apply" \| "coach" }` | `{ path, content }` (§ 7) |
+| `load_skill` | `{ name: "profile" \| "evaluate" \| "apply" \| "coach" \| "search" }` | `{ path, content }` (§ 7) |
 | `read_file` | `{ path }` (workspace path, or `skills/…`) | `{ path, content, readOnly }`; `.pdf`/`.docx` → `unsupported_type` (no extractor yet) |
 | `write_file` | `{ path, content }` | `{ path, written: true }`, or `version_conflict` / `read_first` / `not_editable` |
 | `list_files` | `{ dir? }` | `{ files: { path, size, updatedAt }[] }` |
 | `bash` | `{ command }` | `{ stdout, stderr, exitCode, changed: string[] }` |
-| `web_search` | `{ query, maxResults? (≤ 5) }` | `{ results: [{ url, title, excerpt }] }` |
+| `web_search` | `{ query, maxResults? (≤ 5), jobBoardsOnly? }` | `{ results: [{ url, title, excerpt }] }` (`design-web-search.md` § 4.5) |
 | `fetch_job` | `{ url, saveTo? }` | `{ board, company, title, location, url, text, compensation?, savedTo? }` or `unsupported_url` |
+| `list_board` | see `design-web-search.md` § 4.1 | see `design-web-search.md` § 4.1 |
+| `add_roles` | see `design-web-search.md` § 4.2 | see `design-web-search.md` § 4.2 |
 | `estimate_cost` | `{ action (≤ 6 words), steps, webSearches, items? (≤ 8, each ≤ 12 words) }` | `{ action, lowUsd, highUsd, balanceUsd, needsGate, method }`; opens the gate when `needsGate` (§ 3) |
 | `check_language` | `{ files }` → `{ report, usd }` | adopted by the owner, 2026-09-22 |
+
+`list_board`, `add_roles` and a `jobBoardsOnly` search refuse with
+`estimate_first` until `estimate_cost` ran this turn
+(`design-web-search.md` § 4.7). The three board tools share a budget of
+60 board requests per turn (§ 4.8 there).
 
 - **Versions are tracked by the package**, per chat and path, from
   `read_file`, `write_file` and `bash` write-backs. An existing file the chat
@@ -382,7 +389,7 @@ into `tests/run.py`, plus the coverage check.
 |---|---|---|
 | text | `text` | SDK standard |
 | tool activity | `tool-<name>` | SDK standard; states `input-streaming`, `input-available`, `output-available`, `output-error` |
-| card | `data-card` | `{ card: "verdict" \| "plan" \| "document" \| "checker" \| "cost", props, ref? }`, from code only (§ 6.2) |
+| card | `data-card` | `{ card: "verdict" \| "plan" \| "document" \| "checker" \| "cost" \| "search", props, ref? }`, from code only (§ 6.2) |
 | gate | `data-gate` | `GateRequest` (§ 3) |
 | gate status | `data-gate-status` | `{ gateId, status }`; the latest one wins |
 | error | `data-error` | `{ code: "over_balance" \| "model_error" \| "tool_error" \| "offline" \| "step_cap" \| "cut_off" \| "too_large", message, retryable }` (`cut_off`: § 9.3; `too_large`: § 12.2; both amended 2026-09-24) |
@@ -442,14 +449,15 @@ this table. A card is a
 | after | card | props from | `ref` |
 |---|---|---|---|
 | `estimate_cost` | `cost` | the result: `action`, `lowUsd`, `highUsd`, `balanceUsd` | - |
-| `bash` `record_verdict.py`, exit 0 (every one) | `verdict` | the `jobs.md` row it wrote, via the `jobs_md` port: company, title, tier, score, track, `fit_reason` and dealbreakers word for word | the row's `jd_file` |
+| `bash` `record_verdict.py`, exit 0 (every one) | `verdict` | the `jobs.md` row it wrote, via the `jobs_md` port: company, title, tier, score, track, `fit_reason` and dealbreakers word for word | the row's `analysis_file` |
 | `bash` `check_materials.py` | `checker`, one per file | stdout: `LABEL name: pass\|FAIL (n fail, m warn)`, then each `  [LEVEL] msg` line → a finding `{ level: "FAIL" \| "WARN", message: string }`, word for word | the checked file |
 | `bash` `render_resume.py`, exit 0 | `document` | `--md` path; `words` from `words: N  ->  path`; `htmlPath` if inside the workspace; badge = the chat's latest `checker` result for that `.md`, else `not-run` | the `.md` |
 | `bash` `check_closeout.py`, exit 0 | `plan` | `parsePlanTodo(plan.md)` and the `--stage` value | `plan.md` |
+| turn end, when `list_board` or a `jobBoardsOnly` `web_search` ran | `search` | that turn's `list_board`, `add_roles`, `web_search` and `record_verdict.py` results: counts and the boards not read with their reason | - |
 
-- **Verdict `ref`:** `record_verdict` gets `--jd-file` whenever a JD file
-  exists (host note, § 7). With no `jd_file`, the card has no `ref` and shows
-  "no analysis file linked"; it never guesses.
+- **Verdict `ref`:** `record_verdict` gets `--analysis-file` whenever an
+  analysis was written (host note, § 7). With no `analysis_file`, the card
+  has no `ref` and shows "no analysis file linked"; it never guesses.
 - **`parsePlanTodo(md) → { text, ref? }[]`** is pure and exported from
   `packages/agent`. The card builder uses it. (Corrected 2026-09-26: this
   line used to say `apps/workspace-ui`'s `parsePlan` maps from it. It
@@ -485,8 +493,8 @@ cannot produce `data-card`/`data-gate`/`data-gate-status`; `parsePlanTodo` and
      `skills/profile/templates/web-host-note.md` (beside the Tier 0 template,
      so the word report counts it; a `skills/_host/` dir would fail the
      every-skill-is-converted invariant).
-   - **Tier 1:** the `description:` lines of profile, evaluate, apply, and
-     coach.
+   - **Tier 1:** the `description:` lines of profile, evaluate, apply,
+     coach and search.
    - **The tool descriptions:** about 350 words.
 2. **On match:** `load_skill(name)` → the `SKILL.md` with its bundle path.
 3. **On demand:** `read_file("skills/<skill>/references/<file>.md")`.

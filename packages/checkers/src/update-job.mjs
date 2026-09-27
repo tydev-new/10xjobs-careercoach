@@ -50,9 +50,10 @@ export async function run(argv, io, now = () => new Date()) {
     action = "restored";
   }
   try {
-    await jm.save(io, a.workspace, rows, { now });
+    await jm.save(io, a.workspace, rows, { now, writeKey: jm.key(r) });
   } catch (e) {
     if (e instanceof jm.DuplicateKeyError) return { stdout: "", stderr: e.message + "\n", exitCode: 1 };
+    if (e instanceof jm.EmptyFieldError) return { stdout: "", stderr: e.message + "\n", exitCode: 2 };
     throw e;
   }
   return { stdout: restoreLineSeparators(`updated: ${r.company} — ${r.title} — ${action}\n`), stderr: "", exitCode: 0 };

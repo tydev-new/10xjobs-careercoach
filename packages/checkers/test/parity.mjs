@@ -575,6 +575,124 @@ function addCase(c) {
     setup: () => {},
     args: (ws) => ["--workspace", ws],
   });
+
+  // ---- design-web-search.md § 4.3 (S1): jobs_md's B2 sanitising, the new
+  // `Analysis` field, and record_verdict's `--existing`.
+  addCase({
+    script, bin, name: "sanitises-em-dash-in-company",
+    covers: "design-web-search.md § 4.3: a company containing ' — ' round-trips as ' - '",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "A — B", "--title", "Role", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "sanitises-newline-and-fake-heading-in-title",
+    covers: "design-web-search.md § 4.3 (B1, kept): a title carrying a newline and a forged heading/field stays one line, no forged Verdict",
+    setup: () => {},
+    args: (ws) => [
+      "--workspace", ws, "--company", "RealCo",
+      "--title", "Engineer\n## Offer\n### Evil Co — Row\n- URL: https://evil.example",
+      "--verdict", "weak",
+    ],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "analysis-file-latest-wins-jd-file-keeps-first",
+    covers: "design-web-search.md § 4.3/§ 7.1: --analysis-file replaces on every call; --jd-file keeps the first",
+    setup: (ws) =>
+      writeFiles(ws, {
+        "jobs.md":
+          "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n" +
+          "- Seen: 2026-01-01T00:00:00+00:00\n- JD: jd-inbox/old.md\n- Analysis: jd-analysis/old.md\n",
+      }),
+    args: (ws) => [
+      "--workspace", ws, "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong",
+      "--jd-file", "jd-inbox/new.md", "--analysis-file", "jd-analysis/new.md",
+    ],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "existing-missing-key-exits-2",
+    covers: "design-web-search.md § 4.3: --existing on a missing key exits 2 with jobs.md byte-identical (absent)",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong", "--existing"],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "existing-url-refused",
+    covers: "design-web-search.md § 4.3: --existing refuses --url/--location/--jd-file",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong", "--existing", "--url", "http://x"],
+  });
+  addCase({
+    script, bin, name: "existing-on-present-key-changes-only-verdict-fields",
+    covers: "design-web-search.md § 4.3: --existing on a present key changes only the verdict fields and Evaluated/Updated",
+    setup: (ws) =>
+      writeFiles(ws, {
+        "jobs.md":
+          "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n" +
+          "- URL: https://board/acme\n- Location: Remote\n- Seen: 2026-01-01T00:00:00+00:00\n" +
+          "- Company file: company/acme.md\n- Track: A\n",
+      }),
+    args: (ws) => [
+      "--workspace", ws, "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong",
+      "--score", "62", "--reasons", "quick-scan: fits", "--existing",
+    ],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "multiline-search-notes-untouched-by-reverdict",
+    covers: "design-web-search.md § 4.3: a multi-line Search notes block round-trips byte-identical through save()",
+    setup: (ws) =>
+      writeFiles(ws, {
+        "jobs.md":
+          "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n" +
+          "- Seen: 2026-01-01T00:00:00+00:00\n\n## Search notes\n\nline one\n\n  line two, indented\nline three\n",
+      }),
+    args: (ws) => ["--workspace", ws, "--company", "Acme", "--title", "Staff Engineer", "--verdict", "strong", "--score", "70"],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "sanitises-trailing-em-dash-in-company",
+    covers: "design-web-search.md § 4.3 (S1 review, finding 8): a company ENDING in ' —' has that em dash written as '-'",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "Acme —", "--title", "Role", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
+  addCase({
+    script, bin, name: "refuses-empty-title-after-cleaning",
+    covers: "design-web-search.md § 4.3 (S1 review, finding 6): empty after cleaning -> the writer exits 2, jobs.md unchanged",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "Acme", "--title", "   ", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+  });
+  addCase({
+    script, bin, name: "refuses-empty-company-after-cleaning",
+    covers: "design-web-search.md § 4.3 (S1 review, finding 6): empty after cleaning -> the writer exits 2, jobs.md unchanged",
+    setup: () => {},
+    args: (ws) => ["--workspace", ws, "--company", "\t\n", "--title", "Role", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+  });
+  addCase({
+    script, bin, name: "legacy-row-with-no-em-dash-untouched-by-an-unrelated-write",
+    covers: "design-web-search.md § 4.3 (S1 review, LEAD ruling, third pass): the empty-name refusal applies only to the row this call writes; a pre-existing row (here a legacy heading with no ' — ' separator, so its title parses as empty) is written back exactly as read",
+    setup: (ws) =>
+      writeFiles(ws, {
+        "jobs.md":
+          "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme Staff Engineer\n" +
+          "- Seen: 2026-01-01T00:00:00+00:00\n\n",
+      }),
+    args: (ws) => ["--workspace", ws, "--company", "Beta", "--title", "PM", "--verdict", "weak"],
+    diffFiles: ["jobs.md"],
+    freezeClock: true,
+  });
 }
 
 // ---------------------------------------------------------------- update_job.py

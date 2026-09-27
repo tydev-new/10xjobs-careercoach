@@ -430,7 +430,7 @@ Receipt of the `jobs.md` row `record_verdict.py` wrote (C § 6.2, row
 2) — not the prose summary card evaluate's `SKILL.md` still writes in
 the reply; the two intentionally show the same tier twice, once from
 the file and once from the model (C § 6.2, "S8"). `ref` = the row's
-`jd_file`. **Side panel:** opens `ref`. **Copy:** the `verdict` enum
+`analysis_file` (C § 6.2). **Side panel:** opens `ref`. **Copy:** the `verdict` enum
 maps to a display label by a static UI table (`strong` → "Strong Fit",
 etc. — `eval.md`'s four tier names). No `dealbreakers` → the section
 reads "none", never omitted (rule 8). A `reason` beginning
@@ -594,6 +594,15 @@ proxy's "Request too large.":
 
 It is true for the same reason as `step_cap`'s: the next turn starts
 small, and C § 9.4's note sends the model to the files.
+
+### 2.8 search
+
+`props = { boardsRead, boardsNotRead: { company, reason }[],
+postingsLookedAt, matching, alreadyOnList, added, quickPassed,
+webSearches, droppedOffBoard }`, all counts from the turn's tool
+results (C § 6.2). `ref` unset. **Copy:** counts and names only, no
+adjectives; a board read in part says "read 300 of N"; zero is shown
+as 0, never hidden (rule 8). Words go through § 5.9 stage 4.
 
 ## 3. The collapsed "ran …" line
 
@@ -1042,16 +1051,16 @@ a **Dismissed** group, closed by default, with its count.
 Each row shows, as written: `Company — Title`; Verdict through § 2.1's
 static label table (an unknown value is shown as written; no verdict
 shows "Not evaluated yet"); Score as `load()` reads it (a whole number;
-the scripts only write whole numbers, `record_verdict.py:37`); Track; Location; Reason word for
+the scripts only write whole numbers, `record_verdict.py:37`); Track; Location; the date part of Posted; Reason word for
 word, with § 2.1's quick-scan badge when it begins `quick-scan:`;
 Dealbreakers, only on a row with a Verdict, reading "none" when absent
 (§ 2.1); the date part of Seen and Updated; URL under § 5.2 rule 7.
 A dismissed row adds its Dismissed note word for word and the stage it
 was in (`Was`).
 
-Row controls: **Open analysis** opens the row's `JD` file (`jd_file`)
-in the viewer; with none, the row reads "No analysis file linked" (C
-§ 6.2's own wording). **Ask Ten about this** (§ 5.4).
+Row controls: **Open analysis** opens the row's `Analysis` file
+(`analysis_file`) in the viewer; with none, the row reads "No analysis
+file linked" (C § 6.2's own wording). **Ask Ten about this** (§ 5.4).
 
 **The role's detail** (restore ruling). Choosing a row shows its detail
 beside the list (the designer places it, § 5.6; on the phone the detail
@@ -1072,7 +1081,7 @@ bottom, only the parts whose source exists:
    place per fact, rule 12).
 3. **The posting link:** the row's URL under § 5.2 rule 7. The posting's
    text (`jd-inbox/`) is not shown; the ruling names the link only.
-4. **From the analysis file** (the row's `JD` field, as an exact path):
+4. **From the analysis file** (the row's `Analysis` field, as an exact path):
    - **"What they're asking for"**: the section whose heading starts
      `Competency extraction` (evaluate's schema: the top competencies,
      in priority order).
@@ -1106,7 +1115,7 @@ bottom, only the parts whose source exists:
 
 Each section body goes through `MarkdownView`, word for word (§ 5.2
 rule 8). Evaluate's quick-scan tier writes neither file (evaluate
-`SKILL.md:49`), so a row with no `JD` or no `Company file` is normal:
+`SKILL.md:49`), so a row with no `Analysis` or no `Company file` is normal:
 those parts are left out, and the row's own "No analysis file linked"
 line stays. A field that names a file which doesn't exist shows one
 line in that part's place, "<path> isn't in your workspace.", because a
@@ -1121,7 +1130,7 @@ the file, string for string; a quick-scan row shows no analysis or
 company parts; a table test for a missing file, a failing read and a
 file with none of the headings.
 
-**Reads:** `jobs.md`; for the chosen row, its `JD` file and `Company
+**Reads:** `jobs.md`; for the chosen row, its `Analysis` file and `Company
 file`.
 **Parsed by:** `load(io, "")` from `packages/checkers/src/jobs-md.mjs`,
 unchanged, and, for the detail, `splitSections` (**new**, "Pieces the
@@ -1135,8 +1144,8 @@ thrown, so § 5.2 rule 6 can show it); `readFile(p)` returns the text;
 which invents a "next move", a due date and a warm/cool signal
 (`apps/workspace-ui/server/workspace-core.mjs:37-68`), all against
 rule 8.
-**Empty** (no file, or no rows): "No roles yet. Paste a job link or a
-posting's text into the conversation and Ten will evaluate it."
+**Empty** (no file, or no rows): "No roles yet. Ask Ten to look for
+roles, or paste a job link or a posting's text into the conversation."
 
 #### Applications: the materials per role
 
@@ -1174,7 +1183,7 @@ opened. The detail shows only the parts whose source exists:
    already show them, dated by their turn (§ 5.2 rule 5).
 4. **Next, from you:** the plan items, Waiting on you and then To do,
    in file order, whose `ref` (C § 18: the first backticked path) is one
-   of this entry's file paths or the linked row's `JD` path. Each is
+   of this entry's file paths or the linked row's `Analysis` path. Each is
    shown through the plan item (below). No match: the part is left
    out. These are `plan.md`'s own lines, chosen by an exact path match;
    the page never writes a next step of its own (§ 5.2 rule 3).
@@ -1227,9 +1236,9 @@ today: `skills/apply/references/schema.md` names the file `<key>.md`,
 while `skills/apply/SKILL.md:16` and `fixtures/mvp-journey.json` use
 `<key>-application.md` (reported to the lead to fix the chain; this
 page reads either). The **link** to `jobs.md` is exact: the row whose
-`JD` field is `jd-analysis/<key>.md`. Both file names come from the
-same `company_key` + `title_key` (apply and evaluate schemas), so an
-exact match is the only honest join.
+`Analysis` field is `jd-analysis/<key>.md`. Apply names its files with
+the same slug evaluate used for the analysis (apply and evaluate
+schemas).
 For the detail, `readPlanBoard` and `splitPlanMinutes` (C § 18, § 18.1)
 and `proposalRows` (C § 19, a **changed** reader: one new export of the
 parity-tested `proposal_block` port).
@@ -1378,7 +1387,7 @@ CRLF; a file with no `## ` line; a `# ` line ending a section.
   opens Applications with that entry chosen; a Jobs detail's "Open
   application" opens Applications with the linked entry chosen; an
   application's "Role details" opens Jobs with the linked row chosen.
-  Every one of these follows an exact link (the `JD` join, § 5.3),
+  Every one of these follows an exact link (the `Analysis` join, § 5.3),
   changes only which page and item show (app state, § 5.1), and never
   sends or writes (§ 5.2 rules 1 and 2). Nothing else links page to
   page in this step. *Proved by:* one e2e case per link on the fixture,
@@ -2293,7 +2302,7 @@ One new fixture, `apps/web/fixtures/workspace-pages.json`, under § 4's
 rules (invented persona; every script-written file produced by running
 the real scripts in a `mktemp -d` workspace, never `~/job-search`). Its
 `files` must include: a `jobs.md` with at least one role in each of the
-five stages plus a dismissed role, one row without a `JD` field, and one
+five stages plus a dismissed role, one row without an `Analysis` field, and one
 quick-scan row; a `plan.md` with Goal, Budget, and lines under both
 Waiting on you and To do; an `applications/` folder with one role using
 `<key>.md` and one using `<key>-application.md`, one with a rendered
@@ -2304,10 +2313,10 @@ files, so no fixture holds a hand-edited script-written file.
 `empty-first-run.json` proves every empty state.
 
 **Added by the restore ruling (§ 5).** The same fixture also holds:
-`jobs.md` rows whose `JD` and `Company file` fields point at a
+`jobs.md` rows whose `Analysis` and `Company file` fields point at a
 `jd-analysis/<key>.md` and a `company/<slug>.md` written in evaluate's
 schema shapes (these two are model-written prose, so they are written
-by hand), plus one row whose `JD` names a file that isn't there; an
+by hand), plus one row whose `Analysis` names a file that isn't there; an
 application notes file with `## Coverage` (all three statuses) and
 `## Selection` (at least two `out` rows), whose output
 `proposal_block` produces cleanly when run in the `mktemp -d`
@@ -2379,7 +2388,12 @@ first):
   in its group, `leads.md` absent, sorted by path, the viewer opens
   `.md`, `.html` (sandboxed, print works) and binary; § 5.2 rules 1, 2,
   6 and 8.
-- **3b Jobs. READER (reuse):** the `jobs_md` port unchanged, plus the
+- **3b Jobs. READER (reuse):** **Waits for** `design-web-search.md` S1
+  (the `Analysis` field). 3b also moves the verdict card's `ref` to the
+  row's `analysis_file` (C § 6.2): `packages/agent/src/cards.ts:124`,
+  `tests/agent/cards.test.ts:109-116` (tester-owned), and
+  `apps/web/fixtures/mvp-journey.json:89`'s `--jd-file jd-analysis/…` →
+  `--analysis-file`. The `jobs_md` port unchanged, plus the
   small read-only `store-io.ts` adapter. It also deletes the stub
   `packages/agent/src/jobs-md.ts` (its own comment says it waits for the
   port): `cards.ts:6` moves to the port, the public re-export of
@@ -2423,8 +2437,9 @@ first):
   minutes-sum table; § 5.2 rule 1's check that pages and the rail
   receive only `messages` and `status`, with a spy on every function
   `useChat` returns.
-- **3d Applications. READER (new):** `groupApplications` and the exact
-  `JD` join. *Exit:* a table test over both name forms, the `.html`,
+- **3d Applications. READER (new):** **Waits for** `design-web-search.md`
+  S1 (the `Analysis` field). `groupApplications` and the exact
+  `Analysis` join. *Exit:* a table test over both name forms, the `.html`,
   an unknown suffix and an unmatched key; the page's roles, stages and
   "Not linked" line match the fixture.
   *Restore ruling adds the detail:* **READER (change): `proposalRows`**,

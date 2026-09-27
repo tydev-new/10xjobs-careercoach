@@ -566,8 +566,15 @@ Deno.test("§ 17.10: an invoice_id tag that doesn't verify (forged/mismatched) -
   try {
     h.state.members.add(UID_A);
     const { captureId, orderId } = await plantValidCapture(h, UID_A);
-    // Corrupt the capture's own invoice_id tag after planting.
-    h.paypalState.captures[captureId].invoiceId = h.paypalState.captures[captureId].invoiceId!.slice(0, -1) + "f";
+    // Corrupt the capture's own invoice_id tag after planting. Never
+    // append a fixed "f": when the real last character already IS "f"
+    // (real, if rare — hex-shaped ids sometimes end in "f"), slicing it
+    // off and appending "f" again reproduces the SAME string — a no-op
+    // "corruption" that intermittently made this test flake (it still
+    // verified, so the response was "credited", not "ignored").
+    const cap = h.paypalState.captures[captureId];
+    const inv = cap.invoiceId!;
+    cap.invoiceId = inv.slice(0, -1) + (inv.endsWith("f") ? "0" : "f");
     void orderId;
     const res = await handleRequest(req(captureCompletedEvent({ captureId })), h.deps);
     assertEquals(res.status, 200);

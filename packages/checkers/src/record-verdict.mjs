@@ -17,7 +17,9 @@ const USAGE =
   "                         [--score SCORE] [--reasons REASONS]\n" +
   "                         [--dealbreakers DEALBREAKERS] [--url URL]\n" +
   "                         [--location LOCATION] [--jd-file JD_FILE]\n" +
-  "                         [--company-file COMPANY_FILE] [--track {A,B,C}]\n";
+  "                         [--analysis-file ANALYSIS_FILE]\n" +
+  "                         [--company-file COMPANY_FILE] [--track {A,B,C}]\n" +
+  "                         [--existing]\n";
 const OPTIONS = [
   { flag: "--workspace", dest: "workspace", required: true },
   { flag: "--company", dest: "company", required: true },
@@ -29,8 +31,10 @@ const OPTIONS = [
   { flag: "--url", dest: "url" },
   { flag: "--location", dest: "location" },
   { flag: "--jd-file", dest: "jd_file" },
+  { flag: "--analysis-file", dest: "analysis_file" },
   { flag: "--company-file", dest: "company_file" },
   { flag: "--track", dest: "track", choices: TRACKS },
+  { flag: "--existing", dest: "existing", boolean: true },
 ];
 
 /**
@@ -46,12 +50,22 @@ export async function run(argv, io, now = () => new Date()) {
   if (a.score !== null && !(a.score >= 0 && a.score <= 100)) {
     return { stdout: "", stderr: "error: --score must be 0-100\n", exitCode: 2 };
   }
+  if (a.existing && (a.url !== null || a.location !== null || a.jd_file !== null)) {
+    return { stdout: "", stderr: "error: --existing refuses --url/--location/--jd-file\n", exitCode: 2 };
+  }
 
   const rows = await jm.load(io, a.workspace);
   const nowStr = jm.nowIso(now);
   const k = jm.key({ company: a.company, title: a.title });
   let row = rows.find((r) => jm.key(r) === k) || null;
   const existed = row !== null;
+  if (a.existing && !existed) {
+    return {
+      stdout: "",
+      stderr: restoreLineSeparators(`error: no role ${a.company} — ${a.title} in jobs.md; nothing written\n`),
+      exitCode: 2,
+    };
+  }
   if (!existed) {
     row = { company: a.company, title: a.title, stage: "To Review", dismissed: false, seen_at: nowStr };
     rows.push(row);
@@ -63,14 +77,16 @@ export async function run(argv, io, now = () => new Date()) {
   row.url = a.url || row.url;
   row.location = a.location || row.location;
   row.jd_file = row.jd_file || a.jd_file;
+  row.analysis_file = a.analysis_file || row.analysis_file;
   row.company_file = a.company_file || row.company_file;
   row.track = a.track || row.track;
   row.evaluated_at = row.updated_at = nowStr;
 
   try {
-    await jm.save(io, a.workspace, rows, { now });
+    await jm.save(io, a.workspace, rows, { now, writeKey: k });
   } catch (e) {
     if (e instanceof jm.DuplicateKeyError) return { stdout: "", stderr: e.message + "\n", exitCode: 1 };
+    if (e instanceof jm.EmptyFieldError) return { stdout: "", stderr: e.message + "\n", exitCode: 2 };
     throw e;
   }
   const how = existed ? "updated existing role" : "created NEW role";

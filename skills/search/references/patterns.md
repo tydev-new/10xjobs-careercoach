@@ -9,9 +9,10 @@ composing or revising a plan.
 Every instrument has an **addressing** (by-company needs the working set;
 by-query takes the thesis directly) and an **authority** (an employer's
 own system writes pipeline rows; a **lead** source must be confirmed
-against the employer's own board before the candidate spends time — or
-presented as unconfirmed). Every script prints its own usage — run it,
-don't read it.
+against the employer's own board, or kept internal; the report names
+sources and counts of leads, never a lead). "Kept internal" means: not
+written anywhere, only counted. Every script prints its own usage — run
+it, don't read it.
 
 | Instrument | Addressing · authority | Use it when | Run |
 |---|---|---|---|

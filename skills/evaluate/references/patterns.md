@@ -36,8 +36,9 @@ that a decode without it matches an unskilled read.
    leaves unverifiable).
 7. **Record it:** `python3 scripts/record_verdict.py --workspace .
    --company … --title … --verdict … --score … --reasons …
-   --dealbreakers …` (`--help` for all flags) — on the row's exact
-   strings (rule 6).
+   --dealbreakers …` `--analysis-file jd-analysis/<file>.md` (the
+   analysis you just wrote) (`--help` for all flags) — on the row's
+   exact strings (rule 6).
 
    In a run over several roles, record each one as soon as its verdict is
    decided (its analysis file and its `record_verdict.py` call), then move

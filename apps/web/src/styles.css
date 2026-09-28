@@ -241,10 +241,16 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4);
+  min-height: var(--header-h);
+  flex: none;
+  /* 7px top / 8px bottom, not a plain --space-2 (8px) both sides: with
+     box-sizing: border-box, the 1px bottom border + this padding must
+     leave exactly 44px of content height (the tallest control, the ⋯
+     button) for min-height to land on EXACTLY --header-h (60px) rather
+     than growing past it (measured 61px with symmetric 8px padding). */
+  padding: 7px var(--space-4) 8px;
   border-bottom: 1px solid var(--border);
   gap: var(--space-3);
-  flex-wrap: wrap;
   background: var(--bg-panel);
 }
 
@@ -258,41 +264,16 @@ select:focus-visible {
 .app-header-title {
   font: var(--type-header);
   letter-spacing: var(--track-header);
-  display: inline-flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  /* One line, always: a status word growing (e.g. "thinking" ->
-     "needs you") must never wrap the title or reflow the transcript
-     below it (measured CLS 0.012 at 375px before this). */
+  /* One line, always: the title must never wrap the header or reflow the
+     page below it (measured CLS 0.012 at 375px before this — the same
+     floor the old status word held). No visible state word sits beside
+     the avatar (design-web-ui.md § 5.6, "Ten's avatar") — that state
+     shows only as the avatar's own hover/aria-label (§ 1.3). */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
   flex-shrink: 1;
-}
-
-.app-header-title > span:first-child {
-  flex-shrink: 0;
-}
-
-.app-header-status {
-  font: var(--type-small);
-  color: var(--fg-muted);
-  text-transform: uppercase;
-}
-
-/* app-header-status is nested inside app-header-title, both siblings of
-   .avatar under .app-header-left — the sibling combinator reaches the
-   title, the descendant combinator reaches the status span inside it.
-   Neutral ink, not a second hue (the one-accent rule keeps lime off
-   status text; amber stays reserved for needs-you). */
-.avatar--thinking ~ .app-header-title .app-header-status,
-.avatar--working ~ .app-header-title .app-header-status {
-  color: var(--fg);
-}
-
-.avatar--needs-you ~ .app-header-title .app-header-status {
-  color: var(--amber);
 }
 
 .app-header-action {
@@ -308,6 +289,12 @@ select:focus-visible {
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
+  /* Never shrunk or squeezed into its own wrap by app-header-left's
+     dynamic width (the page title's status action, § 5.6) — every pixel
+     of compression goes to the left group instead (min-width: 0, ellipsis),
+     so the header's own height never depends on that text's length
+     (measured CLS: a wrapped header-right before this, gate-moment@1440). */
+  flex-shrink: 0;
 }
 
 .fixture-picker {
@@ -396,6 +383,19 @@ select:focus-visible {
 }
 .btn--ghost:active:not(:disabled) {
   background: var(--bg-press);
+}
+
+/* Stage 2: the one accent's second use (§ 5.6, "One accent: lime" —
+   "the Continue with Ten button"). Never used for anything else. */
+.btn--lime {
+  background: var(--lime);
+  color: var(--on-lime);
+}
+.btn--lime:hover:not(:disabled) {
+  background: var(--lime-hover);
+}
+.btn--lime:active:not(:disabled) {
+  background: var(--lime-press);
 }
 
 /* Loading holds its width and label (a button never resizes while
@@ -562,75 +562,92 @@ select:focus-visible {
    status hue that IS allowed here) and done (green) — the one-accent
    rule keeps lime and the old blue off every other state. ---- */
 
+/* § 5.6 "Ten's avatar (Stage 2)": the 28px mark, its state carried by a
+   ring drawn 3px outside the tile (radius 11px, 2px wide) — not a
+   colored dot. `.avatar` is the interactive/hoverable element (28px at
+   desktop, a 44px hit area at ≤760px, § 5.5); `.avatar-mark` is the
+   glyph itself, always 28px, so the ring (sized off IT) never drifts
+   away from the mark when the outer hit area grows on phone. */
 .avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-full);
-  background: var(--bg-sunken);
-  border: 1px solid var(--border);
+  width: 28px;
+  height: 28px;
 }
 
-.avatar-dot {
-  width: 15px;
-  height: 15px;
-  border-radius: var(--radius-full);
-  background: var(--fg-muted);
-  display: inline-block;
+.avatar-mark {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
 }
 
-.avatar--idle .avatar-dot {
-  background: var(--fg-muted);
+.avatar-mark::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 11px;
+  border: 2px solid transparent;
+  pointer-events: none;
 }
 
-.avatar--thinking .avatar-dot {
-  background: var(--fg-muted);
-  animation: pulse-slow var(--duration-pulse) var(--ease-standard) infinite;
+.avatar--idle .avatar-mark::after {
+  border-color: transparent;
 }
 
-.avatar--working {
-  border-color: var(--fg);
+.avatar--thinking .avatar-mark::after {
+  border-color: var(--border-strong);
 }
 
-.avatar--working .avatar-dot {
-  background: var(--fg);
-  box-shadow: 0 0 0 3px var(--focus-halo);
-  animation: ring-breathe var(--duration-pulse) var(--ease-standard) infinite;
+.avatar--working .avatar-mark::after {
+  border-color: var(--border-strong);
+  border-top-color: var(--fg);
 }
 
-.avatar--needs-you {
+.avatar--needs-you .avatar-mark::after {
   border-color: var(--amber);
 }
 
-.avatar--needs-you .avatar-dot {
-  background: var(--amber);
-  animation: pulse-amber var(--duration-pulse) var(--ease-standard) infinite;
-}
-
-.avatar--done {
+.avatar--done .avatar-mark::after {
   border-color: var(--green);
 }
 
-.avatar--done .avatar-dot {
-  background: var(--green);
+@media (prefers-reduced-motion: no-preference) {
+  .avatar-mark::after {
+    transition: opacity var(--duration-done) var(--ease-standard);
+  }
+  .avatar--thinking .avatar-mark::after {
+    animation: avatar-ring-pulse var(--duration-pulse) var(--ease-standard) infinite;
+  }
+  .avatar--working .avatar-mark::after {
+    animation: spin var(--duration-spin) linear infinite;
+  }
+  .avatar--needs-you .avatar-mark::after {
+    animation: avatar-ring-pulse var(--duration-pulse) var(--ease-standard) infinite;
+  }
 }
 
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.08); }
+/* Reduced motion (§ 5.6's own table, "Reduced motion" column): thinking
+   and needs-you hold a STILL ring (no animation, already the case above
+   since the animations only run under no-preference); working becomes a
+   static, dashed, --fg-muted ring — never a spinning arc; done shows no
+   ring at all (no fade-in-then-out to perceive). */
+.avatar--done .avatar-mark::after {
+  opacity: 0;
 }
 
-@keyframes pulse-amber {
-  0%, 100% { opacity: 0.65; }
-  50% { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .avatar--working .avatar-mark::after {
+    border-color: var(--fg-muted);
+    border-top-color: var(--fg-muted);
+    border-style: dashed;
+  }
 }
 
-@keyframes ring-breathe {
-  0% { box-shadow: 0 0 0 3px var(--focus-halo); }
-  50% { box-shadow: 0 0 0 6px var(--focus-halo); }
-  100% { box-shadow: 0 0 0 3px var(--focus-halo); }
+@keyframes avatar-ring-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Every animation has a still equivalent — never a hard requirement to
@@ -657,7 +674,12 @@ select:focus-visible {
   padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  /* § 5.6 "Messages (Stage 2)": "The thread is --thread-max wide,
+     centred... 26px between turns." */
+  gap: 26px;
+  max-width: var(--thread-max);
+  width: 100%;
+  margin: 0 auto;
   /* A soft top fade instead of a hard clip: when autoscroll pins to the
      newest turn, whatever's still above the fold reads as "continues
      upward," not as a glitchy cut mid-card. No motion, so reduced-motion
@@ -683,7 +705,19 @@ select:focus-visible {
   text-align: center;
 }
 
+/* § 5.6 "Messages (Stage 2)": "Each turn is a 32px avatar column plus the
+   content." A CSS grid, not a flex row with a wrapping content column —
+   every part (the role label, each text/tool/card/gate/error part) stays
+   a DIRECT child of .bubble, just placed in column 2; only the new
+   .bubble-avatar (added FIRST in the markup) sits in column 1, spanning
+   every row. This is deliberate: e2e.mjs reads .bubble--assistant's own
+   `lastElementChild` to find the last-rendered part (e.g. an error
+   card) — wrapping the parts in their own column container would make
+   THAT container the last child instead, breaking that reader. */
 .bubble {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: var(--space-3);
   /* min(), not a bare 720px: an unbroken long token (a pasted URL) must
      never push this wider than the viewport at 375px — overflow-wrap is
      the second half of that fix, letting a URL itself break mid-word
@@ -693,23 +727,38 @@ select:focus-visible {
   font: var(--type-body);
 }
 
-.bubble--user {
-  align-self: flex-end;
-  background: var(--bg-muted);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+.bubble > :not(.bubble-avatar) {
+  grid-column: 2;
 }
 
+.bubble-avatar {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: start;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bubble-avatar--user {
+  border-radius: var(--radius-full);
+  background: var(--bg-muted);
+  color: var(--fg-muted);
+}
+
+.bubble--user,
 .bubble--assistant {
   align-self: flex-start;
 }
 
 .bubble-role {
-  font: var(--type-small);
-  text-transform: uppercase;
-  color: var(--fg-muted);
-  margin-bottom: var(--space-1);
+  grid-column: 2;
+  font: var(--type-ui);
   font-weight: 600;
+  color: var(--fg);
+  margin-bottom: var(--space-1);
 }
 
 .attachment-chip {
@@ -1488,8 +1537,22 @@ select:focus-visible {
 
 /* ---- Side panel ---- */
 
+/* A transparent wrapper (design-web-ui.md § 5.6 "Page layouts (Stage 2)",
+   the viewer bullet: "on Home it appears only while a file is open") —
+   `display: contents` makes .side-panel itself the effective flex child
+   of .frame when shown; `--hidden` collapses the whole thing instead of
+   unmounting it (the panel keeps its own iframe/print state, same
+   posture as Talk to Ten's own hidden-not-unmounted page). */
+.viewer-slot {
+  display: contents;
+}
+
+.viewer-slot--hidden {
+  display: none;
+}
+
 .side-panel {
-  width: 380px;
+  width: var(--panel-w);
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -1629,11 +1692,323 @@ select:focus-visible {
   }
 }
 
-/* ---- Phone (375px) ---- */
+/* ---- Frame (design-web-ui.md § 5.1 "The frame"; § 5.6 "Page layouts
+   (Stage 2)"): one Frame wraps both builds — the rail, the header (still
+   .app-header, above), the page area, the pinned viewer and the phone tab
+   bar. `container: frame / inline-size` is the ONE breakpoint name every
+   phone rule below keys off (§ 5.6, "Breakpoint" — media queries are for
+   the sign-in screen only, which has no frame). ---- */
 
-@media (max-width: 480px) {
-  .app-shell {
-    position: relative;
+.frame {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  container: frame / inline-size;
+}
+
+.frame-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  border-right: 1px solid var(--border);
+}
+
+.frame-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.frame-page.frame-page--hidden {
+  display: none;
+}
+
+/* ---- Rail (design-web-ui.md § 5.1 "The rail"; § 5.6 "Rail item
+   (Stage 2)"). No counts yet (§ 5.9 Stage 3e's own exit) — never a stale
+   or guessed number in the meantime (rule 12). ---- */
+
+.rail {
+  width: var(--rail-w);
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-rail);
+  border-right: 1px solid var(--border);
+  padding: 14px 10px 10px;
+  overflow-y: auto;
+}
+
+.rail-brand {
+  padding: 4px 8px 16px;
+}
+
+.rail-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--fg-muted);
+  font: var(--type-ui);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.rail-item svg {
+  flex: none;
+  color: var(--fg-subtle);
+}
+
+.rail-item:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+.rail-item:active {
+  background: var(--bg-press);
+}
+
+.rail-item[aria-current="page"] {
+  background: var(--bg-panel);
+  color: var(--fg);
+  box-shadow: var(--shadow-1);
+}
+
+.rail-item[aria-current="page"] svg {
+  color: var(--fg);
+}
+
+/* The current item still needs its OWN distinct hover/press (§ 5.6,
+   "Every control has these five states") — a plain `:hover` rule has the
+   SAME specificity as `[aria-current="page"]`, so without this compound
+   selector the current item's rest look would win the tie and hover
+   would look identical to rest. */
+.rail-item[aria-current="page"]:hover {
+  background: var(--bg-hover);
+}
+
+.rail-item[aria-current="page"]:active {
+  background: var(--bg-press);
+}
+
+.rail-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The needs-your-yes marker (§ 5.1, "A gate while you're elsewhere") —
+   plain, never alarm-styled (rule 8): amber is reserved for needs-you. */
+.rail-needs-you {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 7px 0 8px;
+  border-radius: var(--radius-full);
+  background: var(--amber-soft);
+  color: var(--amber);
+  box-shadow: inset 0 0 0 1px var(--amber-border);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.rail-needs-you-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--amber);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rail-needs-you-dot {
+    animation: needs-you-pulse var(--duration-pulse) ease-in-out infinite;
+  }
+}
+
+@keyframes needs-you-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ---- Page empty state (design-web-ui.md § 5.3's own words per page;
+   § 5.6 "Empty state"). Same shape every EMPTY page uses. ---- */
+
+.page-empty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.page-empty-icon {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-1);
+  color: var(--fg-muted);
+}
+
+.page-empty-title {
+  margin: 0;
+  max-width: 380px;
+  font: var(--type-empty);
+  letter-spacing: var(--track-empty);
+  color: var(--fg);
+}
+
+.page-empty-body {
+  margin: 0;
+  max-width: 380px;
+  font: var(--type-body-sm);
+  color: var(--fg-muted);
+}
+
+/* ---- Phone tab bar (design-web-ui.md § 5.5). Hidden at desktop widths;
+   the container query below turns it on. Hidden again whenever the
+   composer has focus, at any width (§ 5.5: "nothing then sits between
+   the composer and the keyboard").
+   Lead ruling (CLS fix round, reverted): a `turnRunning`-driven hide was
+   tried and measured WORSE, not better — Playwright's `.fill()` focuses
+   the composer via an untrusted call, so hiding on focus is already
+   uncounted-CLS-free for a REAL user (a trusted tap/click is excluded by
+   the browser's own "recent input" rule); the original reappearance on
+   Enter was already inside that same window. Deferring the reappearance
+   to true turn-end moved it OUTSIDE that window instead, so it started
+   counting. Back to focus-only, per § 5.5. The tester's own CLS test
+   focuses the composer with a trusted click instead. ---- */
+
+.tabbar {
+  display: none;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 6px 4px calc(8px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+}
+
+.frame:has(.composer:focus-within) .tabbar {
+  display: none;
+}
+
+.tabbar-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  border: none;
+  background: none;
+  color: var(--fg-subtle);
+  font: var(--type-tab);
+}
+
+.tabbar-item:hover {
+  color: var(--fg);
+}
+
+.tabbar-item:active {
+  opacity: 0.7;
+}
+
+.tabbar-item[aria-current="page"] {
+  color: var(--fg);
+}
+
+.tabbar-item svg {
+  margin: 5px 0;
+}
+
+.tabbar-item-label {
+  line-height: 1;
+}
+
+.tabbar-ten-tile {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 30px;
+  margin-bottom: 2px;
+  border-radius: 10px;
+  background: var(--hero);
+  color: var(--lime);
+}
+
+.tabbar-item--ten[aria-current="page"] .tabbar-ten-tile {
+  background: var(--lime);
+  color: var(--on-lime);
+}
+
+.tabbar-needs-you {
+  position: absolute;
+  top: 4px;
+  right: calc(50% - 26px);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--amber);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* ---- The viewer drawer (761-1100px; § 5.6 "Breakpoint"): "the pinned
+   viewer turns into a drawer... it overlays from the right at
+   min(var(--panel-w), 100%), with --shadow-3, a close ✕ and z-index: 30."
+   Placed BEFORE the ≤760px block below so the phone sheet's OWN
+   .side-panel rules (position: fixed, full width) win there at equal
+   specificity — this block's own condition (max-width: 1100px) still
+   matches at 375px too, since 375 <= 1100. ---- */
+@container frame (max-width: 1100px) {
+  .side-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(var(--panel-w), 100%);
+    z-index: 30;
+    box-shadow: var(--shadow-3);
+  }
+
+  .side-panel-back {
+    display: inline-flex;
+  }
+}
+
+/* ---- Phone (375px; the frame's own container query, § 5.6
+   "Breakpoint") ---- */
+
+@container frame (max-width: 760px) {
+  .rail {
+    display: none;
+  }
+
+  .frame-main {
+    border-right: none;
+  }
+
+  .tabbar {
+    display: grid;
   }
 
   .side-panel {
@@ -1653,12 +2028,86 @@ select:focus-visible {
   }
 
   .app-header {
+    /* § 5.5, "The header shows on every page, 54px high" — the phone's
+       own floor, distinct from --header-h (the desktop 60px). min-height,
+       not height: the mock's dev-only rows (below) still push it taller
+       when they're present; the real app never has them.
+       4px top / 5px bottom, not a plain 5px both sides: with box-sizing:
+       border-box, the 1px bottom border + this padding must leave exactly
+       44px of content height (avatar/chip/menu, all 44px below) for
+       min-height to land on EXACTLY 54px (measured 55px with 5px/5px —
+       the same off-by-one as the desktop header, § 5.6, fixed the same
+       way). */
+    min-height: 54px;
+    padding: 4px var(--space-2) 5px;
     gap: var(--space-2);
+  }
+
+  /* § 5.5: "Each has a 44×44px hit area" (avatar, balance chip, ⋯ menu —
+     the menu trigger is already 44×44 at every width). The avatar's ring
+     stays sized off .avatar-mark (always 28px), never this outer box. */
+  .avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .balance-chip {
+    min-height: 44px;
+  }
+
+  /* § 5.5: "the page title... on the right, Ten's avatar... and the
+     balance chip... The ⋯ menu button sits last." app-header-right must
+     be allowed to SHRINK and WRAP again here (desktop's flex-shrink: 0,
+     § 5.6, keeps the header's height stable there by pushing all the
+     squeeze onto the title) — otherwise it never shrinks below its own
+     one-line content width, so it can never actually reach its own
+     flex-wrap fallback either: the title gets squeezed to nothing AND the
+     mock's dev-only controls (below) still crowd the same row instead of
+     wrapping to their own. */
+  .app-header-left {
+    /* The title sits on the SAME visual row as avatar/chip/menu — not
+       vertically centered against the whole header box, which the mock's
+       extra dev-only rows (below) make much taller than the title's own
+       line (production is never this tall: no dev rows there). */
+    align-self: flex-start;
+  }
+
+  .app-header-right {
+    flex-shrink: 1;
+    flex-basis: auto;
+    min-width: 0;
+    /* Capped, not merely shrinkable: without a hard ceiling here, this
+       group's own hypothetical (single-line) width — avatar + chip + menu
+       + the mock's dev controls all at once — wins nearly all the shrink
+       budget against the title (measured: the title down to a few px,
+       "T…", the dev row still not wrapping). 140px is "Talk to Ten" (the
+       longest page title) plus the header's own side padding, so the
+       title is never cut on any page — this cap forces genuine internal
+       wrapping (this group's own flex-wrap) instead. */
+    max-width: calc(100% - 140px);
   }
 
   .fixture-picker {
     order: 10;
+    flex-basis: 100%;
     width: 100%;
+  }
+
+  .pill-button {
+    order: 9;
+  }
+
+  /* § 5.5, "The rest of the phone layout": "The account menu (⋯) opens
+     under the header, spanning the width with 8px side margins." Fixed
+     (viewport-relative), not the desktop's absolute-under-the-trigger —
+     the trigger sits near the header's right edge, which isn't where a
+     full-width, 8px-margin panel should anchor from. */
+  .menu-panel {
+    position: fixed;
+    top: calc(54px + var(--space-2));
+    left: 8px;
+    right: 8px;
+    width: auto;
   }
 
   .toast {

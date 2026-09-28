@@ -1367,7 +1367,16 @@ CRLF; a file with no `## ` line; a `# ` line ending a section.
   viewer (§ 5.2 rule 8).
 - **Continue with Ten** (Home, beside Ten's last reply) opens Talk to
   Ten, composer focused, no draft. Home has no reply field (restore
-  ruling).
+  ruling). At a frame width of 760px or less it opens Talk to Ten
+  **without** focusing the composer; the candidate's own tap on the
+  composer focuses it. Only this button focuses the composer: rail and
+  tab-bar navigation, and the first load, never do.
+  *Prevents:* on the phone, a focused composer hides the tab bar (§ 5.5,
+  "Keyboard up"), and iOS Safari doesn't raise the keyboard for a
+  focus the script sets after a page change. The candidate would see
+  no keyboard and no tab bar, with no visible way off the page.
+  *Proved by:* at 1440px the button leaves the composer focused; at
+  375px it leaves the composer unfocused with the tab bar showing.
 - **Ask Ten about this** (a Jobs row or its detail, an Applications
   entry or its detail, a Documents file) opens Talk to Ten and puts a draft in the composer: `About
   <label>: `, where `<label>` is `Company — Title` for a role, or the
@@ -2374,7 +2383,8 @@ every control.
 
 **Stage 2: The frame.** Rail, header in the frame, page switching as app
 state, the landing rule, the conversation kept mounted, the needs-you
-marker, and each new page showing only its empty state.
+marker, each new page showing only its empty state, and the message
+layout (§ 5.6, "Messages (Stage 2)").
 *Exit:* § 5.1's three proofs pass (a turn survives a page change, a gate
 seen from another page, the three landing cases); § 5.2 rules 1 and 2
 pass on the frame; § 5.5's phone rules hold with the designer's pattern.

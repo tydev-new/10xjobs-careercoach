@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, type ReactElement } from "react";
 import { latestGateStatuses } from "../agent-helpers";
 import type { AppMessage, DataCardData, DataErrorData, GateRequest } from "../types";
+import { BrandMark } from "./BrandMark";
 import { Card } from "./Cards";
 import { ErrorPart } from "./ErrorPart";
 import { GateCard } from "./GateCard";
+import { Icon } from "../icons.tsx";
 import { ToolRun, type ToolPartLike } from "./ToolRun";
 
 type Group =
@@ -86,7 +88,16 @@ export function Transcript({
           }>;
           return (
             <div className="bubble bubble--user" key={message.id}>
-              <div className="bubble-role">you</div>
+              {/* § 5.6 "Messages (Stage 2)": "Yours is a 28px circle,
+                  --bg-muted, holding user 15px in --fg-muted." — a
+                  sibling FIRST child, not a wrapping column, so it never
+                  changes which element is .bubble's lastElementChild
+                  (a card, when one lands last, stays reachable exactly
+                  the same way it did before this layout). */}
+              <span className="bubble-avatar bubble-avatar--user" aria-hidden="true">
+                <Icon name="user" size={15} />
+              </span>
+              <div className="bubble-role">You</div>
               {text ? <p>{text.text}</p> : null}
               {files.map((f, i) => (
                 <div key={i} className="attachment-chip">
@@ -101,6 +112,12 @@ export function Transcript({
         const groups = groupParts(message.parts as Array<Record<string, unknown>>);
         return (
           <div className="bubble bubble--assistant" key={message.id}>
+            {/* § 5.6: "Ten's avatar is the 28px mark." Plain — no ring,
+                no state; this is a historical turn, not the live header
+                avatar (Avatar.tsx). */}
+            <span className="bubble-avatar bubble-avatar--ten" aria-hidden="true">
+              <BrandMark size={28} />
+            </span>
             <div className="bubble-role">Ten</div>
             {groups.map((group, gi) => {
               if (group.kind === "tool") {

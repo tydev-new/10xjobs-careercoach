@@ -482,7 +482,12 @@ function extractAshbyItem(boardSlug, j) {
     postedAt: isoDateOnly(j.publishedDate ?? j.publishedAt),
     companyName: undefined, // Ashby gives no company name either (§ 6)
     text: htmlToText(j.descriptionPlain ?? j.descriptionHtml ?? j.description ?? ""),
-    compensation: j.compensation?.summary ? htmlToText(j.compensation.summary) : undefined,
+    // The real field (checked live, 2026-09-28, against api.ashbyhq.com/
+    // posting-api/job-board/ashby): `compensation.compensationTierSummary`,
+    // not `.summary` (the OLD tools/index.ts fetchJobTool's own field name,
+    // never live-checked before — fixed on the way, though not one of
+    // § 4.4's two NAMED bugs).
+    compensation: j.compensation?.compensationTierSummary ? htmlToText(j.compensation.compensationTierSummary) : undefined,
     _id: j.id ?? undefined,
   };
 }

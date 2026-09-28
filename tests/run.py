@@ -97,6 +97,23 @@ else:
     else:
         passed += 1
 
+# tests/boards.test.mjs — design-web-search.md § 4.1/§ 4.2/§ 4.4/§ 4.8's
+# own expected-output cases and table tests for the shared board readers
+# (skills/search/scripts/lib/board-readers.mjs) and the local CLI
+# (skills/search/scripts/boards.mjs), over synthetic board answers — "no
+# second language to agree with" (§ 4.4), so this one file is the
+# specification. Skips loudly when `node` isn't on PATH.
+if not node:
+    print("\nSKIPPED tests/boards.test.mjs: no `node` on PATH")
+else:
+    print("\n--- node --test tests/boards.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(HERE, "boards.test.mjs")], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/boards.test.mjs (node --test) — see output above")
+    else:
+        passed += 1
+
 # packages/checkers: the JS ports' own unit tests (docs/design-web-agent.md
 # § 5). The parity machinery (parity.mjs, coverage-gate.mjs) is gone at J2
 # (docs/design-js-only.md § 6): tests/checkers/run-cases.mjs's

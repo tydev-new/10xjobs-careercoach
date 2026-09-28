@@ -9,13 +9,13 @@
 // `words: N  ->  <path>` line) matches byte for byte.
 //
 // Runs in Node AND in the browser; no node:fs, no node:path.
-import { join } from "./path-util.mjs";
-import { pySplit, normSpace, pySplitlines, pyRstrip, pyStrip, restoreLineSeparators } from "./py-text.mjs";
-import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { HELP } from "./help-text.mjs";
-import { crashToTraceback } from "./traceback.mjs";
+import { join } from "../../../profile/scripts/lib/path-util.mjs";
+import { pySplit, normSpace, pySplitlines, pyRstrip, pyStrip, restoreLineSeparators } from "../../../profile/scripts/lib/py-text.mjs";
+import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx.mjs";
+import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
+import { crashToTraceback } from "../../../profile/scripts/lib/traceback.mjs";
 
-const CSS = `
+export const CSS = `
 @page { size: Letter; margin: 0.4in 0.5in; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
        font-size: 10pt; line-height: 1.25; color: #111; margin: 0; }

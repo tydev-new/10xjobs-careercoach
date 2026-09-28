@@ -1,8 +1,10 @@
 // The real ScriptRunner (docs/design-web-agent.md § 4/§ 5): just-bash over
-// an in-memory copy of the workspace, running packages/checkers' ported
-// checker scripts through its file-name `python3` dispatch
-// (packages/checkers/src/just-bash-command.mjs) so skill prose
-// (`python3 scripts/check_materials.py ...`) is unchanged.
+// an in-memory copy of the workspace, running the skills' own ported
+// checker scripts (skills/*/scripts/lib/*.mjs) through its file-name
+// `node` dispatch (packages/checkers/src/just-bash-command.mjs) so skill
+// prose (`node scripts/check_materials.mjs ...`) is unchanged. `python3`
+// is also registered, but only as a pointer to the equivalent `node`
+// command (docs/design-js-only.md § 3.5).
 //
 // packages/agent's `bash` tool (src/tools/index.ts) calls
 // `deps.scripts.run(command, snapshot)` with a snapshot of every workspace
@@ -16,7 +18,7 @@
 import { Bash } from "just-bash";
 // @ts-expect-error - plain .mjs, no type declarations (same posture as
 // packages/checkers/test/browser/browser-main.ts's own import of it).
-import { python3Command } from "../../../../packages/checkers/src/just-bash-command.mjs";
+import { nodeCommand, python3Command } from "../../../../packages/checkers/src/just-bash-command.mjs";
 import type { RunResult, ScriptRunner } from "../../../../packages/agent/src/types.ts";
 
 // An arbitrary absolute root for just-bash's in-memory filesystem — never
@@ -42,7 +44,7 @@ export function createRealScriptRunner(): ScriptRunner {
         initialFiles[toAbs(path)] = content;
       }
       const bash = new Bash({
-        customCommands: [python3Command],
+        customCommands: [nodeCommand, python3Command],
         files: initialFiles,
         cwd: ROOT,
       });

@@ -1,10 +1,10 @@
 // A faithful JS port of skills/evaluate/scripts/record_verdict.py. Runs in
 // Node AND in the browser; no node:fs, no node:path. See jobs-md.mjs for
 // the shared pipeline record it upserts into.
-import * as jm from "./jobs-md.mjs";
-import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { HELP } from "./help-text.mjs";
-import { restoreLineSeparators } from "./py-text.mjs";
+import * as jm from "../../../search/scripts/lib/jobs-md.mjs";
+import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx.mjs";
+import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
+import { restoreLineSeparators } from "../../../profile/scripts/lib/py-text.mjs";
 
 const VERDICTS = ["strong", "investable_stretch", "long_shot", "weak"];
 const TRACKS = ["A", "B", "C"];

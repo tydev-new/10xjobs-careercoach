@@ -5,11 +5,11 @@
 // prose this mirrors; this file intentionally keeps the same shape,
 // comments, and message text so a diff against the Python original stays
 // readable, and so the parity test's byte-for-byte comparison has a chance.
-import { join, basename } from "./path-util.mjs";
-import { pySplit, normSpace, pyListRepr, pySplitlines, restoreLineSeparators, cpSlice, pyStrip, PY_S, PY_NOT_S, PY_B_START, PY_B_END } from "./py-text.mjs";
-import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { HELP } from "./help-text.mjs";
-import { crashToTraceback } from "./traceback.mjs";
+import { join, basename } from "../../../profile/scripts/lib/path-util.mjs";
+import { pySplit, normSpace, pyListRepr, pySplitlines, restoreLineSeparators, cpSlice, pyStrip, PY_S, PY_NOT_S, PY_B_START, PY_B_END } from "../../../profile/scripts/lib/py-text.mjs";
+import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx.mjs";
+import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
+import { crashToTraceback } from "../../../profile/scripts/lib/traceback.mjs";
 
 const STANDARD_SECTIONS = new Set([
   "summary", "professional experience", "experience", "selected experience",

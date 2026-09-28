@@ -10,9 +10,9 @@
 //   io.mtimeMs(path)   -> Promise<number>        (epoch ms)
 // and a `now` function returning epoch ms (defaults to Date.now so tests
 // can freeze time the way the Python test's os.utime() does).
-import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { cpSlice, pySplitlines } from "./py-text.mjs";
-import { HELP } from "./help-text.mjs";
+import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx.mjs";
+import { cpSlice, pySplitlines } from "../../../profile/scripts/lib/py-text.mjs";
+import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
 
 export const STAGES = ["groundwork", "searching", "applying", "interviewing", "deciding"];
 

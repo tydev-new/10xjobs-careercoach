@@ -4,8 +4,8 @@
 // io interface") and, for save()/append_note(), a `now` clock (defaults to
 // `() => new Date()`) so the parity test can freeze time exactly the way
 // the real script's `datetime.now(timezone.utc)` is frozen for comparison.
-import { join } from "./path-util.mjs";
-import { pyInt, codePointCompare, pyRstrip, pyStrip, restoreLineSeparators, PY_S } from "./py-text.mjs";
+import { join } from "../../../profile/scripts/lib/path-util.mjs";
+import { pyInt, codePointCompare, pyRstrip, pyStrip, restoreLineSeparators, PY_S } from "../../../profile/scripts/lib/py-text.mjs";
 
 // The Python source's `\s` in these patterns is Python's own whitespace
 // set, which INCLUDES U+2028/U+2029 — but by the time text reaches here,

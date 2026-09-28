@@ -1,9 +1,9 @@
 // A faithful JS port of skills/search/scripts/update_job.py. Runs in Node
 // AND in the browser; no node:fs, no node:path.
 import * as jm from "./jobs-md.mjs";
-import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { HELP } from "./help-text.mjs";
-import { restoreLineSeparators } from "./py-text.mjs";
+import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx.mjs";
+import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
+import { restoreLineSeparators } from "../../../profile/scripts/lib/py-text.mjs";
 
 const PROG = "update_job.py";
 const USAGE =

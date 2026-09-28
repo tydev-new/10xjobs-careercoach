@@ -47,12 +47,13 @@
 // `--workspace` is never `~`-expanded (documented, unchanged): rule 9 —
 // the web app never sees a real home directory; fixtures use explicit
 // paths.
-import { join, dirname, basename, relative } from "./path-util.mjs";
-import { pySplit, stripChars, pyListRepr, cpSlice, cpArray, pySplitlines, codePointCompare, pySortStrings, restoreLineSeparators } from "./py-text.mjs";
+import { join, dirname, basename } from "./path-util.mjs";
+import { pySortStrings, restoreLineSeparators } from "./py-text.mjs";
 import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { walkFilesRecursive, listFiles, listPerChild, listDirNames } from "./fs-walk.mjs";
+import { listFiles } from "./fs-walk.mjs";
 import { HELP } from "./help-text.mjs";
 import { crashToTraceback } from "./traceback.mjs";
+import { checkTable, checkHistory, checkSkillProse, loadSchemas, checkFile } from "./shapecheck.mjs";
 
 // os.path.join(os.path.dirname(__file__), "..", "..") — pure string
 // arithmetic on whatever path the caller supplies; no filesystem access,
@@ -120,6 +121,9 @@ export const ROUNDS_ENUMS = new Map();
 export const PANEL_HEADER = "| lens | finding | outcome |";
 export const PANEL_ENUMS = new Map([[0, new Set(["ats", "recruiter", "hiring manager"])]]);
 
+// The "## Section" title check_table WARNs about when it's present but
+// the header beneath it isn't exactly right (2026-08-21 alignment review,
+// L1) — domain-specific text, supplied to shapecheck's checkTable.
 const TITLE_FOR_HEADER = new Map([
   [COVERAGE_HEADER, "## Coverage"],
   [SELECTION_HEADER, "## Selection"],
@@ -130,126 +134,20 @@ const TITLE_FOR_HEADER = new Map([
   [HISTORY_HEADERS["storybank-history.md"], "## Rounds"],
 ]);
 
-function countChar(s, ch) {
-  let n = 0;
-  for (const c of s) if (c === ch) n++;
-  return n;
-}
+// The panel outcome column (index 2) isn't a plain enum set — "fixed",
+// "discarded — <why>" (any reason text) or "—" on a VOID row — so it's a
+// column validator, not an `enums` entry.
+const PANEL_COLUMN_VALIDATORS = new Map([
+  [2, (o) => (o && !(o === "fixed" || o.startsWith("discarded —") || o === "—")
+    ? `panel outcome "${o}" is neither "fixed" nor "discarded — <why>" (or "—" on a VOID row) — apply/references/schema.md`
+    : null)],
+]);
 
-export async function checkTable(io, path, header, enums) {
-  const res = [];
-  const rawFile = await io.readFile(path);
-  const raw = rawFile.split("\\|").join("");
-  const allLines = pySplitlines(raw).map((l) => l.trim());
-  const idx = allLines.indexOf(header);
-  if (idx === -1) {
-    const title = TITLE_FOR_HEADER.get(header);
-    if (title && allLines.some((l) => l.startsWith(title))) {
-      res.push(["WARN", `${title} present but its header is not exactly "${header}"`]);
-    }
-    return res;
-  }
-  const block = [];
-  for (const l of allLines.slice(idx + 1)) {
-    if (!l.startsWith("|")) break;
-    block.push(l);
-  }
-  const ncols = countChar(header, "|") - 1;
-  for (const l of block) {
-    if ([...l].every((c) => "|-: ".includes(c))) continue;
-    const stripped = l.replace(/^\|+/, "").replace(/\|+$/, "");
-    const cells = stripped.split("|").map((c) => c.trim());
-    if (cells.length !== ncols) {
-      res.push(["WARN", `row has ${cells.length} cells, the header has ${ncols}: "${cpSlice(l, 60)}"`]);
-      continue;
-    }
-    for (const [i2, allowed] of enums) {
-      const v = stripChars(cells[i2].toLowerCase(), "`*_ ");
-      if (v && !allowed.has(v)) {
-        res.push(["WARN", `"${cells[i2]}" is not one of ${pyListRepr(pySortStrings([...allowed]))} — apply/references/schema.md declares the enum`]);
-      }
-    }
-    if (header === PANEL_HEADER) {
-      const o = stripChars(cells[2], "`*_ ");
-      if (o && !(o === "fixed" || o.startsWith("discarded —") || o === "—")) {
-        res.push(["WARN", `panel outcome "${o}" is neither "fixed" nor "discarded — <why>" (or "—" on a VOID row) — apply/references/schema.md`]);
-      }
-    }
-  }
-  return res;
-}
-
-export async function checkHistory(io, path, header) {
-  const res = [];
-  const rawFile = await io.readFile(path);
-  const raw = rawFile.split("\\|").join("");
-  const lines = pySplitlines(raw).map((l) => l.trim()).filter((l) => l.startsWith("|"));
-  if (!lines.includes(header)) {
-    res.push(["FAIL", `history header missing or altered — must be exactly "${header}"`]);
-    return res;
-  }
-  const ncols = countChar(header, "|") - 1;
-  lines.forEach((l, i) => {
-    if ([...l].every((c) => "|-: ".includes(c))) return;
-    const cols = countChar(l, "|") - 1;
-    if (cols !== ncols) res.push(["FAIL", `history row ${i} has ${cols} cells, the header has ${ncols}`]);
+async function checkTableHere(io, path, header, enums) {
+  return checkTable(io, path, header, enums, {
+    titleForHeader: TITLE_FOR_HEADER,
+    columnValidators: header === PANEL_HEADER ? PANEL_COLUMN_VALIDATORS : undefined,
   });
-  return res;
-}
-
-const LINK_RE = /\]\((\.\.?\/[^)#\s]+)\)|`([\w./-]*\/[\w./-]+\.(?:md|py|html))(?: §[^`]*)?`/g;
-
-export async function checkSkillProse(io, skillsRoot) {
-  const res = [];
-  const files = await walkFilesRecursive(io, skillsRoot, ".md");
-  for (const path of files) {
-    const relName = relative(skillsRoot, path);
-    const text = await io.readFile(path);
-    const here = dirname(path);
-    const skillRoot = join(skillsRoot, relName.split("/")[0]);
-    const seen = new Set();
-    LINK_RE.lastIndex = 0;
-    let m;
-    while ((m = LINK_RE.exec(text)) !== null) {
-      const target = m[1] || m[2];
-      if (target.includes("<") || seen.has(target)) continue;
-      seen.add(target);
-      const bases = target.startsWith(".") ? [here] : [here, skillRoot];
-      let hit = null;
-      for (const base of bases) {
-        const candidate = join(base, target);
-        if (await io.exists(candidate)) {
-          hit = candidate;
-          break;
-        }
-      }
-      if (hit === null) {
-        res.push(["FAIL", `${relName}: link does not resolve — ${target}`]);
-      } else if (relative(skillsRoot, hit).startsWith("..")) {
-        res.push(["FAIL", `${relName}: link escapes the skill tree — ${target}`]);
-      }
-    }
-    const lines = text.split("\n");
-    let i = 0;
-    while (i < lines.length - 1) {
-      const head = lines[i];
-      const sep = lines[i + 1].trim();
-      if (head.startsWith("|") && sep.startsWith("|") && [...sep].every((c) => "|-: ".includes(c))) {
-        const ncols = countChar(head, "|");
-        let j = i + 2;
-        while (j < lines.length && lines[j].startsWith("|")) {
-          if (countChar(lines[j], "|") !== ncols) {
-            res.push(["WARN", `${relName}: table row ${j + 1} has ${countChar(lines[j], "|") - 1} cells, header has ${ncols - 1}`]);
-          }
-          j++;
-        }
-        i = j;
-      } else {
-        i++;
-      }
-    }
-  }
-  return res;
 }
 
 export async function checkStrays(io, workspace, schemas) {
@@ -277,116 +175,6 @@ export async function checkStrays(io, workspace, schemas) {
         "WARN",
         `stray file "${name}" — no skill reads or writes it. A second source of truth starts exactly here: if the candidate dropped it, move it to documents/ and capture it; if it holds real facts, it needs an owner; if it is scratch, move it out`,
       ]);
-    }
-  }
-  return res;
-}
-
-const FILE_RE = /^(?:\*\*|##\s+)`([\w\-.]+\.md)`/;
-const FREEFORM = "free-form body";
-const SECTION_RE = /^(\s*)-\s+`(#{2,3})\s+([^`]+)`(.*)$/;
-
-export async function loadSchemas(io, skillsRoot) {
-  const schemas = {};
-  const paths = [
-    ...(await listPerChild(io, skillsRoot, "SKILL.md")),
-    ...(await listPerChild(io, skillsRoot, "references/schema.md")),
-  ];
-  for (const path of paths) {
-    let current = null;
-    const text = await io.readFile(path);
-    for (const line of text.split("\n")) {
-      const m = line.match(FILE_RE);
-      if (m) {
-        let skillDir = dirname(path);
-        if (basename(skillDir) === "references") skillDir = dirname(skillDir);
-        current = { sections: [], freeform: line.toLowerCase().includes(FREEFORM), owner: basename(skillDir) };
-        if (!(m[1] in schemas) || schemas[m[1]].sections.length === 0) {
-          schemas[m[1]] = current;
-        }
-        continue;
-      }
-      if (current === null) continue;
-      const sec = line.match(SECTION_RE);
-      if (sec) {
-        const [, , hashes, name, rest] = sec;
-        current.sections.push({ name: name.trim(), level: hashes.length, optional: rest.toLowerCase().includes("optional") });
-      } else if (line.trim() && ![" ", "\t", "*", "-"].some((c) => line.startsWith(c))) {
-        current = null;
-      }
-    }
-  }
-  const out = {};
-  for (const [k, v] of Object.entries(schemas)) if (v.sections.length) out[k] = v;
-  return out;
-}
-
-export function norm(s) {
-  let out = s.toLowerCase().replace(/[^a-z0-9 ]/g, "");
-  out = out.trim();
-  const parts = pySplit(out);
-  if (parts.length && parts[parts.length - 1].length > 3 && parts[parts.length - 1].endsWith("s")) {
-    parts[parts.length - 1] = cpArray(parts[parts.length - 1]).slice(0, -1).join("");
-  }
-  return parts.join(" ");
-}
-
-export function headings(text) {
-  const out = [];
-  let currentTop = null;
-  const re = /^(#{2,3})\s+(.+?)\s*$/gm;
-  let m;
-  while ((m = re.exec(text)) !== null) {
-    const level = m[1].length;
-    const name = m[2].trim();
-    if (level === 2) currentTop = name;
-    out.push({
-      name,
-      level,
-      under_escape: norm(currentTop || "") === norm("Other notes") && !(level === 2 && norm(name) === norm("Other notes")),
-    });
-  }
-  return out;
-}
-
-export async function checkFile(io, path, schema, allSchemas, fname) {
-  const res = [];
-  const text = await io.readFile(path);
-  const present = headings(text);
-  const presentNorm = new Set(present.map((h) => norm(h.name)));
-  for (const want of schema.sections) {
-    if (want.optional) continue;
-    const w = norm(want.name);
-    if (![...presentNorm].some((p) => p === w || p.startsWith(w))) {
-      res.push(["FAIL", `missing required section "${"#".repeat(want.level)} ${want.name}"`]);
-    }
-  }
-  const known = new Set(schema.sections.map((s) => norm(s.name)));
-  known.add(norm("Other notes"));
-  const foreign = new Map();
-  for (const [other, osch] of Object.entries(allSchemas)) {
-    if (other === fname) continue;
-    for (const s of osch.sections) {
-      const nk = norm(s.name);
-      if (!foreign.has(nk)) foreign.set(nk, other);
-    }
-  }
-  for (const h of present) {
-    if (h.under_escape) continue;
-    const n = norm(h.name);
-    if ([...known].some((k) => n === k || n.startsWith(k))) continue;
-    if (schema.freeform) continue;
-    let owner = null;
-    for (const [k, f] of foreign) {
-      if (n === k || n.startsWith(k)) {
-        owner = f;
-        break;
-      }
-    }
-    if (owner) {
-      res.push(["FAIL", `section "${h.name}" belongs to ${owner} — content in the wrong file breaks its consumers`]);
-    } else {
-      res.push(["WARN", `unrecognised section "${h.name}" — put novel material under \`## Other notes\``]);
     }
   }
   return res;
@@ -459,7 +247,7 @@ export async function run(argv, io, resolveInvokedScriptPath) {
   for (const [f, hdr] of inlineRounds) {
     const p = join(ws, f);
     if (await io.exists(p)) {
-      for (const [level, msg] of await checkTable(io, p, hdr, new Map())) {
+      for (const [level, msg] of await checkTableHere(io, p, hdr, new Map())) {
         stdout += `${level}  ${f}: ${msg}\n`;
         if (level === "FAIL") failed++;
       }
@@ -476,7 +264,7 @@ export async function run(argv, io, resolveInvokedScriptPath) {
       [SELECTION_HEADER, SELECTION_ENUMS],
     ];
     for (const [header, enums] of tables) {
-      for (const [level, msg] of await checkTable(io, apath, header, enums)) {
+      for (const [level, msg] of await checkTableHere(io, apath, header, enums)) {
         stdout += `${level}  applications/${basename(apath)}: ${msg}\n`;
         if (level === "FAIL") failed++;
       }

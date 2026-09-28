@@ -1,10 +1,10 @@
 // A faithful JS port of skills/apply/scripts/proposal_block.py. Runs in
 // Node AND in the browser; no node:fs, no node:path.
-import { join, isAbsolute } from "./path-util.mjs";
-import { stripChars, pyInt, pyListRepr, cpSlice, cpLength, restoreLineSeparators, pySplitlines } from "./py-text.mjs";
-import { parseFlags, argError, argHelp } from "./argx.mjs";
-import { HELP } from "./help-text.mjs";
-import { crashToTraceback } from "./traceback.mjs";
+import { join, isAbsolute } from "../../../profile/scripts/lib/path-util.mjs";
+import { stripChars, pyInt, pyListRepr, cpSlice, cpLength, restoreLineSeparators, pySplitlines } from "../../../profile/scripts/lib/py-text.mjs";
+import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx.mjs";
+import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
+import { crashToTraceback } from "../../../profile/scripts/lib/traceback.mjs";
 
 const COVERAGE_HEADER = "| requirement | status | evidence | decision |";
 const SELECTION_HEADER = "| # | role | bullet | in/out | source | words | why |";

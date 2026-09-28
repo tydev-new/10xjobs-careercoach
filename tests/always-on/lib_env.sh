@@ -90,7 +90,21 @@ export PATH="$ROOT/guard-bin:$PATH"
 # removes the TRIGGER; the guards below (PATH shims, then the permission
 # layer) are defense in depth for anything else an agent under test might
 # still try, real Chrome or not.
-export RENDER_RESUME_CHROME="$ROOT/fixtures/fake-chrome"
+#
+# RENDER_RESUME_CHROME is NOT exported here (measured miss, arm-A t10 fix
+# round, 2026-09-27): an agent under test read this var, then `cat` the
+# fixture BY PATH — fixtures/fake-chrome's own docstring says "harness-owned
+# stand-in for headless Chrome", so it told the "candidate" it was running
+# inside a sandbox, changing the very behaviour the harness measures.
+# Pointing this var at the repo fixture at all, however early, is the
+# exposure; the fix is staging a comment-free, neutrally-named COPY inside
+# each trial's own sandbox $FAKEHOME and pointing this var at THAT instead —
+# see stage_fake_chrome() below, called from sandbox_home_setup (so the
+# copy always lands inside a sandbox HOME that already exists, never the
+# real fixtures/ dir) once per trial (concurrent trials never share a
+# fake home, same as FAKEHOME itself). The repo fixture at
+# fixtures/fake-chrome keeps its full documentation — only the per-trial
+# copy is stripped.
 
 # --- Kill-command permission guard, second layer (2026-09-27 review) ------
 # Independent review of the PATH guard above (0b748cb, probe_guards.sh)
@@ -230,6 +244,24 @@ unset _v
 # the same conclusion the kill-guard's own residual (CLAUDE_KILL_GUARD_ARGS
 # above) already reached; it is not this fix's scope.
 #
+# Stage a neutral, comment-free COPY of fixtures/fake-chrome inside the
+# sandbox HOME given as $1, and point RENDER_RESUME_CHROME at it (fix round,
+# 2026-09-27 — see the "No real browser" comment above for the finding).
+# tests/always-on/stage_fake_chrome.py does the actual stripping (ast to
+# locate and blank the module docstring, tokenize to drop every comment
+# except a line-1 shebang) — the LOGIC is untouched, byte for byte; only
+# the repo fixture's own full documentation is gone from this copy. Must
+# run AFTER $1 already exists (every caller below is sandbox_home_setup,
+# right after it creates $FAKEHOME) so the copy lands inside the sandbox,
+# never the real fixtures/ dir — and stages a FRESH copy per call, so
+# concurrent trials (each with their own $FAKEHOME) never share one.
+stage_fake_chrome() {
+  local dst_dir="$1/.local/bin"
+  mkdir -p "$dst_dir"
+  python3 "$ROOT/stage_fake_chrome.py" "$ROOT/fixtures/fake-chrome" "$dst_dir/chrome-headless"
+  export RENDER_RESUME_CHROME="$dst_dir/chrome-headless"
+}
+
 # Call once per trial/condition — concurrent trials must not share one
 # fake home. Sets $FAKEHOME and $HTOK for the caller to splice onto its
 # own `claude -p` line (`HOME="$FAKEHOME" USER=candidate LOGNAME=candidate
@@ -241,6 +273,7 @@ sandbox_home_setup() {
   mkdir -p "$FAKEHOME/.claude"
   HTOK=""
   [ -f "$HOME/.claude/harness-token" ] && HTOK="$(cat "$HOME/.claude/harness-token")"
+  stage_fake_chrome "$FAKEHOME"
 }
 sandbox_home_cleanup() { [ -n "${FAKEHOME:-}" ] && rm -rf "$FAKEHOME" 2>/dev/null; }
 

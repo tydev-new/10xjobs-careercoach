@@ -65,21 +65,84 @@ the ~100KB upload limit" line; the padding is a PDF comment appended after
 the last real object and before the xref table, so it changes the file's
 size without touching any object's own bytes or the offsets already
 computed for them.
+
+CALIBRATION fix (arm-A t10 run, 2026-09-27, measured miss #2 this round):
+the constants above (WRAP_WIDTH 95, LINES_PER_PAGE 50, HEADING_EXTRA_LINES
+{h1:3,h2:2,h3:2}) were a guess, not a measurement, and it was too strict —
+a résumé of 330 words (8 headings, 15 bullets:
+tests/always-on/fixtures/resume-330w.md, the arm-A t10 trial's own delivered
+file) rendered 2 pages through this fake while apply's own patterns.md puts
+a page at roughly 520-560 words. The agent under test, told (wrongly) that
+its already-lean résumé was 2 pages, cut it further — down to 278 words —
+chasing a page count nothing real would have reported. Replaced with
+constants DERIVED from render_resume.py's own CSS (that file's CSS string,
+lines 34-45), every step shown:
+
+    Page:    Letter, 8.5in x 11in                      (line 34)
+    Margins: 0.4in top/bottom, 0.5in left/right         (line 34)
+    Content width  = 8.5 - 2*0.5 = 7.5in  = 7.5*72  = 540.0pt
+    Content height = 11  - 2*0.4 = 10.2in = 10.2*72 = 734.4pt
+
+    Body:    font-size 10pt, line-height 1.25           (lines 35-36)
+    BODY_LINE_HEIGHT_PT = 10 * 1.25 = 12.5pt
+
+    Average glyph width ~= 0.5em — a documented approximation (proportional
+    fonts vary letter to letter; this is the standard rule-of-thumb ratio
+    for a body text face, not a per-glyph measurement).
+
+    Characters per line = floor(available_width_pt / (font_pt * 0.5)):
+      h1  18pt   (line 37), full width:              floor(540/9.00)  = 60
+      h2  10.5pt (line 39), full width:               floor(540/5.25)  = 102
+      h3  10.5pt (line 41), full width:               floor(540/5.25)  = 102
+      p   10pt (line 43 has no font-size override,
+          so it renders at body's 10pt), full width:  floor(540/5.00)  = 108
+      li  10pt inherited; width narrowed by ul's own
+          padding-left: 14pt                (line 44): floor((540-14)/5.00)
+                                                                       = 105
+
+    Lines per page = floor(content_height_pt / BODY_LINE_HEIGHT_PT)
+                   = floor(734.4 / 12.5) = 58
+
+    Heading extra lines — the vertical cost a heading's bigger line-height
+    and its own margins add BEYOND the one body-line-height that
+    blocks_to_lines() already counts for its wrapped text, converted to
+    body-line units and rounded to the nearest whole line:
+      h1 (line 37, margin 0 0 2pt): line-height 18*1.25=22.5pt
+         extra = (22.5-12.5) + 0 + 2       = 12.000pt -> round(12.000/12.5) = 1
+      h2 (lines 39-40, margin 8pt 0 4pt, border-bottom 1px (~0.75pt at
+          96px/in) + padding-bottom 2pt): line-height 10.5*1.25=13.125pt
+         extra = (13.125-12.5) + 8+4+0.75+2 = 15.375pt -> round(15.375/12.5) = 1
+      h3 (line 41, margin 7pt 0 1pt): line-height 13.125pt
+         extra = (13.125-12.5) + 7 + 1      = 8.625pt  -> round(8.625/12.5)  = 1
+
+Checked against three real documents (this fix round): the
+t10-over-budget base (438 words, ~50 headings/bullets across three roles,
+"measured at 2 rendered pages") still renders 2 pages; the 330-word
+résumé that over-rendered to 2 pages under the OLD guessed constants
+(tests/always-on/fixtures/resume-330w.md) now renders 1; a ~600-word
+résumé (tests/always-on/fixtures/resume-600w.md) renders 2 — see
+tests/test_always_on_fake_chrome.py, which also recomputes this arithmetic
+from render_resume.py's live CSS so a future CSS edit cannot silently make
+these constants stale.
 """
 import html as html_module
 import os
 import re
 import sys
 
-WRAP_WIDTH = 95      # characters per wrapped line — a fixed stand-in rule,
-LINES_PER_PAGE = 50  # not real_resume.py's own font metrics/CSS page math.
+# Characters per wrapped line, per block tag — derived above from
+# render_resume.py's own CSS (page width, each tag's font-size, the bullet
+# indent), not a fixed guess. WRAP_WIDTH["p"] is also the fallback for any
+# tag not present in this dict.
+WRAP_WIDTH = {"h1": 60, "h2": 102, "h3": 102, "p": 108, "li": 105}
+# Lines per page — derived above from the page's content height and the
+# body line-height.
+LINES_PER_PAGE = 58
 # A heading costs more vertical space than one text line (bigger font,
 # margin above and below) — extra BLANK lines charged after it, on top of
-# its own wrapped line(s). Calibrated (not measured from real CSS) so
-# tests/always-on/cases/t10-over-budget/base-resume.md — "measured at 2
-# rendered pages" — renders 2+ pages through this fake, and a clean,
-# already-tailored one-page résumé still renders 1.
-HEADING_EXTRA_LINES = {"h1": 3, "h2": 2, "h3": 2}
+# its own wrapped line(s). Derived above from each heading's own
+# line-height and CSS margins (h2 also its border/padding), not a guess.
+HEADING_EXTRA_LINES = {"h1": 1, "h2": 1, "h3": 1}
 # The exact block tags render_resume.py's own to_html() ever emits for
 # body content (blocks() in that file: heading levels, paragraphs, list
 # items) — this fake is a stand-in for THAT renderer's output specifically,
@@ -105,7 +168,7 @@ def html_to_blocks(html_text):
     return blocks
 
 
-def wrap_lines(text, width=WRAP_WIDTH):
+def wrap_lines(text, width):
     """Word-wrap into lines of at most `width` characters. Never splits a
     word. An empty/whitespace-only text still yields one blank line, so a
     block always contributes at least one line."""
@@ -123,14 +186,17 @@ def wrap_lines(text, width=WRAP_WIDTH):
     return lines
 
 
-def blocks_to_lines(blocks, width=WRAP_WIDTH):
+def blocks_to_lines(blocks):
     """Each block's own wrapped line(s), in order, with a heading's extra
-    weight (HEADING_EXTRA_LINES) charged right after it. At least one
-    line always comes back, even for a document with no recognized
-    blocks at all."""
+    weight (HEADING_EXTRA_LINES) charged right after it. The wrap width is
+    per TAG (WRAP_WIDTH), since a bigger font (a heading) or a narrower
+    available width (a bullet, indented under ul's own padding-left) fits
+    fewer characters per line than plain body text — WRAP_WIDTH["p"] is the
+    fallback for any tag not in the dict. At least one line always comes
+    back, even for a document with no recognized blocks at all."""
     lines = []
     for tag, text in blocks:
-        lines.extend(wrap_lines(text, width))
+        lines.extend(wrap_lines(text, WRAP_WIDTH.get(tag, WRAP_WIDTH["p"])))
         lines.extend([""] * HEADING_EXTRA_LINES.get(tag, 0))
     return lines or [""]
 
@@ -229,7 +295,7 @@ def main(argv):
         elif not a.startswith("-"):
             html_path = a  # the one bare (non-flag) argv token
     if not pdf_path:
-        print("fake-chrome: no --print-to-pdf=<path> in argv — nothing to write",
+        print("chrome-headless: no --print-to-pdf=<path> in argv — nothing to write",
               file=sys.stderr)
         return 1
     html_text = ""

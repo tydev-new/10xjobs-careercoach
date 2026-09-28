@@ -4,14 +4,40 @@ macOS user `tentest`): a runner's PDF step must never launch a real Chrome
 — that is what hung during the 2026-09-26 incident (see
 skills/apply/scripts/render_resume.py's to_pdf() docstring and
 tests/always-on/guard-bin/pkill for the incident it caused). Every
-run_*.sh sources lib_env.sh, which points RENDER_RESUME_CHROME at
-tests/always-on/fixtures/fake-chrome; render_resume.py's to_pdf() reads
+run_*.sh sources lib_env.sh, which — since the fix round below — stages a
+comment-free copy of tests/always-on/fixtures/fake-chrome inside the
+trial's own sandbox HOME (sandbox_home_setup, never at source time) and
+points RENDER_RESUME_CHROME at THAT; render_resume.py's to_pdf() reads
 that var only when its own caller passes no explicit `chrome=`.
+
+Fix round (arm-A t10 measured misses, 2026-09-27), two independent bugs:
+  (a) an agent under test read RENDER_RESUME_CHROME, then `cat` the file
+      BY PATH — the fixture's own docstring says "harness-owned stand-in
+      for headless Chrome", so it told the "candidate" it was in a
+      sandbox. Fixed: RENDER_RESUME_CHROME now points at a per-trial COPY,
+      staged inside the sandbox HOME with every comment and the module
+      docstring stripped (tests/always-on/stage_fake_chrome.py) — logic
+      untouched, byte for byte (see test_staged_copy_is_logic_identical...
+      below), nothing left worth reading.
+  (b) the page model was a guess, not a measurement, and too strict — a
+      330-word, 8-heading/15-bullet résumé (fixtures/resume-330w.md, an
+      arm-A t10 trial's own delivered file) rendered 2 pages though
+      apply's own patterns.md puts a page at ~520-560 words; the agent
+      under test, told wrongly its résumé was 2 pages, cut it further
+      to 278 words chasing a page count nothing real would report. Fixed:
+      the fixture's WRAP_WIDTH/LINES_PER_PAGE/HEADING_EXTRA_LINES
+      constants are now DERIVED from render_resume.py's own CSS, every
+      step shown in the fixture's own docstring —
+      test_derived_constants_match_render_resume_css below recomputes
+      that same arithmetic fresh from the live CSS so a future CSS edit
+      cannot silently make the fixture's constants stale.
 
     python3 tests/test_always_on_fake_chrome.py
 """
 import atexit
 import os
+import py_compile
+import re
 import stat
 import subprocess
 import sys
@@ -23,6 +49,9 @@ REPO = os.path.dirname(HERE)
 AO = os.path.join(REPO, "tests", "always-on")
 LIB_ENV = os.path.join(AO, "lib_env.sh")
 FAKE_CHROME = os.path.join(AO, "fixtures", "fake-chrome")
+STAGE_SCRIPT = os.path.join(AO, "stage_fake_chrome.py")
+RESUME_330W = os.path.join(AO, "fixtures", "resume-330w.md")
+RESUME_600W = os.path.join(AO, "fixtures", "resume-600w.md")
 
 sys.path.insert(0, os.path.join(REPO, "skills", "apply", "scripts"))
 import render_resume as rr  # noqa: E402
@@ -55,14 +84,27 @@ def test_fake_chrome_is_present_and_executable():
     assert os.access(FAKE_CHROME, os.X_OK), "fake-chrome must be executable"
 
 
-def test_lib_env_points_every_runner_at_the_fake_chrome():
-    """The wiring every run_*.sh gets for free by sourcing lib_env.sh —
-    the same shell setup tests/test_always_on_guards_review.py uses."""
-    prologue = f'set -u\nROOT="{AO}"\nREPO="{REPO}"\nsource "{LIB_ENV}"\n'
+def test_lib_env_points_every_runner_at_a_staged_copy_inside_the_sandbox():
+    """The wiring every run_*.sh gets for free by sourcing lib_env.sh and
+    calling sandbox_home_setup — the same shell setup
+    tests/test_always_on_guards_review.py uses. RENDER_RESUME_CHROME is no
+    longer set at source time (fix round, 2026-09-27): it is set inside
+    sandbox_home_setup, pointing at a copy staged into THAT CALL's own
+    $FAKEHOME — never $FAKEHOME itself directly, and never the documented
+    repo fixture."""
+    prologue = f'set -u\nROOT="{AO}"\nREPO="{REPO}"\nsource "{LIB_ENV}"\nsandbox_home_setup\n'
     env = dict(os.environ, REALJS="/nonexistent-fakechrome-review-vault")
-    r = subprocess.run(["bash", "-c", prologue + 'echo "$RENDER_RESUME_CHROME"'],
-                        capture_output=True, text=True, env=env, timeout=30)
-    assert r.stdout.strip() == FAKE_CHROME, (r.stdout, r.stderr)
+    r = subprocess.run(
+        ["bash", "-c", prologue + 'echo "$FAKEHOME"; echo "$RENDER_RESUME_CHROME"'],
+        capture_output=True, text=True, env=env, timeout=30)
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    fakehome, chrome = r.stdout.splitlines()
+    assert fakehome and chrome, (r.stdout, r.stderr)
+    assert chrome.startswith(fakehome + os.sep), (fakehome, chrome)
+    assert chrome != FAKE_CHROME, "still pointing at the documented repo fixture, not a staged copy"
+    assert os.path.basename(chrome) == "chrome-headless"
+    import shutil
+    shutil.rmtree(fakehome, ignore_errors=True)
 
 
 def test_to_pdf_uses_the_fake_when_only_the_env_var_is_set():
@@ -377,6 +419,190 @@ def test_fake_chrome_over_limit_pdf_still_parses_with_correct_page_count():
         assert len(reader.pages) == 1
         assert "Alex Chen" in reader.pages[0].extract_text()
     os.remove(pdf)
+
+
+# --- Fix round, 2026-09-27 (arm-A t10 measured misses) -------------------
+# (a) hide it: RENDER_RESUME_CHROME must point at a comment-free, per-trial
+#     copy (tests/always-on/stage_fake_chrome.py), not the documented repo
+#     fixture. (b) calibrate it: WRAP_WIDTH/LINES_PER_PAGE/
+#     HEADING_EXTRA_LINES are now derived from render_resume.py's own CSS,
+#     not guessed.
+
+import importlib.machinery  # noqa: E402
+import importlib.util  # noqa: E402
+
+
+def _load_fake_chrome_module():
+    """Import fixtures/fake-chrome (no .py suffix, so plain `import` can't
+    find it) as a real module — used to read its WRAP_WIDTH/LINES_PER_PAGE/
+    HEADING_EXTRA_LINES constants directly, never re-typed by hand here (a
+    copy-pasted expected value could silently drift from the fixture)."""
+    loader = importlib.machinery.SourceFileLoader("fake_chrome_fixture", FAKE_CHROME)
+    spec = importlib.util.spec_from_loader("fake_chrome_fixture", loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
+def test_staged_copy_is_logic_identical_and_carries_no_disclosure_word():
+    """stage_fake_chrome.py's own contract: byte-for-byte identical PDF
+    output for the same input (the docstring/comment strip touches no
+    logic), and no 'harness'/'stand-in'/'fake'/'test' word survives EXCEPT
+    the one required exception, FAKE_CHROME_PDF_BYTES (an opaque env-var
+    NAME the copy must keep reading by this exact name — see
+    test_fake_chrome_size_is_overridable_for_the_over_limit_case and
+    test_fake_chrome_over_limit_pdf_still_parses_with_correct_page_count
+    above, both of which exercise it — never printed/logged to any
+    transcript, unlike the docstring prose this check exists to catch)."""
+    d = tempfile.mkdtemp(prefix="staged-fake-chrome-")
+    try:
+        copy_path = os.path.join(d, "chrome-headless")
+        r = subprocess.run([sys.executable, STAGE_SCRIPT, FAKE_CHROME, copy_path],
+                            capture_output=True, text=True, timeout=30)
+        assert r.returncode == 0, (r.stdout, r.stderr)
+        assert os.access(copy_path, os.X_OK)
+
+        py_compile.compile(copy_path, doraise=True)  # must still be valid Python
+
+        copy_text = open(copy_path, encoding="utf-8").read()
+        scrubbed = copy_text.replace("FAKE_CHROME_PDF_BYTES", "")
+        hit = re.search(r"\b(harness|stand-in|fake|test)\b", scrubbed, re.I)
+        assert hit is None, f"disclosure word survived stripping: {hit.group(0)!r}"
+        assert "FAKE_CHROME_PDF_BYTES" in copy_text, "the one required exception must still be readable by this exact name"
+
+        html = _tmp(".html")
+        open(html, "w", encoding="utf-8").write(RESUME_HTML.format(bullets=""))
+        orig_pdf = _tmp(".pdf")
+        copy_pdf = _tmp(".pdf")
+        ok1, err1 = rr.to_pdf(html, orig_pdf, chrome=FAKE_CHROME)
+        ok2, err2 = rr.to_pdf(html, copy_pdf, chrome=copy_path)
+        assert ok1, err1
+        assert ok2, err2
+        assert open(orig_pdf, "rb").read() == open(copy_pdf, "rb").read(), \
+            "stripping changed the LOGIC (output bytes differ) — it must only remove comments/docstring"
+        os.remove(orig_pdf)
+        os.remove(copy_pdf)
+    finally:
+        import shutil
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_calibration_330_word_resume_renders_one_page():
+    """The exact arm-A t10 over-cut trigger (finding (b)): 330 words, 8
+    headings, 15 bullets — the tester's own delivered file from that
+    trial, copied in as fixtures/resume-330w.md. Rendered 2 pages under
+    the OLD guessed constants; must render 1 now."""
+    assert os.path.isfile(RESUME_330W), RESUME_330W
+    pdf = _render_md_through_real_renderer(RESUME_330W)
+    assert rr.pdf_pages(pdf) == 1, rr.pdf_pages(pdf)
+    if _HAS_PDFTOTEXT:
+        r = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True, timeout=10)
+        assert r.returncode == 0, r.stderr
+        assert len(r.stdout.split()) > 50
+    if _HAS_PYPDF:
+        assert len(_pypdf.PdfReader(pdf).pages) == 1
+    os.remove(pdf)
+
+
+def test_calibration_600_word_resume_renders_two_pages():
+    """The other calibration bound: apply's patterns.md puts a page at
+    ~520-560 words, so a résumé of ABOUT 600 words is just past a single
+    page and must render 2, not the 1 an under-strict fix could also have
+    produced."""
+    assert os.path.isfile(RESUME_600W), RESUME_600W
+    pdf = _render_md_through_real_renderer(RESUME_600W)
+    assert rr.pdf_pages(pdf) == 2, rr.pdf_pages(pdf)
+    if _HAS_PDFTOTEXT:
+        r = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True, timeout=10)
+        assert r.returncode == 0, r.stderr
+        assert len(r.stdout.split()) > 100
+    if _HAS_PYPDF:
+        assert len(_pypdf.PdfReader(pdf).pages) == 2
+    os.remove(pdf)
+
+
+def test_derived_constants_match_render_resume_css():
+    """Canary against future drift: recomputes WRAP_WIDTH/LINES_PER_PAGE/
+    HEADING_EXTRA_LINES fresh from render_resume.py's LIVE CSS string (page
+    size/margins, body font-size/line-height, each heading's font-size and
+    margins, h2's border/padding, and ul's own padding-left for the bullet
+    indent) using the exact same arithmetic the fixture's own docstring
+    shows by hand — average glyph width 0.5em, floor for chars-per-line
+    and lines-per-page, round-to-nearest for a heading's extra lines. If a
+    future CSS edit changes any of these values, this test fails BEFORE
+    the fixture's hard-coded constants go silently stale."""
+    css = rr.CSS
+
+    def rule(selector):
+        for m in re.finditer(r"([^{}]+)\{([^}]*)\}", css):
+            if m.group(1).strip() == selector:
+                return m.group(2)
+        raise AssertionError(f"selector {selector!r} not found in render_resume.py's CSS")
+
+    def num(decl, prop, unit):
+        m = re.search(rf"\b{re.escape(prop)}\s*:\s*([0-9.]+){re.escape(unit)}", decl)
+        assert m, (prop, unit, decl)
+        return float(m.group(1))
+
+    def margin_parts(decl, unit="pt"):
+        # 3-value margin shorthand: top, left+right, bottom. A bare 0 needs
+        # no unit in CSS (render_resume.py's CSS uses this for every 0).
+        val = rf"([0-9.]+(?:{unit})?|0)"
+        m = re.search(rf"\bmargin\s*:\s*{val}\s+{val}\s+{val}\s*;", decl)
+        assert m, decl
+        top, _lr, bot = m.groups()
+        return float(top.rstrip(unit) or 0), float(bot.rstrip(unit) or 0)
+
+    page = rule("@page")
+    pm = re.search(r"margin:\s*([0-9.]+)in\s+([0-9.]+)in", page)
+    top_bottom_in, left_right_in = float(pm.group(1)), float(pm.group(2))
+    content_width_pt = (8.5 - 2 * left_right_in) * 72
+    content_height_pt = (11 - 2 * top_bottom_in) * 72
+
+    body = rule("body")
+    body_font_pt = num(body, "font-size", "pt")
+    body_lh = float(re.search(r"line-height:\s*([0-9.]+)", body).group(1))
+    body_line_height_pt = body_font_pt * body_lh
+
+    h1, h2, h3, ul = rule("h1"), rule("h2"), rule("h3"), rule("ul")
+    h1_font, (h1_mtop, h1_mbot) = num(h1, "font-size", "pt"), margin_parts(h1)
+    h2_font, (h2_mtop, h2_mbot) = num(h2, "font-size", "pt"), margin_parts(h2)
+    h2_pad_bot = num(h2, "padding-bottom", "pt")
+    h2_border_px = float(re.search(r"border-bottom:\s*([0-9.]+)px", h2).group(1))
+    h3_font, (h3_mtop, h3_mbot) = num(h3, "font-size", "pt"), margin_parts(h3)
+    bullet_indent_pt = num(ul, "padding-left", "pt")
+
+    GLYPH_EM = 0.5
+
+    def chars_per_line(font_pt, avail_pt):
+        return int(avail_pt // (font_pt * GLYPH_EM))
+
+    expected_wrap_width = {
+        "h1": chars_per_line(h1_font, content_width_pt),
+        "h2": chars_per_line(h2_font, content_width_pt),
+        "h3": chars_per_line(h3_font, content_width_pt),
+        "p": chars_per_line(body_font_pt, content_width_pt),
+        "li": chars_per_line(body_font_pt, content_width_pt - bullet_indent_pt),
+    }
+    expected_lines_per_page = int(content_height_pt // body_line_height_pt)
+
+    PT_PER_PX = 72 / 96  # CSS px -> pt, 96px/in
+
+    def extra(font_pt, mtop, mbot, border=0, pad=0):
+        lh = font_pt * body_lh
+        extra_pt = (lh - body_line_height_pt) + mtop + mbot + border + pad
+        return round(extra_pt / body_line_height_pt)
+
+    expected_heading_extra = {
+        "h1": extra(h1_font, h1_mtop, h1_mbot),
+        "h2": extra(h2_font, h2_mtop, h2_mbot, border=h2_border_px * PT_PER_PX, pad=h2_pad_bot),
+        "h3": extra(h3_font, h3_mtop, h3_mbot),
+    }
+
+    fixture = _load_fake_chrome_module()
+    assert fixture.WRAP_WIDTH == expected_wrap_width, (fixture.WRAP_WIDTH, expected_wrap_width)
+    assert fixture.LINES_PER_PAGE == expected_lines_per_page, (fixture.LINES_PER_PAGE, expected_lines_per_page)
+    assert fixture.HEADING_EXTRA_LINES == expected_heading_extra, (fixture.HEADING_EXTRA_LINES, expected_heading_extra)
 
 
 if __name__ == "__main__":

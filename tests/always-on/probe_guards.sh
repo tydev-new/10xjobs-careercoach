@@ -124,12 +124,48 @@ none_created() { [ -z "$(printf '%s' "$created" | tr -d ' ')" ]; }
 check "a locked vault refuses new files and directories" \
       "a locked vault still accepts new entries by absolute path:${created} (vault_lock marks only -type f uchg)" none_created
 
-echo "== render_resume.py never launches a real browser in this harness =="
-harness_chrome="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; echo \"\$RENDER_RESUME_CHROME\"")"
-is_fake() { [ "$harness_chrome" = "$ROOT/fixtures/fake-chrome" ] && [ -x "$ROOT/fixtures/fake-chrome" ]; }
-check "lib_env.sh points RENDER_RESUME_CHROME at an executable harness fake" \
-      "RENDER_RESUME_CHROME is not the harness fake (got: ${harness_chrome:-<empty>})" is_fake
-harness_pdf="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; python3 - '$REPO' '$T' <<'EOF'
+echo "== render_resume.py never launches a real browser in this harness, and never discloses that it's a stand-in (fix round, 2026-09-27) =="
+# sandbox_home_setup (not a bare `source`) is the real per-trial path every
+# run_*.sh now takes — RENDER_RESUME_CHROME is no longer set at source
+# time, only once a sandbox HOME exists to stage the neutral copy into
+# (see lib_env.sh's "No real browser" comment). Capture FAKEHOME, the var,
+# and the staged copy's own bytes all from ONE subshell (sandbox_home_setup
+# is a function, its effects don't survive a fresh subshell), delimited so
+# the outer probe can pull each piece back out.
+chrome_probe="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; sandbox_home_setup
+echo \"FAKEHOME=\$FAKEHOME\"
+echo \"RENDER_RESUME_CHROME=\$RENDER_RESUME_CHROME\"
+echo '---COPY---'
+cat \"\$RENDER_RESUME_CHROME\"")"
+# sandbox_home_cleanup is deliberately NOT called inside the subshell above
+# — the executable-ness check right below needs the staged file to still
+# exist after this command substitution returns; it is removed by hand at
+# the end of this block instead (never sandbox_home_cleanup itself, which
+# only knows about ITS OWN caller's $FAKEHOME, not this probe's captured
+# copy of it).
+harness_fakehome="$(printf '%s\n' "$chrome_probe" | sed -n 's/^FAKEHOME=//p')"
+harness_chrome="$(printf '%s\n' "$chrome_probe" | sed -n 's/^RENDER_RESUME_CHROME=//p')"
+harness_copy="$(printf '%s\n' "$chrome_probe" | sed -n '/^---COPY---$/,$p' | tail -n +2)"
+inside_sandbox() {
+  [ -n "$harness_fakehome" ] && [ -n "$harness_chrome" ] || return 1
+  case "$harness_chrome" in "$harness_fakehome"/*) [ -x "$harness_chrome" ];; *) false;; esac
+}
+check "lib_env.sh points RENDER_RESUME_CHROME at an executable copy inside the sandbox HOME" \
+      "RENDER_RESUME_CHROME is not inside the sandbox HOME (FAKEHOME=${harness_fakehome:-<empty>}, got: ${harness_chrome:-<empty>})" inside_sandbox
+no_giveaway() {
+  # FAKE_CHROME_PDF_BYTES is the one required exception: an opaque env-var
+  # NAME the copy must keep reading by this exact name (FAKE_CHROME_PDF_BYTES
+  # still works is its own acceptance line), never printed or logged to any
+  # transcript — unlike the docstring/comment PROSE this check exists to
+  # catch, an agent has no ordinary reason to introspect it.
+  scrubbed="${harness_copy//FAKE_CHROME_PDF_BYTES/}"
+  ! printf '%s' "$scrubbed" | grep -qiE '\b(harness|stand-in|fake|test)\b'
+}
+check "the staged copy carries no 'harness'/'stand-in'/'fake'/'test' word an agent could read back (FAKE_CHROME_PDF_BYTES exempted)" \
+      "the staged copy still discloses what it is: $(printf '%s' "$harness_copy" | grep -inE '\b(harness|stand-in|fake|test)\b' | grep -vF 'FAKE_CHROME_PDF_BYTES' | head -3)" no_giveaway
+[ -n "$harness_fakehome" ] && rm -rf "$harness_fakehome" 2>/dev/null
+
+harness_pdf="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; sandbox_home_setup; python3 - '$REPO' '$T' <<'EOF'
 import sys, os
 sys.path.insert(0, os.path.join(sys.argv[1], 'skills', 'apply', 'scripts'))
 import render_resume as rr
@@ -137,20 +173,37 @@ t = sys.argv[2]
 open(os.path.join(t, 'harness.html'), 'w').write('<html></html>')
 ok, err = rr.to_pdf(os.path.join(t, 'harness.html'), os.path.join(t, 'harness.pdf'))
 print('OK' if ok else 'FAIL:' + str(err))
-EOF")"
+EOF
+sandbox_home_cleanup")"
 pdf_ok() { [ "$harness_pdf" = OK ]; }
-check "an agent-style call (no explicit chrome=) renders via the fake" \
-      "an agent-style call did not render via the harness fake: $harness_pdf" pdf_ok
+check "an agent-style call (no explicit chrome=) renders via the staged copy" \
+      "an agent-style call did not render via the staged copy: $harness_pdf" pdf_ok
 
 # The fake must let t10-over-budget express its failure: that case's base is
 # "measured at 2 rendered pages" (cases/t10-over-budget/expected.md), so an
-# agent-style render of it through the harness fake must report 2+ pages,
-# and its text layer must extract.
-ob_line="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/cases/t10-over-budget/base-resume.md' --pdf '$T/ob.pdf' --pages 1" 2>&1 | grep '^pages:')"
-ob_pages="$(printf '%s' "$ob_line" | sed -n 's/^pages: \([0-9]*\).*/\1/p')"
+# agent-style render of it through the staged copy must report 2+ pages,
+# and its text layer must extract. Also checks the calibration fix's other
+# two acceptance points (fixtures/resume-330w.md -> 1 page,
+# fixtures/resume-600w.md -> 2 pages) the same way, through the same
+# sandboxed copy — see tests/test_always_on_fake_chrome.py for the full,
+# documented arithmetic this re-checks only the OUTCOME of.
+page_probe="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; sandbox_home_setup
+python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/cases/t10-over-budget/base-resume.md' --pdf '$T/ob.pdf' --pages 1 2>&1 | grep '^pages:'
+python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/fixtures/resume-330w.md' --pdf '$T/w330.pdf' --pages 1 2>&1 | grep '^pages:'
+python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/fixtures/resume-600w.md' --pdf '$T/w600.pdf' --pages 1 2>&1 | grep '^pages:'
+sandbox_home_cleanup")"
+ob_pages="$(printf '%s\n' "$page_probe" | sed -n '1s/^pages: \([0-9]*\).*/\1/p')"
+w330_pages="$(printf '%s\n' "$page_probe" | sed -n '2s/^pages: \([0-9]*\).*/\1/p')"
+w600_pages="$(printf '%s\n' "$page_probe" | sed -n '3s/^pages: \([0-9]*\).*/\1/p')"
 two_pages() { [ "${ob_pages:-0}" -ge 2 ]; }
-check "t10-over-budget's 2-page base renders ${ob_pages} pages through the harness fake" \
-      "t10-over-budget's base (measured at 2 real pages) renders ${ob_pages:-?} page(s) through the harness fake — the case cannot express its failure" two_pages
+check "t10-over-budget's 2-page base renders ${ob_pages} pages through the staged copy" \
+      "t10-over-budget's base (measured at 2 real pages) renders ${ob_pages:-?} page(s) through the staged copy — the case cannot express its failure" two_pages
+one_page_330() { [ "${w330_pages:-0}" -eq 1 ]; }
+check "the 330-word résumé (the arm-A t10 over-cut trigger) renders 1 page through the staged copy" \
+      "the 330-word résumé renders ${w330_pages:-?} page(s), not 1 — the over-strict miss this fix round exists for is still live" one_page_330
+two_pages_600() { [ "${w600_pages:-0}" -eq 2 ]; }
+check "the ~600-word résumé renders 2 pages through the staged copy" \
+      "the ~600-word résumé renders ${w600_pages:-?} page(s), not 2" two_pages_600
 has_text() { [ -f "$T/ob.pdf" ] && [ "$(pdftotext "$T/ob.pdf" - 2>/dev/null | wc -w)" -gt 100 ]; }
 if command -v pdftotext >/dev/null; then
   check "the fake's PDF has an extractable text layer (pdftotext)" \

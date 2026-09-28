@@ -31,10 +31,10 @@ import type {
 } from "../types.ts";
 import { countWords } from "../skills/system-prompt.ts";
 import { err, isWorkspaceError } from "./tool-errors.ts";
-// eslint-disable-next-line import type-only cycle guard: ToolContext/TurnState
-// live in ./index.ts, which imports createBoardsTools from here — a
-// TYPE-only import is erased before either `tsc` or Node's type-stripped
-// execution ever sees a runtime edge, so there is no real import cycle.
+// Type-only import cycle guard: ToolContext/TurnState live in ./index.ts,
+// which imports createBoardsTools from here — a TYPE-only import is
+// erased before either `tsc` or Node's type-stripped execution ever sees
+// a runtime edge, so there is no real import cycle.
 import type { ToolContext } from "./index.ts";
 
 import * as jm from "../../../../skills/search/scripts/lib/jobs-md.mjs";

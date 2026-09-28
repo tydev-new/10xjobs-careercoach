@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { builtinModules } from "node:module";
-import { cpSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -124,7 +124,25 @@ const MUTANTS: Record<string, string> = {
 };
 
 function mutantCopy(code: string): string {
-  const root = tmp("agent-mutant-");
+  // design-web-search.md § 4.4 (S2): src/tools/boards.ts imports
+  // skills/search/scripts/lib/{board-readers,jobs-md}.mjs by a relative
+  // path that climbs OUT of packages/agent ("../../../../skills/..." —
+  // "one implementation", not a copy). A bare `root = tmp(...)` used
+  // directly as "AGENT" (the ORIGINAL shape here) breaks that import
+  // in the isolated copy: `root` sits directly under the OS tmpdir, four
+  // levels up from `root/src/tools/` lands nowhere near a `skills/`
+  // folder, so EVERY mutant — including harmless ones — failed to
+  // resolve and was (wrongly) reported as "caught". Fix: nest the copy
+  // two levels deeper (`outer/packages/agent`, mirroring this repo's own
+  // REPO/packages/agent), and symlink `outer/skills` to the real
+  // skills/ tree, so the same relative climb lands correctly. The
+  // returned path is still "AGENT-shaped" (src/, test/, node_modules,
+  // package.json, tsconfig.json all directly inside it) — every existing
+  // caller (scan(), theirLintCatches()) is unchanged.
+  const outer = tmp("agent-mutant-");
+  const root = path.join(outer, "packages", "agent");
+  mkdirSync(root, { recursive: true });
+  symlinkSync(path.join(REPO, "skills"), path.join(outer, "skills"));
   for (const d of ["src", "test"]) cpSync(path.join(AGENT, d), path.join(root, d), { recursive: true });
   for (const f of ["package.json", "tsconfig.json"]) cpSync(path.join(AGENT, f), path.join(root, f));
   symlinkSync(path.join(AGENT, "node_modules"), path.join(root, "node_modules"));

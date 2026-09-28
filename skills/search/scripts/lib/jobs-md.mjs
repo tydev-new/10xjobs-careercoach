@@ -65,14 +65,20 @@ const LABEL_TO_KEY = new Map(FIELDS);
 // ever reaches this class — so by the time ANY value (fresh off argv, or
 // returned by `load()`) arrives here, a sentinel code point can only ever
 // mean "a literal U+E000/U+E001", never "a stand-in for U+2028/U+2029".
-const SANITISE_WS_CHARS = " \\t\\n\\r\\f\\v\\u0085\\u00a0\\u2028\\u2029";
+// Exported (design-web-search.md § 4.4, lead ruling): the whitespace class
+// is defined ONCE, here — board-readers.mjs imports it rather than
+// redefining it, so a board posting's body text and a jobs.md field value
+// are always cleaned by the identical class.
+export const SANITISE_WS_CHARS = " \\t\\n\\r\\f\\v\\u0085\\u00a0\\u2028\\u2029";
 const SANITISE_WS_RE = new RegExp(`[${SANITISE_WS_CHARS}]+`, "g");
 const SANITISE_TRIM_RE = new RegExp(`^[${SANITISE_WS_CHARS}]+|[${SANITISE_WS_CHARS}]+$`, "g");
 
 // Collapse every run of the sanitising whitespace class to one space and
 // trim both ends. `null`/`undefined` (an absent field) pass through
-// unchanged.
-function cleanValue(value) {
+// unchanged. Exported so board-readers.mjs can clean a posting's extracted
+// text with the exact same rule `save()` uses for a jobs.md field, rather
+// than defining a second copy (design-web-search.md § 4.4).
+export function cleanValue(value) {
   if (value === null || value === undefined) return value;
   const cleaned = String(value).replace(SANITISE_WS_RE, " ");
   return cleaned.replace(SANITISE_TRIM_RE, "");

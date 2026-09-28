@@ -6,7 +6,7 @@ tell they are met, and who checks.
 ## Who checks what
 
 - **Structure and counts → the scripts.**
-  `scripts/check_materials.py` — the mechanical floor for the
+  `scripts/check_materials.mjs` — the mechanical floor for the
   résumé and letter: case length · salutation register · one opening
   section · standard section names · no aggregate year counts (quoting
   the JD's bar in a bolded opener is exempt) · no arrow or scaffolding
@@ -14,13 +14,13 @@ tell they are met, and who checks.
   and stale per-role dates · duplicated Summary/Experience sentences ·
   every Experience bullet verbatim from the base except the declared
   `## Reworded` pairs. The letter's length bounds are advisory WARNs
-  (spec-born, never fired; an incident promotes them).  `scripts/render_resume.py` measures words, pages, and file size.
-  `scripts/proposal_block.py` prints the proposal as the block the
+  (spec-born, never fired; an incident promotes them).  `scripts/render_resume.mjs` measures words, pages, and file size.
+  `scripts/proposal_block.mjs` prints the proposal as the block the
   reply carries (out rows first, verbatim) and checks what prose kept
   failing: a `have` row whose JD word is absent from the base (WARN —
   `shown-but-unnamed` unless defended), `out` rows in base order
   (WARN), a cut with no `why`/`words` (FAIL).
-  `../../profile/scripts/check_files.py` validates the four declared tables.
+  `../../profile/scripts/check_files.mjs` validates the four declared tables.
 - **Language against written rules → an INDEPENDENT checker-subagent**,
   spawned on `../../profile/references/language-check.md` with the
   documents and their rule sources (`voice.md`, `base-resume.md § Claim
@@ -56,7 +56,7 @@ deliverable.
   function, title, or seniority the base doesn't carry; unsupported
   sections omitted, never filled. Selection, order, and depth ARE the
   tailoring.
-- **The decisions were disclosed beside the delivered document** — the `proposal_block.py` list in the reply: every cut with what it buys (weakest first), every `shown-but-unnamed` word with where it was placed, every gap as a question, the page choice if the render ran over, and the one sentence that makes reversal cheap. The delivered file matches the list exactly; tool output the candidate never sees does not count (t10-coverage-classify, t10-over-budget measure this — and ~20 trials measured a wait-before-delivery dead).
+- **The decisions were disclosed beside the delivered document** — the `proposal_block.mjs` list in the reply: every cut with what it buys (weakest first), every `shown-but-unnamed` word with where it was placed, every gap as a question, the page choice if the render ran over, and the one sentence that makes reversal cheap. The delivered file matches the list exactly; tool output the candidate never sees does not count (t10-coverage-classify, t10-over-budget measure this — and ~20 trials measured a wait-before-delivery dead).
 - **The standard was written before the draft** (`## Standard`), the
   audit came before the documents, and the page count was measured
   against the target the candidate gave, not discovered.

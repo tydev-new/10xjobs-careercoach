@@ -8,8 +8,8 @@ reached, and who checks.
 - **Structure and counts → the scripts.** Every record search owns is
   script-written and script-validated: `search_ats.py` validates the
   rows it writes, `criteria.json` hard-rejects unknown keys and bad
-  types and warns loudly when stale, `update_job.py` loud-fails on
-  ambiguous matches, and `../../profile/scripts/check_files.py` checks
+  types and warns loudly when stale, `update_job.mjs` loud-fails on
+  ambiguous matches, and `../../profile/scripts/check_files.mjs` checks
   the manifest at session close.
 - **Language against written rules → no checker-subagent.** Search
   writes no candidate-voiced text; there is nothing for it to check.

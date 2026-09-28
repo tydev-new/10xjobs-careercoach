@@ -20,7 +20,7 @@ as complete.
 
 Map each event to its pipeline row by company (+ role when a company
 has several). **0 or 2+ matches → show the candidate the matches and
-ask** — the same loud-fail rule `update_job.py` itself enforces; never
+ask** — the same loud-fail rule `update_job.mjs` itself enforces; never
 guess which row.
 
 ### Calendar

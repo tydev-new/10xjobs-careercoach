@@ -5,7 +5,7 @@ reached, and who checks.
 
 ## Who checks what
 
-- **Structure and counts → two scripts.** `scripts/check_closeout.py` — the stage named, `plan.md` written this turn, a Waiting-on-you row for every question the reply declares it asked (the agent declares; the script checks the disk). `../../profile/scripts/check_files.py` — `plan.md`'s sections and the manifest. Pipeline writes go through `update_job.py`, which fails loudly on an ambiguous match.
+- **Structure and counts → two scripts.** `scripts/check_closeout.mjs` — the stage named, `plan.md` written this turn, a Waiting-on-you row for every question the reply declares it asked (the agent declares; the script checks the disk). `../../profile/scripts/check_files.mjs` — `plan.md`'s sections and the manifest. Pipeline writes go through `update_job.mjs`, which fails loudly on an ambiguous match.
 - **Language against written rules → no checker-subagent.** Briefings
   and prescriptions are the coach's voice; the tone contract
   (`patterns.md § Tone`) is judged, not parsed.

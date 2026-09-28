@@ -53,7 +53,7 @@ run.
 
 ## Session close
 
-Run `../profile/scripts/check_files.py --workspace .`; fix a FAIL
+Run `../profile/scripts/check_files.mjs --workspace .`; fix a FAIL
 before the reply ends. Report outcomes, never narration.
 
 ## Guardrails

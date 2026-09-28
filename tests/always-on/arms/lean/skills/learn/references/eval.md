@@ -7,7 +7,7 @@ reached, and who checks.
 
 - **Structure and counts → `scripts/check_knowledge.py`** (the Map's
   scope and status grammar — FAIL on a malformed scope or a bad status)
-  and `../../profile/scripts/check_files.py` (the manifest). Both at
+  and `../../profile/scripts/check_files.mjs` (the manifest). Both at
   session close.
 - **Language against written rules → no checker-subagent.** Courses and
   assessments are the coach's voice.

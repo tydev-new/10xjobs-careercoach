@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cf-missing-workspace-dir",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "does-not-exist",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "Traceback (most recent call last):",
+   "stderrMatch": "first-line",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

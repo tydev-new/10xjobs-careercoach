@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): help text names the script (§ 5.5's rename check)",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "-h"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n  --skills SKILLS       the skills/ directory the schemas are read from\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

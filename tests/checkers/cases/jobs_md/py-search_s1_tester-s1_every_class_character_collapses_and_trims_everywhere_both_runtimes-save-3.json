@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_every_class_character_collapses_and_trims_everywhere_both_runtimes (jobs_md.save, as _both_save calls it)",
+ "steps": [
+  {
+   "script": "search/scripts/jobs_md.py",
+   "argv": [
+    "save",
+    "<ws>",
+    "[{\"company\": \"\\nAcme\\n\\nCo\\n\", \"title\": \"\\n\\nStaff\\n\\nEngineer\\n\", \"stage\": \"To Review\", \"dismissed\": false, \"url\": \"\\na\\n\\nb\\n\", \"location\": \"\\na\\n\\nb\\n\", \"posted_at\": \"\\na\\n\\nb\\n\", \"seen_at\": \"\\na\\n\\nb\\n\", \"updated_at\": \"\\na\\n\\nb\\n\", \"fit_verdict\": \"\\na\\n\\nb\\n\", \"fit_reason\": \"\\na\\n\\nb\\n\", \"dealbreakers\": \"\\na\\n\\nb\\n\", \"track\": \"\\na\\n\\nb\\n\", \"flags\": \"\\na\\n\\nb\\n\", \"jd_sim\": \"\\na\\n\\nb\\n\", \"jd_file\": \"\\na\\n\\nb\\n\", \"analysis_file\": \"\\na\\n\\nb\\n\", \"company_file\": \"\\na\\n\\nb\\n\", \"evaluated_at\": \"\\na\\n\\nb\\n\"}]",
+    "null"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme Co — Staff Engineer\n- URL: a b\n- Location: a b\n- Posted: a b\n- Seen: a b\n- Updated: a b\n- Verdict: a b\n- Reason: a b\n- Dealbreakers: a b\n- Track: a b\n- Flags: a b\n- Sim: a b\n- JD: a b\n- Analysis: a b\n- Company file: a b\n- Evaluated: a b\n"
+ }
+}

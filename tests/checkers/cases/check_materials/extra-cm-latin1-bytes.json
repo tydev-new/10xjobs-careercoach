@@ -1,0 +1,30 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-latin1-bytes",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "resume.md": {
+   "base64": "IyBS6XN1bekKCiMjIFN1bW1hcnkKCm9rLgo="
+  }
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n",
+   "stderr": "Traceback (most recent call last):",
+   "stderrMatch": "first-line",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

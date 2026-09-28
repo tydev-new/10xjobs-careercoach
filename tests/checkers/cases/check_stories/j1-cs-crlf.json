@@ -1,0 +1,27 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): CRLF index",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "stories/S001-a.md": "# s\n",
+  "storybank.md": "# Storybank\r\n\r\n## Coverage\r\n\r\n| Competency | Source | Covered by |\r\n|---|---|---|\r\n| X | [inferred] | S001 |\r\n\r\n## Stories\r\n\r\n| ID | Title | Strength | Status | Notes |\r\n|---|---|---|---|---|\r\n| S001 | A | 4 | confirmed | |\r\n| S001 | B | 4 | nope | |\r\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  duplicate story ID S001\nFAIL  S001: invalid Status 'nope' — `confirmed` or `draft [source: <file>]`\n\n2 index row(s), 1 story file(s); 2 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

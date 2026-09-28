@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-r2rev-summary-prose-51-words",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "resume.md": "# Alex Chen\n\n## Summary\n\nword word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word\n\n- Cut costs 30%.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: FAIL (1 fail, 0 warn)\n  [FAIL] Summary opens with 51 words of prose (max 50) — the Summary is bullets (apply's patterns.md § The Summary); a recruiter reads 7-11s in an F-pattern and prose past ~2 lines is invisible\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

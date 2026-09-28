@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): U+2028 inside a line is not a line break to file iteration",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| X | track-A | s | gap | | Y | bad | s | gap |\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n1 map row(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

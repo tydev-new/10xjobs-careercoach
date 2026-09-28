@@ -162,6 +162,40 @@ else:
     else:
         passed += 1
 
+# tests/checkers/: the expected-output cases (docs/design-js-only.md § 5) —
+# Python 3.14's recorded output for all eleven shipped scripts, replayed
+# through the `node` path (the ports; python3 for the three unported
+# scripts until J3) and the web's just-bash dispatch; then the § 5.4 tester
+# checks (a planted wrong output, an edited input, the masked temp path and
+# the stub Chrome page line must each FAIL). Node 18 (the floor, § 5.4)
+# runs the `node` path too when NODE18_BIN names a Node 18 binary.
+CASES = os.path.join(HERE, "checkers")
+if not node:
+    print("\nSKIPPED tests/checkers/run-cases.mjs: no `node` on PATH")
+else:
+    for label, args in (
+        ("run-cases.mjs", []),
+        ("run-cases.mjs --self-test", ["--self-test"]),
+    ):
+        print(f"\n--- node tests/checkers/{label} ---")
+        result = subprocess.run([node, os.path.join(CASES, "run-cases.mjs"), *args], cwd=os.path.join(HERE, ".."))
+        if result.returncode != 0:
+            failed += 1
+            print(f"FAIL tests/checkers/{label} — see output above")
+        else:
+            passed += 1
+    node18 = os.environ.get("NODE18_BIN")
+    if not node18:
+        print("\nSKIPPED tests/checkers/run-cases.mjs on Node 18: set NODE18_BIN to a Node 18.19.1 binary")
+    else:
+        print(f"\n--- {node18} tests/checkers/run-cases.mjs --paths=node ---")
+        result = subprocess.run([node18, os.path.join(CASES, "run-cases.mjs"), "--paths=node"], cwd=os.path.join(HERE, ".."))
+        if result.returncode != 0:
+            failed += 1
+            print("FAIL tests/checkers/run-cases.mjs on Node 18 — see output above")
+        else:
+            passed += 1
+
 # packages/agent's own suite (node --test) — plan step 4. Run with cwd
 # set to packages/agent so its own node_modules (ai,
 # @openrouter/ai-sdk-provider) resolve; `node --test` with no path args

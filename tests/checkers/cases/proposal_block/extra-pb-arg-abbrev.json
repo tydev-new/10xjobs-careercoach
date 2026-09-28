@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: pb-arg-abbrev",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--app",
+    "applications/a.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/a.md": ""
+ },
+ "expect": [
+  {
+   "stdout": "\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nFAIL  no coverage table under the declared header — write it to the file first\nFAIL  no selection table under the declared header — write it to the file first\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

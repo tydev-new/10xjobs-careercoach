@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cf-workspace-is-a-file",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "f.md",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "f.md": "x"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "Traceback (most recent call last):",
+   "stderrMatch": "first-line",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

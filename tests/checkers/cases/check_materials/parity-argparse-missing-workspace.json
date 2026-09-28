@@ -1,0 +1,24 @@
+{
+ "note": "packages/checkers/test/parity.mjs: argparse-missing-workspace (covers: argparse: --workspace required)",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--resume",
+    "x.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_materials.py [-h] --workspace WORKSPACE [--resume RESUME]\n                          [--letter LETTER] [--base BASE]\ncheck_materials.py: error: the following arguments are required: --workspace\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

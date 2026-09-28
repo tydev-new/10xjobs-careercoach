@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-accents-headings-filler",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "resume.md": "# Zoë\n\n## Résumé professionnel\n\nPassionate about café culture in Montréal.\n\n## Expérience\n\n- Led the naïve-Bayes rewrite → 3x faster.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: FAIL (2 fail, 2 warn)\n  [WARN] non-standard section name \"Résumé professionnel\" — ATS parsers rank on standard names ('Professional Experience', not 'Where I've Made Impact'); put the ambition in a subtitle line instead\n  [WARN] non-standard section name \"Expérience\" — ATS parsers rank on standard names ('Professional Experience', not 'Where I've Made Impact'); put the ambition in a subtitle line instead\n  [FAIL] arrow/scaffolding glyph \"→\" — write transitions in words (\"from 80% to under 1%\"); glyphs garble in ATS parsers\n  [FAIL] banned filler \"Passionate\" — patterns.md § Shape\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

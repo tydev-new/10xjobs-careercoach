@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_check_files.py::test_storybank_schema_registered_and_enforced",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "storybank.md": "# Storybank\n\n## Coverage\n\n- FDE org design [source: jd-analysis]\n\n## Stories\n\n| ID | Title |\n|---|---|\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n1 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

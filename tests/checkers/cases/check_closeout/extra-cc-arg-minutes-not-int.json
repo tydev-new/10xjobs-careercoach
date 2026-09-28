@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cc-arg-minutes-not-int",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--minutes",
+    "ten"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_closeout.py [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.py: error: argument --minutes: invalid int value: 'ten'\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

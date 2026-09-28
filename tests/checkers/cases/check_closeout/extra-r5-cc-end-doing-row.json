@@ -1,0 +1,30 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r5-cc-end-doing-row",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--stage",
+    "applying",
+    "--asked",
+    "your comp floor"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "# Plan — Test Candidate\nGoal: an offer by 2026-12-01\nBudget: 60 min/day\n\n## Board\nWaiting on you\n- the comp floor — criteria.md § Compensation\nDoing\n- timer: follow up Acme recruiter 10-02\n"
+ },
+ "expect": [
+  {
+   "stdout": "close-out clean: stage applying; plan.md written; 1 question(s) each have a row\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

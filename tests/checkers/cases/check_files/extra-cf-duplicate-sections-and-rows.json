@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cf-duplicate-sections-and-rows",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "base-resume-history.md": "| date | round | driver | scored vs FIXED | what changed |\n|---|---|---|---|---|\n| a | 1 | x | y | z |\n| a | 1 | x | y | z |\n| a | 1 | x | y |\n",
+  "profile.md": "# P\n## Snapshot\n## Experience\n## Intake findings\n### Positioning strengths\n### Likely interviewer concerns\n### Career-narrative gaps\n### Story seeds\n## Interview history\n## Constraints\n## Application defaults\n## Snapshot\n## Snapshot\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  base-resume-history.md: history row 4 has 4 cells, the header has 5\n\n2 file(s) checked against 11 schema(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

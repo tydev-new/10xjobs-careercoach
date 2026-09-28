@@ -1,0 +1,21 @@
+{
+ "note": "packages/checkers/test/parity.mjs: argparse-missing-required (covers: argparse: --workspace, --application required)",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: proposal_block.py [-h] --workspace WORKSPACE --application APPLICATION\n                         [--base BASE]\nproposal_block.py: error: the following arguments are required: --workspace, --application\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

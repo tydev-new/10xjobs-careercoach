@@ -1,0 +1,31 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): files the glob or the S###- pattern skips; S0002 is not S002",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "stories/S0002-x.md": "# story\n",
+  "stories/S001.md": "# story\n",
+  "stories/S002-b.txt": "# story\n",
+  "stories/S1-x.md": "# story\n",
+  "stories/notes.md": "# story\n",
+  "storybank.md": "# Storybank\n\n## Coverage\n\n| Competency | Source | Covered by |\n|---|---|---|\n| X | [inferred] | S001 |\n\n## Stories\n\n| ID | Title | Strength | Status | Notes |\n|---|---|---|---|---|\n| S001 | A | 4 | confirmed | |\n| S002 | B | 4 | confirmed | |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  S001: index row has no stories/S001-*.md file\nFAIL  S002: index row has no stories/S002-*.md file\nFAIL  stories/S0002-x.md: no index row\n\n2 index row(s), 1 story file(s); 3 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

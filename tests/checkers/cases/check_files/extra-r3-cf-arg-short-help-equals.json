@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r3-cf-arg-short-help-equals",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "-h=x"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.py: error: argument -h/--help: ignored explicit argument 'x'\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

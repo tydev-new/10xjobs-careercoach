@@ -1,0 +1,28 @@
+{
+ "note": "packages/checkers/test/parity.mjs: resume-jd-bar-quoted-exempt (covers: test_mechanical_cases (10))",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--resume",
+    "<ws>/resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "resume.md": "# Alex Chen\n\n## Summary\n\n**Forward-Deployed & Solutions Engineering Leader**\n*Turning deployment friction into product strategy.*\n\nBuilt the function twice, from zero, by treating deployment friction as product\nintelligence rather than support noise. Still shipping production code today.\n\n- **10+ years in software engineering, with 5+ years leading delivery teams:** yes — shipping today.\n- **Lead and scale a team:** built the function from zero.\n- **Own discovery through close:** cut cycles 4 months to 3 weeks.\n- **Executive sponsor:** redirected the account from near-cancellation.\n- **Reusable playbooks:** 12-week engagements became 4-week.\n- **Escalate product gaps:** built the field-metrics dashboard.\n\n## Experience\n\nPlatform Lead — Northwind Labs.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: pass (0 fail, 0 warn)\n\n✔ automatic checks clean\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

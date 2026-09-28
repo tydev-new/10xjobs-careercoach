@@ -1,0 +1,30 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-cc-bom-waiting",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--stage",
+    "applying",
+    "--asked",
+    "comp floor"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "## Board\n﻿Waiting on you\n- comp floor\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  asked \"comp floor\" — no Waiting-on-you row shares a word with it; write the row this turn\nFAIL  1 question(s) asked, Waiting on you is empty\nWARN  the Board has no To do and no Waiting-on-you rows — a plan with nothing on it is rarely the plan\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

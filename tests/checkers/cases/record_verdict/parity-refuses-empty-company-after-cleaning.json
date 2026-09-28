@@ -1,0 +1,30 @@
+{
+ "note": "packages/checkers/test/parity.mjs: refuses-empty-company-after-cleaning (covers: design-web-search.md § 4.3 (S1 review, finding 6): empty after cleaning -> the writer exits 2, jobs.md unchanged)",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "\t\n",
+    "--title",
+    "Role",
+    "--verdict",
+    "weak"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: empty company or title after cleaning; nothing written\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

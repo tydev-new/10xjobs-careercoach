@@ -1,0 +1,30 @@
+{
+ "note": "tests/test_closeout_waiting_shapes.py::test_empty_waiting_then_section_is_empty_both_ways",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--stage",
+    "applying",
+    "--asked",
+    "follow up with the Acme recruiter"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "# Plan — Test Candidate\nGoal: an offer by 2026-12-01\nBudget: 60 min/day\n\n## Board\nWaiting on you\n\n## Standing floor\n- timer: follow up Acme recruiter 10-02\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  asked \"follow up with the Acme recruiter\" — no Waiting-on-you row shares a word with it; write the row this turn\nFAIL  1 question(s) asked, Waiting on you is empty\nWARN  the Board has no To do and no Waiting-on-you rows — a plan with nothing on it is rarely the plan\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

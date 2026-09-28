@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r3-cm-arg-double-dash-empty-tail",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "r.md",
+    "--"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "r.md": "# A\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_materials.py [-h] --workspace WORKSPACE [--resume RESUME]\n                          [--letter LETTER] [--base BASE]\ncheck_materials.py: error: unrecognized arguments: --\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

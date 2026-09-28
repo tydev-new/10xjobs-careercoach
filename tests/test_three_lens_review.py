@@ -5,21 +5,60 @@ the spec (docs/design-apply-three-lens.md as amended in 86089d7: §§ 1-5,
 the § 7 test plan, owner rulings 1-7 in § 8), not from the code.
 
     python3 tests/test_three_lens_review.py  (or via tests/run.py)
+
+JS-only J2 (docs/design-js-only.md § 6): check_materials.py and
+check_files.py are deleted; their one copy is JavaScript. The tests that
+imported them now call the same functions in the lib
+(skills/apply/scripts/lib/check-materials.mjs,
+skills/profile/scripts/lib/check-files.mjs) through `node`, and the CLI
+tests run `node` on the .mjs command. check_messages.py stays Python until
+J3, so its tests are unchanged.
 """
-import os, re, subprocess, sys, tempfile
+import json, os, re, subprocess, sys, tempfile
+from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "skills", "apply", "scripts"))
-sys.path.insert(0, os.path.join(ROOT, "skills", "outreach", "scripts"))
-sys.path.insert(0, os.path.join(ROOT, "skills", "profile", "scripts"))
-import check_materials as cm  # noqa: E402
-import check_messages as cmsg  # noqa: E402
-import check_files as cf  # noqa: E402
 
-CM_PY = os.path.join(ROOT, "skills", "apply", "scripts", "check_materials.py")
-CM_JS = os.path.join(ROOT, "packages", "checkers", "src", "check-materials.mjs")
+CM_MJS = os.path.join(ROOT, "skills", "apply", "scripts", "check_materials.mjs")   # the command
+CM_JS = os.path.join(ROOT, "skills", "apply", "scripts", "lib", "check-materials.mjs")  # its logic
 MSG_PY = os.path.join(ROOT, "skills", "outreach", "scripts", "check_messages.py")
-CF_PY = os.path.join(ROOT, "skills", "profile", "scripts", "check_files.py")
+CF_MJS = os.path.join(ROOT, "skills", "profile", "scripts", "check_files.mjs")
+CF_JS = os.path.join(ROOT, "skills", "profile", "scripts", "lib", "check-files.mjs")
+IO_JS = os.path.join(ROOT, "skills", "profile", "scripts", "lib", "io-node.mjs")
+
+
+def _node(body, arg):
+    """Run `body` (an async JS function body over `arg`, with the libs
+    imported as CM, CF and IO) under node; return its JSON result."""
+    code = (f"import * as CM from {json.dumps(Path(CM_JS).as_uri())};\n"
+            f"import * as CF from {json.dumps(Path(CF_JS).as_uri())};\n"
+            f"import {{ nodeIo as IO }} from {json.dumps(Path(IO_JS).as_uri())};\n"
+            "let s = ''; for await (const c of process.stdin) s += c;\n"
+            "const arg = JSON.parse(s);\n"
+            f"const out = await (async (arg) => {{ {body} }})(arg);\n"
+            "process.stdout.write(JSON.stringify(out));\n")
+    r = subprocess.run(["node", "--input-type=module", "-e", code], input=json.dumps(arg),
+                       capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+class _CM:
+    """check_materials' functions, from the JS lib."""
+    @staticmethod
+    def check_resume(text):
+        return [tuple(x) for x in _node("return CM.checkResume(arg);", text)]
+
+
+cm = _CM()
+# The lib's `shared` rungs are not exported; checkLetter runs them on the
+# whole text and adds only these letter rungs, which are dropped here.
+_LETTER_ONLY = ("letter is ", "salutation \"")
+
+
+def _shared_js(text):
+    return [tuple(x) for x in _node("return CM.checkLetter(arg);", text)
+            if not x[1].startswith(_LETTER_ONLY) and not re.match(r"\d+ blocks — max", x[1])]
 
 # § 4 (round 2), the message, verbatim — the same text in all three checkers.
 SPEC_MSG = ('arrow chain "{m}" — write it in words ("from 80% to under 1%"); '
@@ -38,9 +77,7 @@ def flat(s):
 
 
 def shared(text):
-    out = []
-    cm._shared(text, out.append)
-    return out
+    return _shared_js(text)
 
 
 def chain_fails(results):
@@ -113,7 +150,7 @@ def test_cli_exits_1_and_prints_the_message_on_an_ascii_arrow():
         p = os.path.join(ws, "resume.md")
         open(p, "w", encoding="utf-8").write(
             "# Alex Chen\n\n## Summary\n\n- Moved deploys weekly->daily.\n")
-        r = subprocess.run([sys.executable, CM_PY, "--workspace", ws, "--resume", p],
+        r = subprocess.run(["node", CM_MJS, "--workspace", ws, "--resume", p],
                            capture_output=True, text=True)
         assert r.returncode == 1, r.stdout
         assert "[FAIL] " + SPEC_MSG.format(m="->") in r.stdout, r.stdout
@@ -124,7 +161,7 @@ def test_opener_fail_names_one_summary_not_case_plus_checklist():
     r = "# A\n\n## Summary\n\n- x.\n\n## Highlights\n\n- y.\n"
     f = [m for lvl, m in cm.check_resume(r) if lvl == "FAIL" and "two opening sections" in m]
     assert f and "allows ONE Summary, never Summary + a highlights band" in f[0], f
-    for path in (CM_PY, CM_JS):
+    for path in (CM_MJS, CM_JS):
         assert "case + checklist" not in open(path, encoding="utf-8").read(), path
 
 
@@ -153,17 +190,19 @@ def _py_regex(path, name):
 
 
 def test_ascii_arrows_has_the_same_source_text_in_all_three_checkers():
+    # J2: check_materials' one copy is the JS lib; check_messages.py until J3.
     spec = "<=+>|<-+>?|-+>|=+>"
-    assert _py_regex(CM_PY, "ASCII_ARROWS") == spec
     assert _py_regex(MSG_PY, "ASCII_ARROWS") == spec
     js = re.search(r"const ASCII_ARROWS = /(.+?)/;", open(CM_JS, encoding="utf-8").read())
     assert js and js.group(1) == spec, js and js.group(1)
 
 
 def test_exempt_spans_are_the_same_alternation_in_both_python_checkers():
-    a = _py_regex(CM_PY, "ARROW_EXEMPT_SPANS")
+    # J2: one Python checker is left (check_messages.py, until J3); the JS
+    # lib's translation of the same alternation is pinned by
+    # test_js_url_branch_uses_py_not_s_and_no_bare_js_s.
     b = _py_regex(MSG_PY, "EXEMPT_SPANS")
-    assert a == b == SPEC_EXEMPT, (a, b)
+    assert b == SPEC_EXEMPT, b
 
 
 # ---- check_messages: the same pattern, scoped to drafts (§ 4) -------------
@@ -231,11 +270,12 @@ def test_search_jargon_rule_is_bounded_exempted_and_fix_before_delivery():
 # ---- schema: the new scored cell and the waiver form (§ 1, § 7 item 4) ------
 
 def test_application_with_lens_verdicts_waiver_and_void_row_is_silent():
-    app = ("# Acme — Staff Engineer\n\n## Rounds\n\n" + cf.ROUNDS_HEADER + "\n|---|---|---|---|---|\n"
+    rounds_header, panel_header = _node("return [CF.ROUNDS_HEADER, CF.PANEL_HEADER];", None)
+    app = ("# Acme — Staff Engineer\n\n## Rounds\n\n" + rounds_header + "\n|---|---|---|---|---|\n"
            "| 2026-09-25 | 1 | self | 5/7 held; unmet: page target, Skills line; panel not run | first draft |\n"
            "| 2026-09-25 | 2 | panel | 6/7 held; unmet: page target; ats Pass · recruiter Revise · "
            "hiring manager Pass | cut two Earlier roles |\n\n"
-           "## Panel\n\n" + cf.PANEL_HEADER + "\n|---|---|---|\n"
+           "## Panel\n\n" + panel_header + "\n|---|---|---|\n"
            "| ats | Kubernetes missing from prose | fixed |\n"
            "| recruiter | title stack confusing in the header | discarded — candidate waived in chat 2026-09-25 |\n"
            "| hiring manager | VOID — returned prose twice | — |\n")
@@ -243,9 +283,12 @@ def test_application_with_lens_verdicts_waiver_and_void_row_is_silent():
         os.makedirs(os.path.join(ws, "applications"))
         p = os.path.join(ws, "applications", "acme-staff.md")
         open(p, "w", encoding="utf-8").write(app)
-        assert cf.check_table(p, cf.ROUNDS_HEADER, cf.ROUNDS_ENUMS) == []
-        assert cf.check_table(p, cf.PANEL_HEADER, cf.PANEL_ENUMS) == []
-        r = subprocess.run([sys.executable, CF_PY, "--workspace", ws,
+        # the lib's checkTable (header, cell count, enums); the panel's
+        # outcome column is the host's validator, which the CLI run below
+        # exercises (a bad outcome would name the file).
+        assert _node("return [await CF.checkTable(IO, arg, CF.ROUNDS_HEADER, CF.ROUNDS_ENUMS),"
+                     " await CF.checkTable(IO, arg, CF.PANEL_HEADER, CF.PANEL_ENUMS)];", p) == [[], []]
+        r = subprocess.run(["node", CF_MJS, "--workspace", ws,
                             "--skills", os.path.join(ROOT, "skills")],
                            capture_output=True, text=True)
         assert "applications/acme-staff.md" not in r.stdout, r.stdout
@@ -331,7 +374,7 @@ def test_js_url_branch_uses_py_not_s_and_no_bare_js_s():
     line = next(l for l in js.splitlines() if l.startswith("const ARROW_EXEMPT_SPANS"))
     assert line == ('const ARROW_EXEMPT_SPANS = new RegExp("```[\\\\s\\\\S]*?```|~~~[\\\\s\\\\S]*?~~~|'
                     '<!--[\\\\s\\\\S]*?-->|``[^\\\\n]*?``|`[^`\\\\n]*`|https?://" + PY_NOT_S + "+", "g");'), line
-    assert re.search(r'import \{[^}]*\bPY_NOT_S\b[^}]*\} from "\./py-text\.mjs"', js), \
+    assert re.search(r'import \{[^}]*\bPY_NOT_S\b[^}]*\} from "(?:\./|(?:\.\./)+profile/scripts/lib/)py-text\.mjs"', js), \
         "PY_NOT_S must be imported from py-text.mjs"
 
 
@@ -341,7 +384,7 @@ def test_arrow_message_is_word_for_word_in_all_three_checkers():
     # port's template literal carries the text on one line.
     assert ('add("FAIL", `arrow chain "${m[0]}" ' + tail + '`);') in open(CM_JS, encoding="utf-8").read()
     # "garble" survives only in the Unicode glyph message (and its receipt comment)
-    for path in (CM_PY, MSG_PY, CM_JS):
+    for path in (MSG_PY, CM_JS, CM_MJS):
         for ln in open(path, encoding="utf-8").read().splitlines():
             if "garble" in ln:
                 assert "glyph" in ln or "arrows garble in ATS parsers and read as audit" in ln, (path, ln)
@@ -392,10 +435,11 @@ def test_repeated_number_warn_says_the_summary_not_the_case():
 
 
 def test_case_constant_is_renamed_in_both_files():
-    assert hasattr(cm, "SUMMARY_PROSE_MAX_WORDS") and cm.SUMMARY_PROSE_MAX_WORDS == 50
-    assert not hasattr(cm, "CASE_MAX_WORDS")
+    # J2: one copy left; the 50/51 boundary itself is
+    # test_summary_prose_fail_carries_the_round_2_message.
     js = open(CM_JS, encoding="utf-8").read()
     assert "const SUMMARY_PROSE_MAX_WORDS = 50;" in js and "CASE_MAX_WORDS" not in js
+    assert "CASE_MAX_WORDS" not in open(CM_MJS, encoding="utf-8").read()
 
 
 # ---- § 4: rule 6, bounded (static — the t15c measurement is unapproved spend) --
@@ -446,7 +490,7 @@ def test_rule6_names_only_labels_that_exist_elsewhere_in_skills():
     others = []
     for dp, _, fs in os.walk(os.path.join(ROOT, "skills")):
         for f in fs:
-            if f != "language-check.md" and f.endswith((".md", ".py")):
+            if f != "language-check.md" and f.endswith((".md", ".py", ".mjs")):
                 others.append(open(os.path.join(dp, f), encoding="utf-8").read().lower())
     blob = "\n".join(others)
     for label in ("strong fit", "investable stretch", "long-shot stretch", "weak fit", "track b",
@@ -535,7 +579,7 @@ def test_ruling_7_profile_points_to_apply_and_states_no_shape_of_its_own():
             "shape (`../apply/references/patterns.md § The Summary`).") in sk
     pp = flat(read("skills", "profile", "references", "patterns.md"))
     assert ("(`../../apply/references/patterns.md § The Summary` turns those 7–11 seconds into the "
-            "Summary's shape, for the base résumé too; `check_materials.py` FAILs more than 50 "
+            "Summary's shape, for the base résumé too; `check_materials.mjs` FAILs more than 50 "
             "words of Summary prose.)") in pp
     pe = flat(read("skills", "profile", "references", "eval.md"))
     assert "the Summary's shape (`../../apply/references/patterns.md § The Summary`)" in pe

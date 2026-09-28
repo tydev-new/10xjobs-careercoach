@@ -671,6 +671,155 @@ test("every page at 1440 and 375 (mock, gate pending so the marker shows): text 
   assert.deepEqual([...bad], []);
 });
 
+// ---------------------------------------------------------------- § 5.4 amended (2026-09-27)
+
+const composerFocused = (page: Page) => page.evaluate(() => !!document.activeElement?.closest(".composer"));
+
+test("§ 5.4 (amended) 'Proved by': Continue with Ten — at 1440px the composer is focused; at 375px it is not, and the tab bar still shows (mock and real shell)", async () => {
+  const bad: string[] = [];
+  for (const [who, open] of [
+    ["mock", async (ctx: BrowserContext) => openMock(ctx)],
+    ["real", async (ctx: BrowserContext) => (await openReal(ctx, "saved")).page],
+  ] as const) {
+    for (const vp of [DESK, PHONE]) {
+      const ctx = await ctxFor(vp);
+      const page = await open(ctx);
+      if ((await title(page)) !== "Home") await go(page, vp === DESK ? "Home" : "Home");
+      await page.locator(".frame-page:not(.frame-page--hidden)").first().getByRole("button", { name: "Continue with Ten" }).click();
+      await page.waitForTimeout(400);
+      const t = await title(page);
+      const focused = await composerFocused(page);
+      const bar = await shown(page, ".tabbar");
+      if (t !== "Talk to Ten") bad.push(`${who}@${vp.width}: Continue with Ten opened "${t}"`);
+      if (vp === DESK && !focused) bad.push(`${who}@1440: the composer is not focused`);
+      if (vp === PHONE && focused) bad.push(`${who}@375: the composer is focused`);
+      if (vp === PHONE && !bar) bad.push(`${who}@375: the tab bar is hidden`);
+      await ctx.close();
+    }
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("§ 5.4 (amended): only Continue with Ten focuses the composer — the first load, rail and tab navigation to Talk to Ten, and the other pages' 'Talk to Ten' button never do (1440 and 375)", async () => {
+  const bad: string[] = [];
+  for (const vp of [DESK, PHONE]) {
+    // first load: the mock and the real shell's two Talk to Ten landings
+    const c0 = await ctxFor(vp);
+    const m = await openMock(c0);
+    await m.waitForTimeout(400);
+    if (await composerFocused(m)) bad.push(`${vp.width}: mock first load focused the composer`);
+    for (const seed of ["none", "gate"] as const) {
+      const r = await openReal(c0, seed);
+      await r.page.waitForTimeout(400);
+      if ((await title(r.page)) !== "Talk to Ten") bad.push(`${vp.width}: real ${seed} did not land on Talk to Ten`);
+      if (await composerFocused(r.page)) bad.push(`${vp.width}: real first load (${seed}) focused the composer`);
+    }
+    // navigation and the other pages' button
+    const talkName = vp === DESK ? "Talk to Ten" : "Ten";
+    for (const from of ["Jobs", "Applications", "Documents"]) {
+      await go(m, from);
+      await go(m, talkName);
+      await m.waitForTimeout(300);
+      if (await composerFocused(m)) bad.push(`${vp.width}: ${vp === DESK ? "rail" : "tab"} ${from} -> ${talkName} focused the composer`);
+      if (vp === PHONE && !(await shown(m, ".tabbar"))) bad.push(`375: tab bar hidden after tab ${from} -> Ten`);
+      await go(m, from);
+      await m.locator(".frame-page:not(.frame-page--hidden)").first().getByRole("button", { name: "Talk to Ten" }).click();
+      await m.waitForTimeout(300);
+      if ((await title(m)) !== "Talk to Ten") bad.push(`${vp.width}: ${from}'s Talk to Ten button opened "${await title(m)}"`);
+      if (await composerFocused(m)) bad.push(`${vp.width}: ${from}'s Talk to Ten button focused the composer`);
+    }
+    await c0.close();
+  }
+  assert.deepEqual(bad, []);
+});
+
+// ---------------------------------------------------------------- § 5.6 "Messages (Stage 2)"
+
+test("§ 5.6 'Messages (Stage 2)' at 1440 and 375: thread --thread-max wide and centred; each turn a 32px avatar column plus the content, 26px apart; Ten's avatar the 28px mark, yours a 28px --bg-muted circle holding a 15px user icon in --fg-muted; 'Ten'/'You' above each turn in --type-ui at 600; prose in --type-body", async () => {
+  const bad: string[] = [];
+  const bodyFont = TOKENS.get("--type-body")!.match(/([0-9.]+)px\/([0-9.]+)px/)!;
+  const uiFont = TOKENS.get("--type-ui")!.match(/([0-9.]+)px\/([0-9.]+)px/)!;
+  for (const vp of [DESK, PHONE]) {
+    const ctx = await ctxFor(vp);
+    const page = await openMock(ctx, "mvp-journey");
+    for (const m of fx("mvp-journey").messages) {
+      if (m.role !== "user") continue;
+      await page.locator(".composer-input").click();
+      await page.locator(".composer-input").fill(m.parts.find((p: any) => p.type === "text").text);
+      await page.locator(".composer-input").press("Enter");
+      await page.waitForTimeout(40);
+      await settled(page);
+    }
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.waitForTimeout(100);
+    await shot(page, `messages-${vp.width}x${vp.height}`);
+    const g = await page.evaluate(() => {
+      const t = document.querySelector(".frame-page--talk .transcript") as HTMLElement;
+      const pane = t.parentElement!.getBoundingClientRect();
+      const tr = t.getBoundingClientRect();
+      const turns = Array.from(t.querySelectorAll<HTMLElement>(":scope > .bubble"));
+      return {
+        thread: { w: tr.width, center: tr.left + tr.width / 2, paneCenter: pane.left + pane.width / 2, paneW: pane.width },
+        turns: turns.map((b) => {
+          const r = b.getBoundingClientRect();
+          const av = b.querySelector(":scope > .bubble-avatar") as HTMLElement | null;
+          const role = b.querySelector(":scope > .bubble-role") as HTMLElement | null;
+          const content = Array.from(b.children).filter((c) => !c.classList.contains("bubble-avatar")) as HTMLElement[];
+          const avR = av?.getBoundingClientRect();
+          const avCs = av ? getComputedStyle(av) : null;
+          const icon = av?.querySelector("svg");
+          const prose = Array.from(b.querySelectorAll<HTMLElement>("p")).find((p) => !p.closest(".card, .tool-run, .bubble-role") && (p.textContent ?? "").trim().length > 20);
+          const pcs = prose ? getComputedStyle(prose) : null;
+          const rcs = role ? getComputedStyle(role) : null;
+          return {
+            user: b.classList.contains("bubble--user"),
+            top: r.top,
+            bottom: r.bottom,
+            left: r.left,
+            avatar: av ? { left: avR!.left, w: avR!.width, h: avR!.height, mark: av.querySelector("svg.mark")?.getAttribute("width") ?? null, radius: avCs!.borderRadius, bg: avCs!.backgroundColor, color: avCs!.color, iconW: icon?.getAttribute("width") ?? null, first: b.firstElementChild === av } : null,
+            contentLeft: Math.min(...content.map((c) => c.getBoundingClientRect().left)),
+            role: role ? { text: role.textContent?.trim(), size: rcs!.fontSize, lh: rcs!.lineHeight, weight: rcs!.fontWeight, transform: rcs!.textTransform, top: role.getBoundingClientRect().top } : null,
+            prose: pcs ? { size: pcs.fontSize, lh: pcs.lineHeight, family: pcs.fontFamily } : null,
+          };
+        }),
+      };
+    });
+    const w = vp.width;
+    const threadMax = parseInt(px("--thread-max"));
+    if (g.thread.w > threadMax + 0.5) bad.push(`${w}: thread ${g.thread.w}px > --thread-max ${threadMax}`);
+    if (g.thread.paneW > threadMax && Math.abs(g.thread.w - threadMax) > 0.5) bad.push(`${w}: thread ${g.thread.w}px, not --thread-max wide in a ${g.thread.paneW}px pane`);
+    if (Math.abs(g.thread.center - g.thread.paneCenter) > 1) bad.push(`${w}: thread not centred (${g.thread.center} vs ${g.thread.paneCenter})`);
+    if (g.turns.length < 6) bad.push(`${w}: only ${g.turns.length} turns rendered`);
+    if (g.turns.filter((t) => t.prose).length < 4) bad.push(`${w}: prose measured in only ${g.turns.filter((t) => t.prose).length} turns`);
+    g.turns.forEach((t, i) => {
+      const who = `${w} turn ${i} (${t.user ? "you" : "Ten"})`;
+      if (!t.avatar || !t.avatar.first) return void bad.push(`${who}: no avatar first in the turn`);
+      if (Math.round(t.avatar.w) !== 28 || Math.round(t.avatar.h) !== 28) bad.push(`${who}: avatar ${t.avatar.w}x${t.avatar.h}`);
+      if (Math.abs(t.avatar.left - t.left) > 0.5) bad.push(`${who}: avatar not at the turn's left edge`);
+      if (Math.abs(t.contentLeft - t.left - 32) > 16 || t.contentLeft - t.left < 32) bad.push(`${who}: content starts ${t.contentLeft - t.left}px in, § 5.6 a 32px avatar column`);
+      if (t.user) {
+        if (!/50%|999px|9999px/.test(t.avatar.radius) && !(parseFloat(t.avatar.radius) >= 14)) bad.push(`${who}: avatar not a circle (${t.avatar.radius})`);
+        if (t.avatar.bg !== rgb(px("--bg-muted"))) bad.push(`${who}: avatar ${t.avatar.bg}, want --bg-muted`);
+        if (t.avatar.color !== rgb(px("--fg-muted"))) bad.push(`${who}: icon colour ${t.avatar.color}, want --fg-muted`);
+        if (t.avatar.iconW !== "15") bad.push(`${who}: user icon ${t.avatar.iconW}px, want 15`);
+      } else if (t.avatar.mark !== "28") bad.push(`${who}: Ten's avatar is not the 28px mark`);
+      const wantName = t.user ? "You" : "Ten";
+      if (!t.role || t.role.text !== wantName || t.role.transform !== "none") bad.push(`${who}: name ${JSON.stringify(t.role)}, want "${wantName}" as written`);
+      else {
+        if (t.role.size !== `${uiFont[1]}px` || t.role.weight !== "600") bad.push(`${who}: name ${t.role.size}/${t.role.weight}, want --type-ui ${uiFont[1]}px at 600`);
+        if (t.role.top > t.top + 1) bad.push(`${who}: the name is not at the top of the turn`);
+      }
+      if (t.prose && (t.prose.size !== `${bodyFont[1]}px` || t.prose.lh !== `${bodyFont[2]}px` || !/Inter/.test(t.prose.family))) bad.push(`${who}: prose ${JSON.stringify(t.prose)}, want --type-body`);
+      if (i > 0) {
+        const gap = t.top - g.turns[i - 1].bottom;
+        if (Math.abs(gap - 26) > 1) bad.push(`${w} turns ${i - 1}->${i}: ${gap.toFixed(1)}px apart, § 5.6 26px`);
+      }
+    });
+    await ctx.close();
+  }
+  assert.deepEqual([...new Set(bad)], []);
+});
+
 test("no request left this origin in any test above", () => {
   assert.deepEqual([...new Set(external)], []);
 });

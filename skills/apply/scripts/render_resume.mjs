@@ -47,10 +47,28 @@ import { nodeIo } from "../../profile/scripts/lib/io-node.mjs";
 export { toHtml, wordCount } from "./lib/render-resume.mjs";
 export { CSS } from "./lib/render-resume.mjs";
 
+// Sanctioned divergence from the retired render_resume.py's CHROME tuple
+// order (PATH-resolvable names first, the macOS .app bundle paths last):
+// Python's os.path.exists() can be monkey-patched from OUTSIDE the
+// process to hide a machine's own real Chrome during a harness replay
+// (tests/checkers/run-cases.mjs's PY_BOOT does exactly that for
+// /Applications, and its own comment names why — "a Chrome installed on
+// the recording machine can never stand in for the case's own stub").
+// Node has no equivalent external hook, and the harness's only lever for
+// the node path is PATH (tests/always-on/fixtures/fake-chrome,
+// tests/checkers/run-cases.mjs's chromePath()) — so a hardcoded absolute
+// path checked BEFORE PATH would make this script find a real Chrome.app
+// on any Mac that happens to have one installed, even under a harness
+// that explicitly set PATH to point at its own stub or at nothing at
+// all: the exact hang this whole safety design exists to prevent
+// (docs/design-js-only.md, lead ruling 1). Checking PATH first costs
+// nothing in production (a real Chrome install and its PATH-resolvable
+// name are the same browser); it is the only way a caller — real or a
+// test harness — can reliably steer this function.
 const CHROME_CANDIDATES = [
+  "google-chrome", "chromium", "chromium-browser",
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
   "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  "google-chrome", "chromium", "chromium-browser",
 ];
 
 function which(cmd) {
@@ -68,11 +86,22 @@ function which(cmd) {
   return null;
 }
 
+// Testability-only escape hatch, off by default (production never sets
+// it): skips the two hardcoded macOS .app-bundle paths, which bypass
+// PATH entirely (existsSync() doesn't consult PATH the way which()
+// does) — the one gap PATH reordering alone can't close, since a real
+// Chrome.app installed on the machine running an automated test would
+// otherwise always be found even when a harness has deliberately pointed
+// PATH at nothing (docs/design-js-only.md, lead ruling 1: a harness must
+// never be able to reach a real browser). tests/checkers/run-cases.mjs
+// sets this whenever a case controls `chrome` at all.
+const PATH_ONLY = process.env.RENDER_RESUME_CHROME_PATH_ONLY === "1";
+
 export function findChrome() {
   for (const c of CHROME_CANDIDATES) {
     let p = null;
     if (isAbsolute(c)) {
-      if (existsSync(c)) p = c;
+      if (!PATH_ONLY && existsSync(c)) p = c;
     } else {
       p = which(c);
     }

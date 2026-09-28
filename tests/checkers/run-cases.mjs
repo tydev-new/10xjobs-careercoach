@@ -54,6 +54,18 @@ export const PORTED = {
   "check_files.py": "check_files.mjs",
   "check_closeout.py": "check_closeout.mjs",
 };
+// Where each port's Node CLI actually lives after J2 moved
+// packages/checkers/bin/*.mjs under skills/ (docs/design-js-only.md § 2,
+// § 6 J2). Keyed by the `.mjs` name (PORTED's values).
+export const SCRIPT_LOCATION = {
+  "check_materials.mjs": join(SKILLS, "apply", "scripts", "check_materials.mjs"),
+  "proposal_block.mjs": join(SKILLS, "apply", "scripts", "proposal_block.mjs"),
+  "render_resume.mjs": join(SKILLS, "apply", "scripts", "render_resume.mjs"),
+  "record_verdict.mjs": join(SKILLS, "evaluate", "scripts", "record_verdict.mjs"),
+  "update_job.mjs": join(SKILLS, "search", "scripts", "update_job.mjs"),
+  "check_files.mjs": join(SKILLS, "profile", "scripts", "check_files.mjs"),
+  "check_closeout.mjs": join(SKILLS, "coach", "scripts", "check_closeout.mjs"),
+};
 export const UNPORTED = new Set(["check_knowledge.py", "check_messages.py", "check_stories.py"]);
 export const LIBRARY = "jobs_md.py";
 export const WRITERS = new Set(["record_verdict.py", "update_job.py", "jobs_md.py"]);
@@ -62,18 +74,12 @@ export const TRACEBACK = "Traceback (most recent call last):";
 // Cases a path cannot pass yet, by design. Each entry names the stage that
 // ends it; a case listed here that PASSES fails the run (so the entry is
 // removed the moment it is stale). Keep this list short and named.
+//
+// J2 added the Chrome path to render_resume.mjs (docs/design-js-only.md
+// § 6): all six render_resume --pdf cases now clear on the node path, so
+// PENDING is empty again.
 export const PENDING = {
-  node: {
-    // § 6 J2: "render_resume.mjs gains the Chrome path and the page count in
-    // the Node-only command". Until then the node port prints the web's
-    // "PDF: NOT RENDERED" line for every --pdf run.
-    "render_resume/j1-pdf-stub-2pages-html-in-ws": "J2 adds the Chrome path to render_resume.mjs",
-    "render_resume/j1-pdf-stub-2pages-html-tmp": "J2 adds the Chrome path to render_resume.mjs",
-    "render_resume/j1-pdf-stub-2pages-over-target-strict": "J2 adds the Chrome path to render_resume.mjs",
-    "render_resume/j1-pdf-stub-big-file": "J2 adds the Chrome path to render_resume.mjs",
-    "render_resume/j1-pdf-stub-writes-no-file": "J2 adds the Chrome path to render_resume.mjs",
-    "render_resume/j1-pdf-no-chrome": "J2 adds the Chrome path to render_resume.mjs",
-  },
+  node: {},
 };
 // A path that never runs a case (reported as SKIPPED with the reason, never
 // silently): the web has no Chrome and "keeps its PDF: NOT RENDERED line"
@@ -391,8 +397,18 @@ async function runNodeStep(step, ws) {
   if (UNPORTED.has(name)) return runPythonStep(step, ws); // until J3 (§ 5.3)
   const argv = step.argv.map((a) => detokenize(a, ws));
   const env = caseEnv({ CHECKER_NOW_ISO: step.clock || "" });
-  if (step.chrome) env.PATH = chromePath(step.chrome);
-  const file =name === LIBRARY ? join(HERE, "jobs-md-driver.mjs") : join(PKG, "bin", PORTED[name]);
+  // A case that controls `chrome` (a PATH-only stub, or "none") must be
+  // reproducible on ANY machine, including one with a real Chrome.app
+  // installed at its usual macOS path — existsSync() doesn't consult
+  // PATH, so render_resume.mjs's own hardcoded-absolute-path fallback
+  // would otherwise always find that real browser regardless of what
+  // PATH says. RENDER_RESUME_CHROME_PATH_ONLY (render_resume.mjs's own
+  // comment) closes exactly that gap; production never sets it.
+  if (step.chrome) {
+    env.PATH = chromePath(step.chrome);
+    env.RENDER_RESUME_CHROME_PATH_ONLY = "1";
+  }
+  const file = name === LIBRARY ? join(HERE, "jobs-md-driver.mjs") : SCRIPT_LOCATION[PORTED[name]];
   if (!file || (name !== LIBRARY && !PORTED[name])) throw new Error(`no node path for ${name}`);
   return spawnP(NODE_BIN, [file, ...argv], { cwd: join(ws, step.cwd || "."), env });
 }
@@ -402,7 +418,11 @@ let WEB = null;
 async function web() {
   if (WEB) return WEB;
   const { Bash, InMemoryFs } = await import(pathToFileURL(join(PKG, "node_modules", "just-bash", "dist", "bundle", "index.js")).href);
-  const { python3Command } = await import(pathToFileURL(join(PKG, "src", "just-bash-command.mjs")).href);
+  // docs/design-js-only.md § 3.5: "node" is the real dispatcher now;
+  // "python3" only points at the equivalent node command. The web path
+  // below constructs a `node <script>.mjs ...` command line, so it
+  // exercises the real dispatch, not the pointer.
+  const { nodeCommand, python3Command } = await import(pathToFileURL(join(PKG, "src", "just-bash-command.mjs")).href);
   const skillFiles = {};
   const walk = (d) => {
     for (const n of readdirSync(d)) {
@@ -502,8 +522,13 @@ export async function runCase(c, path, { record = false } = {}) {
     let r;
     if (path === "web") {
       const W = await web();
-      const bash = new W.Bash({ fs, cwd: join(ws, step.cwd || "."), customCommands: [W.python3Command] });
-      const cmd = `python3 ${step.script} ${step.argv.map((a) => q(detokenize(a, ws))).join(" ")}`;
+      const bash = new W.Bash({ fs, cwd: join(ws, step.cwd || "."), customCommands: [W.nodeCommand, W.python3Command] });
+      // Reachable only for a PORTED script (webSkipReason() already SKIPs
+      // the library and the three unported scripts) — the case's own
+      // step.script is recorded with its Python name (§ 5's spec is
+      // frozen data); "node ...mjs" is the real dispatch (§ 3.5).
+      const nodeScript = step.script.replace(/\.py$/, ".mjs");
+      const cmd = `node ${nodeScript} ${step.argv.map((a) => q(detokenize(a, ws))).join(" ")}`;
       try {
         const x = await bash.exec(cmd);
         r = { stdout: x.stdout, stderr: x.stderr, exit: x.exitCode };

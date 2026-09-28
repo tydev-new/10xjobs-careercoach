@@ -7,15 +7,20 @@
 //   node jobs-md-driver.mjs roundtrip <ws>                 # load(), print rows, save()
 //   node jobs-md-driver.mjs save <ws> <rowsJson> <notesJson>
 //
-// CHECKER_NOW_ISO freezes the clock, as it does for bin/record_verdict.mjs.
-// J2 repoints the imports at skills/search/scripts/lib/.
+// CHECKER_NOW_ISO freezes the clock, as it does for
+// skills/evaluate/scripts/record_verdict.mjs. J2 (docs/design-js-only.md
+// § 2) moved the library under skills/search/scripts/lib/ and the shared
+// helpers under skills/profile/scripts/lib/ — the imports below point
+// there.
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const SRC = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "packages", "checkers", "src");
-const jm = await import(pathToFileURL(join(SRC, "jobs-md.mjs")).href);
-const { nodeIo } = await import(pathToFileURL(join(SRC, "io-node.mjs")).href);
-const { restoreLineSeparators } = await import(pathToFileURL(join(SRC, "py-text.mjs")).href);
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const SEARCH_LIB = join(ROOT, "skills", "search", "scripts", "lib");
+const PROFILE_LIB = join(ROOT, "skills", "profile", "scripts", "lib");
+const jm = await import(pathToFileURL(join(SEARCH_LIB, "jobs-md.mjs")).href);
+const { nodeIo } = await import(pathToFileURL(join(PROFILE_LIB, "io-node.mjs")).href);
+const { restoreLineSeparators } = await import(pathToFileURL(join(PROFILE_LIB, "py-text.mjs")).href);
 
 const frozen = process.env.CHECKER_NOW_ISO;
 const now = frozen ? () => new Date(frozen) : () => new Date();

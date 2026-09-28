@@ -628,10 +628,16 @@ export async function readPosting({ system, boardSlug, postingId }, { fetchImpl,
   }
   const extractor = EXTRACTORS[system];
   const extracted = extractor(boardSlug, json);
-  // Lever's fix (§ 4.4): no company field — the board slug names the
-  // company, never the team.
-  const companyName = system === "lever" ? boardSlug : extracted.companyName;
-  return { ok: true, board: system, boardSlug, ...extracted, companyName };
+  // § 4.4's Lever fix is what extractLeverItem does NOT do: it never reads
+  // `categories.team` into companyName (the OLD bug), so `companyName`
+  // stays undefined here, exactly like Ashby. It is deliberately NOT
+  // filled in with `boardSlug` at this layer — § 6: "the company check
+  // has a hole on Lever and Ashby... company_mismatch can't fire", which
+  // only holds if `companyName` reaches add_roles as undefined. Each
+  // CALLER picks its own `companyName ?? boardSlug` fallback for DISPLAY
+  // text (fetch_job's own `company` field does; add_roles's row uses the
+  // plan's own `company` regardless, never this fallback).
+  return { ok: true, board: system, boardSlug, ...extracted };
 }
 
 // ---------------------------------------------------------------------

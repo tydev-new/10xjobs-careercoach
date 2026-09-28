@@ -376,7 +376,7 @@ test("readPosting: Greenhouse content is entity-decoded before tags are stripped
   assert.equal(r.text, "Ben & Jerry's");
 });
 
-test("readPosting: Lever names the company after the board slug, never the team", async () => {
+test("readPosting: Lever never reads categories.team into companyName (the old bug); companyName stays undefined, like Ashby", async () => {
   const url = "https://api.lever.co/v0/postings/acme/11111111-2222-3333-4444-555555555555";
   const { fn } = makeFetchStub({
     [url]: () => jsonResponse({ text: "Engineer", categories: { team: "Solutions Engineering", location: "NYC" }, hostedUrl: "https://jobs.lever.co/acme/11111111-2222-3333-4444-555555555555", descriptionPlain: "Build." }),
@@ -384,7 +384,12 @@ test("readPosting: Lever names the company after the board slug, never the team"
   const budget = br.createRequestBudget();
   const r = await br.readPosting({ system: "lever", boardSlug: "acme", postingId: "11111111-2222-3333-4444-555555555555" }, { fetchImpl: fn, budget });
   assert.equal(r.ok, true);
-  assert.equal(r.companyName, "acme", "the board slug, not 'Solutions Engineering'");
+  assert.notEqual(r.companyName, "Solutions Engineering", "never the team");
+  // § 6: "the company check has a hole on Lever and Ashby... company_mismatch
+  // can't fire" — only true if companyName reaches the caller as undefined
+  // (a caller that wants DISPLAY text falls back to boardSlug itself, e.g.
+  // fetch_job's own `company: read.companyName ?? read.boardSlug`).
+  assert.equal(r.companyName, undefined);
 });
 
 // ---------------------------------------------------------------------

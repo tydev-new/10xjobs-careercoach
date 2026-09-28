@@ -316,6 +316,26 @@ test("add_roles: Lever names the company after the board slug, never the team (�
   assert.equal(out.added[0].company, "Acme"); // the plan's name, not "Solutions" (the OLD bug)
 });
 
+test("add_roles: company_mismatch can never fire on Lever — the board gives no company name, § 6's own named hole", async () => {
+  const leverUrl = "https://api.lever.co/v0/postings/acme/11111111-2222-3333-4444-555555555555";
+  const { fn } = makeFetchStub({
+    [leverUrl]: () =>
+      jsonResponse({
+        text: "Forward Deployed Engineer",
+        categories: { team: "Totally Different Co", location: "NYC" },
+        hostedUrl: "https://jobs.lever.co/acme/11111111-2222-3333-4444-555555555555",
+        descriptionPlain: "Build things.",
+      }),
+  });
+  const { tools } = await makeCtx({ fetch: fn });
+  const out: any = await (tools.add_roles.execute as any)(
+    { roles: [{ posting: "https://jobs.lever.co/acme/11111111-2222-3333-4444-555555555555", company: "A Wholly Unrelated Name Inc" }] },
+    {},
+  );
+  assert.deepEqual(out.failed, [], "no company_mismatch — Lever has no company field to compare against");
+  assert.equal(out.added[0].company, "A Wholly Unrelated Name Inc");
+});
+
 test("add_roles: company_mismatch fails and names both when the board's own name disagrees", async () => {
   const { fn } = makeFetchStub({ [GH_POSTING_URL]: () => jsonResponse(GH_LIST_BODY.jobs[0]) });
   const { tools } = await makeCtx({ fetch: fn });

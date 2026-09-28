@@ -34,8 +34,9 @@ The only files both touch are dated records (`docs/receipts.md` and an
 eval record), where each fix only appends rows.
 
 § 6A adds a third fix, also independent: "clean" said beside a warning.
-It touches apply's two scripts, their JavaScript ports, and the t21
-case. Its one outreach line (`check_messages.py`'s closing line) ships
+It touches apply's two scripts, their JavaScript ports, the web
+document card's checker badge, the mvp-journey demo fixture, and the
+t21 case. Its one outreach line (`check_messages.py`'s closing line) ships
 with Bug 1, because Bug 1 adds the warnings that line would stand
 beside.
 
@@ -449,17 +450,23 @@ it; the facts above are the lead's report (§ 10).
   ends)" (`skills/apply/SKILL.md:75`, and the same words in seven other
   skills). It isn't changed now; see the moment rule below.
 
-Found while reading, and **not designed here**:
+Found while reading. The first two are **in this build** (the lead's
+rulings, § 9 Q6-Q7); the third is not designed here:
 
 - **The web app shows "clean" beside a warning too.** The document
   card's checker badge maps a `check_materials` "pass" header to "clean"
   (`packages/agent/src/cards.ts:160`), and a pass can carry warnings
   (`pass (0 fail, 1 warn)`). `apps/web/src/components/Cards.tsx:147`
-  prints the word on the card the candidate sees. § 9, Q6.
+  prints the word on the card the candidate sees. This also drifts from
+  the web design, which says only "zero findings renders as 'clean'"
+  (`design-web-ui.md` § 2.4, `79664d6:docs/design-web-ui.md:485`). The
+  checker card itself is already right: it says "clean" only at 0 fail
+  and 0 warn (`Cards.tsx:174`). Fixed below, "The web badge".
 - **The web demo fixture shows the miss as the ideal.**
   `apps/web/fixtures/mvp-journey.json:158`: `proposal_block` prints a
   `have` WARN ("cross-functional leadership"). The next reply says
-  "nothing failed, nothing flagged" and never tells it. § 9, Q7.
+  "nothing failed, nothing flagged" and never tells it. Fixed below,
+  "The demo fixture".
 - **"mechanical" still reaches replies** through `check_materials.py`'s
   docstring (`:2`, "Mechanical pre-delivery check", which `--help`
   prints) and `skills/apply/references/eval.md:9` ("the mechanical
@@ -566,6 +573,70 @@ reserve is the next step if it fails.
   the B1 lean arm's old copy (`design-js-only.md` § 8: J2 deletes the
   arm's scripts).
 
+### The web badge (lead's ruling, § 9 Q6)
+
+The candidate sees the badge, so "clean" there beside a warning is the
+same miss. **The rendering belongs to `docs/design-web-ui.md` § 2.3
+(`document`) and § 2.4 (`checker`)**: § 2.4 already says the badge comes
+from the checker card's parse, "one parse not two", and that only zero
+findings renders as "clean". The code is brought back to that, plus
+the new state.
+
+- **Parse** (`packages/agent/src/cards.ts:42,160`): the badge keeps the
+  header's warning count as well as its status. A `pass` with 0 warnings
+  is `clean`, a `pass` with N ≥ 1 warnings is the new `warn`, and a
+  `FAIL` is `fail`. `not-run` is unchanged.
+- **Props** (§ 2.3's `{ words, htmlPath?, checker }`): `checker` gains
+  `"warn"`, and the card gains `warnCount` when `checker` is `"warn"`.
+  Both type files change together (`packages/agent/src/types.ts:43`,
+  `apps/web/src/types.ts:40`).
+- **Words** (`apps/web/src/components/Cards.tsx:147`): with `warn`, the
+  badge reads **`no failures, N warning(s)`**. These are the script's new
+  words, without the instruction the agent needs and the candidate
+  doesn't ("fix each one or tell the candidate"). `clean`, `fail` and
+  `not-run` read as today.
+- **§ 2.3 and § 2.4 of `design-web-ui.md`** each get one sentence in the
+  same change, because that doc owns the rendering. § 2.3: "`checker` is
+  `clean`, `warn` or `fail` from the latest check of this `.md`, or
+  `not-run`; `warn` shows 'no failures, N warning(s)'." § 2.4: "a pass
+  with warnings never renders as 'clean', on this card or the
+  `document` badge."
+
+**What it prevents:** a résumé card telling the candidate "clean" while a
+warning on that résumé stands. **How a test proves it:**
+
+- `packages/agent/test/cards.test.ts`, beside its badge test (`:125`): a
+  `check_materials` pass with one `[WARN]` for the same `.md` gives
+  `checker: "warn"` with `warnCount: 1`, and a pass with none still
+  gives `"clean"` (`:150` stays as it is).
+- A render check in `tests/web/` (the builder picks the file; none
+  renders the document badge today): `warn` shows "no failures, 1
+  warning(s)" and never the word "clean".
+- `packages/agent/test/mvp-journey.test.ts:228` stays `"clean"`: that
+  journey's `check_materials` run has 0 warnings. The badge reads
+  `check_materials` only, as § 2.4 says; proposal_block's warnings are
+  the reply's to tell (below).
+
+### The demo fixture (lead's ruling, § 9 Q7)
+
+The fixture **tells the warning**. It doesn't stop tripping it.
+
+- `proposal_block`'s recorded output
+  (`apps/web/fixtures/mvp-journey.json:158`) stays the real script's
+  output, re-captured with the new closing line
+  (`test_plain_replies_review.py:477` holds it to that).
+- **The assistant reply that follows** names the `have` warning in plain
+  words: the posting asks for "cross-functional leadership", and the
+  base résumé never uses the word "leadership". The builder writes that
+  reply text to the new rule. It says what the warning is and offers the
+  choice (place the word, or leave it). It doesn't say "nothing flagged"
+  or "clean" about the package while the warning stands, and it uses
+  none of the file's own terms (`have` row, shown-but-unnamed), which
+  `test_no_old_phrase_remains_in_assistant_text` and the voice scanner
+  forbid in replies.
+- **`packages/agent/test/mvp-journey.test.ts:92`**, the scripted copy
+  of that reply, changes with it. This is a named, allowed change.
+
 ### The moment rule: held in reserve, not built
 
 The smaller change is the script alone. PROCESS allows one change per
@@ -610,7 +681,8 @@ scores it.** New `tests/always-on/score_clean_beside_warn.py
 
 The scorer must see the failure before it is trusted with a pass (as in
 § 7.2). Its unit tests use fixture-persona lines only, stored under
-`tests/always-on/fixtures/honest-ceilings/`:
+`tests/always-on/fixtures/honest-ceilings/`. The builder copies the
+Jordan excerpt there at build time (§ 9 Q8):
 
 | Input | Expected |
 |---|---|
@@ -819,23 +891,29 @@ caveat (PROCESS step 6).
    HOME sandbox. Adding coach to the other runners is a follow-up issue,
    the owner's spend call later.
 
-No owner questions remain from round 1. § 6A's amendment opens three,
-for the lead:
+No owner questions remain from round 1. § 6A's amendment raised three,
+**answered by the lead, 2026-09-28**:
 
 6. **The web badge says "clean" beside a warning**
    (`packages/agent/src/cards.ts:160`, `apps/web/src/components/Cards.tsx:147`).
-   The parser already reads the warning count, so the fix is small, but
-   the card belongs to the web design (`docs/design-web-ui.md`), not
-   this one. My suggestion is a follow-up issue there: the badge says
-   "clean" only when there are no warnings.
+   **Answered: in this build, not a follow-up.** The candidate sees
+   "clean" beside a warning, which is the same miss. A document card
+   whose check is a pass with warnings shows the script's new words in
+   plain form, "no failures, N warning(s)". `design-web-ui.md` § 2.3–2.4
+   owns the rendering. Design and tests: § 6A, "The web badge".
 7. **The demo fixture drops a warning** (`apps/web/fixtures/mvp-journey.json:158`,
    and the same reply text in `packages/agent/test/mvp-journey.test.ts:92`).
-   § 6A's re-capture changes its recorded output anyway. Should the
-   reply tell the warning, or should the fixture's application file
-   stop tripping it? The designer's copy is involved either way.
-8. **The Jordan excerpt for the scorer's unit test.** It needs the
-   three WARN lines and the reply line copied from the transcript
-   (fixture persona, lines only). I haven't read the transcript.
+   **Answered: the fixture tells the warning.** proposal_block's
+   recorded output stays real script output. The reply that follows
+   names the `have` warning in plain words, and the builder writes that
+   text to the new rule. `mvp-journey.test.ts:92` changes with it, as a
+   named, allowed change. § 6A, "The demo fixture".
+8. **The Jordan excerpt for the scorer's unit test.** **Answered: the
+   builder copies it** into `tests/always-on/fixtures/honest-ceilings/`
+   at build time: the three WARN lines and the reply line. It is
+   synthetic persona data.
+
+No questions remain open.
 
 ## 10. UNVERIFIED
 
@@ -937,11 +1015,19 @@ Here's the package." and never told them. Merges after PR #20.
       each one or tell the candidate`; "clean" only with no WARN. Unit
       tests, parity, and the J1 re-capture with its one-line proof
       (design § 6A)
+- [ ] Web document card: a pass with warnings shows `warn`, "no
+      failures, N warning(s)", never "clean" (`cards.ts`, both
+      `types.ts`, `Cards.tsx`); one sentence each in `design-web-ui.md`
+      § 2.3–2.4; the `cards.test.ts` case and a render check (design
+      § 6A, "The web badge")
 - [ ] Re-capture t21's `_materials_check.before.txt` and the
-      mvp-journey fixture's recorded output; t21's `expected.md` MUST and
-      MUST NOT per § 6A
-- [ ] `score_clean_beside_warn.py`, plus its unit test (the Jordan
-      excerpt must FAIL); `score_t13.py` item 5
+      mvp-journey fixture's recorded output. The fixture's next reply
+      names the `have` warning in plain words, and
+      `mvp-journey.test.ts:92` changes with it. t21's `expected.md` MUST
+      and MUST NOT per § 6A
+- [ ] `score_clean_beside_warn.py`, plus its unit test (the builder
+      copies in the Jordan excerpt, which must FAIL); `score_t13.py`
+      item 5
 - [ ] Measure: t21 ×1, then ×3 in total; bars in design § 7.4. The
       apply moment rule lands only if t21 fails (§ 7.5)
 - [ ] Independent review; eval record; receipt row; owner live run or
@@ -949,8 +1035,6 @@ Here's the package." and never told them. Merges after PR #20.
 
 **Follow-ups, not in scope:**
 
-- the web document card's "clean" badge beside a warning (design § 9
-  Q6);
 - the workspace CLAUDE.md's "every loop scores `N/M held`" line (design
   § 9 Q1), with its own measurement;
 - coach in the other runners (the owner's spend call).

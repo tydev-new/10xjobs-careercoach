@@ -18,7 +18,7 @@
   }
  ],
  "before": {
-  "jobs.md": "# Pipeline\r\n\r\n*The record. Script-written (search sweeps, update_job.py moves,\r\nrecord_verdict.py judges) — read it anywhere; change it via chat so\r\nthe duplicate-key check can protect it. Dismissed roles keep their\r\nhistory at the bottom; nothing is ever deleted.*\r\n\r\n**Active: 2** · dismissed: 0 · updated 2026-01-01\r\n\r\n## To Review\r\n\r\n### Acme — Staff Engineer\r\n- URL: https://boards.greenhouse.io/acme/jobs/1\r\n- Location: Remote\r\n- Posted: 2026-01-02\r\n- Seen: 2026-01-01T00:00:00+00:00\r\n- Verdict: weak\r\n- Score: 10\r\n- Reason: old\r\n- Track: B\r\n- JD: jd-inbox/acme.md\r\n- Analysis: jd-analysis/acme-old.md\r\n- Company file: company/acme.md\r\n- Evaluated: 2026-01-01T00:00:00+00:00\r\n\r\n## Interested\r\n\r\n### Beta — PM\r\n- URL: https://b/1\r\n- Seen: 2026-01-01T00:00:00+00:00\r\n"
+  "jobs.md": "# Pipeline\r\n\r\n*The record. Script-written (search sweeps, update_job.mjs moves,\r\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\r\nthe duplicate-key check can protect it. Dismissed roles keep their\r\nhistory at the bottom; nothing is ever deleted.*\r\n\r\n**Active: 2** · dismissed: 0 · updated 2026-01-01\r\n\r\n## To Review\r\n\r\n### Acme — Staff Engineer\r\n- URL: https://boards.greenhouse.io/acme/jobs/1\r\n- Location: Remote\r\n- Posted: 2026-01-02\r\n- Seen: 2026-01-01T00:00:00+00:00\r\n- Verdict: weak\r\n- Score: 10\r\n- Reason: old\r\n- Track: B\r\n- JD: jd-inbox/acme.md\r\n- Analysis: jd-analysis/acme-old.md\r\n- Company file: company/acme.md\r\n- Evaluated: 2026-01-01T00:00:00+00:00\r\n\r\n## Interested\r\n\r\n### Beta — PM\r\n- URL: https://b/1\r\n- Seen: 2026-01-01T00:00:00+00:00\r\n"
  },
  "expect": [
   {

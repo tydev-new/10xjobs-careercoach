@@ -432,7 +432,7 @@ async function web() {
     }
   };
   walk(SKILLS);
-  WEB = { Bash, InMemoryFs, python3Command, skillFiles };
+  WEB = { Bash, InMemoryFs, nodeCommand, python3Command, skillFiles };
   return WEB;
 }
 const WEB_WS = "/home/j1-web-case/workspace";

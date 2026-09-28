@@ -6,6 +6,18 @@
 //
 //   node jobs-md-driver.mjs roundtrip <ws>                 # load(), print rows, save()
 //   node jobs-md-driver.mjs save <ws> <rowsJson> <notesJson>
+//   node jobs-md-driver.mjs roundtrip-safe <ws>             # load(), save() with a
+//                                                            writeKey no real row can
+//                                                            match — every row is
+//                                                            echoed via its own _raw
+//                                                            (tests/test_jobs_md.py's
+//                                                            cross-engine round-trip
+//                                                            guard, docs/design-js-only.md
+//                                                            § 6 J2 ruling 5; a plain
+//                                                            writeKey-less save() cleans
+//                                                            and validates EVERY row,
+//                                                            which a legacy no-em-dash
+//                                                            heading correctly refuses)
 //
 // CHECKER_NOW_ISO freezes the clock, as it does for
 // skills/evaluate/scripts/record_verdict.mjs. J2 (docs/design-js-only.md
@@ -29,6 +41,11 @@ const sorted = (v) =>
     : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted(v[k])]))
       : v;
 
+// A NUL byte can never survive canon()'s cleaning into a real key, so this
+// can never equal a real row's key(row) — every row therefore takes the
+// _raw echo path in _block(), never the clean-and-validate path.
+const NEVER_MATCHES_KEY = "\u0000__jobs-md-driver-roundtrip-safe-sentinel__\u0000";
+
 const [op, ws, rowsJson, notesJson] = process.argv.slice(2);
 if (op === "roundtrip") {
   const rows = await jm.load(nodeIo, ws);
@@ -36,6 +53,9 @@ if (op === "roundtrip") {
   const shown = JSON.parse(restoreLineSeparators(JSON.stringify(rows)));
   process.stdout.write(JSON.stringify(sorted(shown)) + "\n");
   await jm.save(nodeIo, ws, rows, { now });
+} else if (op === "roundtrip-safe") {
+  const rows = await jm.load(nodeIo, ws);
+  await jm.save(nodeIo, ws, rows, { now, writeKey: NEVER_MATCHES_KEY });
 } else if (op === "save") {
   const opts = { now };
   const notes = JSON.parse(notesJson);

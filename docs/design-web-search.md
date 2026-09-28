@@ -15,7 +15,8 @@
   Grok pack in this work, before the beta, not after it.
 
 **Lead rulings (2026-09-26, fix round 1):** M7, the web adds rows
-through the parity-tested `jobs_md` port, with no new script; § 7.1,
+through the job list library (`skills/search/scripts/lib/jobs-md.mjs`
+after J2, the one implementation both hosts use), with no new script; § 7.1,
 `JD` keeps meaning the raw posting and a new `Analysis` field holds the
 analysis; § 7.2, the leads wording. Each is applied below.
 
@@ -148,7 +149,7 @@ PRINCIPLES Part 1 is the test.
    in the plan.
 5. Pick the postings that fit `criteria.md` (the model's judgment).
 6. Add them. Code reads each posting from its board and writes the row.
-7. Give each new role evaluate's quick pass (`record_verdict.py
+7. Give each new role evaluate's quick pass (`record_verdict.mjs
    --existing` with a `quick-scan:` reason, on the company and title
    exactly as the add reported them), up to the run's stated number.
 8. Prune proposals (stale, outranked, gone from its board) as one batch
@@ -161,8 +162,8 @@ PRINCIPLES Part 1 is the test.
 | Read company boards | `node scripts/boards.mjs list …` | `list_board` tool |
 | Add postings | `node scripts/boards.mjs add …` | `add_roles` tool |
 | Web search limited to job boards | the host's web search with its domain filter | `web_search` with `jobBoardsOnly` |
-| Quick pass | `../evaluate/scripts/record_verdict.py` | the same script, through `bash` (ported) |
-| Prune | `update_job.py` | the same script, ported |
+| Quick pass | `node ../evaluate/scripts/record_verdict.mjs …` | the same script, through `bash` |
+| Prune | `node scripts/update_job.mjs …` | the same script |
 | Board systems | Greenhouse, Lever, Ashby, SmartRecruiters, **Workday** | the first four (Workday refuses browser calls, § 12) |
 | Company discovery beyond job boards | attended web search and page reading: companies for the plan, never rows | not in the first ship |
 
@@ -293,10 +294,10 @@ For each role, code, not the model:
 5. Saves the posting text to `jd-inbox/<slug>.md` in the sweep's shape
    (`# Company — Title`, `# Source: <link>`, blank line, text; the slug is
    the sweep's rule), create-only; an existing file is kept.
-6. Writes the row through the job list library: on the web the
-   parity-tested port's `load`, `key` and `save`
-   (`packages/checkers/src/jobs-md.mjs`), imported directly, never the
-   stub `packages/agent/src/jobs-md.ts`; locally `jobs_md.py`. If any
+6. Writes the row through the job list library's `load`, `key` and
+   `save` (`skills/search/scripts/lib/jobs-md.mjs`, the one
+   implementation after J2), imported directly on the web and locally,
+   never the stub `packages/agent/src/jobs-md.ts`. If any
    row, dismissed rows included, has the same key or the same link
    (trimmed, exact), nothing is written and the role is reported under
    `alreadyInJobList` with its stage (or "dismissed"). Otherwise the row
@@ -345,7 +346,9 @@ untouched; the injection test in § 4.3 run through this path.
 
 **B2: sanitising, in `jobs_md.save` and its port.** Every row value `save()` writes (each field's value, and the company and title in the row's heading; never the `## Search notes` block, which `save()` copies as it is),
 first has each run of whitespace turned into one space and is trimmed.
-Whitespace here is one explicit class, the same in both languages (§ 4.4):
+Whitespace here is one explicit class, written out in the one job list
+library (`skills/search/scripts/lib/jobs-md.mjs` after J2; § 4.4 uses
+the same class):
 space, tab, `\n`, `\r`, form feed, vertical tab, U+0085, U+00A0,
 U+2028, U+2029. A company containing ` — ` (space, em dash, space),
 or ending in ` —`, has that em dash written as `-`, because a row's
@@ -354,7 +357,8 @@ theirs; the split takes the first one. A company or title that is
 empty after cleaning, in the row this call writes, is refused: the
 writer exits 2 and jobs.md is unchanged; rows already in the file are
 written back as read. It lives in `save()`, so every writer (the adds,
-`record_verdict.py`, `update_job.py`) is protected in both languages.
+`record_verdict.mjs`, `update_job.mjs`) is protected; after J2 there is
+one `save()`, in `lib/jobs-md.mjs`.
 **Prevents:** a posting title that carries a newline and `## Offer` or
 `- URL:` becoming a stage heading or a field of another row (a job post
 is the plan's named prompt-injection risk). **Proved by:** (B1, kept, run
@@ -397,13 +401,15 @@ agree with.
   `&lt;div…&gt;` (checked, § 12). The new readers decode, then strip.
 - **One entity table and one whitespace class, written out.** Decoding uses exactly this table: `&amp;` `&lt;` `&gt;`
   `&quot;` `&#39;` `&apos;` `&nbsp;` (to U+00A0), plus numeric `&#NNN;`
-  and `&#xHH;`; any other `&name;` is left as written. Neither language
-  calls its library's HTML unescape (Python's `html.unescape` knows
-  about 2,000 names, a browser's decoder differs again). Collapsing
-  whitespace uses § 4.3's written-out class, never `\s`: Python's `\s`
-  on text includes U+001C–U+001F and JavaScript's includes U+FEFF and
-  other Unicode spaces, so `\s` would make the two languages disagree on
-  the same posting. **Risk:** a posting using an entity outside the
+  and `&#xHH;`; any other `&name;` is left as written. The readers call no
+  library HTML unescape: the same file runs under Node (the local
+  command) and in the browser (the web), Node has no HTML decoder built
+  in, and the browser's (`DOMParser`) exists only there and knows the
+  full list of about 2,000 names, so a library call would decode the same
+  posting differently by host, or not load at all. Collapsing whitespace
+  uses § 4.3's written-out class, never `\s`: JavaScript's `\s` leaves
+  out U+0085 and includes U+FEFF and other Unicode spaces, so the readers
+  would clean a posting differently from `save()`. **Risk:** a posting using an entity outside the
   table shows it as written (for example `&eacute;`); that is a visible
   blemish, never a test failure. Expected-output cases include every table
   entry, one unknown name, and each whitespace character.
@@ -483,7 +489,7 @@ model extracting a title or link is how invented data gets in).
 
 - After the adds, the model gives each added role evaluate's quick pass:
   the dealbreaker check, then fit against `criteria.md` and `profile.md`
-  only, from the saved posting, recorded with `record_verdict.py
+  only, from the saved posting, recorded with `record_verdict.mjs
   --existing` and a `quick-scan:` reason, on the company and title exactly
   as the add reported them (§ 4.3; evaluate `SKILL.md` § Quick-scan tier,
   unchanged).
@@ -502,7 +508,7 @@ model extracting a title or link is how invented data gets in).
   evaluate `SKILL.md` (585) ≈ 2,750, under 3,300 (UNVERIFIED until S5's
   measurement).
 - **Local:** the same, in the same run. The quick pass writes through
-  `record_verdict.py` in both hosts.
+  `record_verdict.mjs` in both hosts.
 
 ### 4.7 Cost and the gate (web), size first (both)
 
@@ -566,8 +572,9 @@ model extracting a title or link is how invented data gets in).
   *Proved by:* 70 requested reads give 60 answers and 10
   `request_limit`; a hanging stub times out at 15 s; a redirecting stub
   gives `error`; a board answering HTML gives `error`, with no throw.
-- `boards.ts` imports nothing from the browser or Node (the package's
-  lint rule).
+- `boards.ts` (the package's lint rule) and `board-readers.mjs` (the
+  browser-safety lint, which covers `skills/*/scripts/lib/` from J2)
+  import nothing from the browser or Node.
 
 ### 4.9 Where results land
 
@@ -648,7 +655,7 @@ model extracting a title or link is how invented data gets in).
   Amendments (§ 7.1, § 7.4): the analysis parts read `Analysis`; the row
   shows the date part of `Posted`; the empty state names search.
 - **Ten verdict cards in one turn** (a question for the designer, S5):
-  every `record_verdict.py` call builds a verdict card
+  every `record_verdict.mjs` call builds a verdict card
   (`design-web-agent.md` § 6.2), so a run with ten quick passes puts ten
   cards in the transcript. Whether they show as ten cards, or collapse
   under the search card, is the designer's call; the cards themselves
@@ -696,9 +703,10 @@ model extracting a title or link is how invented data gets in).
 | `tests/test_search_targets.py` (12 tests), `tests/test_search_filters.py` (34) | Test deleted code; the behaviour they protected either moves into `tests/boards.test.mjs` (dedupe, dismissed-stays, fields) or is gone on purpose (regex filters). |
 | `scripts/jobs_md.py` (and `tests/test_jobs_md.py`, which guards it) | Kept after J2 only as `search_ats.py`'s library (`docs/design-js-only.md`, J2); it goes with `search_ats.py`. The job list library is `scripts/lib/jobs-md.mjs`. |
 
-`check_files` drops the four manifest rows (today
-`check_files.py:53-58` and `check-files.mjs:74-79`; one file after J2),
-with its expected-output cases; an old
+`check_files.mjs` drops six manifest rows, `companies.md`, `leads.md`,
+`criteria.json`, `jobs.db`, `jobs.db.bak` and `autopilot-log.md` (today
+`check_files.py:53-58`; `design-js-only.md` § 4.5 keeps the two `jobs.db`
+rows until S4), with its expected-output cases; an old
 workspace's leftover files then show as stray-file WARNs, which is the
 honest signal to delete them. **The first run of the new skill** in a
 workspace that still has any of `leads.md`, `companies.md`,
@@ -706,7 +714,7 @@ workspace that still has any of `leads.md`, `companies.md`,
 question, to move them into `archive/search-<date>/` (the Board column of
 `companies.md` is offered as plan addresses first). Only on the
 candidate's yes are they moved; a no is recorded in the plan and never
-asked again (promise 6). `archive` joins `check_files`' manifest
+asked again (promise 6). `archive` joins `check_files.mjs`' manifest
 folders ("search files the simplified skill no longer uses"), with its
 expected-output cases. On the web, where the store can't move files, an imported
 workspace's leftovers are named once and left in place.
@@ -718,10 +726,10 @@ and `jobs.db.bak`.
 ### 5.2 What is kept or added
 
 - **Kept:** the job list library (hardened, § 4.3; `scripts/lib/jobs-md.mjs`
-  after J2), `update_job.py`, the plan
+  after J2), `update_job.mjs`, the plan
   gate, the sweep loop's budget and exits, the prune report with one
   batch yes, the scheduled-run sequence (plan verbatim, no widening),
-  session close with `check_files.py`.
+  session close with `check_files.mjs`.
 - **Added:** `scripts/boards.mjs` (`list` and `add`; Greenhouse, Lever,
   Ashby, SmartRecruiters, Workday), about 300 lines, stdlib only, its
   readers in `board-readers.mjs`, shared with `boards.ts` for the four
@@ -746,7 +754,7 @@ and `jobs.db.bak`.
 - **`references/patterns.md`**: the catalog becomes three instruments
   (company boards, job-board-limited web search, attended discovery),
   with a "How to run each instrument" table naming both hosts'
-  commands, including the quick pass as `record_verdict.py --existing`
+  commands, including the quick pass as `record_verdict.mjs --existing`
   on the company and title exactly as the add reported them; composing a plan (with board addresses); reading a thin
   result (unchanged craft); the title-judgment hints carried from the
   deleted filters ("Founding X" is usually a hands-on role; a title can
@@ -1022,7 +1030,7 @@ same.
    output (claims of boards read, counts).
 6. **Cost:** `claude -p`'s reported cost. NEW includes the quick passes;
    its search part and quick-pass part are reported separately (split at
-   its first `record_verdict.py` call).
+   its first `record_verdict.mjs` call).
 
 **What counts as found.** The labelling judge sees, per persona and trial, the union of: rows either arm added; OLD's `leads.md` entries from that run; companies OLD appended to `companies.md`; companies NEW proposed for the plan. Rows and leads are labelled fits / borderline / off; each company is labelled "hiring for this persona's roles now: yes / no" with one posting link as evidence. Measure 1b: good-fit employers surfaced (employers of good-fit leads, plus "yes" companies). **Bar adds:** for P2 and P3, NEW's good-fit employers summed over trials ≥ OLD's − 1. **Falsifier adds:** NEW surfaces two or more fewer in P2 or P3 → the discovery instrument that found them comes back as code under test.
 **Run protocol.** Each arm composes its plan in a first `claude -p` call; a second call carries the scripted reply `yes` and runs it; only the second is scored. Each persona's `criteria.md` carries `§ Target companies` and `§ Search settings` in the shape OLD's projection reads, and before any OLD run a code check confirms the generated `criteria.json` contains none of `DEFAULT_TARGETS` or `DEFAULT_CRITERIA`'s themes.

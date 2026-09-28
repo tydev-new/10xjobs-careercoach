@@ -4,15 +4,21 @@
 // conversation itself (Transcript + Composer + the viewer) is owned by
 // the caller and passed in as `talkToTen`; Frame only decides WHICH page
 // shows, never reads or sends anything of its own (§ 5.2 rules 1 and 2 —
-// Frame's own page components receive only `messages` and `status`).
+// Frame's own page components receive only `messages` and `status` from
+// `useChat`; never the `useChat` object itself). Stage 3a adds Documents
+// (§ 5.3): `listDocuments`/`onOpenFile` are the caller's own `store.list()`
+// and `handleOpen`, not `useChat`, so this still holds — Documents never
+// gets `sendMessage` or any other `useChat` function.
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Header, type HeaderProps } from "./Header";
 import { Rail } from "./Rail";
 import { TabBar } from "./TabBar";
 import { EmptyPage } from "./EmptyPage";
+import { DocumentsPage } from "./DocumentsPage";
 import { VersionNotice, type VersionNoticeMode } from "../real/VersionNotice";
 import { landingPage } from "../workspace/landing.ts";
-import type { AppMessage, Page, Status } from "../types.ts";
+import { buildAskTenDraft } from "../workspace/ask-ten.ts";
+import type { AppMessage, FileInfo, Page, Status } from "../types.ts";
 
 export interface FrameVersionNotice {
   mode: VersionNoticeMode;
@@ -51,6 +57,20 @@ export interface FrameProps extends Omit<HeaderProps, "pageTitle"> {
    *  "Continue with Ten... composer focused"). Optional: a caller with no
    *  composer ref (none today) simply navigates without focusing. */
   onFocusComposer?: () => void;
+  /** Stage 3a, Documents (§ 5.3): `store.list()` — the SAME WorkspaceStore
+   *  instance the agent uses (§ 5.2 rule 1), threaded down from the
+   *  caller (ChatShell / RealChatShell already hold it for the composer's
+   *  upload and the side panel's reads). */
+  listDocuments: () => Promise<FileInfo[]>;
+  /** Opens a path in the pinned viewer (§ 5.2 rule 8) — the caller's own
+   *  `handleOpen`, the exact function Talk to Ten's chips and cards call. */
+  onOpenFile: (path: string) => void;
+  /** The composer's current text and its setter (§ 5.4, "Ask Ten about
+   *  this... only when the composer is empty; unsent text is never
+   *  overwritten"). Frame decides whether to write the draft; it never
+   *  reads or clears this on its own otherwise. */
+  composerValue: string;
+  onComposerDraft: (text: string) => void;
 }
 
 const PAGE_TITLE: Record<Page, string> = {
@@ -62,7 +82,20 @@ const PAGE_TITLE: Record<Page, string> = {
 };
 
 export function Frame(props: FrameProps): ReactElement {
-  const { messages, status, talkToTen, sidePanel, viewerOpen, versionNotice, onFocusComposer, ...headerProps } = props;
+  const {
+    messages,
+    status,
+    talkToTen,
+    sidePanel,
+    viewerOpen,
+    versionNotice,
+    onFocusComposer,
+    listDocuments,
+    onOpenFile,
+    composerValue,
+    onComposerDraft,
+    ...headerProps
+  } = props;
   // The landing rule runs ONCE, at mount, off the messages Frame is
   // mounted with (design-web-ui.md § 5.1, "Where the app opens") — never
   // re-run as messages change during the session: a gate opening while
@@ -88,6 +121,16 @@ export function Frame(props: FrameProps): ReactElement {
   };
   const openTalkToTen = (): void => navigate("talk", false);
   const continueWithTen = (): void => navigate("talk", true);
+
+  // "Ask Ten about this" (§ 5.4): puts `About <path>: ` in the composer
+  // ONLY when it's empty ("unsent text is never overwritten"), then opens
+  // Talk to Ten — same as the plain rail/tab-bar navigation above, this
+  // never focuses the composer (§ 5.4 names composer-focus for Continue
+  // with Ten alone). Never sends (§ 5.2 rule 2).
+  const askTenAbout = (path: string): void => {
+    if (composerValue.trim() === "") onComposerDraft(buildAskTenDraft(path));
+    openTalkToTen();
+  };
 
   // The focus call itself must run AFTER Talk to Ten's own
   // `frame-page--hidden` class is removed and the browser has painted it,
@@ -159,11 +202,10 @@ export function Frame(props: FrameProps): ReactElement {
               onOpenTalkToTen={openTalkToTen}
             />
           ) : page === "documents" ? (
-            <EmptyPage
-              icon="files"
-              first="No files yet."
-              rest="Drop your résumé into the conversation to start."
-              cta="talk"
+            <DocumentsPage
+              list={listDocuments}
+              onOpenFile={onOpenFile}
+              onAskTen={askTenAbout}
               onOpenTalkToTen={openTalkToTen}
             />
           ) : null}

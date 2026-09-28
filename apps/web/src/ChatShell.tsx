@@ -64,6 +64,11 @@ export function ChatShell({
   const { fixture, id } = entry;
   const transport = useMemo(() => new MockChatTransport(fixture), [fixture]);
   const store = useMemo(() => new FixtureStore(fixture), [fixture]);
+  // Stage 3a: a STABLE function identity per `store` — Documents' own
+  // effect is keyed on this prop (§ 5.2 rule 4, "reads when it's shown"),
+  // so a NEW closure every render would re-list on every keystroke
+  // elsewhere in ChatShell, not just when Documents is actually shown.
+  const listDocuments = useCallback(() => store.list(), [store]);
 
   const chat = useChat<AppMessage>({ id, transport, messages: [] });
   const { messages, sendMessage, status } = chat;
@@ -240,6 +245,10 @@ export function ChatShell({
       theme={theme}
       onThemeToggle={onThemeToggle}
       viewerOpen={openFile !== undefined}
+      listDocuments={listDocuments}
+      onOpenFile={handleOpen}
+      composerValue={composerValue}
+      onComposerDraft={setComposerValue}
       talkToTen={
         <>
           {isFirstRun ? (

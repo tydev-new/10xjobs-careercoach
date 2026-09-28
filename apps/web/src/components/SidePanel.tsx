@@ -1,6 +1,12 @@
 // The pinned side panel (design-web-ui.md § 1.1/§ 1.2). .md as plain
 // formatted text, .html in a sandboxed iframe. On phone (375px) this
-// becomes a full-screen sheet, closed by a back arrow.
+// becomes a full-screen sheet, closed by a back arrow. Strings F41-F45
+// (§ 5.3.1, Stage 4's label table, origin/docs/workspace-labels, PR #22 —
+// not yet merged to main): "Nothing open yet.", "This file can't be
+// previewed here." (F42, changed from "Binary file — no preview.": C5,
+// "Binary" needs no definition, § 5.3.1), "Print / Save as PDF" (F43, now
+// also the viewer's own control, not only the document card's), "Close",
+// "File preview".
 import { forwardRef, type ReactElement } from "react";
 import { kindOf } from "../store.ts";
 import type { FileRead } from "../types.ts";
@@ -52,6 +58,18 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
   iframeRef
 ): ReactElement {
   const kind = file ? kindOf(file.path) : undefined;
+  // § 5.3.1 F43 ("Viewer (every page) | print button on an .html file |
+  // `Print / Save as PDF`"): the viewer itself carries this control now,
+  // not only the transcript's document card (Cards.tsx's own "Print /
+  // Save as PDF" is unchanged, still the card's receipt of a turn's
+  // render — C § 6.2). Whichever page opened this .html file (a card's
+  // ref, a Jobs/Applications/Documents row), the SAME browser print (the
+  // sandbox's own allow-modals, § 2.3) is one click away here. `iframeRef`
+  // is always the RefObject every caller passes (`useRef`, never a
+  // callback ref) — guarded anyway since `forwardRef`'s type allows one.
+  const printFile = (): void => {
+    if (iframeRef && typeof iframeRef !== "function") iframeRef.current?.contentWindow?.print();
+  };
   return (
     <aside className={`side-panel${open ? " side-panel--open" : ""}`} aria-label="File preview">
       <div className="side-panel-header">
@@ -59,6 +77,11 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
           <Icon name="arrowLeft" size={18} />
         </button>
         <span className="side-panel-path">{file ? file.path : "Nothing open yet."}</span>
+        {file && !file.binary && kind === "html" ? (
+          <button type="button" className="btn btn--ghost side-panel-print" onClick={printFile}>
+            Print / Save as PDF
+          </button>
+        ) : null}
       </div>
       {/* Keyed by path: switching files must fully remount this subtree,
           never diff one file's blocks against a differently-shaped file's
@@ -69,7 +92,7 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
         {!file ? (
           <p className="side-panel-empty">Nothing open yet.</p>
         ) : file.binary ? (
-          <p className="side-panel-empty">Binary file — no preview.</p>
+          <p className="side-panel-empty">This file can't be previewed here.</p>
         ) : kind === "html" ? (
           <iframe
             ref={iframeRef}

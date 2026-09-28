@@ -324,6 +324,13 @@ export function RealChatShell({
     setPanelOpenOnPhone(true);
   };
 
+  // Stage 3a: a STABLE function identity per `workspace` — Documents' own
+  // effect is keyed on this prop (§ 5.2 rule 4, "reads when it's shown"),
+  // so a new closure every render would re-list on every keystroke
+  // elsewhere in this component, not just when Documents is actually
+  // shown.
+  const listDocuments = useCallback(() => workspace.list(), [workspace]);
+
   const handlePrint = (htmlPath: string) => {
     handleOpen(htmlPath);
     setTimeout(() => iframeRef.current?.contentWindow?.print(), 200);
@@ -500,6 +507,10 @@ export function RealChatShell({
         onSignOut={onSignOut}
         coachModel={coachModel}
         viewerOpen={openFile !== undefined}
+        listDocuments={listDocuments}
+        onOpenFile={handleOpen}
+        composerValue={composerValue}
+        onComposerDraft={setComposerValue}
         talkToTen={
           <>
             <input ref={importInputRef} type="file" accept=".zip" hidden onChange={(e) => void handleImportFile(e)} />

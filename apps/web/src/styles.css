@@ -1579,6 +1579,11 @@ select:focus-visible {
   justify-content: center;
 }
 
+.side-panel-print {
+  flex: none;
+  margin-left: auto;
+}
+
 .side-panel-path {
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -1586,6 +1591,11 @@ select:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Shares the header row with the print button (F43) now — must be
+     able to shrink below its own text's intrinsic width, or a long path
+     pushes the button out past --panel-w instead of ellipsizing. */
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .side-panel-body {
@@ -1883,6 +1893,178 @@ select:focus-visible {
   max-width: 380px;
   font: var(--type-body-sm);
   color: var(--fg-muted);
+}
+
+/* ---- The workspace list pane (design-web-ui.md § 5.6, "Jobs"/
+   "Applications"/"Documents": "The same list pane" — --bg-canvas, an
+   inner column max 760px wide, padding 24px 28px). Documents (§ 5.9 Stage
+   3a) is the first page to use it; Jobs and Applications reuse these two
+   classes unchanged in their own stages. ---- */
+
+.workspace-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-canvas);
+}
+
+.workspace-page-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  /* § 5.6 "Jobs": "the list pane is --bg-canvas, with its inner column
+     max 760px and padding 24px 28px" — 28px has no token (--space-6 is
+     24, --space-8 is 32), so the horizontal figure is the spec's own
+     literal, same posture as every other bare px in this file's layout
+     rules (only color/font/radius literals are barred outside the token
+     block, § 5.6 "Chain rules this spec keeps"). */
+  padding: var(--space-6) 28px;
+}
+
+/* ---- Loading skeletons (§ 5.6, "Skeleton": "A page list loading shows
+   three 64px row skeletons.") ---- */
+
+.page-list-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.page-list-skeleton-row {
+  height: 64px;
+}
+
+/* ---- The loud, unreadable-list error (§ 5.2 rule 6: "any other read
+   failure shows... with a Retry button, never the empty state"; § 5.6
+   "Empty state": "Unreadable file uses the error card's shape in neutral
+   colors... and a Retry sec sm button.") A page list's own list() read
+   reuses the same neutral shape — there is no single <path> to name, so
+   the copy says "your files" instead of one path. ---- */
+
+.page-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 380px;
+  padding: var(--space-5);
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  color: var(--red);
+}
+
+.page-error-message {
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--fg);
+}
+
+/* ---- Documents (design-web-ui.md § 5.3 "Documents: every file"; § 5.6
+   "Documents"): one card per group, group headings with a plain count,
+   rows at least 44px with the file icon, the path (folder prefix dimmed)
+   and the date, divided by a 1px border inside the group's card. ---- */
+
+.documents-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.doc-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font: var(--type-card-title);
+  color: var(--fg);
+}
+
+.doc-group-count {
+  font: var(--type-meta);
+  color: var(--fg-subtle);
+}
+
+.doc-group-card {
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.doc-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.doc-row + .doc-row {
+  border-top: 1px solid var(--border);
+}
+
+.doc-row-open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 240px;
+  min-width: 0;
+  background: none;
+  border: none;
+  min-height: 44px;
+  color: var(--fg);
+  text-align: left;
+}
+
+.doc-row-open:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.doc-row-open svg {
+  flex: none;
+  color: var(--fg-subtle);
+}
+
+.doc-row-path {
+  font: var(--type-ui);
+  overflow-wrap: anywhere;
+}
+
+.doc-row-prefix {
+  color: var(--fg-subtle);
+}
+
+.doc-row-date {
+  flex: none;
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+
+.doc-row-ask {
+  flex: none;
+  margin-left: auto;
+}
+
+@container frame (max-width: 760px) {
+  .workspace-page-inner {
+    padding: var(--space-4);
+  }
+
+  .doc-row {
+    align-items: flex-start;
+  }
+
+  .doc-row-date {
+    order: 2;
+  }
+
+  .doc-row-ask {
+    order: 3;
+    margin-left: 0;
+  }
 }
 
 /* ---- Phone tab bar (design-web-ui.md § 5.5). Hidden at desktop widths;

@@ -593,8 +593,10 @@ the new state.
 - **Words** (`apps/web/src/components/Cards.tsx:147`): with `warn`, the
   badge reads **`no failures, N warning(s)`**. These are the script's new
   words, without the instruction the agent needs and the candidate
-  doesn't ("fix each one or tell the candidate"). `clean`, `fail` and
-  `not-run` read as today.
+  doesn't ("fix each one or tell the candidate"). The badge's words,
+  these included, come from `design-web-ui.md` § 5.3.1, rows T2–T6
+  (lead ruling, 2026-09-28): `clean` and `fail` as today, `not-run` as
+  "not run", after "automatic checks:" rather than "checker".
 - **§ 2.3 and § 2.4 of `design-web-ui.md`** each get one sentence in the
   same change, because that doc owns the rendering. § 2.3: "`checker` is
   `clean`, `warn` or `fail` from the latest check of this `.md`, or

@@ -153,16 +153,16 @@ inside_sandbox() {
 check "lib_env.sh points RENDER_RESUME_CHROME at an executable copy inside the sandbox HOME" \
       "RENDER_RESUME_CHROME is not inside the sandbox HOME (FAKEHOME=${harness_fakehome:-<empty>}, got: ${harness_chrome:-<empty>})" inside_sandbox
 no_giveaway() {
-  # FAKE_CHROME_PDF_BYTES is the one required exception: an opaque env-var
-  # NAME the copy must keep reading by this exact name (FAKE_CHROME_PDF_BYTES
-  # still works is its own acceptance line), never printed or logged to any
-  # transcript — unlike the docstring/comment PROSE this check exists to
-  # catch, an agent has no ordinary reason to introspect it.
-  scrubbed="${harness_copy//FAKE_CHROME_PDF_BYTES/}"
-  ! printf '%s' "$scrubbed" | grep -qiE '\b(harness|stand-in|fake|test)\b'
+  # No exceptions (2026-09-27, second fix round): a live run sets
+  # FAKE_CHROME_PDF_BYTES in the agent's own environment, so a plain `env`
+  # printed "FAKE_CHROME" — the same leak this check exists to catch, just
+  # reached through the environment instead of the file. Renamed to
+  # PDF_PAD_BYTES everywhere (the fixture, this copy, every test/probe) so
+  # the check can be a real zero-exceptions ban.
+  ! printf '%s' "$harness_copy" | grep -qiE '\b(harness|stand-in|fake|test)\b'
 }
-check "the staged copy carries no 'harness'/'stand-in'/'fake'/'test' word an agent could read back (FAKE_CHROME_PDF_BYTES exempted)" \
-      "the staged copy still discloses what it is: $(printf '%s' "$harness_copy" | grep -inE '\b(harness|stand-in|fake|test)\b' | grep -vF 'FAKE_CHROME_PDF_BYTES' | head -3)" no_giveaway
+check "the staged copy carries no 'harness'/'stand-in'/'fake'/'test' word an agent could read back (no exceptions)" \
+      "the staged copy still discloses what it is: $(printf '%s' "$harness_copy" | grep -inE '\b(harness|stand-in|fake|test)\b' | head -3)" no_giveaway
 [ -n "$harness_fakehome" ] && rm -rf "$harness_fakehome" 2>/dev/null
 
 harness_pdf="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; sandbox_home_setup; python3 - '$REPO' '$T' <<'EOF'

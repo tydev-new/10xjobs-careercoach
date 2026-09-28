@@ -133,11 +133,10 @@ if [ "$inside_sandbox" = 1 ] && [ -x "$chrome_var" ]; then
 else
   say FAIL "RENDER_RESUME_CHROME is not an executable path inside the sandbox HOME (FAKEHOME=${chrome_fakehome:-<empty>}, got: ${chrome_var:-<empty>})"; fail=1
 fi
-chrome_scrubbed="${chrome_copy//FAKE_CHROME_PDF_BYTES/}"
-if printf '%s' "$chrome_scrubbed" | grep -qiE '\b(harness|stand-in|fake|test)\b'; then
+if printf '%s' "$chrome_copy" | grep -qiE '\b(harness|stand-in|fake|test)\b'; then
   say FAIL "the staged copy still contains a disclosure word (harness/stand-in/fake/test)"; fail=1
 else
-  say ok "the staged copy carries no 'harness'/'stand-in'/'fake'/'test' word (FAKE_CHROME_PDF_BYTES exempted — see probe_guards.sh)"
+  say ok "the staged copy carries no 'harness'/'stand-in'/'fake'/'test' word (no exceptions)"
 fi
 [ -n "$chrome_fakehome" ] && rm -rf "$chrome_fakehome" 2>/dev/null
 

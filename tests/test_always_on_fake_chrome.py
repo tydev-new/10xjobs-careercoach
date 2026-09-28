@@ -155,13 +155,13 @@ def test_fake_chrome_size_is_overridable_for_the_over_limit_case():
     html = _tmp(".html")
     open(html, "w", encoding="utf-8").write("<html></html>")
     pdf = _tmp(".pdf")
-    had, old = _pop_env("FAKE_CHROME_PDF_BYTES")
-    os.environ["FAKE_CHROME_PDF_BYTES"] = "150000"
+    had, old = _pop_env("PDF_PAD_BYTES")
+    os.environ["PDF_PAD_BYTES"] = "150000"
     try:
         ok, err = rr.to_pdf(html, pdf, chrome=FAKE_CHROME)
     finally:
-        os.environ.pop("FAKE_CHROME_PDF_BYTES", None)
-        _restore_env("FAKE_CHROME_PDF_BYTES", had, old)
+        os.environ.pop("PDF_PAD_BYTES", None)
+        _restore_env("PDF_PAD_BYTES", had, old)
     assert ok, err
     assert os.path.getsize(pdf) >= 150_000
     os.remove(pdf)
@@ -394,19 +394,19 @@ def test_calibration_clean_one_page_resume_renders_one_page():
 
 
 def test_fake_chrome_over_limit_pdf_still_parses_with_correct_page_count():
-    """FAKE_CHROME_PDF_BYTES pads via a PDF comment appended AFTER every
+    """PDF_PAD_BYTES pads via a PDF comment appended AFTER every
     object's offset is already computed — the padded file must still be a
     valid, correctly-paginated PDF, not just a bigger one."""
     html = _tmp(".html")
     open(html, "w", encoding="utf-8").write(RESUME_HTML.format(bullets=""))
     pdf = _tmp(".pdf")
-    had, old = _pop_env("FAKE_CHROME_PDF_BYTES")
-    os.environ["FAKE_CHROME_PDF_BYTES"] = "150000"
+    had, old = _pop_env("PDF_PAD_BYTES")
+    os.environ["PDF_PAD_BYTES"] = "150000"
     try:
         ok, err = rr.to_pdf(html, pdf, chrome=FAKE_CHROME)
     finally:
-        os.environ.pop("FAKE_CHROME_PDF_BYTES", None)
-        _restore_env("FAKE_CHROME_PDF_BYTES", had, old)
+        os.environ.pop("PDF_PAD_BYTES", None)
+        _restore_env("PDF_PAD_BYTES", had, old)
     assert ok, err
     assert os.path.getsize(pdf) >= 150_000
     assert rr.pdf_pages(pdf) == 1
@@ -447,13 +447,15 @@ def _load_fake_chrome_module():
 def test_staged_copy_is_logic_identical_and_carries_no_disclosure_word():
     """stage_fake_chrome.py's own contract: byte-for-byte identical PDF
     output for the same input (the docstring/comment strip touches no
-    logic), and no 'harness'/'stand-in'/'fake'/'test' word survives EXCEPT
-    the one required exception, FAKE_CHROME_PDF_BYTES (an opaque env-var
-    NAME the copy must keep reading by this exact name — see
+    logic), and NO 'harness'/'stand-in'/'fake'/'test' word survives —
+    ZERO exceptions (2026-09-27, second fix round): the env var that used
+    to be the one exempted exception, FAKE_CHROME_PDF_BYTES, was itself a
+    leak — a live run sets it in the agent's own environment, so a plain
+    `env` printed "FAKE_CHROME". Renamed to PDF_PAD_BYTES (see
     test_fake_chrome_size_is_overridable_for_the_over_limit_case and
     test_fake_chrome_over_limit_pdf_still_parses_with_correct_page_count
-    above, both of which exercise it — never printed/logged to any
-    transcript, unlike the docstring prose this check exists to catch)."""
+    above, both of which exercise it under the new name) so this check can
+    be a real, absolute ban with nothing scrubbed out first."""
     d = tempfile.mkdtemp(prefix="staged-fake-chrome-")
     try:
         copy_path = os.path.join(d, "chrome-headless")
@@ -465,10 +467,9 @@ def test_staged_copy_is_logic_identical_and_carries_no_disclosure_word():
         py_compile.compile(copy_path, doraise=True)  # must still be valid Python
 
         copy_text = open(copy_path, encoding="utf-8").read()
-        scrubbed = copy_text.replace("FAKE_CHROME_PDF_BYTES", "")
-        hit = re.search(r"\b(harness|stand-in|fake|test)\b", scrubbed, re.I)
+        hit = re.search(r"\b(harness|stand-in|fake|test)\b", copy_text, re.I)
         assert hit is None, f"disclosure word survived stripping: {hit.group(0)!r}"
-        assert "FAKE_CHROME_PDF_BYTES" in copy_text, "the one required exception must still be readable by this exact name"
+        assert "PDF_PAD_BYTES" in copy_text, "the pad-size env var must still be readable by its own name"
 
         html = _tmp(".html")
         open(html, "w", encoding="utf-8").write(RESUME_HTML.format(bullets=""))

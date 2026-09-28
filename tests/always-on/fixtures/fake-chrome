@@ -58,7 +58,7 @@ COUNTS EXTRA (a bigger font and the margin above/below it cost more
 vertical space than one text line) — see HEADING_EXTRA_LINES.
 
 Size is derived from what the content actually needs (no artificial
-padding by default). FAKE_CHROME_PDF_BYTES still overrides/pads the size
+padding by default). PDF_PAD_BYTES still overrides/pads the size
 up (never down — it never truncates below what real content requires) for
 the one case that specifically wants to exercise render_resume.py's "over
 the ~100KB upload limit" line; the padding is a PDF comment appended after
@@ -304,7 +304,7 @@ def main(argv):
             html_text = f.read()
     blocks = html_to_blocks(html_text)
     pages = paginate(blocks_to_lines(blocks))
-    pad_to = os.environ.get("FAKE_CHROME_PDF_BYTES")
+    pad_to = os.environ.get("PDF_PAD_BYTES")
     pdf_bytes = build_pdf_bytes(pages, pad_to=int(pad_to) if pad_to else None)
     with open(pdf_path, "wb") as f:
         f.write(pdf_bytes)

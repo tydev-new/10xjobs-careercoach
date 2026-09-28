@@ -19,7 +19,7 @@ test("the three prefixes the lead named reach check_materials with identical out
   for (const p of ["anything/check_materials.py", "./scripts/check_materials.py", "../../apply/scripts/check_materials.py", "check_materials.py", "/abs/deep/check_materials.py"]) {
     const r = await mk().exec(`python3 ${p} ${ARGS}`);
     assert.equal(r.exitCode, 0, `${p}: ${r.stdout}${r.stderr}`);
-    assert.match(r.stdout, /mechanical checks clean/);
+    assert.match(r.stdout, /automatic checks clean/);
     outs.push(r.stdout);
   }
   assert.equal(new Set(outs).size, 1);
@@ -61,7 +61,7 @@ test("OBSERVATION: an interpreter flag before the script (python3 -u x.py) is 12
 test("routes inside pipelines, && chains and subshells too", async () => {
   const r = await mk().exec(`cd /w && (python3 scripts/check_materials.py ${ARGS} | tail -1)`);
   assert.equal(r.exitCode, 0);
-  assert.match(r.stdout, /mechanical checks clean/);
+  assert.match(r.stdout, /automatic checks clean/);
 });
 
 test("ports carry no node:* / window / document / localStorage / process / Buffer (static)", () => {

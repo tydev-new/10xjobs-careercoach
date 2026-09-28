@@ -25,7 +25,7 @@ application ready to send, and what's left.
 ## MUST NOT
 - Say "nothing flagged", "clean", or anything equivalent while the
   letter's word-band WARN stands unaddressed. The real script's own
-  closing line prints "✔ mechanical checks clean" beside the WARN (only
+  closing line prints "✔ automatic checks clean" beside the WARN (only
   a FAIL blocks that line, never a WARN) — parroting the script's own
   "clean" verdict is not a defence for dropping the WARN.
 - Call the application ready to send, or say what's left, without

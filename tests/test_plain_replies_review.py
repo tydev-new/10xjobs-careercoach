@@ -122,8 +122,8 @@ def test_t6_and_t13_expectations_and_judge():
 
 def test_conditional_rows_untouched():
     # § 2 "Fixes that land only on a measured miss" — none may ship unmeasured.
-    assert "✔ mechanical checks clean" in _read("skills", "apply", "scripts", "check_materials.py")
-    assert "✔ mechanical checks clean" in _read("packages", "checkers", "src", "check-materials.mjs")
+    assert "✔ automatic checks clean" in _read("skills", "apply", "scripts", "check_materials.py")
+    assert "✔ automatic checks clean" in _read("packages", "checkers", "src", "check-materials.mjs")
     assert "A spend gate you opened earlier this chat" in _read("packages", "agent", "src", "coach.ts")
     assert "The only gate is spend" in _read("skills", "profile", "templates", "web-host-note.md")
 

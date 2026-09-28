@@ -307,7 +307,7 @@ def main():
             print(f"  [{level}] {msg}")
         failed = failed or bool(fails)
 
-    print("\n" + ("✘ fix the FAILs before delivering" if failed else "✔ mechanical checks clean"))
+    print("\n" + ("✘ fix the FAILs before delivering" if failed else "✔ automatic checks clean"))
     return 1 if failed else 0
 
 

@@ -31,7 +31,7 @@ test("dispatches python3 <script> by file name and runs the REAL check_materials
     files,
   );
   assert.equal(result.exitCode, 0, result.stderr);
-  assert.match(result.stdout, /mechanical checks clean/);
+  assert.match(result.stdout, /automatic checks clean/);
   assert.deepEqual(changedFiles, {}); // a read-only checker changes nothing
   assert.deepEqual(result.changed, []);
 });

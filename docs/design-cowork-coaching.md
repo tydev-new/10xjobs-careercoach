@@ -449,8 +449,8 @@ and tests: `design-web-ui.md` § 5.
 | Re-read the brief in full; say when it's done | **discipline** — Loop A prose | built (#12; inline per loop since 2026-08-21) |
 
 **Anything that later becomes checkable moves up to code** — and the
-receipt moves with it, into the commit or the docstring, out of the prose
-(goal 4's deletion valve).
+receipt moves with it, into the commit or the script's opening comment,
+out of the prose (goal 4's deletion valve).
 
 ## 10. Assumptions still live
 

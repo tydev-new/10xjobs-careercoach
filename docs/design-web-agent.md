@@ -49,7 +49,7 @@ export interface Deps {
   fetch: typeof fetch;           // ATS fetch and the price list only
   clock: { now(): Date };        // every timestamp and mtime check reads this
   logger?: { info(e: object): void; warn(e: object): void; error(e: object): void };
-  scripts: ScriptRunner;         // the ported checkers behind `python3` (§ 5)
+  scripts: ScriptRunner;         // the skills' scripts behind `node` (§ 5)
   webSearch?: (q: string, n: number) => Promise<{ results: SearchResult[]; usd: number }>; // § 4
   checkLanguage?: (files: string[]) => Promise<{ report: string; usd: number }>;          // § 4
   limits?: { maxSteps?: number /* 25 */; spendGateUsd?: number /* 1.00, owner 2026-09-22 */; windowWords?: number /* 4000 */ };
@@ -284,7 +284,7 @@ Nothing is thrown into the stream.
     tracked version, under the same write rules (so `CLAUDE.md` and
     `skills/` are refused). A refusal or conflict fails the command with
     exit 1 and names the file.
-  - `python3` is a custom command (§ 5), with `python: false`.
+  - `node` is a custom command (§ 5), and `python3` only points to it.
   - No network.
 - **`web_search`** makes one proxy call with `plugins: [{ id: "web" }]` (the
   proxy fixes the engine and ≤ 5 results) and returns the `url_citation`
@@ -377,8 +377,8 @@ expected-output cases (`tests/checkers/cases/`).
 
 **Prevents:** skill prose forking between web and local (rule 12); a checker
 that behaves differently in the browser (rule 14).
-**Proved by:** step 3's parity test, 100% identical over the corpus and wired
-into `tests/run.py`, plus the coverage check.
+**Proved by:** the expected-output cases, 100% on both paths, wired into
+`tests/run.py`.
 
 ---
 

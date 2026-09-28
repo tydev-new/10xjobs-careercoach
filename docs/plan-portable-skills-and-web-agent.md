@@ -356,6 +356,9 @@ MVP's default model; the judge stays pinned.
 - Step 3 ports scripts, so it is unaffected.
 - Step 4's conduct parity compares the web runtime and `claude -p` **on the same
   skills commit**. Every B1 batch merge re-runs that parity.
+- **During the JavaScript switch** (`docs/design-js-only.md` § 8), no B1
+  batch is open from the start of J1 (or from the day J2 branches, if
+  that is earlier) to the end of J5.
 
 **Exit:**
 

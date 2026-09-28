@@ -368,10 +368,19 @@ function spawnP(cmd, args, opts) {
   });
 }
 
+// A case's own Chrome is the stub on its PATH (or none). render_resume.py
+// reads RENDER_RESUME_CHROME before PATH (c8d6898, the always-on harness
+// points it at its fake), so an ambient value would stand in for the case's
+// stub and fail every --pdf case (or, recording, freeze the wrong output).
+function caseEnv(extra) {
+  const env = { ...process.env, ...extra };
+  delete env.RENDER_RESUME_CHROME;
+  return env;
+}
 async function runPythonStep(step, ws) {
   const name = base(step.script);
   const argv = step.argv.map((a) => detokenize(a, ws));
-  const env = { ...process.env, FREEZE_ISO: step.clock || "", PYTHONDONTWRITEBYTECODE: "1", PYTHONIOENCODING: "utf-8" };
+  const env = caseEnv({ FREEZE_ISO: step.clock || "", PYTHONDONTWRITEBYTECODE: "1", PYTHONIOENCODING: "utf-8" });
   if (step.chrome) env.PATH = chromePath(step.chrome);
   const script = join(SKILLS, step.script);
   const args = name === LIBRARY ? ["-c", PY_JM, script, ...argv] : ["-c", PY_BOOT, script, ...argv];
@@ -381,9 +390,9 @@ async function runNodeStep(step, ws) {
   const name = base(step.script);
   if (UNPORTED.has(name)) return runPythonStep(step, ws); // until J3 (§ 5.3)
   const argv = step.argv.map((a) => detokenize(a, ws));
-  const env = { ...process.env, CHECKER_NOW_ISO: step.clock || "" };
+  const env = caseEnv({ CHECKER_NOW_ISO: step.clock || "" });
   if (step.chrome) env.PATH = chromePath(step.chrome);
-  const file = name === LIBRARY ? join(HERE, "jobs-md-driver.mjs") : join(PKG, "bin", PORTED[name]);
+  const file =name === LIBRARY ? join(HERE, "jobs-md-driver.mjs") : join(PKG, "bin", PORTED[name]);
   if (!file || (name !== LIBRARY && !PORTED[name])) throw new Error(`no node path for ${name}`);
   return spawnP(NODE_BIN, [file, ...argv], { cwd: join(ws, step.cwd || "."), env });
 }

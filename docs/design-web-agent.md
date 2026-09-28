@@ -330,7 +330,7 @@ pass its allowance.
 
 ## 5. Checkers to port (step 3)
 
-Found by grepping the MVP skills for `scripts/`; skill prose unchanged.
+Found by grepping the MVP skills for `scripts/`; skill prose names the `.mjs` commands (J2).
 
 **Dispatch:** `node` matches its first argument by **file name**, so
 `scripts/…`, `../apply/scripts/…` and `skills/apply/scripts/…` reach the
@@ -373,7 +373,8 @@ expected-output cases (`tests/checkers/cases/`).
   the script and the web's dispatch, and both must match.
 - **Known risk:** Python and JS regexes differ on non-ASCII; the corpus
   includes accented text. Step 3 starts with file-name dispatch and
-  `check_materials` parity (spike 2 proved the mechanism only).
+  `check_materials`' expected-output cases (spike 2 proved the mechanism
+  only).
 
 **Prevents:** skill prose forking between web and local (rule 12); a checker
 that behaves differently in the browser (rule 14).

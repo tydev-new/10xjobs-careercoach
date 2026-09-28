@@ -96,6 +96,74 @@ def test_ascii_arrow_in_draft_fails_and_in_url_is_exempt():
     assert not cmsg.ASCII_ARROWS.search(cmsg.EXEMPT_SPANS.sub(" ", ds_url[0])), ds_url
 
 
+def test_rubric_hedge_mark_is_a_fail():
+    """design-honest-ceilings.md § 4.2, table row 1: t13-p1A's exact hedge
+    mark, 2026-09-26 — a ⚠ beside "cleared in one pass" was the miss."""
+    line = "(rubric: specificity ✓ · brevity ⚠ dense by request · ask ✓ · value ✓ · voice ✓)"
+    checks = cmsg.rubric_line_checks(1, line)
+    assert any(level == "FAIL" and '"⚠"' in msg for level, msg in checks), checks
+
+
+def test_rubric_normalized_marks_all_met_is_clean():
+    line = "(rubric: specificity ✔ · brevity ✅ · ask ✓ · value ✓ · voice ✓)"
+    assert cmsg.rubric_line_checks(1, line) == []
+
+
+def test_rubric_note_glyph_is_not_a_mark():
+    """A ⚠ inside a parenthetical note, not right after a criterion name,
+    is not a mark — only what follows the criterion name is checked."""
+    line = "brevity ✓ (~280/300 chars) · value ✓ (the ⚠ WATCH claim left out)"
+    assert cmsg.rubric_line_checks(1, line) == []
+
+
+def test_rubric_x_with_unmet_is_clean():
+    line = "brevity ✗ … UNMET: dbt evidence cut"
+    assert cmsg.rubric_line_checks(1, line) == []
+
+
+def test_rubric_x_without_unmet_is_a_warn():
+    line = "specificity ✓ · brevity ✗ · ask ✓ · value ✓ · voice ✓"
+    checks = cmsg.rubric_line_checks(1, line)
+    assert checks == [("WARN", "draft 1: rubric has ✗ but no UNMET — say the bar wasn't "
+                                "met, and what didn't fit")], checks
+
+
+def test_rubric_unmet_without_x_is_a_warn():
+    line = "UNMET — specificity ✓ · brevity ✓ · ask ✓ · value ✓ · voice ✓"
+    checks = cmsg.rubric_line_checks(1, line)
+    assert checks == [("WARN", "draft 1: rubric says UNMET but marks nothing ✗ — mark the "
+                                "criterion that failed")], checks
+
+
+def test_rubric_line_is_the_first_non_blank_line_after_the_group_only():
+    """A draft with no rubric: line right after it gets no rubric check —
+    left alone on purpose (design-honest-ceilings.md § 4.2)."""
+    text = "> A draft with no rubric line after it, just prose.\n\nSome other prose, no rubric here.\n"
+    groups, lines = cmsg._draft_groups(text)
+    assert len(groups) == 1
+    d, end_idx = groups[0]
+    assert cmsg.draft_rubric_line(lines, end_idx) is None
+
+
+def test_planted_t13_draft_all_check_marks_stays_clean():
+    """The real t13-ceiling planted draft (all ✓) must not trip the new
+    hedge-mark FAIL or either WARN."""
+    text = _read_fixture()
+    groups, lines = cmsg._draft_groups(text)
+    assert len(groups) == 1
+    d, end_idx = groups[0]
+    rline = cmsg.draft_rubric_line(lines, end_idx)
+    assert rline is not None and "rubric:" in rline.lower()
+    assert cmsg.rubric_line_checks(1, rline) == []
+
+
+def _read_fixture():
+    here = os.path.dirname(__file__)
+    path = os.path.join(here, "always-on", "cases", "t13-ceiling", "ws-extra", "contacts", "nimbus.md")
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
 if __name__ == "__main__":
     for name in sorted(list(globals())):
         if name.startswith("test_"):

@@ -28,7 +28,7 @@ vault_state_dir() {  # the state dir lib_env.sh derives for vault $1
 }
 cleanup() {
   /usr/bin/pkill -f "$T/zz" 2>/dev/null
-  for v in "$T/v1" "$T/v2" "$T/v3" "$T/v4"; do [ -d "$v" ] && rm -rf "$(vault_state_dir "$v")"; done
+  for v in "$T/v1" "$T/v2" "$T/v3" "$T/v4" "$T/v5"; do [ -d "$v" ] && rm -rf "$(vault_state_dir "$v")"; done
   chflags -R nouchg "$T" 2>/dev/null; rm -rf "$T"
 }
 trap cleanup EXIT
@@ -108,6 +108,21 @@ wait
 held_xt() { [ "$(cat "$T/xt")" = held ]; }
 check "vault stays locked across runners whose TMPDIR differs" \
       "vault UNLOCKED under a live runner when a runner with a different TMPDIR exited — the state dir is keyed under \${TMPDIR:-/tmp}, not a fixed path" held_xt
+
+# Lock coverage: vault_lock marks FILES immutable (`find -type f ... uchg`).
+# A locked vault must also refuse NEW files and directories — a test
+# session planting data in a real candidate workspace is the failure the
+# lock exists for (CLAUDE.md: never plant test data in one).
+mkdir -p "$T/v5/applications"; echo x > "$T/v5/profile.md"; echo y > "$T/v5/applications/a.md"
+REALJS="$T/v5" bash -c "ROOT='$ROOT' REPO='$REPO'; source '$ROOT/lib_env.sh'; vault_lock
+  r=''; echo n > '$T/v5/planted.md' 2>/dev/null && r=\"\$r top-file\"
+  echo n > '$T/v5/applications/planted.md' 2>/dev/null && r=\"\$r sub-file\"
+  mkdir '$T/v5/planted-dir' 2>/dev/null && r=\"\$r new-dir\"
+  echo \"\$r\" > '$T/xc'; vault_unlock"
+created="$(cat "$T/xc")"
+none_created() { [ -z "$(printf '%s' "$created" | tr -d ' ')" ]; }
+check "a locked vault refuses new files and directories" \
+      "a locked vault still accepts new entries by absolute path:${created} (vault_lock marks only -type f uchg)" none_created
 
 echo "== render_resume.py never launches a real browser in this harness =="
 harness_chrome="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; echo \"\$RENDER_RESUME_CHROME\"")"

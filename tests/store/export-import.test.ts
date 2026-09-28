@@ -232,7 +232,7 @@ test("I5 a workspace holding only the app's root CLAUDE.md (§ 7: created 'at fi
 
 function checkFiles(dir: string): { code: number; out: string } {
   try {
-    const out = execFileSync("python3", [path.join(REPO, "skills/profile/scripts/check_files.py"), "--workspace", dir, "--skills", path.join(REPO, "skills")], { encoding: "utf8" });
+    const out = execFileSync("node", [path.join(REPO, "skills/profile/scripts/check_files.mjs"), "--workspace", dir, "--skills", path.join(REPO, "skills")], { encoding: "utf8" });
     return { code: 0, out };
   } catch (e) {
     const x = e as { status: number; stdout: string };
@@ -246,7 +246,7 @@ function writeTree(dir: string, t: Record<string, Uint8Array>) {
   }
 }
 
-test("P1 exported via the SUPABASE store: check_files.py output on the export == on the raw fixture (zero new failures)", async () => {
+test("P1 exported via the SUPABASE store: check_files.mjs output on the export == on the raw fixture (zero new failures)", async () => {
   const want = step2Fixture();
   const store = await makers[2].make();
   await importWorkspace(store, zipSync(want));
@@ -267,7 +267,7 @@ test("P1 exported via the SUPABASE store: check_files.py output on the export ==
   }
 });
 
-test("P2 a schema-conformant workspace (from skills/profile/references/schema.md) passes check_files.py after a SUPABASE round trip", async () => {
+test("P2 a schema-conformant workspace (from skills/profile/references/schema.md) passes check_files.mjs after a SUPABASE round trip", async () => {
   const conformant: Record<string, Uint8Array> = {
     "profile.md": enc(
       "# Profile\n\n## Snapshot\n- Analytics engineer, 6 years\n\n## Experience\n- Nimbus: dbt\n\n## Intake findings\n\n### Positioning strengths\n- x\n\n### Likely interviewer concerns\n- x\n\n### Career-narrative gaps\n- x\n\n### Story seeds\n- x\n\n## Interview history\n\n## Constraints\n\n## Application defaults\n\n",

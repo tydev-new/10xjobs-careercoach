@@ -144,7 +144,13 @@ function DocumentCard({
       </div>
       <p className="card-meta">
         {props.words} words · checker{" "}
-        <span className={`badge badge--${props.checker}`}>{props.checker}</span>
+        <span className={`badge badge--${props.checker}`}>
+          {/* design-honest-ceilings.md § 6A: a pass with warnings never
+              renders as "clean" — clean, fail and not-run read as today. */}
+          {props.checker === "warn"
+            ? `no failures, ${props.warnCount === 1 ? "1 warning" : `${props.warnCount ?? 0} warnings`}`
+            : props.checker}
+        </span>
       </p>
       <div className="card-actions">
         {fileRef ? <OpenInPanel onOpen={() => onOpen(fileRef)} /> : null}

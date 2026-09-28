@@ -34,12 +34,16 @@ function scriptName(command: string): string {
   return basename(scriptArg);
 }
 
+/** design-honest-ceilings.md § 6A: a pass with warnings is its own badge
+ *  state — never "clean" beside a standing WARN. */
+type CheckerBadge = { status: "clean" | "fail" | "warn"; warnCount?: number };
+
 /** Holds the one piece of cross-tool-call state § 6.2 needs: the chat's
  *  latest checker result per checked file, for the document card's
  *  badge. One instance per chat, held by the coach for the chat's
  *  lifetime (mirrors VersionTracker). */
 export class CardBuilder {
-  #checkerStatusByRef = new Map<string, "clean" | "fail">();
+  #checkerStatusByRef = new Map<string, CheckerBadge>();
 
   async forToolResult(
     toolName: string,
@@ -157,7 +161,16 @@ export class CardBuilder {
       const card: DataCardData = { card: "checker", props };
       if (ref) {
         card.ref = ref;
-        this.#checkerStatusByRef.set(ref, status === "pass" ? "clean" : "fail");
+        // design-honest-ceilings.md § 6A: a pass with 0 warnings is
+        // "clean", a pass with N >= 1 warnings is "warn" (never folded
+        // into "clean"), and a FAIL is "fail".
+        if (status !== "pass") {
+          this.#checkerStatusByRef.set(ref, { status: "fail" });
+        } else if (props.warnCount > 0) {
+          this.#checkerStatusByRef.set(ref, { status: "warn", warnCount: props.warnCount });
+        } else {
+          this.#checkerStatusByRef.set(ref, { status: "clean" });
+        }
       }
       cards.push(card);
     }
@@ -175,8 +188,9 @@ export class CardBuilder {
     // trusting the parsed stdout path there would point the side panel
     // at a file the workspace store can't read.
     const htmlPath = flags.html;
-    const checker = this.#checkerStatusByRef.get(mdPath) ?? "not-run";
-    const props: DocumentCardProps = { words, checker };
+    const badge = this.#checkerStatusByRef.get(mdPath);
+    const props: DocumentCardProps = { words, checker: badge?.status ?? "not-run" };
+    if (badge?.status === "warn") props.warnCount = badge.warnCount;
     if (htmlPath) props.htmlPath = htmlPath;
     return [{ card: "document", props, ref: mdPath }];
   }

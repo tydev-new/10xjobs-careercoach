@@ -350,6 +350,70 @@ test(`§ 5.9 3a exit on the § 5.7 fixture (${FIXTURE}), mock preview (FixtureSt
   assert.deepEqual(checkListing(got, Object.keys(files), null), []);
 });
 
+test(`§ 5.7 fixture (${FIXTURE}) holds what 3a's exit needs: a leads.md, an upload under documents/, and a rendered .html`, { skip: FIXTURE !== "workspace-pages" && "stand-in fixture" }, () => {
+  const paths = Object.keys(fx(FIXTURE).files);
+  assert.ok(paths.includes("leads.md"), "no leads.md");
+  assert.ok(paths.some((p) => /^documents\/.+\.(pdf|docx)$/.test(p)), "no upload under documents/");
+  assert.ok(paths.some((p) => p.endsWith(".html")), "no .html");
+});
+
+test(`§ 5.9 3a exit 'the viewer opens .md, .html (sandboxed, print works) and binary' on the § 5.7 fixture's own files (${FIXTURE}), real shell at 1440 and 375; phone opens each as the full-screen sheet`, async () => {
+  const files = fx(FIXTURE).files as Record<string, string>;
+  const paths = Object.keys(files);
+  const pick = {
+    md: paths.find((p) => p === "plan.md") ?? paths.find((p) => p.endsWith(".md") && p !== "leads.md")!,
+    html: paths.find((p) => p.endsWith(".html"))!,
+    bin: paths.find((p) => /\.(pdf|docx)$/.test(p))!,
+    txt: paths.find((p) => p.endsWith(".txt")),
+  };
+  const bad: string[] = [];
+  for (const vp of [DESK, PHONE]) {
+    const ctx = await ctxFor(vp);
+    const r = await openReal(ctx, files);
+    const page = r.page;
+    await go(page, "Documents");
+    if (vp === PHONE) await shot(page, `fixture-documents-375x812`);
+    for (const [kind, p] of Object.entries(pick)) {
+      if (!p) continue;
+      await openRow(page, p);
+      const v = await page.locator(".side-panel").evaluate((e) => ({
+        path: e.querySelector(".side-panel-path")?.textContent,
+        md: !!e.querySelector(".markdown-view"),
+        sandbox: e.querySelector("iframe")?.getAttribute("sandbox") ?? null,
+        text: e.textContent ?? "",
+        buttons: Array.from(e.querySelectorAll("button")).map((b) => (b.textContent ?? "").trim()),
+        z: getComputedStyle(e).zIndex,
+        w: e.getBoundingClientRect().width,
+      }));
+      const who = `${vp.width} ${kind} ${p}`;
+      if (v.path !== p) bad.push(`${who}: viewer shows ${v.path}`);
+      if ((kind === "md" || kind === "txt") && !v.md) bad.push(`${who}: not through MarkdownView`);
+      if (kind === "html") {
+        if (v.sandbox === null || v.sandbox.split(/\s+/).includes("allow-scripts")) bad.push(`${who}: sandbox ${v.sandbox}`);
+        if (!v.buttons.includes(PRINT)) bad.push(`${who}: no "${PRINT}"`);
+        else {
+          await page.evaluate(() => {
+            (window as any).__printed = 0;
+            const w = document.querySelector<HTMLIFrameElement>(".side-panel iframe")?.contentWindow as any;
+            if (w) w.print = () => (window as any).__printed++;
+          });
+          await page.locator(".side-panel").getByRole("button", { name: PRINT }).click();
+          if ((await page.evaluate(() => (window as any).__printed)) !== 1) bad.push(`${who}: print did not reach the iframe`);
+        }
+      }
+      if (kind === "bin" && (!v.text.includes(NO_PREVIEW) || v.sandbox !== null || v.md)) bad.push(`${who}: ${v.text.slice(0, 80)}`);
+      if (vp === PHONE && (v.z !== "30" || Math.round(v.w) !== PHONE.width)) bad.push(`${who}: not the full-screen sheet (z ${v.z}, ${v.w}px)`);
+      if (vp === PHONE) await shot(page, `fixture-sheet-${kind}-375x812`);
+      else await shot(page, `fixture-viewer-${kind}-1440x900`);
+      await closeViewer(page);
+    }
+    const s = await spy(page);
+    if (s.writes.length || s.uploads.length || r.proxyHits || s.saves) bad.push(`${vp.width}: writes ${s.writes} uploads ${s.uploads} model calls ${r.proxyHits} saves ${s.saves}`);
+    await ctx.close();
+  }
+  assert.deepEqual(bad, []);
+});
+
 // ---------------------------------------------------------------- edge seed
 
 /** Every MANIFEST_DIRS folder once, top-level files, leads.md, two unknown

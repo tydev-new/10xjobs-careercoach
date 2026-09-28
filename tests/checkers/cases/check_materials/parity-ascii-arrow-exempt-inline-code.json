@@ -18,7 +18,7 @@
  },
  "expect": [
   {
-   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nLETTER letter.md: pass (0 fail, 1 warn)\n  [WARN] letter is 18 words — patterns.md § Cover letter wants 250-400\n\n✔ automatic checks clean\n",
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nLETTER letter.md: pass (0 fail, 1 warn)\n  [WARN] letter is 18 words — patterns.md § Cover letter wants 250-400\n\nno failures, 1 warning above — fix each one or tell the candidate\n",
    "stderr": "",
    "stderrMatch": "exact",
    "exit": 0

@@ -499,6 +499,7 @@ export function RealChatShell({
         onSetPassword={() => setShowSetPassword(true)}
         onSignOut={onSignOut}
         coachModel={coachModel}
+        viewerOpen={openFile !== undefined}
         talkToTen={
           <>
             <input ref={importInputRef} type="file" accept=".zip" hidden onChange={(e) => void handleImportFile(e)} />

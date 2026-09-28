@@ -239,6 +239,7 @@ export function ChatShell({
       onAutoplayToggle={() => setAutoplay((v) => !v)}
       theme={theme}
       onThemeToggle={onThemeToggle}
+      viewerOpen={openFile !== undefined}
       talkToTen={
         <>
           {isFirstRun ? (

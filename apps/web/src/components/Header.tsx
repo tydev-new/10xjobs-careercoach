@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { Avatar } from "./Avatar";
 import { Icon } from "../icons.tsx";
 import { formatBalanceUsd } from "../format.ts";
@@ -98,6 +98,22 @@ export function Header(props: HeaderProps): ReactElement {
   } = props;
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // § 5.6 "Stacking": "Escape closes the top-most first: dialog, then
+  // menu, then sheet." This menu has no dialog/sheet open beneath it in
+  // this component, so its own Escape closes it — the frame's higher-
+  // level pieces (a dialog, the phone sheet) already stop their own
+  // keydown from reaching here when THEY are the top-most (they call
+  // stopPropagation or aren't mounted at the same time as an open menu
+  // in this codebase's own dialogs).
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
+
   return (
     <header className="app-header">
       <div className="app-header-left">
@@ -106,12 +122,11 @@ export function Header(props: HeaderProps): ReactElement {
             own list is "the page title... on the right... avatar, balance
             chip, ⋯", no brand mark (lead ruling: the rail carries the one
             wordmark; § 5.5 says "No wordmark on the phone" explicitly). No
-            visible state word beside the avatar either (moved to
-            app-header-right, below); that state still surfaces as the
-            avatar's own hover/aria-label (Avatar.tsx), never as page-title
-            prose. */}
+            status-action text either (reviewer finding: "evaluate 6 saved
+            roles" read as a visible state word in the header) — that text
+            lives on the avatar's own hover/aria-label (Avatar.tsx, § 1.3)
+            and the activity line, never as header prose. */}
         <span className="app-header-title">{pageTitle}</span>
-        {status.action ? <span className="app-header-action">{status.action}</span> : null}
       </div>
       <div className="app-header-right">
         {SHOW_MOCK_CONTROLS ? (

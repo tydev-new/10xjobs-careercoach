@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- design-web-ui.md § 5.5 "Keyboard up": viewport-fit=cover (the
+         safe-area insets the tab bar and composer read) and
+         interactive-widget=resizes-content (so the visual viewport, not
+         just the layout viewport, shrinks for the on-screen keyboard —
+         iOS Safari ignores this; § 5.5's own fallback there is the tab
+         bar hiding on composer focus, unchanged). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <!-- Owner ruling (2026-09-24): the real app is light-only. This meta
          tag (belt-and-suspenders alongside styles.css's `:root {
          color-scheme: light }`) tells the browser's own UA chrome

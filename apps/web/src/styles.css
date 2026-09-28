@@ -243,7 +243,12 @@ select:focus-visible {
   justify-content: space-between;
   min-height: var(--header-h);
   flex: none;
-  padding: var(--space-2) var(--space-4);
+  /* 7px top / 8px bottom, not a plain --space-2 (8px) both sides: with
+     box-sizing: border-box, the 1px bottom border + this padding must
+     leave exactly 44px of content height (the tallest control, the ⋯
+     button) for min-height to land on EXACTLY --header-h (60px) rather
+     than growing past it (measured 61px with symmetric 8px padding). */
+  padding: 7px var(--space-4) 8px;
   border-bottom: 1px solid var(--border);
   gap: var(--space-3);
   background: var(--bg-panel);
@@ -557,75 +562,92 @@ select:focus-visible {
    status hue that IS allowed here) and done (green) — the one-accent
    rule keeps lime and the old blue off every other state. ---- */
 
+/* § 5.6 "Ten's avatar (Stage 2)": the 28px mark, its state carried by a
+   ring drawn 3px outside the tile (radius 11px, 2px wide) — not a
+   colored dot. `.avatar` is the interactive/hoverable element (28px at
+   desktop, a 44px hit area at ≤760px, § 5.5); `.avatar-mark` is the
+   glyph itself, always 28px, so the ring (sized off IT) never drifts
+   away from the mark when the outer hit area grows on phone. */
 .avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-full);
-  background: var(--bg-sunken);
-  border: 1px solid var(--border);
+  width: 28px;
+  height: 28px;
 }
 
-.avatar-dot {
-  width: 15px;
-  height: 15px;
-  border-radius: var(--radius-full);
-  background: var(--fg-muted);
-  display: inline-block;
+.avatar-mark {
+  position: relative;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
 }
 
-.avatar--idle .avatar-dot {
-  background: var(--fg-muted);
+.avatar-mark::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 11px;
+  border: 2px solid transparent;
+  pointer-events: none;
 }
 
-.avatar--thinking .avatar-dot {
-  background: var(--fg-muted);
-  animation: pulse-slow var(--duration-pulse) var(--ease-standard) infinite;
+.avatar--idle .avatar-mark::after {
+  border-color: transparent;
 }
 
-.avatar--working {
-  border-color: var(--fg);
+.avatar--thinking .avatar-mark::after {
+  border-color: var(--border-strong);
 }
 
-.avatar--working .avatar-dot {
-  background: var(--fg);
-  box-shadow: 0 0 0 3px var(--focus-halo);
-  animation: ring-breathe var(--duration-pulse) var(--ease-standard) infinite;
+.avatar--working .avatar-mark::after {
+  border-color: var(--border-strong);
+  border-top-color: var(--fg);
 }
 
-.avatar--needs-you {
+.avatar--needs-you .avatar-mark::after {
   border-color: var(--amber);
 }
 
-.avatar--needs-you .avatar-dot {
-  background: var(--amber);
-  animation: pulse-amber var(--duration-pulse) var(--ease-standard) infinite;
-}
-
-.avatar--done {
+.avatar--done .avatar-mark::after {
   border-color: var(--green);
 }
 
-.avatar--done .avatar-dot {
-  background: var(--green);
+@media (prefers-reduced-motion: no-preference) {
+  .avatar-mark::after {
+    transition: opacity var(--duration-done) var(--ease-standard);
+  }
+  .avatar--thinking .avatar-mark::after {
+    animation: avatar-ring-pulse var(--duration-pulse) var(--ease-standard) infinite;
+  }
+  .avatar--working .avatar-mark::after {
+    animation: spin var(--duration-spin) linear infinite;
+  }
+  .avatar--needs-you .avatar-mark::after {
+    animation: avatar-ring-pulse var(--duration-pulse) var(--ease-standard) infinite;
+  }
 }
 
-@keyframes pulse-slow {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.08); }
+/* Reduced motion (§ 5.6's own table, "Reduced motion" column): thinking
+   and needs-you hold a STILL ring (no animation, already the case above
+   since the animations only run under no-preference); working becomes a
+   static, dashed, --fg-muted ring — never a spinning arc; done shows no
+   ring at all (no fade-in-then-out to perceive). */
+.avatar--done .avatar-mark::after {
+  opacity: 0;
 }
 
-@keyframes pulse-amber {
-  0%, 100% { opacity: 0.65; }
-  50% { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .avatar--working .avatar-mark::after {
+    border-color: var(--fg-muted);
+    border-top-color: var(--fg-muted);
+    border-style: dashed;
+  }
 }
 
-@keyframes ring-breathe {
-  0% { box-shadow: 0 0 0 3px var(--focus-halo); }
-  50% { box-shadow: 0 0 0 6px var(--focus-halo); }
-  100% { box-shadow: 0 0 0 3px var(--focus-halo); }
+@keyframes avatar-ring-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Every animation has a still equivalent — never a hard requirement to
@@ -652,7 +674,12 @@ select:focus-visible {
   padding: var(--space-5) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  /* § 5.6 "Messages (Stage 2)": "The thread is --thread-max wide,
+     centred... 26px between turns." */
+  gap: 26px;
+  max-width: var(--thread-max);
+  width: 100%;
+  margin: 0 auto;
   /* A soft top fade instead of a hard clip: when autoscroll pins to the
      newest turn, whatever's still above the fold reads as "continues
      upward," not as a glitchy cut mid-card. No motion, so reduced-motion
@@ -678,7 +705,19 @@ select:focus-visible {
   text-align: center;
 }
 
+/* § 5.6 "Messages (Stage 2)": "Each turn is a 32px avatar column plus the
+   content." A CSS grid, not a flex row with a wrapping content column —
+   every part (the role label, each text/tool/card/gate/error part) stays
+   a DIRECT child of .bubble, just placed in column 2; only the new
+   .bubble-avatar (added FIRST in the markup) sits in column 1, spanning
+   every row. This is deliberate: e2e.mjs reads .bubble--assistant's own
+   `lastElementChild` to find the last-rendered part (e.g. an error
+   card) — wrapping the parts in their own column container would make
+   THAT container the last child instead, breaking that reader. */
 .bubble {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: var(--space-3);
   /* min(), not a bare 720px: an unbroken long token (a pasted URL) must
      never push this wider than the viewport at 375px — overflow-wrap is
      the second half of that fix, letting a URL itself break mid-word
@@ -688,23 +727,38 @@ select:focus-visible {
   font: var(--type-body);
 }
 
-.bubble--user {
-  align-self: flex-end;
-  background: var(--bg-muted);
-  border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+.bubble > :not(.bubble-avatar) {
+  grid-column: 2;
 }
 
+.bubble-avatar {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  align-self: start;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bubble-avatar--user {
+  border-radius: var(--radius-full);
+  background: var(--bg-muted);
+  color: var(--fg-muted);
+}
+
+.bubble--user,
 .bubble--assistant {
   align-self: flex-start;
 }
 
 .bubble-role {
-  font: var(--type-small);
-  text-transform: uppercase;
-  color: var(--fg-muted);
-  margin-bottom: var(--space-1);
+  grid-column: 2;
+  font: var(--type-ui);
   font-weight: 600;
+  color: var(--fg);
+  margin-bottom: var(--space-1);
 }
 
 .attachment-chip {
@@ -1483,8 +1537,22 @@ select:focus-visible {
 
 /* ---- Side panel ---- */
 
+/* A transparent wrapper (design-web-ui.md § 5.6 "Page layouts (Stage 2)",
+   the viewer bullet: "on Home it appears only while a file is open") —
+   `display: contents` makes .side-panel itself the effective flex child
+   of .frame when shown; `--hidden` collapses the whole thing instead of
+   unmounting it (the panel keeps its own iframe/print state, same
+   posture as Talk to Ten's own hidden-not-unmounted page). */
+.viewer-slot {
+  display: contents;
+}
+
+.viewer-slot--hidden {
+  display: none;
+}
+
 .side-panel {
-  width: 380px;
+  width: var(--panel-w);
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -1904,6 +1972,29 @@ select:focus-visible {
   box-shadow: 0 0 0 2px var(--bg);
 }
 
+/* ---- The viewer drawer (761-1100px; § 5.6 "Breakpoint"): "the pinned
+   viewer turns into a drawer... it overlays from the right at
+   min(var(--panel-w), 100%), with --shadow-3, a close ✕ and z-index: 30."
+   Placed BEFORE the ≤760px block below so the phone sheet's OWN
+   .side-panel rules (position: fixed, full width) win there at equal
+   specificity — this block's own condition (max-width: 1100px) still
+   matches at 375px too, since 375 <= 1100. ---- */
+@container frame (max-width: 1100px) {
+  .side-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(var(--panel-w), 100%);
+    z-index: 30;
+    box-shadow: var(--shadow-3);
+  }
+
+  .side-panel-back {
+    display: inline-flex;
+  }
+}
+
 /* ---- Phone (375px; the frame's own container query, § 5.6
    "Breakpoint") ---- */
 
@@ -1940,9 +2031,28 @@ select:focus-visible {
     /* § 5.5, "The header shows on every page, 54px high" — the phone's
        own floor, distinct from --header-h (the desktop 60px). min-height,
        not height: the mock's dev-only rows (below) still push it taller
-       when they're present; the real app never has them. */
+       when they're present; the real app never has them.
+       4px top / 5px bottom, not a plain 5px both sides: with box-sizing:
+       border-box, the 1px bottom border + this padding must leave exactly
+       44px of content height (avatar/chip/menu, all 44px below) for
+       min-height to land on EXACTLY 54px (measured 55px with 5px/5px —
+       the same off-by-one as the desktop header, § 5.6, fixed the same
+       way). */
     min-height: 54px;
+    padding: 4px var(--space-2) 5px;
     gap: var(--space-2);
+  }
+
+  /* § 5.5: "Each has a 44×44px hit area" (avatar, balance chip, ⋯ menu —
+     the menu trigger is already 44×44 at every width). The avatar's ring
+     stays sized off .avatar-mark (always 28px), never this outer box. */
+  .avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .balance-chip {
+    min-height: 44px;
   }
 
   /* § 5.5: "the page title... on the right, Ten's avatar... and the
@@ -1985,6 +2095,19 @@ select:focus-visible {
 
   .pill-button {
     order: 9;
+  }
+
+  /* § 5.5, "The rest of the phone layout": "The account menu (⋯) opens
+     under the header, spanning the width with 8px side margins." Fixed
+     (viewport-relative), not the desktop's absolute-under-the-trigger —
+     the trigger sits near the header's right edge, which isn't where a
+     full-width, 8px-margin panel should anchor from. */
+  .menu-panel {
+    position: fixed;
+    top: calc(54px + var(--space-2));
+    left: 8px;
+    right: 8px;
+    width: auto;
   }
 
   .toast {

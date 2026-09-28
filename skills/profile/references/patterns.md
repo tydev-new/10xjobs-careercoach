@@ -77,11 +77,6 @@ after a gap, or **a founder or co-founder returning to employment**. Any
 of these means 2–3 bridge stories become the top storybank priority, the
 pitch frames the move as intentional, and prep expects it to be probed.
 
-Founder re-entry gets called out on its own because it carries its own
-question — *"will you leave to go back to it?"* — which needs a factual
-answer about what happened to the company and what changed, not a
-reassurance.
-
 **Target reality check.** This fires on a clear mismatch and is never
 manufactured. Two kinds:
 

@@ -36,7 +36,8 @@ you need.
 
 ## Requirements
 
-Python 3.10+ for the skills' scripts (no packages beyond the standard
-library except where a script says so — `render_resume.py` uses headless
-Chrome if present). The harness in `tests/always-on/` needs the `claude`
-CLI.
+Node.js 18 or newer for the skills' scripts (check with `node --version`;
+Ubuntu 24.04's own `nodejs` package is enough, and any current Node LTS
+works). The scripts need no packages. `render_resume.mjs` uses headless
+Chrome if present, to make the PDF and count its pages. The harness in
+`tests/always-on/` needs the `claude` CLI.

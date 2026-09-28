@@ -34,7 +34,7 @@ three:
 | 3 | **Models through OpenRouter**, default a Claude model | one API for all models (it also serves B); billing is a per-user ledger behind one app key in a proxy (row 7); web search runs on OpenRouter's servers |
 | 4 | **State in Supabase**: auth, workspace text files as versioned rows and binaries in Storage (design § 2), plus the usage ledger and the gate log | already in the stack; per-user access rules; no DB copies of career facts (rule 12) |
 | 5 | **New app, replaces the existing WebUI later**; beta users migrate after phase 6 | owner's call; Phase 5 of the earlier plan (OpenClaw integration) is superseded |
-| 6 | Checkers: **ported to JavaScript**, with a parity test against Python until the local plugin switches over. Pyodide is the fallback | one runtime for the browser, a later server, and the MCP server. A temporary duplicate is allowed only with a loud-fail parity test (PROCESS step 4) |
+| 6 | Checkers: **JavaScript only** (amended 2026-09-26, owner: "switch to js completely"). Each script is one `.mjs` file under `skills/`, run with `node` locally and through the web's dispatch. The Python copies and the parity test are deleted; Python's last output is kept as expected-output tests (`docs/design-js-only.md`). Pyodide is dropped | one runtime for the browser, a later server, the MCP server and the local plugin. A duplicate cost every change twice and proved "identical" for one Python version only |
 | 7 | **Model proxy (2026-09-23):** the owner's existing OpenRouter key (shared with the live CareerCoach app; $20 limit, daily reset), only in the Edge Function `ten-model-proxy`; a derived ledger balance; the owner's existing production Supabase project with `ten_`-named objects; Vercel hosting | the owner won't create a management key; no key in the browser; one money table; the shared $20/day limit bounds every loss path |
 
 ---
@@ -49,7 +49,7 @@ Browser tab
       ├─ skills/ bundled read-only at build time; loaded in stages:
       │    descriptions always → SKILL.md when a skill is activated → references on demand
       ├─ just-bash: in-memory workspace + custom commands
-      │    `python3 …/check_materials.py` → the JS port (so skill prose is unchanged)
+      │    `node …/check_materials.mjs` → the same file the local host runs
       ├─ tools: file read/write · checkers · web search (OpenRouter) ·
       │    ATS fetch (a Greenhouse/Lever/Ashby job URL → that board's public API)
       └─ gate: spend only (owner, 2026-09-22) → "needs your word" → the typed yes gets logged
@@ -85,7 +85,7 @@ The four spikes, each written up as a one-page pass/fail note in `docs/spikes/`:
 1. The AI SDK plus `@openrouter/ai-sdk-provider` runs **in the browser**: it
    streams, calls tools in a loop, and a cache read shows up on turn 2 with a
    Claude model.
-2. just-bash custom commands: running `python3 skills/apply/scripts/check_materials.py <file>`
+2. just-bash custom commands: running `node skills/apply/scripts/check_materials.mjs <file>`
    inside just-bash reaches a JS function, and its output and exit code match the
    Python script's.
 3. Supabase Storage isolation: user A's token cannot list, read, or write

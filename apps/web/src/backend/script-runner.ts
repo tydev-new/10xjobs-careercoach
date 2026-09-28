@@ -52,7 +52,7 @@ export function createRealScriptRunner(): ScriptRunner {
       const exec = await bash.exec(command);
 
       // Diff every path the sandbox now has against what it started with —
-      // this is how a script's own write-back (e.g. record_verdict.py
+      // this is how a script's own write-back (e.g. record_verdict.mjs
       // rewriting jobs.md) is discovered; § 4: "Each changed file goes
       // back through WorkspaceStore.write with its tracked version." A
       // script never legitimately touches `skills/...` (the bundle is

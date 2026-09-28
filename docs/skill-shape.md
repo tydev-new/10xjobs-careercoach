@@ -23,7 +23,7 @@ something goes, ask which question it answers.
 
 **All five, no exceptions** — with one sanctioned form of sharing: a
 skill whose mechanical checks live in another skill's script (positioning
-runs profile's `check_files.py`) needs no `scripts/` of its own, and its
+runs profile's `check_files.mjs`) needs no `scripts/` of its own, and its
 `eval.md § Who checks what` names the script it uses. A uniform set is
 what makes drift loud:
 `tests/test_skill_shape.py` FAILs a converted skill missing a file or
@@ -141,7 +141,7 @@ file wearing the generic name.
 ## schema.md — and the parser's three rules
 
 Holds every record shape: index rows, file templates, status grammars,
-history rows, lifecycle. `check_files.py` **parses schema declarations
+history rows, lifecycle. `check_files.mjs` **parses schema declarations
 out of this file** (and out of `SKILL.md`), so the format is load-bearing:
 
 - A file is declared by `## `name.md` — role` (heading form) or
@@ -208,7 +208,7 @@ Profile took five passes; this list is what they taught.
    lists or sentences. The force of every rule survives the unpacking —
    this pass rewrites shape, never strength — and the token check
    re-runs after it.
-6. Run `tests/run.py` AND `check_files.py` against the live workspace;
+6. Run `tests/run.py` AND `check_files.mjs` against the live workspace;
    **compare the printed schema count against what you expect**. Run
    `python3 tests/word_report.py` and report the tier-2 delta — growth
    into the loaded tier is the shape's known cost, and it is reported,

@@ -1,5 +1,5 @@
 // All seven ported CLIs, run through the shipping dispatch (just-bash +
-// python3Command) over an in-memory fs. Imported by the browser page AND by
+// nodeCommand) over an in-memory fs. Imported by the browser page AND by
 // verify.mjs in Node, so the two runtimes execute byte-identical inputs.
 const SKILL = "# s\n\n## State\n\n**`profile.md` — who.**\n- `## Snapshot` — x\n- `## Experience` — y\n- `## Other notes` — optional\n";
 const PLAN = "Goal: x\n\n## Board\nWaiting on you\n- the comp floor — criteria.md\n- café visit\nTo do\n- review\n";
@@ -17,24 +17,24 @@ export const SEED = {
   "/ws/jobs.md": "# Pipeline\n\n## To Review\n\n### Café Labs — Staff Engineer\n- URL: https://c\n\n",
 };
 export const COMMANDS = [
-  "python3 scripts/check_materials.py --workspace . --resume applications/acme-resume.md --letter applications/acme-cover-letter.md",
-  "python3 scripts/proposal_block.py --workspace . --application applications/acme.md",
-  "python3 scripts/render_resume.py --md applications/acme-resume.md --html out.html && cat out.html",
-  "python3 ../evaluate/scripts/record_verdict.py --workspace . --company 'Montréal Co' --title 'PM 𠀀' --verdict weak --score 3",
-  "python3 ../search/scripts/update_job.py --workspace . --company Café --title Staff --dismiss --reason 'trop loin'",
+  "node scripts/check_materials.mjs --workspace . --resume applications/acme-resume.md --letter applications/acme-cover-letter.md",
+  "node scripts/proposal_block.mjs --workspace . --application applications/acme.md",
+  "node scripts/render_resume.mjs --md applications/acme-resume.md --html out.html && cat out.html",
+  "node ../evaluate/scripts/record_verdict.mjs --workspace . --company 'Montréal Co' --title 'PM 𠀀' --verdict weak --score 3",
+  "node ../search/scripts/update_job.mjs --workspace . --company Café --title Staff --dismiss --reason 'trop loin'",
   "cat jobs.md",
-  "python3 ../../profile/scripts/check_files.py --workspace . --skills /sk",
-  "python3 anything/check_closeout.py --workspace . --stage applying --asked 'your comp floor'",
-  "python3 scripts/check_messages.py --workspace .",
+  "node ../../profile/scripts/check_files.mjs --workspace . --skills /sk",
+  "node anything/check_closeout.mjs --workspace . --stage applying --asked 'your comp floor'",
+  "node scripts/check_messages.mjs --workspace .",
   // Re-verify of fix round 1: the skill prose's own call (no --skills), with
   // the bundle at the design's mount. Must find the schema in BOTH runtimes.
-  "python3 ../profile/scripts/check_files.py --workspace .",
+  "node ../profile/scripts/check_files.mjs --workspace .",
   // Same call after also copying the skill to /skills: shows whether the
   // default depends on where the runtime's module URL happens to sit.
-  "mkdir -p /skills/profile && cp /ws/skills/profile/SKILL.md /skills/profile/ && python3 ../profile/scripts/check_files.py --workspace .",
+  "mkdir -p /skills/profile && cp /ws/skills/profile/SKILL.md /skills/profile/ && node ../profile/scripts/check_files.mjs --workspace .",
 ];
-export async function runAll(Bash, python3Command) {
-  const bash = new Bash({ customCommands: [python3Command], files: SEED, cwd: "/ws" });
+export async function runAll(Bash, nodeCommand) {
+  const bash = new Bash({ customCommands: [nodeCommand], files: SEED, cwd: "/ws" });
   const out = [];
   for (const cmd of COMMANDS) {
     const r = await bash.exec(cmd);

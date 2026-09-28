@@ -18,12 +18,21 @@ paths = sorted(glob.glob(os.path.join(HERE, "test_*.py")))
 paths += [os.path.join(KIT, "test_kit.py")]          # the kit's guarded copies
 for path in paths:
     name = os.path.basename(path)[:-3]
-    if path.startswith(KIT):
-        name = "kit_" + name
-        spec = importlib.util.spec_from_file_location(name, path)
-        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-    else:
-        mod = importlib.import_module(name)
+    try:
+        if path.startswith(KIT):
+            name = "kit_" + name
+            spec = importlib.util.spec_from_file_location(name, path)
+            mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        else:
+            mod = importlib.import_module(name)
+    except Exception:
+        # A single test file's own import failing (e.g. a module it
+        # imports was deleted this stage) must not crash every OTHER
+        # test file's run — reported as one FAIL, not a hard stop.
+        failed += 1
+        print(f"FAIL {name} (import)")
+        traceback.print_exc()
+        continue
     for name in sorted(dir(mod)):
         if name.startswith("test_"):
             try:

@@ -7,17 +7,17 @@
       "# in the order shown, so jobs.md and every tool-bash stdout below come from the same, consistent build.",
       "python3 skills/profile/scripts/check_files.py --workspace .   # after documents/priya-nandakumar-resume.pdf only -> 0 file(s) checked (not used in the fixture's messages)",
       "python3 skills/profile/scripts/check_files.py --workspace .   # after base-resume.md, criteria.md, plan.md -> 3 file(s) checked against 11 schema(s); 0 failure(s).",
-      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'NovaGrid Energy' --title 'Staff PM' --verdict strong --score 88 --track A --reasons 'Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.' --url https://jobs.novagrid.example.com/staff-pm-4471 --location 'Remote (US)' --jd-file jd-inbox/novagrid-staff-pm.md --analysis-file jd-analysis/novagrid-staff-pm.md --company-file company/novagrid-energy.md",
-      "python3 search/scripts/update_job.py --workspace . --company 'NovaGrid Energy' --title 'Staff PM' --stage Applied",
-      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --verdict investable_stretch --score 71 --track B --reasons 'Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn'\"'\"'t have; the software-adjacent platform experience is the addressable gap.' --dealbreakers 'The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.' --url https://boards.greenhouse.io/fernway/jobs/58231 --location 'Hybrid — Austin, TX' --jd-file jd-inbox/fernway-senior-pm.md --analysis-file jd-analysis/fernway-senior-pm.md --company-file company/fernway-robotics.md",
-      "python3 search/scripts/update_job.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --stage Interviewing",
-      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --verdict long_shot --score 42 --reasons 'quick-scan: consumer CPG PM ask reads adjacent to this profile'\"'\"'s B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.' --url https://jobs.lever.co/brightloom/product-manager-2291 --location 'Remote (US)'",
-      "python3 search/scripts/update_job.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --stage Interested",
-      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Cascadia Analytics' --title 'Product Lead' --verdict investable_stretch --score 65 --track A --reasons 'The data-platform ownership scope matches; the posting'\"'\"'s ask for direct people-management experience is the one open gap worth probing in a screen.' --url https://cascadia-analytics.example.com/careers/product-lead --location 'Remote (US)' --analysis-file jd-analysis/cascadia-product-lead.md --company-file company/cascadia-analytics.md   # --analysis-file names jd-analysis/cascadia-product-lead.md, deliberately never written (the missing-analysis-file case)",
-      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Solstice Health' --title 'Product Director' --verdict strong --score 91 --track A --reasons 'Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel'\"'\"'s own notes call out the partner-integration story as the reason they moved to offer.' --url https://jobs.solstice.example.com/product-director-902 --location 'Remote (US)' --analysis-file jd-analysis/solstice-product-director.md --company-file company/solstice-health.md",
-      "python3 search/scripts/update_job.py --workspace . --company 'Solstice Health' --title 'Product Director' --stage Offer",
-      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --verdict weak --score 34 --reasons 'Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn'\"'\"'t match this profile'\"'\"'s platform/ecosystem focus.' --url https://jobs.ashcroft.example.com/growth-pm-118 --location 'Remote (US)'",
-      "python3 search/scripts/update_job.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --dismiss --reason 'posting is a growth-marketing PM role, not platform PM — doesn'\"'\"'t match the Track A target'",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company \"NovaGrid Energy\" --title \"Staff PM\" --verdict strong --score 88 --track A --reasons \"Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.\" --url https://jobs.novagrid.example.com/staff-pm-4471 --location \"Remote (US)\" --jd-file jd-analysis/novagrid-staff-pm.md --analysis-file jd-analysis/novagrid-staff-pm.md --company-file company/novagrid-energy.md",
+      "python3 search/scripts/update_job.py --workspace . --company \"NovaGrid Energy\" --title \"Staff PM\" --stage Applied",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Fernway Robotics\" --title \"Senior PM\" --verdict investable_stretch --score 71 --track B --reasons \"Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn't have; the software-adjacent platform experience is the addressable gap.\" --dealbreakers \"The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.\" --url https://boards.greenhouse.io/fernway/jobs/58231 --location \"Hybrid — Austin, TX\" --jd-file jd-analysis/fernway-senior-pm.md --analysis-file jd-analysis/fernway-senior-pm.md --company-file company/fernway-robotics.md",
+      "python3 search/scripts/update_job.py --workspace . --company \"Fernway Robotics\" --title \"Senior PM\" --stage Interviewing",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Brightloom Foods\" --title \"Product Manager\" --verdict long_shot --score 42 --reasons \"quick-scan: consumer CPG PM ask reads adjacent to this profile's B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.\" --url https://jobs.lever.co/brightloom/product-manager-2291 --location \"Remote (US)\"",
+      "python3 search/scripts/update_job.py --workspace . --company \"Brightloom Foods\" --title \"Product Manager\" --stage Interested",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Cascadia Analytics\" --title \"Product Lead\" --verdict investable_stretch --score 65 --track A --reasons \"The data-platform ownership scope matches; the posting's ask for direct people-management experience is the one open gap worth probing in a screen.\" --url https://cascadia-analytics.example.com/careers/product-lead --location \"Remote (US)\" --analysis-file jd-analysis/cascadia-product-lead.md --company-file company/cascadia-analytics.md # --analysis-file names jd-analysis/cascadia-product-lead.md, deliberately never written (the missing-analysis-file case)",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Solstice Health\" --title \"Product Director\" --verdict strong --score 91 --track A --reasons \"Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel's own notes call out the partner-integration story as the reason they moved to offer.\" --url https://jobs.solstice.example.com/product-director-902 --location \"Remote (US)\" --jd-file jd-analysis/solstice-product-director.md --analysis-file jd-analysis/solstice-product-director.md --company-file company/solstice-health.md",
+      "python3 search/scripts/update_job.py --workspace . --company \"Solstice Health\" --title \"Product Director\" --stage Offer",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Ashcroft Systems\" --title \"Growth PM\" --verdict weak --score 34 --reasons \"Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn't match this profile's platform/ecosystem focus.\" --url https://jobs.ashcroft.example.com/growth-pm-118 --location \"Remote (US)\"",
+      "python3 search/scripts/update_job.py --workspace . --company \"Ashcroft Systems\" --title \"Growth PM\" --dismiss --reason \"posting is a growth-marketing PM role, not platform PM — doesn't match the Track A target\"",
       "python3 apply/scripts/check_materials.py --workspace . --resume applications/novagrid-staff-pm-resume.md --letter applications/novagrid-staff-pm-cover-letter.md",
       "python3 apply/scripts/render_resume.py --md applications/novagrid-staff-pm-resume.md --html applications/novagrid-staff-pm-resume.html --pages 2",
       "python3 apply/scripts/proposal_block.py --workspace . --application applications/novagrid-staff-pm-application.md --base base-resume.md   # real WARNs kept as printed (the requirement's own words aren't literally in base-resume.md); not a FAIL",
@@ -50,10 +50,10 @@
     "jd-analysis/solstice-product-director.md": "# Solstice Health — Product Director: decode (2026-09-28)\n\n## Competency extraction\n1. Clinical-adjacent product leadership — Decode, Fit · HIGH · seen 3x · Screening\n2. Partner-integration ownership — Decode · HIGH · seen 2x · Screening\n3. Director-level org scope, 5+ direct reports — Decode · MEDIUM · seen 1x · Differentiating\n\n## Fit assessment (Track A lens)\n- Requirement coverage: Strong. Partner-integration ownership tracks directly against the Argent Grid Systems and Halcyon Metering work.\n- Seniority alignment: Strong. Director scope is a credible next step from Staff/Senior PM.\n- Domain relevance: Moderate. Health-sector experience is not in the base résumé; the transferable skill is data-platform partner ownership.\n- Trajectory coherence: Strong.\n\n## Verdict: **Strong Fit — 91/100**\nNine years of platform-ownership and partner-integration work lines up with the scope of this role; the panel's own notes call out the partner-integration story specifically as the reason they moved to offer.\n",
     "jd-inbox/fernway-senior-pm.md": "Fernway Robotics — Senior PM (Hybrid, Austin TX)\n\nFernway is hiring a Senior PM to own the fleet-software roadmap for our warehouse robotics line. 3+ years of experience shipping product on a hardware cadence required. Quarterly travel to our Austin hardware lab expected. You'll lead a cross-functional team of engineers and hardware liaisons.\n",
     "jd-inbox/novagrid-staff-pm.md": "NovaGrid Energy — Staff PM (Remote, US)\n\nNovaGrid is looking for a Staff PM to own our partner-facing analytics platform end to end: roadmap, data-science and field-ops alignment, and the surface our utility partners build on. You'll work closely with engineering and field operations leadership. 8+ years of B2B SaaS or data-platform product management experience preferred.\n",
-    "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 5** · dismissed: 1 · updated 2026-09-28\n\n## To Review\n\n### Cascadia Analytics — Product Lead\n- URL: https://cascadia-analytics.example.com/careers/product-lead\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: investable_stretch\n- Score: 65\n- Reason: The data-platform ownership scope matches; the posting's ask for direct people-management experience is the one open gap worth probing in a screen.\n- Track: A\n- Analysis: jd-analysis/cascadia-product-lead.md\n- Company file: company/cascadia-analytics.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Interested\n\n### Brightloom Foods — Product Manager\n- URL: https://jobs.lever.co/brightloom/product-manager-2291\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: long_shot\n- Score: 42\n- Reason: quick-scan: consumer CPG PM ask reads adjacent to this profile's B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Applied\n\n### NovaGrid Energy — Staff PM\n- URL: https://jobs.novagrid.example.com/staff-pm-4471\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: strong\n- Score: 88\n- Reason: Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.\n- Track: A\n- JD: jd-inbox/novagrid-staff-pm.md\n- Analysis: jd-analysis/novagrid-staff-pm.md\n- Company file: company/novagrid-energy.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Interviewing\n\n### Fernway Robotics — Senior PM\n- URL: https://boards.greenhouse.io/fernway/jobs/58231\n- Location: Hybrid — Austin, TX\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: investable_stretch\n- Score: 71\n- Reason: Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn't have; the software-adjacent platform experience is the addressable gap.\n- Dealbreakers: The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.\n- Track: B\n- JD: jd-inbox/fernway-senior-pm.md\n- Analysis: jd-analysis/fernway-senior-pm.md\n- Company file: company/fernway-robotics.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Offer\n\n### Solstice Health — Product Director\n- URL: https://jobs.solstice.example.com/product-director-902\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: strong\n- Score: 91\n- Reason: Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel's own notes call out the partner-integration story as the reason they moved to offer.\n- Track: A\n- Analysis: jd-analysis/solstice-product-director.md\n- Company file: company/solstice-health.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Dismissed\n\n### Ashcroft Systems — Growth PM\n- URL: https://jobs.ashcroft.example.com/growth-pm-118\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: weak\n- Score: 34\n- Reason: Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn't match this profile's platform/ecosystem focus.\n- Evaluated: 2026-09-28T18:01:11+00:00\n- Was: To Review\n- Dismissed: posting is a growth-marketing PM role, not platform PM — doesn't match the Track A target\n",
+    "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 5** · dismissed: 1 · updated 2026-09-28\n\n## To Review\n\n### Cascadia Analytics — Product Lead\n- URL: https://cascadia-analytics.example.com/careers/product-lead\n- Location: Remote (US)\n- Seen: 2026-09-28T22:00:28+00:00\n- Updated: 2026-09-28T22:00:28+00:00\n- Verdict: investable_stretch\n- Score: 65\n- Reason: The data-platform ownership scope matches; the posting's ask for direct people-management experience is the one open gap worth probing in a screen.\n- Track: A\n- Analysis: jd-analysis/cascadia-product-lead.md\n- Company file: company/cascadia-analytics.md\n- Evaluated: 2026-09-28T22:00:28+00:00\n\n## Interested\n\n### Brightloom Foods — Product Manager\n- URL: https://jobs.lever.co/brightloom/product-manager-2291\n- Location: Remote (US)\n- Seen: 2026-09-28T22:00:28+00:00\n- Updated: 2026-09-28T22:00:28+00:00\n- Verdict: long_shot\n- Score: 42\n- Reason: quick-scan: consumer CPG PM ask reads adjacent to this profile's B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.\n- Evaluated: 2026-09-28T22:00:28+00:00\n\n## Applied\n\n### NovaGrid Energy — Staff PM\n- URL: https://jobs.novagrid.example.com/staff-pm-4471\n- Location: Remote (US)\n- Seen: 2026-09-28T22:00:27+00:00\n- Updated: 2026-09-28T22:00:27+00:00\n- Verdict: strong\n- Score: 88\n- Reason: Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.\n- Track: A\n- JD: jd-analysis/novagrid-staff-pm.md\n- Analysis: jd-analysis/novagrid-staff-pm.md\n- Company file: company/novagrid-energy.md\n- Evaluated: 2026-09-28T22:00:27+00:00\n\n## Interviewing\n\n### Fernway Robotics — Senior PM\n- URL: https://boards.greenhouse.io/fernway/jobs/58231\n- Location: Hybrid — Austin, TX\n- Seen: 2026-09-28T22:00:28+00:00\n- Updated: 2026-09-28T22:00:28+00:00\n- Verdict: investable_stretch\n- Score: 71\n- Reason: Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn't have; the software-adjacent platform experience is the addressable gap.\n- Dealbreakers: The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.\n- Track: B\n- JD: jd-analysis/fernway-senior-pm.md\n- Analysis: jd-analysis/fernway-senior-pm.md\n- Company file: company/fernway-robotics.md\n- Evaluated: 2026-09-28T22:00:28+00:00\n\n## Offer\n\n### Solstice Health — Product Director\n- URL: https://jobs.solstice.example.com/product-director-902\n- Location: Remote (US)\n- Seen: 2026-09-28T22:00:28+00:00\n- Updated: 2026-09-28T22:00:28+00:00\n- Verdict: strong\n- Score: 91\n- Reason: Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel's own notes call out the partner-integration story as the reason they moved to offer.\n- Track: A\n- JD: jd-analysis/solstice-product-director.md\n- Analysis: jd-analysis/solstice-product-director.md\n- Company file: company/solstice-health.md\n- Evaluated: 2026-09-28T22:00:28+00:00\n\n## Dismissed\n\n### Ashcroft Systems — Growth PM\n- URL: https://jobs.ashcroft.example.com/growth-pm-118\n- Location: Remote (US)\n- Seen: 2026-09-28T22:00:28+00:00\n- Updated: 2026-09-28T22:00:28+00:00\n- Verdict: weak\n- Score: 34\n- Reason: Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn't match this profile's platform/ecosystem focus.\n- Evaluated: 2026-09-28T22:00:28+00:00\n- Was: To Review\n- Dismissed: posting is a growth-marketing PM role, not platform PM — doesn't match the Track A target\n",
     "leads.md": "## Leads, unvalidated\n- Solera Grid Systems — Product Manager — found via a board sweep, not yet reviewed\n- Halcyon Metering — Senior PM (internal referral rumor, unconfirmed) — not yet reviewed\n",
     "negotiation/novagrid-comp-notes.md": "## NovaGrid — comp notes\nNo offer yet. Recruiter mentioned the Staff band \"starts in the low $200s total comp\" in the intro call (2026-09-25) — unconfirmed, not yet in writing.\n",
-    "plan.md": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n- Confirm whether the quarterly Austin travel for Fernway Robotics is workable before I keep prepping interview questions (`jd-analysis/fernway-senior-pm.md`)\n- Tell me if you want me to widen the search past the platform-PM roles you started with\n\nTo do\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet\n- Prep three STAR stories for the Fernway loop — 15 min — the interview is inside two weeks\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone\n",
+    "plan.md": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n- Confirm whether the quarterly Austin travel for Fernway Robotics is workable before I keep prepping interview questions (`jd-analysis/fernway-senior-pm.md`)\n- Tell me if you want me to widen the search past the platform-PM roles you started with\n\nTo do\n- Look over the Fernway materials before your Thursday screen (`applications/fernway-senior-pm-resume.md`) — 5 min — the automatic checks found no failures; the letter is short at 136 words\n- Prep three STAR stories for the Fernway loop (`prep/fernway-senior-pm.md`) — 15 min — the interview is inside two weeks\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet",
     "practice/fernway-senior-pm-practice-log.md": "## 2026-09-27 — mock round, hiring-manager lens\nRan through the hardware-cadence question out loud. The bridging story\nstill leans too hard on the data-platform side; needs one concrete\nsentence about how I'd ramp on a hardware release cycle.\n\n## Next session\nRedo the bridging story once the recruiter confirms whether a\nhardware-cadence answer is actually scored, or just a screen question.\n",
     "prep/fernway-senior-pm.md": "## Likely questions\n- \"Walk me through a time you shipped on a hardware team's cadence.\" — flagged gap, needs a bridging story\n- \"How do you handle a roadmap slot two teams both want?\" — have: the Argent Grid Systems partner-funnel story\n- \"What's your read on our fleet-software architecture?\" — needs research before the loop\n\n## Prep plan\n1. Draft a gap-bridging narrative for the hardware-cadence question (see plan.md)\n2. Review Fernway's public engineering material — none found yet (see company/fernway-robotics.md)\n",
     "stories/leadership-partner-escalation.md": "## Story: the partner-funnel escalation\n**Situation:** Two enterprise partners threatened to churn from Argent Grid Systems within the same week, both citing the same missing analytics view.\n**Task:** Decide whether to interrupt the roadmap to fix it, or hold the line and lose the partners.\n**Action:** Pulled the funnel data, confirmed it was the #1 blocker for 40% of partners (not just the two escalating), and re-sequenced two sprints to ship the view.\n**Result:** Both partners stayed; the view became the top-adopted feature that quarter, driving the 12% → 65% adoption growth.\n**Used in:** NovaGrid cover letter, Fernway prep (bridging story draft).\n"
@@ -279,7 +279,7 @@
           "toolCallId": "call-11",
           "state": "output-available",
           "input": {
-            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'NovaGrid Energy' --title 'Staff PM' --verdict strong --score 88 --track A --reasons 'Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.' --url https://jobs.novagrid.example.com/staff-pm-4471 --location 'Remote (US)' --jd-file jd-inbox/novagrid-staff-pm.md --analysis-file jd-analysis/novagrid-staff-pm.md --company-file company/novagrid-energy.md"
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"NovaGrid Energy\" --title \"Staff PM\" --verdict strong --score 88 --track A --reasons \"Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.\" --url https://jobs.novagrid.example.com/staff-pm-4471 --location \"Remote (US)\" --jd-file jd-analysis/novagrid-staff-pm.md --analysis-file jd-analysis/novagrid-staff-pm.md --company-file company/novagrid-energy.md"
           },
           "output": {
             "stdout": "recorded (created NEW role): NovaGrid Energy — Staff PM → strong (88)\n",
@@ -438,18 +438,6 @@
         {
           "type": "data-card",
           "data": {
-            "card": "document",
-            "ref": "applications/novagrid-staff-pm-resume.md",
-            "props": {
-              "words": 111,
-              "htmlPath": "applications/novagrid-staff-pm-resume.html",
-              "checker": "clean"
-            }
-          }
-        },
-        {
-          "type": "data-card",
-          "data": {
             "card": "checker",
             "ref": "applications/novagrid-staff-pm-resume.md",
             "props": {
@@ -483,8 +471,72 @@
           }
         },
         {
+          "type": "data-card",
+          "data": {
+            "card": "document",
+            "ref": "applications/novagrid-staff-pm-resume.md",
+            "props": {
+              "words": 111,
+              "htmlPath": "applications/novagrid-staff-pm-resume.html",
+              "checker": "clean"
+            }
+          }
+        },
+        {
           "type": "text",
           "text": "Résumé and cover letter are ready (111 words, 1 page). the automatic checks found no failures — the letter is a bit short at 249 words, under the usual 250-400, so give it one more look before you send it. Two more things: your notes list “partner ecosystem platform ownership” and “cross-functional leadership, 5+ people” as things you already show, but the words “ownership” and “leadership” don't appear anywhere in your base résumé — either add the word so it's there in black and white, or tell me you're confident the claim holds as written and I'll leave it. I also can't find direct people-management experience in either role, so I've left that as an open gap; say the word if you want me to draft a bridging answer for it. I put two steps in your plan: send the letter, then submit the application yourself once it's sent — I can't submit on your behalf."
+        }
+      ]
+    },
+    {
+      "id": "m8a",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "I sent the NovaGrid application this morning."
+        }
+      ]
+    },
+    {
+      "id": "m8b",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-r4-1",
+          "state": "output-available",
+          "input": {
+            "command": "python3 search/scripts/update_job.py --workspace . --company \"NovaGrid Energy\" --title \"Staff PM\" --stage Applied"
+          },
+          "output": {
+            "stdout": "updated: NovaGrid Energy — Staff PM — stage -> Applied\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-r4-2",
+          "state": "output-available",
+          "input": {
+            "path": "plan.md",
+            "content": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n\nTo do\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet"
+          },
+          "output": {
+            "path": "plan.md",
+            "written": true
+          }
+        },
+        {
+          "type": "text",
+          "text": "Got it — moved NovaGrid to Applied and checked the send-and-submit steps off your plan."
         }
       ]
     },
@@ -572,7 +624,7 @@
           "toolCallId": "call-24",
           "state": "output-available",
           "input": {
-            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --verdict investable_stretch --score 71 --track B --reasons 'Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn'\"'\"'t have; the software-adjacent platform experience is the addressable gap.' --dealbreakers 'The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.' --url https://boards.greenhouse.io/fernway/jobs/58231 --location 'Hybrid — Austin, TX' --jd-file jd-inbox/fernway-senior-pm.md --analysis-file jd-analysis/fernway-senior-pm.md --company-file company/fernway-robotics.md"
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Fernway Robotics\" --title \"Senior PM\" --verdict investable_stretch --score 71 --track B --reasons \"Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn't have; the software-adjacent platform experience is the addressable gap.\" --dealbreakers \"The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.\" --url https://boards.greenhouse.io/fernway/jobs/58231 --location \"Hybrid — Austin, TX\" --jd-file jd-analysis/fernway-senior-pm.md --analysis-file jd-analysis/fernway-senior-pm.md --company-file company/fernway-robotics.md"
           },
           "output": {
             "stdout": "recorded (created NEW role): Fernway Robotics — Senior PM → investable_stretch (71)\n",
@@ -588,7 +640,7 @@
           "toolCallId": "call-25",
           "state": "output-available",
           "input": {
-            "command": "python3 search/scripts/update_job.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --stage Interviewing"
+            "command": "python3 search/scripts/update_job.py --workspace . --company \"Fernway Robotics\" --title \"Senior PM\" --stage Interviewing"
           },
           "output": {
             "stdout": "updated: Fernway Robotics — Senior PM — stage -> Interviewing\n",
@@ -735,7 +787,7 @@
           "toolCallId": "call-33",
           "state": "output-available",
           "input": {
-            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --verdict long_shot --score 42 --reasons 'quick-scan: consumer CPG PM ask reads adjacent to this profile'\"'\"'s B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.' --url https://jobs.lever.co/brightloom/product-manager-2291 --location 'Remote (US)'"
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Brightloom Foods\" --title \"Product Manager\" --verdict long_shot --score 42 --reasons \"quick-scan: consumer CPG PM ask reads adjacent to this profile's B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.\" --url https://jobs.lever.co/brightloom/product-manager-2291 --location \"Remote (US)\""
           },
           "output": {
             "stdout": "recorded (created NEW role): Brightloom Foods — Product Manager → long_shot (42)\n",
@@ -747,11 +799,24 @@
           }
         },
         {
+          "type": "data-card",
+          "data": {
+            "card": "verdict",
+            "props": {
+              "company": "Brightloom Foods",
+              "title": "Product Manager",
+              "verdict": "long_shot",
+              "score": 42,
+              "reason": "quick-scan: consumer CPG PM ask reads adjacent to this profile's B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere."
+            }
+          }
+        },
+        {
           "type": "tool-bash",
           "toolCallId": "call-34",
           "state": "output-available",
           "input": {
-            "command": "python3 search/scripts/update_job.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --stage Interested"
+            "command": "python3 search/scripts/update_job.py --workspace . --company \"Brightloom Foods\" --title \"Product Manager\" --stage Interested"
           },
           "output": {
             "stdout": "updated: Brightloom Foods — Product Manager — stage -> Interested\n",
@@ -767,7 +832,7 @@
           "toolCallId": "call-35",
           "state": "output-available",
           "input": {
-            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --verdict weak --score 34 --reasons 'Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn'\"'\"'t match this profile'\"'\"'s platform/ecosystem focus.' --url https://jobs.ashcroft.example.com/growth-pm-118 --location 'Remote (US)'"
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Ashcroft Systems\" --title \"Growth PM\" --verdict weak --score 34 --reasons \"Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn't match this profile's platform/ecosystem focus.\" --url https://jobs.ashcroft.example.com/growth-pm-118 --location \"Remote (US)\""
           },
           "output": {
             "stdout": "recorded (created NEW role): Ashcroft Systems — Growth PM → weak (34)\n",
@@ -779,11 +844,24 @@
           }
         },
         {
+          "type": "data-card",
+          "data": {
+            "card": "verdict",
+            "props": {
+              "company": "Ashcroft Systems",
+              "title": "Growth PM",
+              "verdict": "weak",
+              "score": 34,
+              "reason": "Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn't match this profile's platform/ecosystem focus."
+            }
+          }
+        },
+        {
           "type": "tool-bash",
           "toolCallId": "call-36",
           "state": "output-available",
           "input": {
-            "command": "python3 search/scripts/update_job.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --dismiss --reason 'posting is a growth-marketing PM role, not platform PM — doesn'\"'\"'t match the Track A target'"
+            "command": "python3 search/scripts/update_job.py --workspace . --company \"Ashcroft Systems\" --title \"Growth PM\" --dismiss --reason \"posting is a growth-marketing PM role, not platform PM — doesn't match the Track A target\""
           },
           "output": {
             "stdout": "updated: Ashcroft Systems — Growth PM — dismissed (posting is a growth-marketing PM role, not platform PM — doesn't match the Track A target)\n",
@@ -792,6 +870,21 @@
             "changed": [
               "jobs.md"
             ]
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "checker",
+            "ref": "applications/fernway-senior-pm-resume.md",
+            "props": {
+              "label": "RESUME",
+              "name": "fernway-senior-pm-resume.md",
+              "status": "pass",
+              "failCount": 0,
+              "warnCount": 0,
+              "findings": []
+            }
           }
         },
         {
@@ -873,7 +966,7 @@
           "toolCallId": "call-39",
           "state": "output-available",
           "input": {
-            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Cascadia Analytics' --title 'Product Lead' --verdict investable_stretch --score 65 --track A --reasons 'The data-platform ownership scope matches; the posting'\"'\"'s ask for direct people-management experience is the one open gap worth probing in a screen.' --url https://cascadia-analytics.example.com/careers/product-lead --location 'Remote (US)' --analysis-file jd-analysis/cascadia-product-lead.md --company-file company/cascadia-analytics.md"
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Cascadia Analytics\" --title \"Product Lead\" --verdict investable_stretch --score 65 --track A --reasons \"The data-platform ownership scope matches; the posting's ask for direct people-management experience is the one open gap worth probing in a screen.\" --url https://cascadia-analytics.example.com/careers/product-lead --location \"Remote (US)\" --analysis-file jd-analysis/cascadia-product-lead.md --company-file company/cascadia-analytics.md"
           },
           "output": {
             "stdout": "recorded (created NEW role): Cascadia Analytics — Product Lead → investable_stretch (65)\n",
@@ -882,6 +975,20 @@
             "changed": [
               "jobs.md"
             ]
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "verdict",
+            "props": {
+              "company": "Cascadia Analytics",
+              "title": "Product Lead",
+              "verdict": "investable_stretch",
+              "score": 65,
+              "track": "A",
+              "reason": "The data-platform ownership scope matches; the posting's ask for direct people-management experience is the one open gap worth probing in a screen."
+            }
           }
         },
         {
@@ -915,7 +1022,7 @@
           "toolCallId": "call-42",
           "state": "output-available",
           "input": {
-            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Solstice Health' --title 'Product Director' --verdict strong --score 91 --track A --reasons 'Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel'\"'\"'s own notes call out the partner-integration story as the reason they moved to offer.' --url https://jobs.solstice.example.com/product-director-902 --location 'Remote (US)' --analysis-file jd-analysis/solstice-product-director.md --company-file company/solstice-health.md"
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Solstice Health\" --title \"Product Director\" --verdict strong --score 91 --track A --reasons \"Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel's own notes call out the partner-integration story as the reason they moved to offer.\" --url https://jobs.solstice.example.com/product-director-902 --location \"Remote (US)\" --jd-file jd-analysis/solstice-product-director.md --analysis-file jd-analysis/solstice-product-director.md --company-file company/solstice-health.md"
           },
           "output": {
             "stdout": "recorded (created NEW role): Solstice Health — Product Director → strong (91)\n",
@@ -931,7 +1038,7 @@
           "toolCallId": "call-43",
           "state": "output-available",
           "input": {
-            "command": "python3 search/scripts/update_job.py --workspace . --company 'Solstice Health' --title 'Product Director' --stage Offer"
+            "command": "python3 search/scripts/update_job.py --workspace . --company \"Solstice Health\" --title \"Product Director\" --stage Offer"
           },
           "output": {
             "stdout": "updated: Solstice Health — Product Director — stage -> Offer\n",
@@ -1012,7 +1119,7 @@
           "state": "output-available",
           "input": {
             "path": "plan.md",
-            "content": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n- Confirm whether the quarterly Austin travel for Fernway Robotics is workable before I keep prepping interview questions (`jd-analysis/fernway-senior-pm.md`)\n- Tell me if you want me to widen the search past the platform-PM roles you started with\n\nTo do\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet\n- Prep three STAR stories for the Fernway loop — 15 min — the interview is inside two weeks\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone\n"
+            "content": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n- Confirm whether the quarterly Austin travel for Fernway Robotics is workable before I keep prepping interview questions (`jd-analysis/fernway-senior-pm.md`)\n- Tell me if you want me to widen the search past the platform-PM roles you started with\n\nTo do\n- Look over the Fernway materials before your Thursday screen (`applications/fernway-senior-pm-resume.md`) — 5 min — the automatic checks found no failures; the letter is short at 136 words\n- Prep three STAR stories for the Fernway loop (`prep/fernway-senior-pm.md`) — 15 min — the interview is inside two weeks\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet"
           },
           "output": {
             "path": "plan.md",
@@ -1035,7 +1142,7 @@
         },
         {
           "type": "text",
-          "text": "Logged the course and the comp note (unconfirmed until it's in writing, so I kept it out of any number I'd show you). Here's where the six roles stand: NovaGrid is Applied — the letter and application are ready for you to send and submit. Fernway is Interviewing, with your Thursday screen and a prep note on the hardware-cadence question. Cascadia is still on the list waiting for a closer look; I owe you the full decode. Brightloom is Interested from a quick scan only. Solstice is at Offer — nice work. Ashcroft is dismissed as a target mismatch. Your plan's To-do list has the NovaGrid send-and-submit steps plus prepping three STAR stories for the Fernway loop, about 30 of your 45 minutes a day; the open question on Fernway's travel is waiting on you before I keep prepping."
+          "text": "Logged the course and the comp note (unconfirmed until it's in writing, so I kept it out of any number I'd show you). Here's where the six roles stand: NovaGrid is Applied — you sent it this morning, so that one's off your plate. Fernway is Interviewing, with your Thursday screen and a prep note on the hardware-cadence question. Cascadia is still on the list waiting for a closer look; I owe you the full decode. Brightloom is Interested from a quick scan only. Solstice is at Offer — nice work. Ashcroft is dismissed as a target mismatch. Your plan's To-do list now has you looking over the Fernway materials and prepping three STAR stories for the loop, about 20 of your 45 minutes a day; the open question on Fernway's travel is waiting on you before I keep prepping."
         }
       ]
     }

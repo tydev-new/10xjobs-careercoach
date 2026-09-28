@@ -257,8 +257,8 @@ export async function save(io, workspace, rows, { notes = undefined, now = () =>
   const out = [
     "# Pipeline",
     "",
-    "*The record. Script-written (search sweeps, update_job.py moves,",
-    "record_verdict.py judges) — read it anywhere; change it via chat so",
+    "*The record. Script-written (search sweeps, update_job.mjs moves,",
+    "record_verdict.mjs judges) — read it anywhere; change it via chat so",
     "the duplicate-key check can protect it. Dismissed roles keep their",
     "history at the bottom; nothing is ever deleted.*",
     "",

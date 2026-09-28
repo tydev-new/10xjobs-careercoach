@@ -13,7 +13,7 @@
  "before": {},
  "expect": [
   {
-   "stdout": "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n  --skills SKILLS       the skills/ directory the schemas are read from\n",
+   "stdout": "usage: check_files.mjs [-h] --workspace WORKSPACE [--skills SKILLS]\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n  --skills SKILLS       the skills/ directory the schemas are read from\n",
    "stderr": "",
    "stderrMatch": "exact",
    "exit": 0

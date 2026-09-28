@@ -20,7 +20,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: record_verdict.py [-h] --workspace WORKSPACE --company COMPANY\n                         --title TITLE\n                         --verdict {strong,investable_stretch,long_shot,weak}\n                         [--score SCORE] [--reasons REASONS]\n                         [--dealbreakers DEALBREAKERS] [--url URL]\n                         [--location LOCATION] [--jd-file JD_FILE]\n                         [--analysis-file ANALYSIS_FILE]\n                         [--company-file COMPANY_FILE] [--track {A,B,C}]\n                         [--existing]\nrecord_verdict.py: error: argument --title: expected one argument\n",
+   "stderr": "usage: record_verdict.mjs [-h] --workspace WORKSPACE --company COMPANY\n                         --title TITLE\n                         --verdict {strong,investable_stretch,long_shot,weak}\n                         [--score SCORE] [--reasons REASONS]\n                         [--dealbreakers DEALBREAKERS] [--url URL]\n                         [--location LOCATION] [--jd-file JD_FILE]\n                         [--analysis-file ANALYSIS_FILE]\n                         [--company-file COMPANY_FILE] [--track {A,B,C}]\n                         [--existing]\nrecord_verdict.mjs: error: argument --title: expected one argument\n",
    "stderrMatch": "exact",
    "exit": 2
   }

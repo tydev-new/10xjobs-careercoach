@@ -5,9 +5,9 @@ import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx
 import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
 import { restoreLineSeparators } from "../../../profile/scripts/lib/py-text.mjs";
 
-const PROG = "update_job.py";
+const PROG = "update_job.mjs";
 const USAGE =
-  "usage: update_job.py [-h] --workspace WORKSPACE --company COMPANY\n" +
+  "usage: update_job.mjs [-h] --workspace WORKSPACE --company COMPANY\n" +
   "                     --title TITLE\n" +
   "                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n" +
   "                     --dismiss | --restore) [--reason REASON]\n";

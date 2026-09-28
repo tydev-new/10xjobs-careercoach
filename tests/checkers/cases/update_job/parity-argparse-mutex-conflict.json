@@ -22,7 +22,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: update_job.py [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.py: error: argument --dismiss: not allowed with argument --stage\n",
+   "stderr": "usage: update_job.mjs [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.mjs: error: argument --dismiss: not allowed with argument --stage\n",
    "stderrMatch": "exact",
    "exit": 2
   }

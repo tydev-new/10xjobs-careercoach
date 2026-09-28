@@ -15,7 +15,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: proposal_block.py [-h] --workspace WORKSPACE --application APPLICATION\n                         [--base BASE]\nproposal_block.py: error: the following arguments are required: --application\n",
+   "stderr": "usage: proposal_block.mjs [-h] --workspace WORKSPACE --application APPLICATION\n                         [--base BASE]\nproposal_block.mjs: error: the following arguments are required: --application\n",
    "stderrMatch": "exact",
    "exit": 2
   }

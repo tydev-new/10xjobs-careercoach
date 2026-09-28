@@ -19,7 +19,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: render_resume.py [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n                        [--strict]\nrender_resume.py: error: argument --pages: invalid int value: 'two'\n",
+   "stderr": "usage: render_resume.mjs [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n                        [--strict]\nrender_resume.mjs: error: argument --pages: invalid int value: 'two'\n",
    "stderrMatch": "exact",
    "exit": 2
   }

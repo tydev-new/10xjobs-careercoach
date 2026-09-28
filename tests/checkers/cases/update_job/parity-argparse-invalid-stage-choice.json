@@ -21,7 +21,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: update_job.py [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.py: error: argument --stage: invalid choice: 'Bogus' (choose from To Review, Interested, Applied, Interviewing, Offer)\n",
+   "stderr": "usage: update_job.mjs [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.mjs: error: argument --stage: invalid choice: 'Bogus' (choose from To Review, Interested, Applied, Interviewing, Offer)\n",
    "stderrMatch": "exact",
    "exit": 2
   }

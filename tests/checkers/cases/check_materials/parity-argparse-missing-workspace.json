@@ -15,7 +15,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_materials.py [-h] --workspace WORKSPACE [--resume RESUME]\n                          [--letter LETTER] [--base BASE]\ncheck_materials.py: error: the following arguments are required: --workspace\n",
+   "stderr": "usage: check_materials.mjs [-h] --workspace WORKSPACE [--resume RESUME]\n                          [--letter LETTER] [--base BASE]\ncheck_materials.mjs: error: the following arguments are required: --workspace\n",
    "stderrMatch": "exact",
    "exit": 2
   }

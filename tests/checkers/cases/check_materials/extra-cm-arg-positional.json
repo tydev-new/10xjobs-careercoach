@@ -16,7 +16,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_materials.py [-h] --workspace WORKSPACE [--resume RESUME]\n                          [--letter LETTER] [--base BASE]\ncheck_materials.py: error: unrecognized arguments: stray\n",
+   "stderr": "usage: check_materials.mjs [-h] --workspace WORKSPACE [--resume RESUME]\n                          [--letter LETTER] [--base BASE]\ncheck_materials.mjs: error: unrecognized arguments: stray\n",
    "stderrMatch": "exact",
    "exit": 2
   }

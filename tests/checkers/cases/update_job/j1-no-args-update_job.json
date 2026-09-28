@@ -12,7 +12,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: update_job.py [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.py: error: the following arguments are required: --workspace, --company, --title\n",
+   "stderr": "usage: update_job.mjs [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.mjs: error: the following arguments are required: --workspace, --company, --title\n",
    "stderrMatch": "exact",
    "exit": 2
   }

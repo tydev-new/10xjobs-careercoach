@@ -14,7 +14,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.py: error: argument -h/--help: ignored explicit argument 'x'\n",
+   "stderr": "usage: check_files.mjs [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.mjs: error: argument -h/--help: ignored explicit argument 'x'\n",
    "stderrMatch": "exact",
    "exit": 2
   }

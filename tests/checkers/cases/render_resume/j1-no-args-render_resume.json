@@ -12,7 +12,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: render_resume.py [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n                        [--strict]\nrender_resume.py: error: the following arguments are required: --md\n",
+   "stderr": "usage: render_resume.mjs [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n                        [--strict]\nrender_resume.mjs: error: the following arguments are required: --md\n",
    "stderrMatch": "exact",
    "exit": 2
   }

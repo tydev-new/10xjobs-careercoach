@@ -20,7 +20,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: render_resume.py [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n                        [--strict]\nrender_resume.py: error: argument --strict: ignored explicit argument 'yes'\n",
+   "stderr": "usage: render_resume.mjs [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n                        [--strict]\nrender_resume.mjs: error: argument --strict: ignored explicit argument 'yes'\n",
    "stderrMatch": "exact",
    "exit": 2
   }

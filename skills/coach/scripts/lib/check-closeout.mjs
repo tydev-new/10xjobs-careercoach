@@ -153,9 +153,9 @@ export async function checkCloseout(args, io, now = () => Date.now()) {
   return { stdout, exitCode };
 }
 
-const PROG = "check_closeout.py";
+const PROG = "check_closeout.mjs";
 const USAGE =
-  "usage: check_closeout.py [-h] --workspace WORKSPACE [--stage STAGE]\n" +
+  "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n" +
   "                         [--asked ASKED] [--minutes MINUTES]\n";
 const OPTIONS = [
   { flag: "--workspace", dest: "workspace", required: true },

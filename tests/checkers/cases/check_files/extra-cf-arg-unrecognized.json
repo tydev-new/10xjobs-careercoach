@@ -18,7 +18,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.py: error: unrecognized arguments: --x\n",
+   "stderr": "usage: check_files.mjs [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.mjs: error: unrecognized arguments: --x\n",
    "stderrMatch": "exact",
    "exit": 2
   }

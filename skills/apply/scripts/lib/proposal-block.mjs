@@ -42,9 +42,9 @@ function contentWords(text) {
   return words.filter((w) => !STOP.has(w.toLowerCase()) && w.length > 2);
 }
 
-const PROG = "proposal_block.py";
+const PROG = "proposal_block.mjs";
 const USAGE =
-  "usage: proposal_block.py [-h] --workspace WORKSPACE --application APPLICATION\n" +
+  "usage: proposal_block.mjs [-h] --workspace WORKSPACE --application APPLICATION\n" +
   "                         [--base BASE]\n";
 const OPTIONS = [
   { flag: "--workspace", dest: "workspace", required: true },

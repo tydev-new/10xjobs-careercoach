@@ -12,7 +12,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.py: error: the following arguments are required: --workspace\n",
+   "stderr": "usage: check_files.mjs [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.mjs: error: the following arguments are required: --workspace\n",
    "stderrMatch": "exact",
    "exit": 2
   }

@@ -54,6 +54,10 @@ import { listFiles } from "./fs-walk.mjs";
 import { HELP } from "./help-text.mjs";
 import { crashToTraceback } from "./traceback.mjs";
 import { checkTable, checkHistory, checkSkillProse, loadSchemas, checkFile } from "./shapecheck.mjs";
+// Re-exported: check-files.mjs is the host checker that composes these
+// domain-neutral primitives (§ 2.1), and existing callers/tests import
+// them from here rather than reaching into shapecheck.mjs directly.
+export { checkTable, checkHistory, checkSkillProse, loadSchemas, checkFile, norm, headings } from "./shapecheck.mjs";
 
 // os.path.join(os.path.dirname(__file__), "..", "..") — pure string
 // arithmetic on whatever path the caller supplies; no filesystem access,
@@ -180,8 +184,8 @@ export async function checkStrays(io, workspace, schemas) {
   return res;
 }
 
-const PROG = "check_files.py";
-const USAGE = "usage: check_files.py [-h] --workspace WORKSPACE [--skills SKILLS]\n";
+const PROG = "check_files.mjs";
+const USAGE = "usage: check_files.mjs [-h] --workspace WORKSPACE [--skills SKILLS]\n";
 const OPTIONS = [
   { flag: "--workspace", dest: "workspace", required: true },
   { flag: "--skills", dest: "skills" }, // no static default — see skillsRootFromScriptPath above

@@ -14,7 +14,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_closeout.py [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.py: error: argument -h/--help: ignored explicit argument ''\n",
+   "stderr": "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.mjs: error: argument -h/--help: ignored explicit argument ''\n",
    "stderrMatch": "exact",
    "exit": 2
   }

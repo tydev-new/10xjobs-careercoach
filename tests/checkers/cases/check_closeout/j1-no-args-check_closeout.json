@@ -12,7 +12,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_closeout.py [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.py: error: the following arguments are required: --workspace\n",
+   "stderr": "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.mjs: error: the following arguments are required: --workspace\n",
    "stderrMatch": "exact",
    "exit": 2
   }

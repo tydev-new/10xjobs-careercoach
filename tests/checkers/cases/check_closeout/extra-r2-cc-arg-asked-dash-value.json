@@ -21,7 +21,7 @@
  "expect": [
   {
    "stdout": "",
-   "stderr": "usage: check_closeout.py [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.py: error: argument --asked: expected one argument\n",
+   "stderr": "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.mjs: error: argument --asked: expected one argument\n",
    "stderrMatch": "exact",
    "exit": 2
   }

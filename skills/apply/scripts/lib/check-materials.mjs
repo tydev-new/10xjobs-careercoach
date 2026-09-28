@@ -211,9 +211,9 @@ function countOccurrences(haystack, needle) {
   return count;
 }
 
-const PROG = "check_materials.py";
+const PROG = "check_materials.mjs";
 const USAGE =
-  "usage: check_materials.py [-h] --workspace WORKSPACE [--resume RESUME]\n" +
+  "usage: check_materials.mjs [-h] --workspace WORKSPACE [--resume RESUME]\n" +
   "                          [--letter LETTER] [--base BASE]\n";
 const OPTIONS = [
   { flag: "--workspace", dest: "workspace", required: true },

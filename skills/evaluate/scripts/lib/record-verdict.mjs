@@ -9,9 +9,9 @@ import { restoreLineSeparators } from "../../../profile/scripts/lib/py-text.mjs"
 const VERDICTS = ["strong", "investable_stretch", "long_shot", "weak"];
 const TRACKS = ["A", "B", "C"];
 
-const PROG = "record_verdict.py";
+const PROG = "record_verdict.mjs";
 const USAGE =
-  "usage: record_verdict.py [-h] --workspace WORKSPACE --company COMPANY\n" +
+  "usage: record_verdict.mjs [-h] --workspace WORKSPACE --company COMPANY\n" +
   "                         --title TITLE\n" +
   "                         --verdict {strong,investable_stretch,long_shot,weak}\n" +
   "                         [--score SCORE] [--reasons REASONS]\n" +

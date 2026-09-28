@@ -174,9 +174,9 @@ export async function pdfPages(pdfPath) {
   return count("/Type /Page") - count("/Type /Pages");
 }
 
-const PROG = "render_resume.py";
+const PROG = "render_resume.mjs";
 const USAGE =
-  "usage: render_resume.py [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n" +
+  "usage: render_resume.mjs [-h] --md MD [--html HTML] [--pdf PDF] [--pages PAGES]\n" +
   "                        [--strict]\n";
 const OPTIONS = [
   { flag: "--md", dest: "md", required: true },

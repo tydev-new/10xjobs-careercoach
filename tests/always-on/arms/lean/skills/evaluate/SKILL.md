@@ -26,8 +26,8 @@ competitiveness filters).
    reason quoted both times:
 
    ```
-   python3 scripts/record_verdict.py --workspace . --company <company> --title <title> --verdict weak --score 0 --reasons "dq: <quote>"
-   python3 ../search/scripts/update_job.py --workspace . --company <company> --title <title> --dismiss --reason "dq: <quote>"
+   node scripts/record_verdict.mjs --workspace . --company <company> --title <title> --verdict weak --score 0 --reasons "dq: <quote>"
+   node ../search/scripts/update_job.mjs --workspace . --company <company> --title <title> --dismiss --reason "dq: <quote>"
    ```
 
    The first command creates the row if none exists; a role already
@@ -49,7 +49,7 @@ competitiveness filters).
    - **Long-Shot Stretch** (`long_shot`) — needs a one-line why
    - **Weak Fit** (`weak`)
 
-   Record it: `python3 scripts/record_verdict.py --workspace . --company
+   Record it: `node scripts/record_verdict.mjs --workspace . --company
    <company> --title <title> --verdict <value> --score <0-100> --reasons
    "..." [--dealbreakers "..."] [--track <A|B|C>]` — on the row's exact
    company/title strings, never a fresh spelling.
@@ -77,7 +77,7 @@ candidate can always override.
 
 ## Session close
 
-Run `../profile/scripts/check_files.py --workspace .`; fix a FAIL
+Run `../profile/scripts/check_files.mjs --workspace .`; fix a FAIL
 before the reply ends. Report outcomes, never narration.
 
 ## Guardrails

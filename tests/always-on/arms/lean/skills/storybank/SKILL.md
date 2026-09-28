@@ -66,7 +66,7 @@ in `base-resume.md § Claim rules` as declined rulings.
 ## Session close
 
 Run `scripts/check_stories.py --workspace .` and
-`../profile/scripts/check_files.py --workspace .`; run the independent
+`../profile/scripts/check_files.mjs --workspace .`; run the independent
 language checker-subagent
 (`../profile/references/language-check.md`) on edited stories; fix a
 FAIL before the reply ends. Report outcomes, never narration.

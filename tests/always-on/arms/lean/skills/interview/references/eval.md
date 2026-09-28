@@ -4,7 +4,7 @@
 
 ## Who checks what
 
-- **Structure and manifest → `../../profile/scripts/check_files.py`**: checks `prep/`, `practice/`, `practice-log.md`, `question-bank.md`, `composite-target.md`, `negotiation/`.
+- **Structure and manifest → `../../profile/scripts/check_files.mjs`**: checks `prep/`, `practice/`, `practice-log.md`, `question-bank.md`, `composite-target.md`, `negotiation/`.
 - **Language against written rules → no checker-subagent**: scores, briefs, and feedback are the coach's voice.
 - **Semantic quality → verified during turn**: sourced claims, question tiers, story fit accuracy, independent scoring.
 

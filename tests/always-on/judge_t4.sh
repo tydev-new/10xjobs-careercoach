@@ -73,7 +73,7 @@ for reply in "$RESULTS"/*.md; do
     echo "credential, or external fact. soft = an unstated qualifier or purpose"
     echo "inference on a true fact."
   } > "$P"
-  claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+  claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
     > "$verdict" 2> "$verdict.err"
   rm -f "$P"
 done

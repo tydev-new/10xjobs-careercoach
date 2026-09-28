@@ -30,6 +30,9 @@ CASES=all TRIALS=2 ./run_t14.sh <tag>    # evaluate/pruning temptations (#20). t
 ./judge_t14.sh <tag>
 TRIALS=2 ./run_t19.sh <tag>    # multi-turn intake via the persona driver (#19)
 ./judge_t19.sh <tag>
+TRIALS=3 ./run_t21.sh <tag>    # plain-report honesty (docs/design-plain-replies.md § 4)
+./judge_t21.sh <tag>           # this case's own MUST/MUST NOT bar (expected.md)
+./judge_voice.sh results/t21-<tag>   # the plain-words leak/echo bar — grades ANY results dir
 ./run_t15.sh <tag>             # checker head-to-head: py vs subagent (no judge —
 python3 score_t15.py <tag>     #   deterministic scorer vs truth.json)
 ```
@@ -66,10 +69,34 @@ undated rather than silently):
   environment:
   ```bash
   claude -p "hi" --model opus --output-format json --setting-sources project \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin)["model"])'
+    | python3 -c '
+  import json, sys
+  d = json.load(sys.stdin)
+  mu = d.get("modelUsage") or {}
+  def share(v):
+      return sum(x for x in v.values() if isinstance(x, (int, float))) if isinstance(v, dict) else 0
+  served = max(mu, key=lambda k: share(mu[k])) if mu else d.get("model", "UNKNOWN")
+  print(served)
+  '
   ```
-  and export the printed id (e.g. `export JUDGE_MODEL=<dated-opus-id>`)
-  in your shell profile or CI config.
+  (the non-streaming `--output-format json` result has no top-level
+  `"model"` field — the SERVED id is a key of `"modelUsage"` instead, the
+  same object `record_served_models` reads from the streaming form's
+  per-event `message.model`. `"modelUsage"` can carry more than one key —
+  a turn that used a subagent or a fallback model reports each model it
+  actually served — so the served id here is the one with the LARGEST
+  token/cost share, never just the first key in the dict: dict order is
+  insertion order, not usage share, and the first-served model on a turn
+  is not always the one that did most of the work. `.get("model", ...)`
+  is kept only as a fallback for a CLI version that does carry a flat
+  field. This served id is itself UNDATED — it is exactly the same kind
+  of value the `RUNNER_MODEL`/`JUDGE_MODEL` dated-id check above guards
+  against accepting bare: confirm it actually has a `-20YYMMDD` suffix
+  before exporting it, and if it doesn't, that is itself the finding —
+  Sonnet 5 may serve with no dated id at all, same as this README's
+  `RUNNER_MODEL` section already notes.)
+  Export the printed id (e.g. `export JUDGE_MODEL=<dated-opus-id>`) in
+  your shell profile or CI config.
 - **`SIM_MODEL`** (t19's persona simulator only) — same dated-or-escape
   rule as `RUNNER_MODEL`, default `claude-sonnet-5` with
   `SIM_MODEL_UNDATED_OK=1` auto-set on that default path.

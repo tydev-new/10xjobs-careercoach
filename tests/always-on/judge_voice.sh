@@ -180,7 +180,7 @@ for reply in "$RESULTS"/*.md; do
       echo "Expectations contradicts — that blocks the same as a hard"
       echo "fabrication."
     } > "$P"
-    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
       > "$verdict" 2> "$verdict.err"
     rm -f "$P" "$PLAN_ADDED" "$SCAN_OUT" "$TOOLS_RESULTS"
   ) &

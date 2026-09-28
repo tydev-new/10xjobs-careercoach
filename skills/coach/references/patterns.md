@@ -40,7 +40,7 @@ one of the 2–4 slots — the next piece, prepared.
 
 The date makes the plan arithmetic instead of judgment. Work backward, out loud, at every mirror: an offer by the date → final rounds ~2 weeks before → first interviews ~4–5 weeks before → applications mostly in the FIRST third of the runway → how many, at the response rate (a stated market assumption until 5+ real outcomes exist, then the observed rate) → this week's commitments → today's items. Every why traces to this chain, not taste.
 
-When the math says the goal and the limits don't meet, that is the mirror's DECISION (its rule 2).
+When the math says the goal and the limits don't meet, that is the mirror's decision for the candidate to make (its rule 2).
 
 ## Principles (three)
 

@@ -25,10 +25,9 @@ CASES="${CASES:-}"
 # The vault (2026-08-20 incident class): the founder's real ~/job-search is
 # immutable for the whole run — locked before the first turn, unlocked on
 # every exit path (EXIT after the final wait; INT/TERM also kill the group).
-REALJS="$HOME/job-search"
-vault_unlock() { find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null; }
-vault_lock()   { find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null; }
-[ -d "$REALJS" ] && { vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM; }
+# Vault lock/unlock: shared, reference-counted (lib_env.sh) -- see its
+# comment for the race this fixes (a sibling run_*.sh unlocking early).
+vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM
 FIX="$ROOT/fixtures/eval14"
 APX="$ROOT/fixtures/apply"
 for trial in $(seq 1 "$TRIALS"); do
@@ -49,13 +48,17 @@ for case_name in $CASES; do
     [ -d "$CASE/ws-extra" ] && cp -r "$CASE/ws-extra/." "$WS/"
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$RUNNER_SKILLS_DIR/evaluate" "$RUNNER_SKILLS_DIR/search" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
+    # coach ships in every real workspace — an agent without it hunts the
+    # disk and finds the owner's DEPLOYED coach (env contract rule 1).
+    cp -r "$RUNNER_SKILLS_DIR/evaluate" "$RUNNER_SKILLS_DIR/search" "$RUNNER_SKILLS_DIR/profile" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
+    sandbox_home_setup
     : > "$out.err"
-    ( cd "$WS" && claude -p "$(cat "$CASE/prompt.md")" \
+    ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$CASE/prompt.md")" \
         --model "$MODEL" --dangerously-skip-permissions \
-        --setting-sources project --output-format stream-json --verbose \
+        --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
       ) > "$out.turn1.stream.json" 2>> "$out.err"
+    sandbox_home_cleanup
     python3 "$ROOT/extract_text.py" "$out.turn1.stream.json" > "$out.md"
     mkdir -p "$out-ws"
     cp "$WS"/*.md "$out-ws/" 2>/dev/null

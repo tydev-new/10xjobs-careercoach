@@ -47,7 +47,7 @@ Instrument catalog and discovery tactics in `references/patterns.md`.
   1. *Single revision:* One evidence-backed revision pass at a time.
   2. *To-Review ranking only:* Active pipeline rows (Interested, Applied, Interviewing) are strictly excluded from prune proposals.
   3. *Batch confirm:* Proposed dismissals require explicit single batch approval.
-- **Exits:** Sweep reported and prune actions confirmed; or **the ceiling: two passes with the same yield** → stop and present parameter adjustment as a **DECISION**. Standard does not bend to thin weeks.
+- **Exits:** Sweep reported and prune actions confirmed; or **the ceiling: two passes with the same yield** → stop and present parameter adjustment as a decision for them to make. Standard does not bend to thin weeks.
 
 ### Scheduled run (a sequence, unattended)
 

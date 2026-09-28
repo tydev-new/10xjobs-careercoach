@@ -13,7 +13,7 @@ Find who matters $\rightarrow$ learn what they care about $\rightarrow$ identify
 |---|---|
 | $\le$6 leads per company with evidence chain, confidence, and send channel | `contacts/<company>.md` |
 | Sourced hooks from recipient's public signals, or explicit miss | lead's entry |
-| Written rubric line and deterministic + language checks run before display | next to draft |
+| Written rubric line and deterministic + wording checks run before display | next to draft |
 | Credential claims trace to base résumé | `base-resume.md § Claim rules` |
 | Warm path evaluated or explicitly marked not found | warm-path line |
 | All candidate sends logged and dated | send log |
@@ -59,8 +59,8 @@ Extended search tactics and message frameworks live in `references/patterns.md`.
 
 - **Standard:** Channel limit (`references/eval.md`), recipient's sourced hook, top posting competency, 5-criterion rubric, and `voice.md`.
 - **Budget:** 2 self-passes.
-- **Each round:** Apply recipient hook (recipient's own words open, positioning closes). Draft inside limit. Self-loop with `python3 scripts/check_messages.py` and language checker-subagent (`../profile/references/language-check.md`). Write rubric line next to draft.
-- **Exits:** Clears standard; or **the ceiling: two passes without clearing** → stop, record honest score (UNMET), and present tradeoff as a **DECISION**. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
+- **Each round:** Apply recipient hook (recipient's own words open, positioning closes). Draft inside limit. Self-loop with `python3 scripts/check_messages.py` and the wording check subagent (`../profile/references/language-check.md`). Write rubric line next to draft.
+- **Exits:** Clears standard; or **the ceiling: two passes without clearing** → stop, record honest score (UNMET), and present tradeoff as a decision for them to make. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
 
 ### Plan close-out (a sequence)
 
@@ -81,7 +81,7 @@ Extended search tactics and message frameworks live in `references/patterns.md`.
 Owned: `contacts/` (shapes in `references/schema.md`).
 
 - **Hands back:** Interview booked → `interview`; low response rate → `profile`.
-- **Session close:** Run `../profile/scripts/check_files.py --workspace .`. Language checker-subagent runs on every displayed draft. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `../profile/scripts/check_files.py --workspace .`. Wording check subagent runs on every displayed draft. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

@@ -35,7 +35,7 @@ async function main() {
       cwd: "/home/user/ws",
     });
     const r1 = await bash1.exec("python3 skills/apply/scripts/check_materials.py --workspace . --resume resume.md");
-    const pass1 = r1.exitCode === 0 && r1.stdout.includes("mechanical checks clean");
+    const pass1 = r1.exitCode === 0 && r1.stdout.includes("automatic checks clean");
 
     // 2. record_verdict.py: a real write (jobs.md) through just-bash's
     // in-memory fs — proves the writer path (not just a reader) works in

@@ -45,7 +45,7 @@
           "output": { "path": "applications/brightline-data-eng-lead-resume.md", "written": true } },
         { "type": "tool-bash", "toolCallId": "call-6", "state": "output-available",
           "input": { "command": "python3 apply/scripts/check_materials.py --workspace . --resume applications/brightline-data-eng-lead-resume.md --base base-resume.md" },
-          "output": { "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME brightline-data-eng-lead-resume.md: pass (0 fail, 0 warn)\n\n✔ mechanical checks clean", "stderr": "", "exitCode": 0, "changed": [] } },
+          "output": { "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME brightline-data-eng-lead-resume.md: pass (0 fail, 0 warn)\n\n✔ automatic checks clean", "stderr": "", "exitCode": 0, "changed": [] } },
         { "type": "tool-bash", "toolCallId": "call-7", "state": "output-available",
           "input": { "command": "python3 apply/scripts/render_resume.py --md applications/brightline-data-eng-lead-resume.md --html applications/brightline-data-eng-lead-resume.html" },
           "output": { "stdout": "words: 56  ->  applications/brightline-data-eng-lead-resume.html", "stderr": "", "exitCode": 0, "changed": ["applications/brightline-data-eng-lead-resume.html"] } },

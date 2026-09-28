@@ -56,5 +56,5 @@ test("check_materials.py reached through just-bash's in-memory fs, writer + read
   await bash.exec(`cat <<'EOF' > resume.md\n# A\n\n## Summary\n\nok.\n\n## Experience\n\n- did the thing\nEOF`);
   const r = await bash.exec("python3 skills/apply/scripts/check_materials.py --workspace . --resume resume.md");
   assert.equal(r.exitCode, 0, r.stdout);
-  assert.match(r.stdout, /mechanical checks clean/);
+  assert.match(r.stdout, /automatic checks clean/);
 });

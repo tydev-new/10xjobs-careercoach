@@ -39,14 +39,16 @@ for cond in $CONDS; do
     cp -r "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
   fi
   echo "=== t4 / $cond / trial $trial -> $WS"
-  ( cd "$WS" && claude -p "$(cat "$CASE/turn1.md")" \
+  sandbox_home_setup   # one FAKEHOME per trial — turn 2's --continue needs the SAME one turn 1 used
+  ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$CASE/turn1.md")" \
       --model "$MODEL" --permission-mode acceptEdits \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$out.turn1.stream.json" 2> "$out.err"
-  ( cd "$WS" && claude -p --continue "$(cat "$CASE/turn2.md")" \
+  ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p --continue "$(cat "$CASE/turn2.md")" \
       --model "$MODEL" --permission-mode acceptEdits \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$out.turn2.stream.json" 2>> "$out.err"
+  sandbox_home_cleanup
   {
     echo "===== TURN 1 ====="
     python3 "$ROOT/extract_text.py" "$out.turn1.stream.json"

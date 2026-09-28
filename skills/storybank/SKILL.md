@@ -51,7 +51,7 @@ Extended craft, elicitation questions, and diagnostic score ladders live in `ref
 - **Standard:** The target competency plus *specific, owned, and defensible*.
 - **Budget:** 2–3 rounds. Read `## Rounds` (or `storybank-history.md`) first.
 - **Each round:** Apply minimum score-moving changes (`references/patterns.md § Improving by score band`). Show before/after, re-score, and update index row. Append row to `## Rounds` in `storybank.md` (or `storybank-history.md`).
-- **Exits:** Story scores 4–5; budget expires; or **the ceiling: two rounds in a row with no movement** → stop and present tradeoff as a **DECISION**. Never relax the standard.
+- **Exits:** Story scores 4–5; budget expires; or **the ceiling: two rounds in a row with no movement** → stop and present tradeoff as a decision for them to make. Never relax the standard.
 
 ### Asking the bank
 
@@ -64,7 +64,7 @@ Extended craft, elicitation questions, and diagnostic score ladders live in `ref
 Owned: `storybank.md` and `stories/S###-<slug>.md` (shapes in `references/schema.md`).
 
 - **Hands back:** When records are written and proposals delivered.
-- **Session close:** Run `scripts/check_stories.py --workspace .` and `../profile/scripts/check_files.py --workspace .`. Run independent language checker-subagent (`../profile/references/language-check.md`) on edited stories. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `scripts/check_stories.py --workspace .` and `../profile/scripts/check_files.py --workspace .`. Run the independent wording check subagent (`../profile/references/language-check.md`) on edited stories. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## A story is not a résumé line
 

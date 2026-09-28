@@ -271,7 +271,7 @@ export async function run(argv, io) {
       for (const [level, msg] of results) stdout += `  [${level}] ${msg}\n`;
       failed = failed || fails.length > 0;
     }
-    stdout += "\n" + (failed ? "✘ fix the FAILs before delivering" : "✔ mechanical checks clean") + "\n";
+    stdout += "\n" + (failed ? "✘ fix the FAILs before delivering" : "✔ automatic checks clean") + "\n";
     return { stdout: restoreLineSeparators(stdout), stderr: "", exitCode: failed ? 1 : 0 };
   } catch (e) {
     // Python's os.path.exists() is true for a directory too, so a

@@ -125,7 +125,7 @@
           "output": { "path": "applications/acme-staff-pm-cover-letter.md", "written": true } },
         { "type": "tool-bash", "toolCallId": "call-17", "state": "output-available",
           "input": { "command": "python3 apply/scripts/check_materials.py --workspace . --resume applications/acme-staff-pm-resume.md --letter applications/acme-staff-pm-cover-letter.md --base base-resume.md" },
-          "output": { "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME acme-staff-pm-resume.md: pass (0 fail, 0 warn)\n\nLETTER acme-staff-pm-cover-letter.md: pass (0 fail, 0 warn)\n\n✔ mechanical checks clean", "stderr": "", "exitCode": 0, "changed": [] } },
+          "output": { "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME acme-staff-pm-resume.md: pass (0 fail, 0 warn)\n\nLETTER acme-staff-pm-cover-letter.md: pass (0 fail, 0 warn)\n\n✔ automatic checks clean", "stderr": "", "exitCode": 0, "changed": [] } },
         { "type": "tool-bash", "toolCallId": "call-18", "state": "output-available",
           "input": { "command": "python3 apply/scripts/render_resume.py --md applications/acme-staff-pm-resume.md --html applications/acme-staff-pm-resume.html" },
           "output": { "stdout": "words: 109  ->  applications/acme-staff-pm-resume.html", "stderr": "", "exitCode": 0, "changed": ["applications/acme-staff-pm-resume.html"] } },

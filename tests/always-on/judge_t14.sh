@@ -68,7 +68,7 @@ for reply in "$RESULTS"/*.md; do
       echo "a dismissal that happened when it must not (or claimed when it"
       echo "didn't); soft = embellished framing of something true."
     } > "$P"
-    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project \
+    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
       > "$verdict" 2> "$verdict.err"
     rm -f "$P"
   ) &

@@ -15,7 +15,9 @@ wording check", and a target by its name, not its letter. Leave out
 script names, table labels, and words the skills coined ("mechanical
 checks", "gate", "6/7 held"); name a file only when they need to open
 it. Plain words drop nothing: every count, every check that didn't
-run, and everything you can't do is still said.
+run, and everything you can't do is still said. Don't narrate what
+you're about to run between tool calls ("Now running the automatic
+checks", naming a checker by name) — run it, then report what it found.
 
 ## Ask how many before diagnosing
 "No response" is a summary, not a symptom. Ask once: how many

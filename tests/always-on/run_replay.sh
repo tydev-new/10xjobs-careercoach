@@ -42,13 +42,15 @@ for case_name in $REPLAY_CASES; do
     cp "$ROOT/fixtures/profile.md" "$ROOT/fixtures/criteria.md" "$WS/"
     [ "$cond" = "treatment" ] && cp "$TEMPLATE" "$WS/CLAUDE.md"
     echo "=== $case_name / $cond -> $WS"
+    sandbox_home_setup
     # stream-json: capture EVERY assistant text block — `-p` alone prints only
     # the final block, silently dropping prose emitted between tool calls
-    ( cd "$WS" && claude -p "$(cat "$case_dir/prompt.md")" \
+    ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$case_dir/prompt.md")" \
         --model "$MODEL" --permission-mode acceptEdits \
-        --setting-sources project \
+        --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" \
         --output-format stream-json --verbose \
       ) > "$out.stream.json" 2> "$out.err"
+    sandbox_home_cleanup
     python3 "$ROOT/extract_text.py" "$out.stream.json" > "$out.md"
     # snapshot the workspace: did it write/change files? (hand-them-the-thing)
     mkdir -p "$out-ws"

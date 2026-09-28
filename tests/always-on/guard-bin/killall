@@ -1,0 +1,12 @@
+#!/bin/bash
+# Safety guard, not the real killall. See ./pkill in this same directory
+# for the incident and the reasoning — killall kills by NAME too (on
+# macOS, an exact process name rather than a pattern), so it has the same
+# "can hit a process this run does not own" hazard and gets the same
+# unconditional refusal.
+echo "killall is disabled in this test harness (tests/always-on/guard-bin) —" >&2
+echo "a name-based kill can hit processes this run does not own (the" >&2
+echo "2026-09-26 Chrome incident). This session must not stop any process" >&2
+echo "it did not itself start — if a step is hung, say so and report it as" >&2
+echo "hung; do not try to kill it yourself, by name or by PID." >&2
+exit 1

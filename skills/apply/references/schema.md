@@ -26,7 +26,7 @@ outreach-plan summary.
   one item — M is the bullet count.** Each of the JD's top requirements
   is its own bullet, in the JD's order; then one bullet each for the
   band call, the page target, the word budget, "check_materials.py
-  clean", and "language checker clean". It is the tailoring loop's
+  clean", and "wording check clean". It is the tailoring loop's
   FIXED — one job, one file, so it lives here instead of in a brief.
 - `## Coverage` — one row per requirement in the jd-analysis:
   `| requirement | status | evidence | decision |` — `status` one of
@@ -82,7 +82,7 @@ the base's own sentences except the declared `## Reworded` pairs.
 - `## Reworded` — IN THE RÉSUMÉ FILE: each approved rewording as a
   `base:` / `tailored:` pair. `scripts/check_materials.py` exempts
   exactly these lines and still FAILs any other non-verbatim bullet;
-  the language checker reads the same block.
+  the wording check reads the same block.
 
 - The PDF is rendered by `scripts/render_resume.py` only — it owns the
   markup, the escaping, and the measurement (words · pages against the

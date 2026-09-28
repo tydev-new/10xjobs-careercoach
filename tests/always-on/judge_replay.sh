@@ -70,7 +70,7 @@ for case_name in $REPLAY_CASES; do
       echo "fabrication you find, even if no MUST/MUST-NOT bullet covers it."
     } > "$P"
 
-    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project > "$verdict" 2> "$verdict.err"
+    claude -p "$(cat "$P")" --model "$JUDGE_MODEL" --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" > "$verdict" 2> "$verdict.err"
     rm -f "$P"
   done
 done

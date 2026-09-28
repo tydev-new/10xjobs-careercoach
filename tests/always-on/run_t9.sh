@@ -23,10 +23,9 @@ TRIALS="${TRIALS:-1}"
 # The vault (2026-08-20 incident class): the founder's real ~/job-search is
 # immutable for the whole run — locked before the first turn, unlocked on
 # every exit path (EXIT after the final wait; INT/TERM also kill the group).
-REALJS="$HOME/job-search"
-vault_unlock() { find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null; }
-vault_lock()   { find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null; }
-[ -d "$REALJS" ] && { vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM; }
+# Vault lock/unlock: shared, reference-counted (lib_env.sh) -- see its
+# comment for the race this fixes (a sibling run_*.sh unlocking early).
+vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM
 
 # Targeted by default: name the cases whose rules moved; CASES=all for the suite.
 ALL_CASES="t9-scope-discipline t9-never-certify t9-uncited-canon"
@@ -35,12 +34,12 @@ CASES="${CASES:-}"
 [ "$CASES" = all ] && CASES="$ALL_CASES"
 CONDS="${CONDS:-full}"
 
-run_turn() { # ws prompt-file out-stream err-file continue?
+run_turn() { # ws prompt-file out-stream err-file continue? — HOME sandbox from the caller's own sandbox_home_setup (one per case, reused across turns so --continue finds its session)
   local cont=""
   [ "${5:-}" = "continue" ] && cont="--continue"
-  ( cd "$1" && claude -p $cont "$(cat "$2")" \
+  ( cd "$1" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p $cont "$(cat "$2")" \
       --model "$MODEL" --dangerously-skip-permissions \
-      --setting-sources project --output-format stream-json --verbose \
+      --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$3" 2>> "$4"
 }
 
@@ -66,9 +65,12 @@ for case_name in $CASES; do
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     if [ "$cond" = "full" ]; then
       mkdir -p "$WS/.claude/skills"
-      cp -r "$RUNNER_SKILLS_DIR/learn" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
+      # coach ships in every real workspace — an agent without it hunts the
+      # disk and finds the owner's DEPLOYED coach (env contract rule 1).
+      cp -r "$RUNNER_SKILLS_DIR/learn" "$RUNNER_SKILLS_DIR/profile" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
     fi
     echo "=== $case_name / $cond / trial $trial -> $WS"
+    sandbox_home_setup
     : > "$out.err"
     if [ -f "$CASE/turn1.md" ]; then
       run_turn "$WS" "$CASE/turn1.md" "$out.turn1.stream.json" "$out.err"
@@ -91,6 +93,7 @@ for case_name in $CASES; do
       --skills "$RUNNER_SKILLS_DIR" > "$out-ws/_schema_check.txt" 2>&1
     grep -ho '"skill": *"[^"]*"' "$out".turn*.stream.json 2>/dev/null | sort -u > "$out.skills.txt"
     record_served_models "$out"
+    sandbox_home_cleanup
     rm -rf "$WS"
   ) &
 done

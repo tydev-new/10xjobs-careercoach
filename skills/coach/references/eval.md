@@ -15,9 +15,9 @@ reached, and who checks.
 
 ## The destination, judged
 
-- **Every reply is one of four kinds** — DECISION, ARTIFACT, TO-DO,
-  STATUS — and names the stage the search is in. Anything else is the
-  design drifting.
+- **Every reply is one of four kinds** — a decision (trade-off framed),
+  an artifact, a to-do, a status — and names the stage the search is in.
+  Anything else is the design drifting.
 - **Every write the reply claims exists on disk before the reply ends**;
   every question asked became a Waiting-on-you row the same turn
   (saying "logged" without the write is fabrication — it happened
@@ -48,8 +48,8 @@ to the thresholds; one pattern promoted to the focus. The standard is
 the goal math (`patterns.md § The goal and the math`) and the budget
 floor. **The ceiling**: a plan that hasn't happened two weeks running
 is data about the plan or the person — the third mirror asks the real
-question instead of repeating the plan, or raises the DECISION (more
-minutes, a later date, a narrower aim).
+question instead of repeating the plan, or raises it as a decision for
+them to make (more minutes, a later date, a narrower aim).
 
 ## The progress review — graduation and change-approach
 

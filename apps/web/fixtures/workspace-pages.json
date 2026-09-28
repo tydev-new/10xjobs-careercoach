@@ -1,0 +1,1043 @@
+{
+  "meta": {
+    "persona": "Priya Nandakumar (invented) — priya.nandakumar.demo@example.com, 555-0187",
+    "description": "The shared workspace-pages fixture for Home/Jobs/Applications/Documents (design-web-ui.md § 5.7). Six invented roles across all five jobs.md stages plus Dismissed: NovaGrid Energy — Staff PM (Applied, full analysis+company files, live application with a rendered .html), Fernway Robotics — Senior PM (Interviewing, full analysis+company files, live application using the plain <key>.md notes form with no Coverage/Selection tables), Brightloom Foods — Product Manager (Interested, quick-scan verdict, no Analysis/Company file), Cascadia Analytics — Product Lead (To Review, Analysis field names a file that was never written, Company file present), Solstice Health — Product Director (Offer, full analysis+company files, no linked application), Ashcroft Systems — Growth PM (Dismissed). Applications also carries an entry keyed by a resume filename with no matching jobs.md row (juniper-analytics-pm) and one with an unrecognized suffix (relocation-notes.txt), both unlinked. Documents has at least one file in every labeled folder (documents, applications, jd-analysis, jd-inbox, company, contacts, prep, practice, stories, courses, negotiation) plus leads.md at the top level, which Documents must hide. plan.md's To do has three lines in design-web-agent.md § 18.1's strict minutes form and one line with no minutes (so Home's minutes sum never shows on this fixture); one line's backticked ref is an application file, another (in Waiting on you) is a jd-analysis file. Every checker/script tool-bash output below is real stdout, captured by running the real scripts (record_verdict.py, update_job.py, check_files.py, check_materials.py, render_resume.py, proposal_block.py) against a mktemp -d workspace built from this fixture's own files — never ~/job-search, never hand-typed. The last assistant message carries tool parts and a text part over 280 code points, for Home's last-reply truncation test.",
+    "commands": [
+      "# Every command below was run with --workspace set to one shared mktemp -d directory (never ~/job-search),",
+      "# in the order shown, so jobs.md and every tool-bash stdout below come from the same, consistent build.",
+      "python3 skills/profile/scripts/check_files.py --workspace .   # after documents/priya-nandakumar-resume.pdf only -> 0 file(s) checked (not used in the fixture's messages)",
+      "python3 skills/profile/scripts/check_files.py --workspace .   # after base-resume.md, criteria.md, plan.md -> 3 file(s) checked against 11 schema(s); 0 failure(s).",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'NovaGrid Energy' --title 'Staff PM' --verdict strong --score 88 --track A --reasons 'Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.' --url https://jobs.novagrid.example.com/staff-pm-4471 --location 'Remote (US)' --jd-file jd-inbox/novagrid-staff-pm.md --analysis-file jd-analysis/novagrid-staff-pm.md --company-file company/novagrid-energy.md",
+      "python3 search/scripts/update_job.py --workspace . --company 'NovaGrid Energy' --title 'Staff PM' --stage Applied",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --verdict investable_stretch --score 71 --track B --reasons 'Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn'\"'\"'t have; the software-adjacent platform experience is the addressable gap.' --dealbreakers 'The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.' --url https://boards.greenhouse.io/fernway/jobs/58231 --location 'Hybrid — Austin, TX' --jd-file jd-inbox/fernway-senior-pm.md --analysis-file jd-analysis/fernway-senior-pm.md --company-file company/fernway-robotics.md",
+      "python3 search/scripts/update_job.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --stage Interviewing",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --verdict long_shot --score 42 --reasons 'quick-scan: consumer CPG PM ask reads adjacent to this profile'\"'\"'s B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.' --url https://jobs.lever.co/brightloom/product-manager-2291 --location 'Remote (US)'",
+      "python3 search/scripts/update_job.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --stage Interested",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Cascadia Analytics' --title 'Product Lead' --verdict investable_stretch --score 65 --track A --reasons 'The data-platform ownership scope matches; the posting'\"'\"'s ask for direct people-management experience is the one open gap worth probing in a screen.' --url https://cascadia-analytics.example.com/careers/product-lead --location 'Remote (US)' --analysis-file jd-analysis/cascadia-product-lead.md --company-file company/cascadia-analytics.md   # --analysis-file names jd-analysis/cascadia-product-lead.md, deliberately never written (the missing-analysis-file case)",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Solstice Health' --title 'Product Director' --verdict strong --score 91 --track A --reasons 'Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel'\"'\"'s own notes call out the partner-integration story as the reason they moved to offer.' --url https://jobs.solstice.example.com/product-director-902 --location 'Remote (US)' --analysis-file jd-analysis/solstice-product-director.md --company-file company/solstice-health.md",
+      "python3 search/scripts/update_job.py --workspace . --company 'Solstice Health' --title 'Product Director' --stage Offer",
+      "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --verdict weak --score 34 --reasons 'Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn'\"'\"'t match this profile'\"'\"'s platform/ecosystem focus.' --url https://jobs.ashcroft.example.com/growth-pm-118 --location 'Remote (US)'",
+      "python3 search/scripts/update_job.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --dismiss --reason 'posting is a growth-marketing PM role, not platform PM — doesn'\"'\"'t match the Track A target'",
+      "python3 apply/scripts/check_materials.py --workspace . --resume applications/novagrid-staff-pm-resume.md --letter applications/novagrid-staff-pm-cover-letter.md",
+      "python3 apply/scripts/render_resume.py --md applications/novagrid-staff-pm-resume.md --html applications/novagrid-staff-pm-resume.html --pages 2",
+      "python3 apply/scripts/proposal_block.py --workspace . --application applications/novagrid-staff-pm-application.md --base base-resume.md   # real WARNs kept as printed (the requirement's own words aren't literally in base-resume.md); not a FAIL",
+      "python3 apply/scripts/check_materials.py --workspace . --resume applications/fernway-senior-pm-resume.md --letter applications/fernway-senior-pm-cover-letter.md",
+      "python3 skills/profile/scripts/check_files.py --workspace .   # final state, all files -> 10 file(s) checked against 11 schema(s); 0 failure(s)."
+    ],
+    "startingBalanceUsd": 8.4
+  },
+  "files": {
+    "applications/fernway-senior-pm-cover-letter.md": "Dear Fernway Hiring Team,\n\nI lead cross-functional platform roadmaps end to end, most recently for a partner-facing analytics platform that grew utility-partner adoption from 12% to 65% in two years. Your Senior PM posting asks for someone who can own the fleet-software roadmap alongside hardware engineering, and cross-functional ownership is the part of the job I've spent nine years doing.\n\nI don't yet have direct experience shipping on a hardware cadence, and I want to be upfront about that rather than talk around it. What I do bring is a track record of instrumenting a product before committing engineering time to it, and of keeping a cross-functional team aligned on what to build next.\n\nI'd welcome a conversation about how close a fit that is for where Fernway's roadmap stands today.\n\nPriya Nandakumar\npriya.nandakumar.demo@example.com · 555-0187\n",
+    "applications/fernway-senior-pm-resume.md": "# Priya Nandakumar\n\npriya.nandakumar.demo@example.com · 555-0187\n\n## Summary\n9 years of B2B product management across energy-data and utility platforms, with a record of owning cross-functional platform roadmaps end to end.\n\n## Selected Experience\n\n### Senior Product Manager, Argent Grid Systems (2021-2026)\n- Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n\n## Education\nBS Industrial Engineering, State University\n\n## Skills\nRoadmapping, cross-functional leadership, partner ecosystems, SQL, Figma\n",
+    "applications/fernway-senior-pm.md": "# Fernway — Senior PM\n\n## Standard\n- Own the fleet-software roadmap and coordinate with hardware engineering, stated plainly\n- Cross-functional leadership, 5+ people\n- 2-page target\n- check_materials.py clean\n- wording check clean\n",
+    "applications/juniper-analytics-pm-resume.md": "# Priya Nandakumar\n\npriya.nandakumar.demo@example.com · 555-0187\n\n## Summary\n9 years of B2B product management across energy-data and utility platforms.\n\n## Selected Experience\n\n### Senior Product Manager, Argent Grid Systems (2021-2026)\n- Took the partner analytics platform from 12% to 65% utility-partner adoption in two years\n\n## Education\nBS Industrial Engineering, State University\n",
+    "applications/novagrid-staff-pm-application.md": "# NovaGrid — Staff PM\n\n## Standard\n- Own the partner-facing analytics platform roadmap end to end, stated plainly\n- Cross-functional leadership across data science and field ops, 5+ people\n- Quantified adoption or revenue impact from a platform launch\n- 2-page target\n- check_materials.py clean\n- wording check clean\n\n## Coverage\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| partner ecosystem platform ownership | have | Argent Grid Systems partner analytics platform ownership, 12% to 65% adoption | answered |\n| cross-functional leadership, 5+ people | have | led 7 engineers and 3 data scientists on the platform roadmap | answered |\n| enterprise billing or metering integration experience | shown-but-unnamed | Halcyon Metering data-pipeline bullet exists but doesn't use the word \"billing\" in the Summary | answered |\n| direct people-management experience | gap | no direct reports in either role; both were cross-functional leads | open |\n\n## Selection\n| # | role | bullet | in/out | source | words | why |\n|---|---|---|---|---|---|---|\n| 1 | Argent Grid Systems | Took the partner analytics platform from 12% to 65% utility-partner adoption in two years | in | base | 16 | strongest match to the JD's ecosystem-ownership ask |\n| 2 | Argent Grid Systems | Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap | in | base | 15 | answers the leadership requirement directly |\n| 3 | Argent Grid Systems | Instrumented the partner funnel and shipped only what the data showed partners were blocked on | in | base | 16 | shows the same data-first approach the JD's culture section describes |\n| 4 | Halcyon Metering | Owned the smart-meter data pipeline used by 250+ utility customers | out | base | 11 | weakest fit for this JD; page budget cut here first |\n| 5 | Halcyon Metering | Cut onboarding time from 8 weeks to 3 weeks by redesigning the intake flow | out | base | 12 | second-weakest fit; earlier role, less ecosystem-relevant |\n",
+    "applications/novagrid-staff-pm-cover-letter.md": "Dear NovaGrid Hiring Team,\n\nI lead partner-facing data platforms in businesses where the ecosystem, not any single feature, is the moat — which is the bet your Staff PM posting is making. Over the last five years I have watched the same pattern play out at two different companies: the platform that wins is the one whose partners can build on it without waiting for a roadmap slot, and the team that gets there first treats the partner surface as its own product from day one.\n\nAt Argent Grid Systems I took our partner analytics platform from 12% to 65% utility-partner adoption in two years. The turn came from instrumenting the partner funnel before writing a line of new surface, so every build decision traced back to where partners were actually stuck. That same discipline carried into the metering-data work earlier in my career at Halcyon Metering, where a redesigned intake flow cut onboarding time from eight weeks to three for over 250 utility customers.\n\nYour posting describes the same inflection point NovaGrid is at with its own ecosystem: real usage, an unclear next layer, and a decision about whether the partner experience gets a dedicated roadmap or stays a side project. I would bring the same approach: instrument first, then build only what the data says partners are blocked on.\n\nI would welcome the chance to talk about where NovaGrid's partner strategy stands today and where a Staff PM could move it fastest.\n\nPriya Nandakumar\npriya.nandakumar.demo@example.com · 555-0187\n",
+    "applications/novagrid-staff-pm-resume.html": "<!doctype html><html><head><meta charset='utf-8'><title>Resume</title><style>\n@page { size: Letter; margin: 0.4in 0.5in; }\nbody { font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Helvetica, Arial, sans-serif;\n       font-size: 10pt; line-height: 1.25; color: #111; margin: 0; }\nh1 { font-size: 18pt; letter-spacing: .5px; margin: 0 0 2pt; }\nh1 + p { font-size: 9.5pt; margin: 0 0 7pt; }\nh2 { font-size: 10.5pt; text-transform: uppercase; letter-spacing: .6px;\n     border-bottom: 1px solid #222; padding-bottom: 2pt; margin: 8pt 0 4pt; }\nh3 { font-size: 10.5pt; margin: 7pt 0 1pt; }\nh3 + p { margin: 0 0 2pt; font-size: 9.3pt; }\np { margin: 0 0 4pt; }\nul { margin: 2pt 0 4pt; padding-left: 14pt; }\nli { margin: 0 0 2.5pt; }\nh2, h3, li { page-break-inside: avoid; }\nh2, h3, h3 + p { page-break-after: avoid; }\n</style></head><body><h1>Priya Nandakumar</h1><p>priya.nandakumar.demo@example.com · 555-0187</p><h2>Summary</h2><p>9 years of B2B product management across energy-data and utility platforms, most recently owning a partner-facing analytics platform end to end. Grew utility-partner adoption from 12% to 65% in two years by treating partners as a first-class segment.</p><h2>Selected Experience</h2><h3>Senior Product Manager, Argent Grid Systems (2021-2026)</h3><ul><li>Took the partner analytics platform from 12% to 65% utility-partner adoption in two years</li><li>Instrumented the partner funnel and shipped only what the data showed partners were blocked on</li><li>Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap</li></ul><h2>Education</h2><p>BS Industrial Engineering, State University</p><h2>Skills</h2><p>Roadmapping, data-platform strategy, partner ecosystems, SQL, Figma</p></body></html>",
+    "applications/novagrid-staff-pm-resume.md": "# Priya Nandakumar\n\npriya.nandakumar.demo@example.com · 555-0187\n\n## Summary\n9 years of B2B product management across energy-data and utility platforms, most recently owning a partner-facing analytics platform end to end. Grew utility-partner adoption from 12% to 65% in two years by treating partners as a first-class segment.\n\n## Selected Experience\n\n### Senior Product Manager, Argent Grid Systems (2021-2026)\n- Took the partner analytics platform from 12% to 65% utility-partner adoption in two years\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n- Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap\n\n## Education\nBS Industrial Engineering, State University\n\n## Skills\nRoadmapping, data-platform strategy, partner ecosystems, SQL, Figma\n",
+    "applications/relocation-notes.txt": "Notes on relocation questions that keep coming up in screens:\n- Open to hybrid roles within a 2-hour flight of Denver.\n- Not open to a full-time office return before 2027.\n- Willing to travel up to one week per quarter.\n",
+    "base-resume.md": "# Priya Nandakumar\n\npriya.nandakumar.demo@example.com · 555-0187\n\n## Summary\n9 years of B2B product management across energy-data and utility platforms, most recently owning a partner-facing analytics platform end to end. Grew utility-partner adoption from 12% to 65% in two years by treating partners as a first-class segment.\n\n## Selected Experience\n\n### Senior Product Manager, Argent Grid Systems (2021-2026)\n- Took the partner analytics platform from 12% to 65% utility-partner adoption in two years\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n- Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap\n\n### Product Manager, Halcyon Metering (2018-2021)\n- Owned the smart-meter data pipeline used by 250+ utility customers\n- Cut onboarding time from 8 weeks to 3 weeks by redesigning the intake flow\n\n## Education\nBS Industrial Engineering, State University\n\n## Skills\nRoadmapping, data-platform strategy, partner ecosystems, SQL, Figma\n\n## Claim rules\n- \"65% utility-partner adoption\" — verified from Argent Grid Systems internal dashboards, safe to state as-is\n- \"250+ utility customers\" — verified from Halcyon Metering CRM export\n",
+    "company/cascadia-analytics.md": "# Cascadia Analytics — research brief (2026-09-28)\nDepth: quick scan\n\n## Snapshot\n- Stage: privately held, profitable (General knowledge: widely reported, no funding round found)\n- Size: ~85 employees (General knowledge)\n- Industry: workforce analytics software\n- Funding: none found — appears bootstrapped\n- Recent signal: launched a \"Product Lead\" req for the first time, September 2026 (Verified: cascadia-analytics.example.com/careers)\n- Sources consulted: cascadia-analytics.example.com/careers, cascadia-analytics.example.com/about\n\n## Culture & hiring signals\n- Public values: \"customers before headcount\" (Verified: cascadia-analytics.example.com/about)\n- What they optimize for: Unknown — no engineering or product blog found\n- Red flags: none found\n- Interview-process reports: none found\n- What I could not find: no engineering blog, no public leveling guide, no data on whether this is a newly created role or a backfill.\n\n## Fit notes\n- Seniority alignment: Moderate — \"Product Lead\" title is ambiguous between Senior and Staff scope.\n- Domain relevance: Moderate — data-platform ownership transfers; workforce-analytics domain is new.\n- Trajectory coherence: Moderate.\n",
+    "company/fernway-robotics.md": "# Fernway Robotics — research brief (2026-09-28)\nDepth: standard\n\n## Snapshot\n- Stage: Series B, 2025 (Verified: fernway.example.com/about)\n- Size: ~120 employees (General knowledge: widely reported in trade coverage)\n- Industry: warehouse robotics hardware and fleet software\n- Funding: $40M Series B, 2025 (Verified: fernway.example.com/about)\n- Recent signal: opened a second hardware lab in Austin, TX, early 2026 (Verified: fernway.example.com/careers)\n- Sources consulted: fernway.example.com/about, fernway.example.com/careers, news.example.com\n\n## Culture & hiring signals\n- Public values: not published — no careers-page values statement found\n- What they optimize for: Unknown — no engineering blog or published culture material found\n- Red flags: none found\n- Interview-process reports: none found\n- What I could not find: no engineering blog, no employee-review coverage, no stated travel-frequency policy for the Austin lab.\n\n## Fit notes\n- Seniority alignment: Strong — Senior scope matches the current title.\n- Domain relevance: Weak — no robotics or physical-hardware product experience in the base résumé.\n- Trajectory coherence: Moderate — a lateral domain shift from data platforms to robotics.\n",
+    "company/novagrid-energy.md": "# NovaGrid Energy — research brief (2026-09-28)\nDepth: standard\n\n## Snapshot\n- Stage: Series C, 2026 (Verified: news.example.com/novagrid-series-c)\n- Size: ~340 employees (General knowledge: widely reported in coverage of the round)\n- Industry: grid analytics software for utilities\n- Funding: $68M Series C, 2026 (Verified: news.example.com/novagrid-series-c)\n- Recent signal: opened a second engineering hub in Denver, August 2026 (Verified: novagrid.example.com/careers)\n- Sources consulted: novagrid.example.com/careers, eng.novagrid.example.com/blog, news.example.com\n\n## Culture & hiring signals\n- Public values: \"ship in small teams, measure everything\" (Verified: eng.novagrid.example.com/blog)\n- What they optimize for: weekly release cadence over big-bang launches (Verified: eng.novagrid.example.com/blog)\n- Red flags: none found\n- Interview-process reports: candidates on a public forum describe a take-home case study plus two rounds (crowd-sourced, unverified — label as Unknown)\n- What I could not find: no public data on parental-leave policy or leveling guide for the Staff tier.\n\n## Fit notes\n- Seniority alignment: Strong — Staff scope matches a natural next step from Senior.\n- Domain relevance: Moderate — utility-sector data platform experience present but not the most recent role.\n- Trajectory coherence: Strong.\n",
+    "company/solstice-health.md": "# Solstice Health — research brief (2026-09-28)\nDepth: standard\n\n## Snapshot\n- Stage: Series D, 2025 (Verified: news.example.com/solstice-series-d)\n- Size: ~600 employees (General knowledge: widely reported in healthcare-tech coverage)\n- Industry: care-coordination software for health systems\n- Funding: $120M Series D, 2025 (Verified: news.example.com/solstice-series-d)\n- Recent signal: announced a partner-integration push at a healthcare-tech conference, June 2026 (Verified: solstice.example.com/newsroom)\n- Sources consulted: solstice.example.com/newsroom, solstice.example.com/careers, news.example.com\n\n## Culture & hiring signals\n- Public values: \"measure the outcome, not the activity\" (Verified: solstice.example.com/careers)\n- What they optimize for: partner-integration depth over feature breadth (Verified: solstice.example.com/newsroom)\n- Red flags: none found\n- Interview-process reports: candidates describe a panel loop with a product-director-level case study (crowd-sourced, unverified — label as Unknown)\n- What I could not find: no public data on the team's current headcount or reporting structure.\n\n## Roles evaluated at this company\n- Product Director — Strong Fit — 2026-09-28 — jd-analysis/solstice-product-director.md\n",
+    "contacts/fernway-robotics.md": "## Leads\n- Dana Okafor, Recruiter — dana.okafor.demo@example.com — sourced this role, first reply 2026-09-20\n- Marcus Chen, Engineering Manager (hiring manager's peer) — found via a mutual connection, not yet contacted\n\n## Notes\nNo outreach sent yet; waiting on the travel-frequency answer before reaching out to Marcus.\n",
+    "courses/product-analytics-refresher.md": "## Course: Product Analytics Refresher\nStatus: in progress (module 3 of 5)\nWhy: brushing up on cohort-retention analysis before the NovaGrid onboarding round, since the role leans on partner-adoption metrics.\n",
+    "criteria.md": "## Targets\nSenior/Staff PM, energy-data or B2B SaaS platforms\n\n## Level\nSenior to Staff\n\n## Geo\nRemote US\n\n## Compensation\nFloor not yet captured\n\n## Dealbreakers\nNone captured yet\n\n## Target companies\nNone yet\n\n## Retired\n(none)\n",
+    "documents/priya-nandakumar-resume.pdf": "%PDF-1.4 (fixture placeholder bytes)\n",
+    "jd-analysis/fernway-senior-pm.md": "# Fernway Robotics — Senior PM: decode (2026-09-28)\n\n## Competency extraction\n1. Platform roadmap ownership — Decode, Fit · HIGH · seen 3x · Screening\n2. 3+ years directly inside a robotics hardware cycle — Decode · HIGH · seen 2x · Screening\n3. Cross-functional leadership, 5+ people — Decode · HIGH · seen 1x · Screening\n4. Quarterly travel to the Austin hardware lab — Decode · HIGH · seen 1x · Differentiating\n\n## Fit assessment (Track B lens)\n- Requirement coverage: Moderate. Platform roadmap ownership and cross-functional leadership both match; the hardware-cycle requirement does not — both base roles are software-only platforms.\n- Seniority alignment: Strong. Senior scope matches the current title.\n- Domain relevance: Weak. No robotics or physical-hardware product experience in the base résumé.\n- Trajectory coherence: Moderate. The move from data platforms to robotics is a lateral domain shift, not a natural next step.\n- Culture fit signal: Unknown — could not find an engineering blog or public culture page for Fernway Robotics.\n\n## Verdict: **Investable Stretch — 71/100**\nStrong product sense and platform-ownership experience carry real weight, but the posting's 3+ years directly inside a robotics hardware cycle is a gap this profile doesn't close; worth a screen to test how hard that line is held.\n\n## Verify with the recruiter\n1. Is the hardware-cycle requirement a hard filter, or can strong platform-PM experience substitute?\n2. How often is the quarterly Austin travel actually required in practice?\n",
+    "jd-analysis/novagrid-staff-pm.md": "# NovaGrid Energy — Staff PM: decode (2026-09-28)\n\n## Competency extraction\n1. Partner ecosystem platform ownership — Decode, Fit · HIGH · seen 3x · Screening\n2. Cross-functional leadership across data science and field ops — Decode · HIGH · seen 2x · Screening\n3. Utility or energy-sector data platform experience — Decode · MEDIUM · seen 2x · Differentiating\n4. Enterprise billing or metering integration — Decode · MEDIUM · seen 1x · Differentiating\n5. Staff-level scope, ambiguous IC-vs-lead — Decode · LOW · seen 1x · Differentiating\n\n## Fit assessment (Track A lens)\n- Requirement coverage: Strong. Partner ecosystem ownership and cross-functional leadership both match directly against the base résumé's Argent Grid Systems experience.\n- Seniority alignment: Strong. Staff scope reads as a natural next step from the current Senior title.\n- Domain relevance: Moderate. Utility-sector data platform experience is present (Halcyon Metering) but not the most recent role.\n- Trajectory coherence: Strong. Both roles build toward owning a partner-facing platform end to end.\n- Culture fit signal: Moderate. Small-team, weekly-release culture (verified: eng.novagrid.example.com/blog) matches the candidate's stated preference for fast iteration.\n\n## Verdict: **Strong Fit — 88/100**\nEight years of platform PM work, most of it partner-facing, lines up with a Staff-level owner of the grid analytics platform; the one open question is how much direct people-management the role expects day to day.\n\n## Verify with the recruiter\n1. Does the Staff PM title carry direct reports, or is it an IC-with-influence role?\n2. Is the \"billing platform\" requirement a hard filter or a nice-to-have?\n",
+    "jd-analysis/solstice-product-director.md": "# Solstice Health — Product Director: decode (2026-09-28)\n\n## Competency extraction\n1. Clinical-adjacent product leadership — Decode, Fit · HIGH · seen 3x · Screening\n2. Partner-integration ownership — Decode · HIGH · seen 2x · Screening\n3. Director-level org scope, 5+ direct reports — Decode · MEDIUM · seen 1x · Differentiating\n\n## Fit assessment (Track A lens)\n- Requirement coverage: Strong. Partner-integration ownership tracks directly against the Argent Grid Systems and Halcyon Metering work.\n- Seniority alignment: Strong. Director scope is a credible next step from Staff/Senior PM.\n- Domain relevance: Moderate. Health-sector experience is not in the base résumé; the transferable skill is data-platform partner ownership.\n- Trajectory coherence: Strong.\n\n## Verdict: **Strong Fit — 91/100**\nNine years of platform-ownership and partner-integration work lines up with the scope of this role; the panel's own notes call out the partner-integration story specifically as the reason they moved to offer.\n",
+    "jd-inbox/fernway-senior-pm.md": "Fernway Robotics — Senior PM (Hybrid, Austin TX)\n\nFernway is hiring a Senior PM to own the fleet-software roadmap for our warehouse robotics line. 3+ years of experience shipping product on a hardware cadence required. Quarterly travel to our Austin hardware lab expected. You'll lead a cross-functional team of engineers and hardware liaisons.\n",
+    "jd-inbox/novagrid-staff-pm.md": "NovaGrid Energy — Staff PM (Remote, US)\n\nNovaGrid is looking for a Staff PM to own our partner-facing analytics platform end to end: roadmap, data-science and field-ops alignment, and the surface our utility partners build on. You'll work closely with engineering and field operations leadership. 8+ years of B2B SaaS or data-platform product management experience preferred.\n",
+    "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 5** · dismissed: 1 · updated 2026-09-28\n\n## To Review\n\n### Cascadia Analytics — Product Lead\n- URL: https://cascadia-analytics.example.com/careers/product-lead\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: investable_stretch\n- Score: 65\n- Reason: The data-platform ownership scope matches; the posting's ask for direct people-management experience is the one open gap worth probing in a screen.\n- Track: A\n- Analysis: jd-analysis/cascadia-product-lead.md\n- Company file: company/cascadia-analytics.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Interested\n\n### Brightloom Foods — Product Manager\n- URL: https://jobs.lever.co/brightloom/product-manager-2291\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: long_shot\n- Score: 42\n- Reason: quick-scan: consumer CPG PM ask reads adjacent to this profile's B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Applied\n\n### NovaGrid Energy — Staff PM\n- URL: https://jobs.novagrid.example.com/staff-pm-4471\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: strong\n- Score: 88\n- Reason: Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.\n- Track: A\n- JD: jd-inbox/novagrid-staff-pm.md\n- Analysis: jd-analysis/novagrid-staff-pm.md\n- Company file: company/novagrid-energy.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Interviewing\n\n### Fernway Robotics — Senior PM\n- URL: https://boards.greenhouse.io/fernway/jobs/58231\n- Location: Hybrid — Austin, TX\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: investable_stretch\n- Score: 71\n- Reason: Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn't have; the software-adjacent platform experience is the addressable gap.\n- Dealbreakers: The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.\n- Track: B\n- JD: jd-inbox/fernway-senior-pm.md\n- Analysis: jd-analysis/fernway-senior-pm.md\n- Company file: company/fernway-robotics.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Offer\n\n### Solstice Health — Product Director\n- URL: https://jobs.solstice.example.com/product-director-902\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: strong\n- Score: 91\n- Reason: Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel's own notes call out the partner-integration story as the reason they moved to offer.\n- Track: A\n- Analysis: jd-analysis/solstice-product-director.md\n- Company file: company/solstice-health.md\n- Evaluated: 2026-09-28T18:01:11+00:00\n\n## Dismissed\n\n### Ashcroft Systems — Growth PM\n- URL: https://jobs.ashcroft.example.com/growth-pm-118\n- Location: Remote (US)\n- Seen: 2026-09-28T18:01:11+00:00\n- Updated: 2026-09-28T18:01:11+00:00\n- Verdict: weak\n- Score: 34\n- Reason: Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn't match this profile's platform/ecosystem focus.\n- Evaluated: 2026-09-28T18:01:11+00:00\n- Was: To Review\n- Dismissed: posting is a growth-marketing PM role, not platform PM — doesn't match the Track A target\n",
+    "leads.md": "## Leads, unvalidated\n- Solera Grid Systems — Product Manager — found via a board sweep, not yet reviewed\n- Halcyon Metering — Senior PM (internal referral rumor, unconfirmed) — not yet reviewed\n",
+    "negotiation/novagrid-comp-notes.md": "## NovaGrid — comp notes\nNo offer yet. Recruiter mentioned the Staff band \"starts in the low $200s total comp\" in the intro call (2026-09-25) — unconfirmed, not yet in writing.\n",
+    "plan.md": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n- Confirm whether the quarterly Austin travel for Fernway Robotics is workable before I keep prepping interview questions (`jd-analysis/fernway-senior-pm.md`)\n- Tell me if you want me to widen the search past the platform-PM roles you started with\n\nTo do\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet\n- Prep three STAR stories for the Fernway loop — 15 min — the interview is inside two weeks\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone\n",
+    "practice/fernway-senior-pm-practice-log.md": "## 2026-09-27 — mock round, hiring-manager lens\nRan through the hardware-cadence question out loud. The bridging story\nstill leans too hard on the data-platform side; needs one concrete\nsentence about how I'd ramp on a hardware release cycle.\n\n## Next session\nRedo the bridging story once the recruiter confirms whether a\nhardware-cadence answer is actually scored, or just a screen question.\n",
+    "prep/fernway-senior-pm.md": "## Likely questions\n- \"Walk me through a time you shipped on a hardware team's cadence.\" — flagged gap, needs a bridging story\n- \"How do you handle a roadmap slot two teams both want?\" — have: the Argent Grid Systems partner-funnel story\n- \"What's your read on our fleet-software architecture?\" — needs research before the loop\n\n## Prep plan\n1. Draft a gap-bridging narrative for the hardware-cadence question (see plan.md)\n2. Review Fernway's public engineering material — none found yet (see company/fernway-robotics.md)\n",
+    "stories/leadership-partner-escalation.md": "## Story: the partner-funnel escalation\n**Situation:** Two enterprise partners threatened to churn from Argent Grid Systems within the same week, both citing the same missing analytics view.\n**Task:** Decide whether to interrupt the roadmap to fix it, or hold the line and lose the partners.\n**Action:** Pulled the funnel data, confirmed it was the #1 blocker for 40% of partners (not just the two escalating), and re-sequenced two sprints to ship the view.\n**Result:** Both partners stayed; the view became the top-adopted feature that quarter, driving the 12% → 65% adoption growth.\n**Used in:** NovaGrid cover letter, Fernway prep (bridging story draft).\n"
+  },
+  "messages": [
+    {
+      "id": "m1",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "hi, here's my resume"
+        },
+        {
+          "type": "file",
+          "mediaType": "application/pdf",
+          "filename": "priya-nandakumar-resume.pdf",
+          "url": "workspace:documents/priya-nandakumar-resume.pdf"
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-read_file",
+          "toolCallId": "call-1",
+          "state": "output-available",
+          "input": {
+            "path": "documents/priya-nandakumar-resume.pdf"
+          },
+          "output": {
+            "path": "documents/priya-nandakumar-resume.pdf",
+            "text": "Priya Nandakumar — Senior Product Manager… (extracted text)",
+            "extracted": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-2",
+          "state": "output-available",
+          "input": {
+            "path": "base-resume.md",
+            "content": "# Priya Nandakumar\n\npriya.nandakumar.demo@example.com · 555-0187\n\n## Summary\n9 years of B2B product management across energy-data and utility platforms, most recently owning a partner-facing analytics platform end to end. Grew utility-partner adoption from 12% to 65% in two years by treating partners as a first-class segment.\n\n## Selected Experience\n\n### Senior Product Manager, Argent Grid Systems (2021-2026)\n- Took the partner analytics platform from 12% to 65% utility-partner adoption in two years\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n- Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap\n\n### Product Manager, Halcyon Metering (2018-2021)\n- Owned the smart-meter data pipeline used by 250+ utility customers\n- Cut onboarding time from 8 weeks to 3 weeks by redesigning the intake flow\n\n## Education\nBS Industrial Engineering, State University\n\n## Skills\nRoadmapping, data-platform strategy, partner ecosystems, SQL, Figma\n\n## Claim rules\n- \"65% utility-partner adoption\" — verified from Argent Grid Systems internal dashboards, safe to state as-is\n- \"250+ utility customers\" — verified from Halcyon Metering CRM export\n"
+          },
+          "output": {
+            "path": "base-resume.md",
+            "written": true
+          }
+        },
+        {
+          "type": "text",
+          "text": "Got it — I've read your résumé and saved your experience as your base résumé. Before I tailor anything, I need three things: the roles you're aiming for, how much time you can give this each day, and when you'd like an offer by. Got a few minutes now?"
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "sure — I'm targeting senior/staff PM roles at energy-data or B2B SaaS platforms, remote US. Goal: offer by mid-December. I can do about 45 min a day."
+        }
+      ]
+    },
+    {
+      "id": "m4",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-3",
+          "state": "output-available",
+          "input": {
+            "path": "criteria.md",
+            "content": "## Targets\nSenior/Staff PM, energy-data or B2B SaaS platforms\n\n## Level\nSenior to Staff\n\n## Geo\nRemote US\n\n## Compensation\nFloor not yet captured\n\n## Dealbreakers\nNone captured yet\n\n## Target companies\nNone yet\n\n## Retired\n(none)\n"
+          },
+          "output": {
+            "path": "criteria.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-4",
+          "state": "output-available",
+          "input": {
+            "path": "plan.md",
+            "content": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n\nTo do\n\nDoing\n\nDone"
+          },
+          "output": {
+            "path": "plan.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-5",
+          "state": "output-available",
+          "input": {
+            "command": "python3 profile/scripts/check_files.py --workspace ."
+          },
+          "output": {
+            "stdout": "\n3 file(s) checked against 11 schema(s); 0 failure(s).\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": []
+          }
+        },
+        {
+          "type": "text",
+          "text": "Saved. Goal: an offer by Dec 15, with 45 minutes a day. Paste a job posting whenever you've got one, or I can start finding roles for you."
+        }
+      ]
+    },
+    {
+      "id": "m5",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "found this one: https://jobs.novagrid.example.com/staff-pm-4471"
+        }
+      ]
+    },
+    {
+      "id": "m6",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-fetch_job",
+          "toolCallId": "call-6",
+          "state": "output-available",
+          "input": {
+            "url": "https://jobs.novagrid.example.com/staff-pm-4471",
+            "saveTo": "jd-inbox/novagrid-staff-pm.md"
+          },
+          "output": {
+            "board": "novagrid-careers",
+            "company": "NovaGrid Energy",
+            "title": "Staff PM",
+            "location": "Remote (US)",
+            "url": "https://jobs.novagrid.example.com/staff-pm-4471",
+            "text": "NovaGrid Energy — Staff PM (Remote, US)\n\nNovaGrid is looking for a Staff PM to own our partner-facing analytics platform end to end: roadmap, data-science and field-ops alignment, and the surface our utility partners build on. You'll work closely with engineering and field operations leadership. 8+ years of B2B SaaS or data-platform product management experience preferred.",
+            "savedTo": "jd-inbox/novagrid-staff-pm.md"
+          }
+        },
+        {
+          "type": "tool-web_search",
+          "toolCallId": "call-7",
+          "state": "output-available",
+          "input": {
+            "query": "NovaGrid Energy Series C funding 2026",
+            "maxResults": 3
+          },
+          "output": {
+            "results": [
+              {
+                "url": "https://news.example.com/novagrid-series-c",
+                "title": "NovaGrid Energy raises Series C",
+                "excerpt": "NovaGrid Energy announced a $68M Series C in 2026 and opened a second engineering hub in Denver."
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool-web_search",
+          "toolCallId": "call-8",
+          "state": "output-available",
+          "input": {
+            "query": "NovaGrid Energy engineering blog culture",
+            "maxResults": 3
+          },
+          "output": {
+            "results": [
+              {
+                "url": "https://eng.novagrid.example.com/blog",
+                "title": "How we ship at NovaGrid",
+                "excerpt": "Small teams, weekly releases, partner-first roadmap reviews."
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-9",
+          "state": "output-available",
+          "input": {
+            "path": "jd-analysis/novagrid-staff-pm.md",
+            "content": "# NovaGrid Energy — Staff PM: decode (2026-09-28)\n\n## Competency extraction\n1. Partner ecosystem platform ownership — Decode, Fit · HIGH · seen 3x · Screening\n2. Cross-functional leadership across data science and field ops — Decode · HIGH · seen 2x · Screening\n3. Utility or energy-sector data platform experience — Decode · MEDIUM · seen 2x · Differentiating\n4. Enterprise billing or metering integration — Decode · MEDIUM · seen 1x · Differentiating\n5. Staff-level scope, ambiguous IC-vs-lead — Decode · LOW · seen 1x · Differentiating\n\n## Fit assessment (Track A lens)\n- Requirement coverage: Strong. Partner ecosystem ownership and cross-functional leadership both match directly against the base résumé's Argent Grid Systems experience.\n- Seniority alignment: Strong. Staff scope reads as a natural next step from the current Senior title.\n- Domain relevance: Moderate. Utility-sector data platform experience is present (Halcyon Metering) but not the most recent role.\n- Trajectory coherence: Strong. Both roles build toward owning a partner-facing platform end to end.\n- Culture fit signal: Moderate. Small-team, weekly-release culture (verified: eng.novagrid.example.com/blog) matches the candidate's stated preference for fast iteration.\n\n## Verdict: **Strong Fit — 88/100**\nEight years of platform PM work, most of it partner-facing, lines up with a Staff-level owner of the grid analytics platform; the one open question is how much direct people-management the role expects day to day.\n\n## Verify with the recruiter\n1. Does the Staff PM title carry direct reports, or is it an IC-with-influence role?\n2. Is the \"billing platform\" requirement a hard filter or a nice-to-have?\n"
+          },
+          "output": {
+            "path": "jd-analysis/novagrid-staff-pm.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-10",
+          "state": "output-available",
+          "input": {
+            "path": "company/novagrid-energy.md",
+            "content": "# NovaGrid Energy — research brief (2026-09-28)\nDepth: standard\n\n## Snapshot\n- Stage: Series C, 2026 (Verified: news.example.com/novagrid-series-c)\n- Size: ~340 employees (General knowledge: widely reported in coverage of the round)\n- Industry: grid analytics software for utilities\n- Funding: $68M Series C, 2026 (Verified: news.example.com/novagrid-series-c)\n- Recent signal: opened a second engineering hub in Denver, August 2026 (Verified: novagrid.example.com/careers)\n- Sources consulted: novagrid.example.com/careers, eng.novagrid.example.com/blog, news.example.com\n\n## Culture & hiring signals\n- Public values: \"ship in small teams, measure everything\" (Verified: eng.novagrid.example.com/blog)\n- What they optimize for: weekly release cadence over big-bang launches (Verified: eng.novagrid.example.com/blog)\n- Red flags: none found\n- Interview-process reports: candidates on a public forum describe a take-home case study plus two rounds (crowd-sourced, unverified — label as Unknown)\n- What I could not find: no public data on parental-leave policy or leveling guide for the Staff tier.\n\n## Fit notes\n- Seniority alignment: Strong — Staff scope matches a natural next step from Senior.\n- Domain relevance: Moderate — utility-sector data platform experience present but not the most recent role.\n- Trajectory coherence: Strong.\n"
+          },
+          "output": {
+            "path": "company/novagrid-energy.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-11",
+          "state": "output-available",
+          "input": {
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'NovaGrid Energy' --title 'Staff PM' --verdict strong --score 88 --track A --reasons 'Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops.' --url https://jobs.novagrid.example.com/staff-pm-4471 --location 'Remote (US)' --jd-file jd-inbox/novagrid-staff-pm.md --analysis-file jd-analysis/novagrid-staff-pm.md --company-file company/novagrid-energy.md"
+          },
+          "output": {
+            "stdout": "recorded (created NEW role): NovaGrid Energy — Staff PM → strong (88)\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "verdict",
+            "ref": "jd-analysis/novagrid-staff-pm.md",
+            "props": {
+              "company": "NovaGrid Energy",
+              "title": "Staff PM",
+              "verdict": "strong",
+              "score": 88,
+              "track": "A",
+              "reason": "Eight years leading platform PM work matches their ask for a staff-level owner of the grid analytics platform; the partner-integration story lines up with their stated need for one owner across data science and field ops."
+            }
+          }
+        },
+        {
+          "type": "text",
+          "text": "It's a Strong Fit, and it's on your job list now. Want me to tailor a résumé and cover letter for this one?"
+        }
+      ]
+    },
+    {
+      "id": "m7",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "yes, tailor them for NovaGrid, and put together whatever else I need to send it"
+        }
+      ]
+    },
+    {
+      "id": "m8",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-12",
+          "state": "output-available",
+          "input": {
+            "path": "stories/leadership-partner-escalation.md",
+            "content": "## Story: the partner-funnel escalation\n**Situation:** Two enterprise partners threatened to churn from Argent Grid Systems within the same week, both citing the same missing analytics view.\n**Task:** Decide whether to interrupt the roadmap to fix it, or hold the line and lose the partners.\n**Action:** Pulled the funnel data, confirmed it was the #1 blocker for 40% of partners (not just the two escalating), and re-sequenced two sprints to ship the view.\n**Result:** Both partners stayed; the view became the top-adopted feature that quarter, driving the 12% → 65% adoption growth.\n**Used in:** NovaGrid cover letter, Fernway prep (bridging story draft).\n"
+          },
+          "output": {
+            "path": "stories/leadership-partner-escalation.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-13",
+          "state": "output-available",
+          "input": {
+            "path": "applications/novagrid-staff-pm-application.md",
+            "content": "# NovaGrid — Staff PM\n\n## Standard\n- Own the partner-facing analytics platform roadmap end to end, stated plainly\n- Cross-functional leadership across data science and field ops, 5+ people\n- Quantified adoption or revenue impact from a platform launch\n- 2-page target\n- check_materials.py clean\n- wording check clean\n\n## Coverage\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| partner ecosystem platform ownership | have | Argent Grid Systems partner analytics platform ownership, 12% to 65% adoption | answered |\n| cross-functional leadership, 5+ people | have | led 7 engineers and 3 data scientists on the platform roadmap | answered |\n| enterprise billing or metering integration experience | shown-but-unnamed | Halcyon Metering data-pipeline bullet exists but doesn't use the word \"billing\" in the Summary | answered |\n| direct people-management experience | gap | no direct reports in either role; both were cross-functional leads | open |\n\n## Selection\n| # | role | bullet | in/out | source | words | why |\n|---|---|---|---|---|---|---|\n| 1 | Argent Grid Systems | Took the partner analytics platform from 12% to 65% utility-partner adoption in two years | in | base | 16 | strongest match to the JD's ecosystem-ownership ask |\n| 2 | Argent Grid Systems | Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap | in | base | 15 | answers the leadership requirement directly |\n| 3 | Argent Grid Systems | Instrumented the partner funnel and shipped only what the data showed partners were blocked on | in | base | 16 | shows the same data-first approach the JD's culture section describes |\n| 4 | Halcyon Metering | Owned the smart-meter data pipeline used by 250+ utility customers | out | base | 11 | weakest fit for this JD; page budget cut here first |\n| 5 | Halcyon Metering | Cut onboarding time from 8 weeks to 3 weeks by redesigning the intake flow | out | base | 12 | second-weakest fit; earlier role, less ecosystem-relevant |\n"
+          },
+          "output": {
+            "path": "applications/novagrid-staff-pm-application.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-14",
+          "state": "output-available",
+          "input": {
+            "path": "applications/novagrid-staff-pm-resume.md",
+            "content": "# Priya Nandakumar\n\npriya.nandakumar.demo@example.com · 555-0187\n\n## Summary\n9 years of B2B product management across energy-data and utility platforms, most recently owning a partner-facing analytics platform end to end. Grew utility-partner adoption from 12% to 65% in two years by treating partners as a first-class segment.\n\n## Selected Experience\n\n### Senior Product Manager, Argent Grid Systems (2021-2026)\n- Took the partner analytics platform from 12% to 65% utility-partner adoption in two years\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n- Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap\n\n## Education\nBS Industrial Engineering, State University\n\n## Skills\nRoadmapping, data-platform strategy, partner ecosystems, SQL, Figma\n"
+          },
+          "output": {
+            "path": "applications/novagrid-staff-pm-resume.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-15",
+          "state": "output-available",
+          "input": {
+            "command": "python3 apply/scripts/render_resume.py --md applications/novagrid-staff-pm-resume.md --html applications/novagrid-staff-pm-resume.html --pages 2"
+          },
+          "output": {
+            "stdout": "words: 111  ->  applications/novagrid-staff-pm-resume.html\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": []
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-16",
+          "state": "output-available",
+          "input": {
+            "path": "applications/novagrid-staff-pm-cover-letter.md",
+            "content": "Dear NovaGrid Hiring Team,\n\nI lead partner-facing data platforms in businesses where the ecosystem, not any single feature, is the moat — which is the bet your Staff PM posting is making. Over the last five years I have watched the same pattern play out at two different companies: the platform that wins is the one whose partners can build on it without waiting for a roadmap slot, and the team that gets there first treats the partner surface as its own product from day one.\n\nAt Argent Grid Systems I took our partner analytics platform from 12% to 65% utility-partner adoption in two years. The turn came from instrumenting the partner funnel before writing a line of new surface, so every build decision traced back to where partners were actually stuck. That same discipline carried into the metering-data work earlier in my career at Halcyon Metering, where a redesigned intake flow cut onboarding time from eight weeks to three for over 250 utility customers.\n\nYour posting describes the same inflection point NovaGrid is at with its own ecosystem: real usage, an unclear next layer, and a decision about whether the partner experience gets a dedicated roadmap or stays a side project. I would bring the same approach: instrument first, then build only what the data says partners are blocked on.\n\nI would welcome the chance to talk about where NovaGrid's partner strategy stands today and where a Staff PM could move it fastest.\n\nPriya Nandakumar\npriya.nandakumar.demo@example.com · 555-0187\n"
+          },
+          "output": {
+            "path": "applications/novagrid-staff-pm-cover-letter.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-17",
+          "state": "output-available",
+          "input": {
+            "command": "python3 apply/scripts/check_materials.py --workspace . --resume applications/novagrid-staff-pm-resume.md --letter applications/novagrid-staff-pm-cover-letter.md"
+          },
+          "output": {
+            "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME novagrid-staff-pm-resume.md: pass (0 fail, 0 warn)\n\nLETTER novagrid-staff-pm-cover-letter.md: pass (0 fail, 1 warn)\n  [WARN] letter is 249 words — patterns.md § Cover letter wants 250-400\n\n✔ automatic checks clean\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": []
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-18",
+          "state": "output-available",
+          "input": {
+            "command": "python3 apply/scripts/proposal_block.py --workspace . --application applications/novagrid-staff-pm-application.md --base base-resume.md"
+          },
+          "output": {
+            "stdout": "**Cut — 2 of 5 bullets, weakest first.** Say \"keep\" and the bullet's name or number to bring one back.\n1. Halcyon Metering — Owned the smart-meter data pipeline used by 250+ utility customers — *weakest fit for this JD; page budget cut here first*\n2. Halcyon Metering — Cut onboarding time from 8 weeks to 3 weeks by redesigning the inta… — *second-weakest fit; earlier role, less ecosystem-relevant*\n\n**Their words, placed** — say \"Summary\", \"Skills\", or \"leave it out\" to move any of these:\n- **enterprise billing or metering integration experience** — true of you (Halcyon Metering data-pipeline bullet exists but doesn't use…); placed where the document shows it\n\n**Gaps — evidence you might have?** (\"no\" is a fine answer)\n- direct people-management experience — no direct reports in either role; both were cross-functional leads\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nWARN  `have` row \"partner ecosystem platform ownership\": their word(s) ['ownership'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\nWARN  `have` row \"cross-functional leadership, 5+ people\": their word(s) ['leadership', 'people'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": []
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-19",
+          "state": "output-available",
+          "input": {
+            "path": "plan.md",
+            "content": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n\nTo do\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone"
+          },
+          "output": {
+            "path": "plan.md",
+            "written": true
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "document",
+            "ref": "applications/novagrid-staff-pm-resume.md",
+            "props": {
+              "words": 111,
+              "htmlPath": "applications/novagrid-staff-pm-resume.html",
+              "checker": "clean"
+            }
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "checker",
+            "ref": "applications/novagrid-staff-pm-resume.md",
+            "props": {
+              "label": "RESUME",
+              "name": "novagrid-staff-pm-resume.md",
+              "status": "pass",
+              "failCount": 0,
+              "warnCount": 0,
+              "findings": []
+            }
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "checker",
+            "ref": "applications/novagrid-staff-pm-cover-letter.md",
+            "props": {
+              "label": "LETTER",
+              "name": "novagrid-staff-pm-cover-letter.md",
+              "status": "pass",
+              "failCount": 0,
+              "warnCount": 1,
+              "findings": [
+                {
+                  "level": "WARN",
+                  "message": "letter is 249 words — patterns.md § Cover letter wants 250-400"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "text",
+          "text": "Résumé and cover letter are ready (111 words, 1 page). the automatic checks found no failures — the letter is a bit short at 249 words, under the usual 250-400, so give it one more look before you send it. Two more things: your notes list “partner ecosystem platform ownership” and “cross-functional leadership, 5+ people” as things you already show, but the words “ownership” and “leadership” don't appear anywhere in your base résumé — either add the word so it's there in black and white, or tell me you're confident the claim holds as written and I'll leave it. I also can't find direct people-management experience in either role, so I've left that as an open gap; say the word if you want me to draft a bridging answer for it. I put two steps in your plan: send the letter, then submit the application yourself once it's sent — I can't submit on your behalf."
+        }
+      ]
+    },
+    {
+      "id": "m9",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "also found a robotics PM role at Fernway — I already have a screen booked with their recruiter Thursday. https://boards.greenhouse.io/fernway/jobs/58231"
+        }
+      ]
+    },
+    {
+      "id": "m10",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-fetch_job",
+          "toolCallId": "call-20",
+          "state": "output-available",
+          "input": {
+            "url": "https://boards.greenhouse.io/fernway/jobs/58231",
+            "saveTo": "jd-inbox/fernway-senior-pm.md"
+          },
+          "output": {
+            "board": "greenhouse",
+            "company": "Fernway Robotics",
+            "title": "Senior PM",
+            "location": "Hybrid — Austin, TX",
+            "url": "https://boards.greenhouse.io/fernway/jobs/58231",
+            "text": "Fernway Robotics — Senior PM (Hybrid, Austin TX)\n\nFernway is hiring a Senior PM to own the fleet-software roadmap for our warehouse robotics line. 3+ years of experience shipping product on a hardware cadence required. Quarterly travel to our Austin hardware lab expected. You'll lead a cross-functional team of engineers and hardware liaisons.",
+            "savedTo": "jd-inbox/fernway-senior-pm.md"
+          }
+        },
+        {
+          "type": "tool-web_search",
+          "toolCallId": "call-21",
+          "state": "output-available",
+          "input": {
+            "query": "Fernway Robotics engineering culture Austin",
+            "maxResults": 3
+          },
+          "output": {
+            "results": [
+              {
+                "url": "https://fernway.example.com/about",
+                "title": "Fernway Robotics — About",
+                "excerpt": "Series B robotics company; opened a second hardware lab in Austin, TX in early 2026."
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-22",
+          "state": "output-available",
+          "input": {
+            "path": "jd-analysis/fernway-senior-pm.md",
+            "content": "# Fernway Robotics — Senior PM: decode (2026-09-28)\n\n## Competency extraction\n1. Platform roadmap ownership — Decode, Fit · HIGH · seen 3x · Screening\n2. 3+ years directly inside a robotics hardware cycle — Decode · HIGH · seen 2x · Screening\n3. Cross-functional leadership, 5+ people — Decode · HIGH · seen 1x · Screening\n4. Quarterly travel to the Austin hardware lab — Decode · HIGH · seen 1x · Differentiating\n\n## Fit assessment (Track B lens)\n- Requirement coverage: Moderate. Platform roadmap ownership and cross-functional leadership both match; the hardware-cycle requirement does not — both base roles are software-only platforms.\n- Seniority alignment: Strong. Senior scope matches the current title.\n- Domain relevance: Weak. No robotics or physical-hardware product experience in the base résumé.\n- Trajectory coherence: Moderate. The move from data platforms to robotics is a lateral domain shift, not a natural next step.\n- Culture fit signal: Unknown — could not find an engineering blog or public culture page for Fernway Robotics.\n\n## Verdict: **Investable Stretch — 71/100**\nStrong product sense and platform-ownership experience carry real weight, but the posting's 3+ years directly inside a robotics hardware cycle is a gap this profile doesn't close; worth a screen to test how hard that line is held.\n\n## Verify with the recruiter\n1. Is the hardware-cycle requirement a hard filter, or can strong platform-PM experience substitute?\n2. How often is the quarterly Austin travel actually required in practice?\n"
+          },
+          "output": {
+            "path": "jd-analysis/fernway-senior-pm.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-23",
+          "state": "output-available",
+          "input": {
+            "path": "company/fernway-robotics.md",
+            "content": "# Fernway Robotics — research brief (2026-09-28)\nDepth: standard\n\n## Snapshot\n- Stage: Series B, 2025 (Verified: fernway.example.com/about)\n- Size: ~120 employees (General knowledge: widely reported in trade coverage)\n- Industry: warehouse robotics hardware and fleet software\n- Funding: $40M Series B, 2025 (Verified: fernway.example.com/about)\n- Recent signal: opened a second hardware lab in Austin, TX, early 2026 (Verified: fernway.example.com/careers)\n- Sources consulted: fernway.example.com/about, fernway.example.com/careers, news.example.com\n\n## Culture & hiring signals\n- Public values: not published — no careers-page values statement found\n- What they optimize for: Unknown — no engineering blog or published culture material found\n- Red flags: none found\n- Interview-process reports: none found\n- What I could not find: no engineering blog, no employee-review coverage, no stated travel-frequency policy for the Austin lab.\n\n## Fit notes\n- Seniority alignment: Strong — Senior scope matches the current title.\n- Domain relevance: Weak — no robotics or physical-hardware product experience in the base résumé.\n- Trajectory coherence: Moderate — a lateral domain shift from data platforms to robotics.\n"
+          },
+          "output": {
+            "path": "company/fernway-robotics.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-24",
+          "state": "output-available",
+          "input": {
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --verdict investable_stretch --score 71 --track B --reasons 'Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn'\"'\"'t have; the software-adjacent platform experience is the addressable gap.' --dealbreakers 'The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further.' --url https://boards.greenhouse.io/fernway/jobs/58231 --location 'Hybrid — Austin, TX' --jd-file jd-inbox/fernway-senior-pm.md --analysis-file jd-analysis/fernway-senior-pm.md --company-file company/fernway-robotics.md"
+          },
+          "output": {
+            "stdout": "recorded (created NEW role): Fernway Robotics — Senior PM → investable_stretch (71)\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-25",
+          "state": "output-available",
+          "input": {
+            "command": "python3 search/scripts/update_job.py --workspace . --company 'Fernway Robotics' --title 'Senior PM' --stage Interviewing"
+          },
+          "output": {
+            "stdout": "updated: Fernway Robotics — Senior PM — stage -> Interviewing\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-26",
+          "state": "output-available",
+          "input": {
+            "path": "prep/fernway-senior-pm.md",
+            "content": "## Likely questions\n- \"Walk me through a time you shipped on a hardware team's cadence.\" — flagged gap, needs a bridging story\n- \"How do you handle a roadmap slot two teams both want?\" — have: the Argent Grid Systems partner-funnel story\n- \"What's your read on our fleet-software architecture?\" — needs research before the loop\n\n## Prep plan\n1. Draft a gap-bridging narrative for the hardware-cadence question (see plan.md)\n2. Review Fernway's public engineering material — none found yet (see company/fernway-robotics.md)\n"
+          },
+          "output": {
+            "path": "prep/fernway-senior-pm.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-27",
+          "state": "output-available",
+          "input": {
+            "path": "contacts/fernway-robotics.md",
+            "content": "## Leads\n- Dana Okafor, Recruiter — dana.okafor.demo@example.com — sourced this role, first reply 2026-09-20\n- Marcus Chen, Engineering Manager (hiring manager's peer) — found via a mutual connection, not yet contacted\n\n## Notes\nNo outreach sent yet; waiting on the travel-frequency answer before reaching out to Marcus.\n"
+          },
+          "output": {
+            "path": "contacts/fernway-robotics.md",
+            "written": true
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "verdict",
+            "ref": "jd-analysis/fernway-senior-pm.md",
+            "props": {
+              "company": "Fernway Robotics",
+              "title": "Senior PM",
+              "verdict": "investable_stretch",
+              "score": 71,
+              "track": "B",
+              "reason": "Strong product sense and a record of shipping platform features on schedule, but the posting wants 3+ years directly inside a robotics hardware cycle, which this profile doesn't have; the software-adjacent platform experience is the addressable gap.",
+              "dealbreakers": "The posting requires quarterly travel to the Austin hardware lab; worth confirming frequency before going further."
+            }
+          }
+        },
+        {
+          "type": "text",
+          "text": "Investable Stretch (71/100) — the hardware-cycle requirement is the real gap here, so worth naming that in the screen rather than hoping it doesn't come up. Since you've already got Thursday booked, I moved this straight to Interviewing and started a prep note with the questions I'd expect. I also logged the two contacts you mentioned so outreach has somewhere to live."
+        }
+      ]
+    },
+    {
+      "id": "m11",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "can you draft something for Fernway too, and quick-check two more I'm unsure about: Brightloom Foods 'Product Manager' (https://jobs.lever.co/brightloom/product-manager-2291) and Ashcroft Systems 'Growth PM' (https://jobs.ashcroft.example.com/growth-pm-118)"
+        }
+      ]
+    },
+    {
+      "id": "m12",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-28",
+          "state": "output-available",
+          "input": {
+            "path": "applications/fernway-senior-pm.md",
+            "content": "# Fernway — Senior PM\n\n## Standard\n- Own the fleet-software roadmap and coordinate with hardware engineering, stated plainly\n- Cross-functional leadership, 5+ people\n- 2-page target\n- check_materials.py clean\n- wording check clean\n"
+          },
+          "output": {
+            "path": "applications/fernway-senior-pm.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-29",
+          "state": "output-available",
+          "input": {
+            "path": "applications/fernway-senior-pm-resume.md",
+            "content": "# Priya Nandakumar\n\npriya.nandakumar.demo@example.com · 555-0187\n\n## Summary\n9 years of B2B product management across energy-data and utility platforms, with a record of owning cross-functional platform roadmaps end to end.\n\n## Selected Experience\n\n### Senior Product Manager, Argent Grid Systems (2021-2026)\n- Led a cross-functional team of 7 engineers and 3 data scientists on the platform roadmap\n- Instrumented the partner funnel and shipped only what the data showed partners were blocked on\n\n## Education\nBS Industrial Engineering, State University\n\n## Skills\nRoadmapping, cross-functional leadership, partner ecosystems, SQL, Figma\n"
+          },
+          "output": {
+            "path": "applications/fernway-senior-pm-resume.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-30",
+          "state": "output-available",
+          "input": {
+            "path": "applications/fernway-senior-pm-cover-letter.md",
+            "content": "Dear Fernway Hiring Team,\n\nI lead cross-functional platform roadmaps end to end, most recently for a partner-facing analytics platform that grew utility-partner adoption from 12% to 65% in two years. Your Senior PM posting asks for someone who can own the fleet-software roadmap alongside hardware engineering, and cross-functional ownership is the part of the job I've spent nine years doing.\n\nI don't yet have direct experience shipping on a hardware cadence, and I want to be upfront about that rather than talk around it. What I do bring is a track record of instrumenting a product before committing engineering time to it, and of keeping a cross-functional team aligned on what to build next.\n\nI'd welcome a conversation about how close a fit that is for where Fernway's roadmap stands today.\n\nPriya Nandakumar\npriya.nandakumar.demo@example.com · 555-0187\n"
+          },
+          "output": {
+            "path": "applications/fernway-senior-pm-cover-letter.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-31",
+          "state": "output-available",
+          "input": {
+            "command": "python3 apply/scripts/check_materials.py --workspace . --resume applications/fernway-senior-pm-resume.md --letter applications/fernway-senior-pm-cover-letter.md"
+          },
+          "output": {
+            "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME fernway-senior-pm-resume.md: pass (0 fail, 0 warn)\n\nLETTER fernway-senior-pm-cover-letter.md: pass (0 fail, 1 warn)\n  [WARN] letter is 136 words — patterns.md § Cover letter wants 250-400\n\n✔ automatic checks clean\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": []
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-32",
+          "state": "output-available",
+          "input": {
+            "path": "practice/fernway-senior-pm-practice-log.md",
+            "content": "## 2026-09-27 — mock round, hiring-manager lens\nRan through the hardware-cadence question out loud. The bridging story\nstill leans too hard on the data-platform side; needs one concrete\nsentence about how I'd ramp on a hardware release cycle.\n\n## Next session\nRedo the bridging story once the recruiter confirms whether a\nhardware-cadence answer is actually scored, or just a screen question.\n"
+          },
+          "output": {
+            "path": "practice/fernway-senior-pm-practice-log.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-33",
+          "state": "output-available",
+          "input": {
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --verdict long_shot --score 42 --reasons 'quick-scan: consumer CPG PM ask reads adjacent to this profile'\"'\"'s B2B SaaS platform background, not aligned — worth a full look only if the Track A search comes up short elsewhere.' --url https://jobs.lever.co/brightloom/product-manager-2291 --location 'Remote (US)'"
+          },
+          "output": {
+            "stdout": "recorded (created NEW role): Brightloom Foods — Product Manager → long_shot (42)\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-34",
+          "state": "output-available",
+          "input": {
+            "command": "python3 search/scripts/update_job.py --workspace . --company 'Brightloom Foods' --title 'Product Manager' --stage Interested"
+          },
+          "output": {
+            "stdout": "updated: Brightloom Foods — Product Manager — stage -> Interested\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-35",
+          "state": "output-available",
+          "input": {
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --verdict weak --score 34 --reasons 'Two levels below the target band and no platform-ownership scope; growth-marketing-adjacent PM work doesn'\"'\"'t match this profile'\"'\"'s platform/ecosystem focus.' --url https://jobs.ashcroft.example.com/growth-pm-118 --location 'Remote (US)'"
+          },
+          "output": {
+            "stdout": "recorded (created NEW role): Ashcroft Systems — Growth PM → weak (34)\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-36",
+          "state": "output-available",
+          "input": {
+            "command": "python3 search/scripts/update_job.py --workspace . --company 'Ashcroft Systems' --title 'Growth PM' --dismiss --reason 'posting is a growth-marketing PM role, not platform PM — doesn'\"'\"'t match the Track A target'"
+          },
+          "output": {
+            "stdout": "updated: Ashcroft Systems — Growth PM — dismissed (posting is a growth-marketing PM role, not platform PM — doesn't match the Track A target)\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "checker",
+            "ref": "applications/fernway-senior-pm-cover-letter.md",
+            "props": {
+              "label": "LETTER",
+              "name": "fernway-senior-pm-cover-letter.md",
+              "status": "pass",
+              "failCount": 0,
+              "warnCount": 1,
+              "findings": [
+                {
+                  "level": "WARN",
+                  "message": "letter is 136 words — patterns.md § Cover letter wants 250-400"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "text",
+          "text": "Fernway materials are drafted. the automatic checks found no failures — the letter is short at 136 words, well under the usual 250-400, so give it a look before you send it. Ran a mock round on the hardware-cadence question too; the notes are in your practice log. On the other two: Brightloom was a quick scan only, not a full evaluation — it reads adjacent to your background, so I put it in Interested rather than dropping it. Ashcroft I dismissed: it's two levels below your target band with no platform-ownership scope, so it's not worth your time right now. Say the word if you want either one back."
+        }
+      ]
+    },
+    {
+      "id": "m13",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "two more — Cascadia Analytics has a 'Product Lead' opening (https://cascadia-analytics.example.com/careers/product-lead), not sure about that one. And Solstice Health actually just called with an offer for the 'Product Director' role I interviewed for a few weeks back!"
+        }
+      ]
+    },
+    {
+      "id": "m14",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-web_search",
+          "toolCallId": "call-37",
+          "state": "output-available",
+          "input": {
+            "query": "Cascadia Analytics careers product lead",
+            "maxResults": 3
+          },
+          "output": {
+            "results": [
+              {
+                "url": "https://cascadia-analytics.example.com/about",
+                "title": "Cascadia Analytics — About",
+                "excerpt": "Privately held workforce-analytics company; \"customers before headcount.\""
+              }
+            ]
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-38",
+          "state": "output-available",
+          "input": {
+            "path": "company/cascadia-analytics.md",
+            "content": "# Cascadia Analytics — research brief (2026-09-28)\nDepth: quick scan\n\n## Snapshot\n- Stage: privately held, profitable (General knowledge: widely reported, no funding round found)\n- Size: ~85 employees (General knowledge)\n- Industry: workforce analytics software\n- Funding: none found — appears bootstrapped\n- Recent signal: launched a \"Product Lead\" req for the first time, September 2026 (Verified: cascadia-analytics.example.com/careers)\n- Sources consulted: cascadia-analytics.example.com/careers, cascadia-analytics.example.com/about\n\n## Culture & hiring signals\n- Public values: \"customers before headcount\" (Verified: cascadia-analytics.example.com/about)\n- What they optimize for: Unknown — no engineering or product blog found\n- Red flags: none found\n- Interview-process reports: none found\n- What I could not find: no engineering blog, no public leveling guide, no data on whether this is a newly created role or a backfill.\n\n## Fit notes\n- Seniority alignment: Moderate — \"Product Lead\" title is ambiguous between Senior and Staff scope.\n- Domain relevance: Moderate — data-platform ownership transfers; workforce-analytics domain is new.\n- Trajectory coherence: Moderate.\n"
+          },
+          "output": {
+            "path": "company/cascadia-analytics.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-39",
+          "state": "output-available",
+          "input": {
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Cascadia Analytics' --title 'Product Lead' --verdict investable_stretch --score 65 --track A --reasons 'The data-platform ownership scope matches; the posting'\"'\"'s ask for direct people-management experience is the one open gap worth probing in a screen.' --url https://cascadia-analytics.example.com/careers/product-lead --location 'Remote (US)' --analysis-file jd-analysis/cascadia-product-lead.md --company-file company/cascadia-analytics.md"
+          },
+          "output": {
+            "stdout": "recorded (created NEW role): Cascadia Analytics — Product Lead → investable_stretch (65)\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-40",
+          "state": "output-available",
+          "input": {
+            "path": "jd-analysis/solstice-product-director.md",
+            "content": "# Solstice Health — Product Director: decode (2026-09-28)\n\n## Competency extraction\n1. Clinical-adjacent product leadership — Decode, Fit · HIGH · seen 3x · Screening\n2. Partner-integration ownership — Decode · HIGH · seen 2x · Screening\n3. Director-level org scope, 5+ direct reports — Decode · MEDIUM · seen 1x · Differentiating\n\n## Fit assessment (Track A lens)\n- Requirement coverage: Strong. Partner-integration ownership tracks directly against the Argent Grid Systems and Halcyon Metering work.\n- Seniority alignment: Strong. Director scope is a credible next step from Staff/Senior PM.\n- Domain relevance: Moderate. Health-sector experience is not in the base résumé; the transferable skill is data-platform partner ownership.\n- Trajectory coherence: Strong.\n\n## Verdict: **Strong Fit — 91/100**\nNine years of platform-ownership and partner-integration work lines up with the scope of this role; the panel's own notes call out the partner-integration story specifically as the reason they moved to offer.\n"
+          },
+          "output": {
+            "path": "jd-analysis/solstice-product-director.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-41",
+          "state": "output-available",
+          "input": {
+            "path": "company/solstice-health.md",
+            "content": "# Solstice Health — research brief (2026-09-28)\nDepth: standard\n\n## Snapshot\n- Stage: Series D, 2025 (Verified: news.example.com/solstice-series-d)\n- Size: ~600 employees (General knowledge: widely reported in healthcare-tech coverage)\n- Industry: care-coordination software for health systems\n- Funding: $120M Series D, 2025 (Verified: news.example.com/solstice-series-d)\n- Recent signal: announced a partner-integration push at a healthcare-tech conference, June 2026 (Verified: solstice.example.com/newsroom)\n- Sources consulted: solstice.example.com/newsroom, solstice.example.com/careers, news.example.com\n\n## Culture & hiring signals\n- Public values: \"measure the outcome, not the activity\" (Verified: solstice.example.com/careers)\n- What they optimize for: partner-integration depth over feature breadth (Verified: solstice.example.com/newsroom)\n- Red flags: none found\n- Interview-process reports: candidates describe a panel loop with a product-director-level case study (crowd-sourced, unverified — label as Unknown)\n- What I could not find: no public data on the team's current headcount or reporting structure.\n\n## Roles evaluated at this company\n- Product Director — Strong Fit — 2026-09-28 — jd-analysis/solstice-product-director.md\n"
+          },
+          "output": {
+            "path": "company/solstice-health.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-42",
+          "state": "output-available",
+          "input": {
+            "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company 'Solstice Health' --title 'Product Director' --verdict strong --score 91 --track A --reasons 'Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel'\"'\"'s own notes call out the partner-integration story as the reason they moved to offer.' --url https://jobs.solstice.example.com/product-director-902 --location 'Remote (US)' --analysis-file jd-analysis/solstice-product-director.md --company-file company/solstice-health.md"
+          },
+          "output": {
+            "stdout": "recorded (created NEW role): Solstice Health — Product Director → strong (91)\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-43",
+          "state": "output-available",
+          "input": {
+            "command": "python3 search/scripts/update_job.py --workspace . --company 'Solstice Health' --title 'Product Director' --stage Offer"
+          },
+          "output": {
+            "stdout": "updated: Solstice Health — Product Director — stage -> Offer\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": [
+              "jobs.md"
+            ]
+          }
+        },
+        {
+          "type": "data-card",
+          "data": {
+            "card": "verdict",
+            "ref": "jd-analysis/solstice-product-director.md",
+            "props": {
+              "company": "Solstice Health",
+              "title": "Product Director",
+              "verdict": "strong",
+              "score": 91,
+              "track": "A",
+              "reason": "Nine years of clinical-adjacent product leadership lines up precisely with the scope of this role, and the panel's own notes call out the partner-integration story as the reason they moved to offer."
+            }
+          }
+        },
+        {
+          "type": "text",
+          "text": "Congratulations on Solstice — I've recorded it as an offer, Strong Fit (91/100), with your notes on why. On Cascadia: first pass is Investable Stretch (65/100), the platform-ownership scope matches, but I haven't finished the full decode write-up yet — I'll pick that back up next session, so the deeper notes aren't in your workspace yet."
+        }
+      ]
+    },
+    {
+      "id": "m15",
+      "role": "user",
+      "metadata": {
+        "origin": "typed"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "quick updates: I started that analytics refresher course, and NovaGrid's recruiter mentioned the Staff band \"starts in the low $200s total comp\" on our intro call. Also — where does everything stand overall?"
+        }
+      ]
+    },
+    {
+      "id": "m16",
+      "role": "assistant",
+      "parts": [
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-44",
+          "state": "output-available",
+          "input": {
+            "path": "courses/product-analytics-refresher.md",
+            "content": "## Course: Product Analytics Refresher\nStatus: in progress (module 3 of 5)\nWhy: brushing up on cohort-retention analysis before the NovaGrid onboarding round, since the role leans on partner-adoption metrics.\n"
+          },
+          "output": {
+            "path": "courses/product-analytics-refresher.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-45",
+          "state": "output-available",
+          "input": {
+            "path": "negotiation/novagrid-comp-notes.md",
+            "content": "## NovaGrid — comp notes\nNo offer yet. Recruiter mentioned the Staff band \"starts in the low $200s total comp\" in the intro call (2026-09-25) — unconfirmed, not yet in writing.\n"
+          },
+          "output": {
+            "path": "negotiation/novagrid-comp-notes.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-write_file",
+          "toolCallId": "call-46",
+          "state": "output-available",
+          "input": {
+            "path": "plan.md",
+            "content": "Goal: an offer by 2026-12-15\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n- Confirm whether the quarterly Austin travel for Fernway Robotics is workable before I keep prepping interview questions (`jd-analysis/fernway-senior-pm.md`)\n- Tell me if you want me to widen the search past the platform-PM roles you started with\n\nTo do\n- Send the NovaGrid cover letter (`applications/novagrid-staff-pm-cover-letter.md`) — 5 min — the automatic checks found no failures; the letter is short at 249 words, two coverage lines use words not in your base résumé, and the wording check hasn't run\n- Submit the NovaGrid application yourself once you've sent the letter (`applications/novagrid-staff-pm-application.md`) — 10 min — I can't submit applications for you yet\n- Prep three STAR stories for the Fernway loop — 15 min — the interview is inside two weeks\n- Decide if you want me to keep looking for more Senior/Staff PM roles\n\nDoing\n\nDone\n"
+          },
+          "output": {
+            "path": "plan.md",
+            "written": true
+          }
+        },
+        {
+          "type": "tool-bash",
+          "toolCallId": "call-47",
+          "state": "output-available",
+          "input": {
+            "command": "python3 profile/scripts/check_files.py --workspace ."
+          },
+          "output": {
+            "stdout": "\n10 file(s) checked against 11 schema(s); 0 failure(s).\n",
+            "stderr": "",
+            "exitCode": 0,
+            "changed": []
+          }
+        },
+        {
+          "type": "text",
+          "text": "Logged the course and the comp note (unconfirmed until it's in writing, so I kept it out of any number I'd show you). Here's where the six roles stand: NovaGrid is Applied — the letter and application are ready for you to send and submit. Fernway is Interviewing, with your Thursday screen and a prep note on the hardware-cadence question. Cascadia is still on the list waiting for a closer look; I owe you the full decode. Brightloom is Interested from a quick scan only. Solstice is at Offer — nice work. Ashcroft is dismissed as a target mismatch. Your plan's To-do list has the NovaGrid send-and-submit steps plus prepping three STAR stories for the Fernway loop, about 30 of your 45 minutes a day; the open question on Fernway's travel is waiting on you before I keep prepping."
+        }
+      ]
+    }
+  ]
+}

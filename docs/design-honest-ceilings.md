@@ -480,7 +480,7 @@ never prints "clean" while a warning stands.**
 | This run found | Closing line |
 |---|---|
 | a FAIL | unchanged: `✘ fix the FAILs before delivering` (check_materials) · `✘ fix the FAILs before finalizing` (check_messages) · no closing line (proposal_block) |
-| no FAIL, and N warnings (N ≥ 1) | **new, the same in all three:** `no failures, N warning(s) above — fix each one or tell the candidate` |
+| no FAIL, and N warnings (N ≥ 1) | **new, the same in all three:** `no failures, 1 warning above — fix each one or tell the candidate` for one warning; `no failures, N warnings above — fix each one or tell the candidate` for two or more |
 | no FAIL, no warning | unchanged: `✔ automatic checks clean` · `✔ message floor clean` · `clean: proposal block printed; no FAIL, no WARN` |
 
 - N is the number of WARN lines this run printed. For check_materials
@@ -591,7 +591,8 @@ the new state.
   Both type files change together (`packages/agent/src/types.ts:43`,
   `apps/web/src/types.ts:40`).
 - **Words** (`apps/web/src/components/Cards.tsx:147`): with `warn`, the
-  badge reads **`no failures, N warning(s)`**. These are the script's new
+  badge reads **`no failures, 1 warning`** or **`no failures, N warnings`**
+  (`design-web-ui.md` § 5.3.1, T4 and T8). These are the script's new
   words, without the instruction the agent needs and the candidate
   doesn't ("fix each one or tell the candidate"). The badge's words,
   these included, come from `design-web-ui.md` § 5.3.1, rows T2–T6
@@ -600,7 +601,7 @@ the new state.
 - **§ 2.3 and § 2.4 of `design-web-ui.md`** each get one sentence in the
   same change, because that doc owns the rendering. § 2.3: "`checker` is
   `clean`, `warn` or `fail` from the latest check of this `.md`, or
-  `not-run`; `warn` shows 'no failures, N warning(s)'." § 2.4: "a pass
+  `not-run`; `warn` shows 'no failures, 1 warning' or 'no failures, N warnings'." § 2.4: "a pass
   with warnings never renders as 'clean', on this card or the
   `document` badge."
 
@@ -613,7 +614,7 @@ warning on that résumé stands. **How a test proves it:**
   gives `"clean"` (`:150` stays as it is).
 - A render check in `tests/web/` (the builder picks the file; none
   renders the document badge today): `warn` shows "no failures, 1
-  warning(s)" and never the word "clean".
+  warning" and never the word "clean".
 - `packages/agent/test/mvp-journey.test.ts:228` stays `"clean"`: that
   journey's `check_materials` run has 0 warnings. The badge reads
   `check_materials` only, as § 2.4 says; proposal_block's warnings are
@@ -901,7 +902,7 @@ No owner questions remain from round 1. § 6A's amendment raised three,
    **Answered: in this build, not a follow-up.** The candidate sees
    "clean" beside a warning, which is the same miss. A document card
    whose check is a pass with warnings shows the script's new words in
-   plain form, "no failures, N warning(s)". `design-web-ui.md` § 2.3–2.4
+   plain form, "no failures, 1 warning" or "no failures, N warnings". `design-web-ui.md` § 2.3–2.4
    owns the rendering. Design and tests: § 6A, "The web badge".
 7. **The demo fixture drops a warning** (`apps/web/fixtures/mvp-journey.json:158`,
    and the same reply text in `packages/agent/test/mvp-journey.test.ts:92`).
@@ -1013,12 +1014,13 @@ Here's the package." and never told them. Merges after PR #20.
 
 - [ ] `check_materials.py` / `check-materials.mjs` and
       `proposal_block.py` / `proposal-block.mjs`: with no FAIL and N
-      WARNs, the closing line is `no failures, N warning(s) above — fix
-      each one or tell the candidate`; "clean" only with no WARN. Unit
+      WARNs, the closing line is `no failures, 1 warning above — fix
+      each one or tell the candidate`, or `… N warnings above …` for
+      two or more; "clean" only with no WARN. Unit
       tests, parity, and the J1 re-capture with its one-line proof
       (design § 6A)
 - [ ] Web document card: a pass with warnings shows `warn`, "no
-      failures, N warning(s)", never "clean" (`cards.ts`, both
+      failures, 1 warning" or "no failures, N warnings", never "clean" (`cards.ts`, both
       `types.ts`, `Cards.tsx`); one sentence each in `design-web-ui.md`
       § 2.3–2.4; the `cards.test.ts` case and a render check (design
       § 6A, "The web badge")

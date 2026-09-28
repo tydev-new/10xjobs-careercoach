@@ -55,7 +55,7 @@ four new pages are. Still no settings page and no interview view.
 │  ▸ ran evaluate · web search ×3                  │ ## Selected Experience   │
 │                                                  │ - Led...                 │
 │  ┌ Verdict ─────────────────────────────────┐   │                           │
-│  │ Acme — Staff PM: Strong Fit (Track A)     │   │                           │
+│  │ Acme — Staff PM: Strong Fit               │   │                           │
 │  │ 8 years of B2B SaaS PM experience...      │   │                           │
 │  │ [ See full analysis → ]                   │   │                           │
 │  └────────────────────────────────────────────┘  │                           │
@@ -64,10 +64,10 @@ four new pages are. Still no settings page and no interview view.
 │  you: yes                                        │                           │
 │                                                  │                           │
 │  ▸ ran apply · check_materials · render_resume   │                           │
-│  ┌ Résumé — 109 words · checker ✓ ──────────┐   │  [ Print / Save as PDF ]  │
+│  ┌ Résumé — 109 words · automatic checks ✓ ─┐   │  [ Print / Save as PDF ]  │
 │  └────────────────────────────────────────────┘  │  [ Export workspace ]    │
 ├────────────────────────────────────────────────┤                           │
-│ [ + ]  Message Ten…            /skills   🔗link  │                           │
+│ [ + ]  Message Ten…                  🔗Job link  │                           │
 └────────────────────────────────────────────────┴───────────────────────────┘
 ```
 
@@ -85,7 +85,7 @@ four new pages are. Still no settings page and no interview view.
   — plain language always works, rule 18), a pasted link is offered
   as "evaluate this?" rather than parsed silently.
 - **Side panel:** shows whichever workspace file the last-opened card
-  points at (its `ref`), with a download button when a `document`
+  points at (its `ref`), with a print button, "Print / Save as PDF", when a `document`
   card's `htmlPath` is set. Empty: "Nothing open yet."
 
 ### 1.2 Phone wireframe (375px)
@@ -112,8 +112,8 @@ gate's `label` (C § 3 — the model's own ≤6-word tag).
 ### 1.4 Sign-in
 
 Minimal: email/password or magic link, one line under the logo from
-`PRINCIPLES.md` rule 1 ("Help you get a job offer you actually want"),
-and a link "Prefer local? Run it from your terminal" (rule 9 —
+`PRINCIPLES.md` rule 1 ("Help you get a job offer you actually want."),
+and a line "Prefer local? Run it from your terminal." (rule 9 —
 local-first stays a supported exit). Sign-in is **shared with the
 older CareerCoach app** (C § 8) — the same credentials sign a
 candidate into both, and anyone can complete it; it proves who someone
@@ -205,7 +205,7 @@ credit row of $5.00), so the chip reads `$5.00`, not `$0.00`:
 ```
 ◉ Ten · idle                                  $5.00  ⋯
 Ten: I don't have anything of yours yet. Drop in a résumé,
-     or tell me the job you're going for, and I'll start
+     or tell me the job you're going for, and that starts
      your workspace.
 ```
 
@@ -239,7 +239,8 @@ typed `yes` standing in for a button the same way it does at a spend
 gate (§ 2.5):
 
 1. **The complete thing** — named, not summarized: "your workspace
-   files, your conversation, and your gate log" (C § 8:
+   files, your conversation, and your record of cost approvals"
+   (§ 5.3.1, C15; C § 8:
    `ten_ws_files` and the Storage bucket, `ten_conversations` (C § 11.7,
    amended 2026-09-24), `ten_gate_log`; every ledger row is kept,
    C § 17.4, amended 2026-09-25).
@@ -545,7 +546,8 @@ limit. Try again tomorrow.") and an upstream failure are both
 never by a separate code. A reply cut off at the output limit is its
 own code, `cut_off` (C § 9.3, amended 2026-09-24): a fixed message
 that already says what to do, so it has no `nextStep` line. `over_balance`'s own message is now "Your beta credit
-is used up. Ask the person who invited you for more." — there is no
+is used up. Ask the person who invited you for more." (since C § 17.4,
+§ 1.11's line replaces it; § 5.3.1, C16) — there is no
 "add funds" step in the beta (one shared app key, no per-candidate
 spend), so the old `nextStep` lookup entry for it is gone; the message
 already says what to do, and repeating it would be the kind of
@@ -614,7 +616,8 @@ SDK's own states: `input-streaming` → `input-available` →
 envelope kind. Collapsed: `▸ ran evaluate · web search ×3` (repeats of
 one tool collapse to a count). Expanded: one row per part, its literal
 `input` and `output`/`errorText`, word for word (rule 11 — never a
-restated description of what the model believes it did).
+restated description of what the model believes it did). Its words
+(2026-09-28): § 5.3.1 rows L1–L26 and W1–W19, C24.
 
 ## 4. Fixture conversations
 
@@ -852,7 +855,7 @@ Each rule names what it prevents and the test that proves it.
    line is lost, C § 18.1); the To do minutes sum; the
    280-character cut of Ten's last reply, marked with "…"; and static
    label tables keyed by a file's exact words (§ 2.1's tier names, and
-   § 5.3's coverage-status and section labels). Choosing the plan lines
+   § 5.3's coverage-status, decision and section labels). Choosing the plan lines
    whose path matches an application's file ("Next, from you", § 5.3)
    is selection by an exact match, not a computed next step.
 4. **Fresh reads, no copy.** A page reads its files when it's shown and
@@ -879,8 +882,8 @@ Each rule names what it prevents and the test that proves it.
    (`resource_missing`) shows the page's empty state. Any other read
    failure shows "Couldn't read <path>. Try again in a moment." with a
    Retry button, never the empty state. A section a reader can't parse
-   shows its lines as written under "Ten couldn't read these lines of
-   <path>:" and a link that opens the file (`design-cowork-coaching.md`
+   shows its lines as written under "This page couldn't read these lines of
+   <path>:" (§ 5.3.1, C21) and a link that opens the file (`design-cowork-coaching.md`
    § 1, principle 8, "degrade loudly"). *Prevents:* "No roles yet" or
    "Nothing here right now" shown over a file that has them (rule 8).
    *Proved by:* a store whose `read` throws a non-missing error; a
@@ -1004,7 +1007,7 @@ the designer sets the columns, § 5.6):
     order (newest change first). This is the page's fixed sort key, not
     a judgment. None: the card isn't shown. More than one: the card
     shows the first, and its header adds "The most recently changed of
-    N" with a link to Applications.
+    N active applications" with a link to Applications.
   - *Shows:* `Company — Title` and Location from the row, as written;
     the tier label (§ 2.1's table) and the score when the row has one;
     **the stage steps** (below) from the row; the row's Seen and Updated
@@ -1017,7 +1020,7 @@ the designer sets the columns, § 5.6):
     submit", which is a computed next step (rule 8). *Proved by:* on the
     fixture, the card's role is the first linked live entry, its lines
     equal the plan lines whose `ref` matches, and a fixture with two
-    live entries shows "The most recently changed of 2".
+    live entries shows "The most recently changed of 2 active applications".
 
 **Reads:** `plan.md`, `jobs.md`, `store.list("applications")`, and the
 frame's `messages` and chat status.
@@ -1032,8 +1035,9 @@ Counts are rows by stage, counted by code (rule 14). The page never
 reads `jobs.md`'s own bold `Active:` line, which would be a second
 source for one number. The last reply needs no parser.
 **Empty** (the two files have no items and no unreadable lines between
-them, which includes neither file existing): "Nothing here yet. Ten writes your plan and your
-job list as you work together." (§ 5.3.1, C2) and Continue with Ten. Ten's last
+them, which includes neither file existing): "Nothing here yet. Talk to Ten to start your plan and your
+job list; they show here." (§ 5.3.1, C2 and C11) and Continue with Ten,
+or "Talk to Ten" when no conversation is saved yet. Ten's last
 reply still shows above it when one qualifies. **Home's view is a pure
 component** that takes what the readers return as props, so sign-in's
 preview (§ 1.4) renders the same view on the fixture.
@@ -1090,12 +1094,12 @@ bottom, only the parts whose source exists:
 3. **The posting link:** the row's URL under § 5.2 rule 7. The posting's
    text (`jd-inbox/`) is not shown; the ruling names the link only.
 4. **From the analysis file** (the row's `Analysis` field, as an exact path):
-   - **"What they're asking for"**: the section whose heading starts
+   - **"What the posting asks for"** (§ 5.3.1, C17): the section whose heading starts
      `Competency extraction` (evaluate's schema: the top competencies,
      in priority order).
    - **"How you fit"**: the section whose heading starts
      `Fit assessment`. The rest of the heading, such as `(Track A
-     lens)`, is shown as written after the label.
+     lens)`, is not shown (§ 5.3.1, C4); the body is.
 5. **From the company file** (the row's `Company file` field, as an
    exact path, never guessed from the company name):
    - **"About <Company>"**: the section whose heading starts `Snapshot`
@@ -1166,7 +1170,8 @@ the conversation."
 entry has:
 
 - **The role**: `Company — Title` from the linked `jobs.md` row, else
-  the file key as written (for example `acme-staff-pm`).
+  the path of the entry's notes file, or of its first file when it has
+  none (for example `applications/acme-staff-pm.md`; § 5.3.1, C20).
 - **Its stage** from that row, or "Dismissed" plus the note. With no
   linked row: "Not linked to a role on your job list." The page never
   guesses a link from a company name.
@@ -1204,9 +1209,10 @@ opened. The detail shows only the parts whose source exists:
    `## Coverage` rows, from `proposalRows` (C § 19). Each row shows its
    requirement and evidence word for word and its status through a
    static label table: `have` → "Covered", `shown-but-unnamed` →
-   "Shown, not named", `gap` → "Gap"; any other value as written. The
-   decision column is shown word for word (`open`, `answered`,
-   `skipped`). It stays because the plan holds only one "gap interview
+   "Shown, not in their words", `gap` → "Gap"; any other value as written
+   (§ 5.3.1, C17). The decision column goes through a second static
+   table: `open` → "Not answered yet", `answered` → "Answered",
+   `skipped` → "Skipped"; any other value as written. It stays because the plan holds only one "gap interview
    open" line for the whole application while any row is `open` (apply
    `references/schema.md:111-114`), and hiding the column would hide
    which gaps were `skipped`.
@@ -1219,10 +1225,10 @@ opened. The detail shows only the parts whose source exists:
 The **notes file** is the entry's `<key>.md` or `<key>-application.md`
 (see "Parsed by"). An entry with both shows neither's tables and says
 so in one line: "This role has two notes files, <a> and <b>, so this
-page shows neither's tables." Choosing one would be a guess. A table
+page shows neither's tables. Ask Ten which one to keep." Choosing one would be a guess. A table
 whose header is absent, or that has no rows, is left out. Rows under
 either header with the wrong cell count (`proposalRows`' `unreadable`)
-show under § 5.2 rule 6's "Ten couldn't read these lines of <path>:",
+show under § 5.2 rule 6's "This page couldn't read these lines of <path>:",
 cells joined by ` | `, never dropped. A read failure shows § 5.2 rule
 6's error in parts 5 and 6 only.
 *Prevents:* checker results shown with no file behind them; a
@@ -1255,8 +1261,8 @@ schemas).
 For the detail, `readPlanBoard` and `splitPlanMinutes` (C § 18, § 18.1)
 and `proposalRows` (C § 19, a **changed** reader: one new export of the
 parity-tested `proposal_block` port).
-**Empty:** "No applications yet. When you decide to apply for a role,
-Ten drafts the materials and they show here."
+**Empty:** "No applications yet. Ask Ten to draft a résumé and letter
+for a role, and they show here." (§ 5.3.1, C11)
 
 #### Documents: every file
 
@@ -1375,33 +1381,33 @@ CRLF; a file with no `## ` line; a `# ` line ending a section.
 
 #### 5.3.1 Every string the workspace shows (Stage 4)
 
-Written 2026-09-28 by the architect as Stage 4's first step (§ 5.9).
-The lead ruled on every conflict and open question the same day ("Lead
-rulings", after the table). It waits for Stage 4's independent string
-review. This is the one list of
-words for the four pages, the rail, the tab bar, the header, the
-frame's own lines and the viewer, plus the restore ruling's sign-in
-strings and the document badge. The coder copies each string word for
-word.
+Written 2026-09-28 by the architect as Stage 4's first step (§ 5.9),
+then corrected the same day after the lead's rulings and an independent
+string review ("Lead rulings", "Conflicts" and "Removed from the screen"
+follow the table). It waits for the reviewer's second pass. The coder
+copies each string word for word.
 
+- **What the table covers.** Every candidate-visible string in
+  `apps/web/src` at `c8d6898`, visible text and accessible names alike;
+  every string the pages still to be built will show; and the sign-in
+  strings of § 1.4. **What has no row:** text shown from a file, a
+  tool's own input and output, or the model's reply (the file's, tool's
+  or model's own words, § 5.2 rule 3 and rule 11); dev-only controls
+  (the fixture picker, Autoplay, the theme switch, and the mock app's
+  own screens); PayPal's own buttons; and fixed text sent from outside
+  `apps/web/src`: `packages/agent`'s error messages
+  (`packages/agent/src/coach.ts:42-60`) and decline line
+  ("Declined — nothing started.", `:537`), and the proxy's messages
+  (C § 8). The messages this doc quotes have rows (E12–E15); the rest
+  are a named follow-up for the lead, against the same rules.
 - **How to read a row.** Placeholders are in angle brackets (`<N>`,
   `<path>`); everything else is literal, the final period included.
   **Source** is the section and line where this doc (or the named doc)
   gives the words. **Kind:** *Given*, the doc had the words and the row
-  copies them; *NEW*, the doc had a slot but no words, so they are
-  written here; *Changed*, the doc's words broke a rule below or two
-  places disagreed, so the source line now carries the new words and
-  "Conflicts" (after the table) says why.
-- **What has no row, and why.** Text a page shows from a file (a plan
-  line, a Reason, a section body, a path, a date, the Goal line) is the
-  file's own words (§ 5.2 rule 3). Talk to Ten's transcript, cards,
-  gate, errors and notices (§ 1.5, § 1.8's blocked-send line, § 1.9,
-  § 2, § 3), the header's dialogs (§ 1.7, § 1.10, § 1.11) and sign-in's
-  form and recovery screens (§ 1.10) are word for word in their own
-  sections, and built and tested already; a second copy here would
-  drift (rule 12). Rows T1–T7 cover only the composer's placeholder,
-  the document badge and the wording-check line. Dev-only controls (the fixture picker, Autoplay,
-  the theme switch) never ship.
+  copies them; *Kept*, the code's words, which no doc gave, kept as
+  they are; *NEW*, written here; *Changed*, the old words broke a rule
+  below or two places disagreed, so the row carries new words, the
+  source line changed in the same commit, and "Conflicts" says why.
 - **Each string was checked** against rule 8 (true; no praise, no
   urgency), rule 18 (plain; no word a candidate would need defined),
   § 2.7's rule (what's true and what the candidate can do, never what
@@ -1409,142 +1415,154 @@ word.
   (`design-plain-replies.md` § 1–§ 3: no file name except a path the
   candidate can open, no script name, no schema label, no "JD", no
   "gate", no § sign). A `<path>` appears only in a line about that very
-  file, which the candidate can open from the same page.
+  file.
 - *Prevents:* a string the coder words on the spot; a string that says
-  more than is true; one thing shown under two names (rule 12).
-  *Proved by:* (1) a doc test: every row with a source line finds its
-  string at that line, whitespace collapsed (a row with a placeholder
-  finds the words around it), so the table and its source can't drift
-  apart; (2) Stage 4's bundle test: every string without a placeholder
-  is in the built bundle, and each one with a placeholder shows filled
-  in when its page renders the § 5.7 fixture (T7 is deferred and left
-  out); (3) `tests/always-on/scan_voice.py --reply` over the String
-  column finds no HARD hit. Until the plain-replies follow-up moves `To
-  Review` to REVIEW (C8's ruling), that one HARD hit is expected.
+  more than is true; one thing shown under two names (rule 12); an old
+  string surviving next to its replacement. *Proved by:*
+  1. a doc test: every row with a source line finds its string at that
+     line, whitespace collapsed (a row with a placeholder finds the
+     words around it), so the table and its sources can't drift apart;
+  2. the bundle test: every string with no placeholder and at least 12
+     characters is in the built bundle, except J19, T7 and K6 (not
+     shown yet);
+  3. the page test: shorter strings ("Ten", "Open", "—", "…", "none")
+     and strings with a placeholder are found filled in on the rendered
+     page, over the § 5.7 fixture and the conversation fixtures (§ 4);
+  4. the negative tests: until `design-web-search.md` § 9 S5, J19's
+     words ("Ask Ten to look for roles") are absent from the bundle and
+     J18's are present, and from S5 the reverse; and no rendered page,
+     over every fixture, shows any string in "Removed from the screen";
+  5. `tests/always-on/scan_voice.py --reply` over the String column
+     finds no HARD hit. Until the plain-replies follow-up moves "To
+     Review" to REVIEW in the scanner (C8), that one HARD hit is
+     expected.
 
 | # | Page | Where it shows | String (placeholders in `<>`) | Source | Kind |
 |---|---|---|---|---|---|
-| F1 | Rail | place 1 of 5 | `Home` | § 5 ruling :675 | Given |
-| F2 | Rail | place 2 of 5 | `Talk to Ten` | § 5 ruling :675 | Given |
-| F3 | Rail | place 3 of 5 | `Jobs` | § 5 ruling :675 | Given |
-| F4 | Rail | place 4 of 5 | `Applications` | § 5 ruling :675 | Given |
-| F5 | Rail | place 5 of 5 | `Documents` | § 5 ruling :675 | Given |
-| F6 | Rail | beside Jobs, Applications, Documents, when above 0 | `<N>` | § 5.1 Rail counts :742 | Given |
-| F7 | Rail | on Talk to Ten while a gate waits | `Needs your yes` | § 5.1 :789 | Given |
-| F8 | Rail | the wordmark, beside the mark | `Ten` | § 5.6 The brand mark :2176 | Given |
-| F9 | Rail, tab bar | accessible name of the navigation | `Workspace` | this table; today's code; the doc named none | NEW |
-| F10 | Tab bar (phone) | tab 1 of 5 | `Home` | § 5.5 :1748 | Given |
-| F11 | Tab bar (phone) | tab 2 of 5 | `Jobs` | § 5.5 :1748 | Given |
-| F12 | Tab bar (phone) | tab 3 of 5 | `Ten` | § 5.5 :1748 | Given |
-| F13 | Tab bar (phone) | tab 4 of 5 | `Applications` | § 5.5 :1748 | Given |
-| F14 | Tab bar (phone) | tab 5 of 5 | `Documents` | § 5.5 :1748 | Given |
-| F15 | Tab bar (phone) | hidden text on the Ten tab while a gate waits | `Needs your yes` | § 5.5 :1760 | Given |
-| F16 | Header | left: the page title | `<place name>` | § 5.5 header :1767; the same words as F1–F5 | Given |
-| F17 | Header | avatar hover text and accessible name: idle | `Ten` | this table; § 1.3 gives no words for idle | NEW |
-| F18 | Header | avatar: thinking | `Ten is writing` | this table; § 1.3 gives no words for thinking | NEW |
-| F19 | Header | avatar: working | `Ten is <tool label>` | this table; § 1.3 gives the `<tool label>` only; F46–F47 are its plain forms (lead ruling 2026-09-28) | NEW |
-| F46 | Header | avatar: working, while the automatic checks run | `Ten is running the automatic checks` | this table; lead ruling 2026-09-28; `TOOL_LABELS` changes to match in the Stage 4 build | NEW |
-| F47 | Header | avatar: working, while the wording check runs | `Ten is running the wording check` | this table; lead ruling 2026-09-28; `TOOL_LABELS` changes to match in the Stage 4 build | NEW |
-| F20 | Header | avatar: needs-you | `Needs your yes: <gate label>` | this table; § 1.3 gives the `<gate label>` only; the prefix is F7's words | NEW |
-| F21 | Header | avatar: done | `Ten has finished` | this table; § 1.3 gives no words for done | NEW |
+| F1 | Rail | place 1 of 5 | `Home` | § 5 ruling :678 | Given |
+| F2 | Rail | place 2 of 5 | `Talk to Ten` | § 5 ruling :678 | Given |
+| F3 | Rail | place 3 of 5 | `Jobs` | § 5 ruling :678 | Given |
+| F4 | Rail | place 4 of 5 | `Applications` | § 5 ruling :678 | Given |
+| F5 | Rail | place 5 of 5 | `Documents` | § 5 ruling :678 | Given |
+| F6 | Rail | beside Jobs, Applications, Documents, when above 0 | `<N>` | § 5.1 Rail counts :745 | Given |
+| F7 | Rail | on Talk to Ten while a spend waits for a yes | `Needs your yes` | § 5.1 :792 | Given |
+| F8 | Rail | the wordmark, and the mark's accessible name | `Ten` | § 5.6 The brand mark :2537 | Given |
+| F9 | Rail, tab bar | accessible name of the navigation | `Workspace` | this table | Kept |
+| F10 | Tab bar (phone) | tab 1 of 5 | `Home` | § 5.5 :2109 | Given |
+| F11 | Tab bar (phone) | tab 2 of 5 | `Jobs` | § 5.5 :2109 | Given |
+| F12 | Tab bar (phone) | tab 3 of 5 | `Ten` | § 5.5 :2109 | Given |
+| F13 | Tab bar (phone) | tab 4 of 5 | `Applications` | § 5.5 :2109 | Given |
+| F14 | Tab bar (phone) | tab 5 of 5 | `Documents` | § 5.5 :2109 | Given |
+| F15 | Tab bar (phone) | added to the Ten tab's accessible name while a spend waits (today's code: "Ten. Needs your yes.") | `Needs your yes` | § 5.5 :2121 | Given |
+| F16 | Header | left: the page title (the words of F1–F5) | `<place name>` | § 5.5 header :2128 | Given |
+| F17 | Header | avatar hover text and accessible name: idle | `Ten` | this table; § 1.3 gives no words | NEW |
+| F18 | Header | avatar: thinking | `Ten is writing` | this table; § 1.3 gives no words | NEW |
+| F19 | Header | avatar: working; `<working words>` is one of W1–W19 | `Ten is <working words>` | this table; § 1.3 gives the tool label only | NEW |
+| F20 | Header | avatar: needs-you; `<request label>` is the pending spend's own label (C § 3) | `Needs your yes: <request label>` | this table; prefix is F7's words | NEW |
+| F21 | Header | avatar: done | `Ten has finished` | this table; § 1.3 gives no words | NEW |
 | F22 | Header | balance chip, rounded down to the cent, `$0.00` at or below zero | `$<amount>` | § 1.1 :76 | Given |
-| F23 | Header | balance chip, balance not known | `—` | this table; today's code; never an invented number (rule 8) | NEW |
-| F24 | Header | button inside the balance chip (desktop) | `Buy credit` | § 5.6 Balance chip :2276 | Given |
-| F25 | Header | accessible name of the `⋯` button | `Menu` | this table; today's code; the doc named none | NEW |
-| F26 | Header | `⋯` menu item | `Export workspace` | § 1.1 wireframe :68 | Given |
-| F27 | Header | `⋯` menu item | `Import workspace` | § 1.1 :77; today's code's label; kept and added to § 1.1 (lead ruling Q3) | NEW |
-| F28 | Header | `⋯` menu item | `Buy credit` | § 1.11 :388 | Given |
-| F29 | Header | `⋯` menu item, after a divider | `Delete my beta data` | § 5.6 The `⋯` menu :2287 | Given |
-| F30 | Header | `⋯` menu item | `Set a new password` | § 1.10 :330 | Given |
-| F31 | Header | `⋯` menu item | `Sign out` | § 1.10 :330 | Given |
-| F32 | Header | `⋯` menu link, above the model line | `Privacy` | `design-web-agent.md` § 13.6 :1809 | Given |
-| F33 | Header | `⋯` menu, last line, plain text (real app only) | `Model: <model name>` | `design-web-agent.md` § 13.3 :1692; e.g. `Model: DeepSeek V4.1 Flash (testing)` | Given |
-| F34 | Frame (every page) | one neutral line while a turn runs | `Ten is working. This page updates when it finishes.` | § 5.2 rule 4 :861 | Given |
-| F35 | Frame (every page) | new-version notice | `Ten has been updated. Reload to use the new version. Your files and this conversation are saved.` | § 1.8 :287 | Given |
-| F36 | Frame (every page) | the notice's button | `Reload` | § 1.8 :287 | Given |
-| F37 | Frame (every page) | the notice's ending when this tab's latest save failed | `Your files are saved; your latest messages weren't saved and will clear from the screen.` | § 1.8 :293 | Given |
-| F38 | Frame (every page) | a file that can't be read (not a missing one) | `Couldn't read <path>. Try again in a moment.` | § 5.2 rule 6 :880 | Given |
-| F39 | Frame (every page) | the button beside F38 | `Retry` | § 5.2 rule 6 :880 | Given |
-| F40 | Frame (every page) | above lines a reader can't parse, with a link to the file | `Ten couldn't read these lines of <path>:` | § 5.2 rule 6 :882 | Given |
-| F41 | Viewer (every page) | nothing open | `Nothing open yet.` | § 1.1 :89 | Given |
-| F42 | Viewer (every page) | a file it can't show | `This file can't be previewed here.` | § 5.2 rule 8 :899 | Changed (C5) |
-| F43 | Viewer (every page) | print button on an `.html` file | `Print / Save as PDF` | § 2.3 :469 | Changed (C6) |
-| F44 | Viewer (every page) | close button's accessible name | `Close` | this table; today's code | NEW |
-| F45 | Viewer (every page) | the viewer's accessible name | `File preview` | this table; today's code | NEW |
-| P1 | Jobs, Applications, Documents | a row, entry, detail or file control | `Ask Ten about this` | § 5.3 Jobs :1069 | Given |
-| P2 | Jobs, Applications, Documents | the draft P1 puts in an empty composer; `<label>` is P4 or the path | `About <label>: ` | § 5.4 :1718 | Given |
-| P3 | Jobs, Applications, Documents | empty state's button | `Talk to Ten` | § 5.6 Empty state :2466 | Given |
-| P4 | Home, Jobs, Applications | a role's label, from its row as written | `<Company> — <Title>` | § 5.3 Jobs :1055 | Given |
-| P5 | Home, Jobs, Applications | tier label (§ 2.1's table) | `Strong Fit` | § 5.6 tier pills :2372 | Given |
-| P6 | Home, Jobs, Applications | tier label (§ 2.1's table) | `Investable Stretch` | § 5.6 tier pills :2373 | Given |
-| P7 | Home, Jobs, Applications | tier label (§ 2.1's table) | `Long-Shot Stretch` | § 5.6 tier pills :2374 | Given |
-| P8 | Home, Jobs, Applications | tier label (§ 2.1's table) | `Weak Fit` | § 5.6 tier pills :2375 | Given |
-| P9 | Jobs | badge on a Reason that begins `quick-scan:` | `Quick scan` | § 5.6 tier pills :2376 | Given |
-| P10 | Home, Jobs, Applications | the score, when the row has one | `<n>/100` | § 5.3 Jobs detail :1082; one form on every page (decision N1) | Given |
-| P11 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `To Review` | § 5.3 stage steps :1311; C8 | Given |
-| P12 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Interested` | § 5.3 stage steps :1311 | Given |
-| P13 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Applied` | § 5.3 stage steps :1311 | Given |
-| P14 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Interviewing` | § 5.3 stage steps :1312 | Given |
-| P15 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Offer` | § 5.3 stage steps :1312 | Given |
-| P16 | Home, Jobs, Applications | Home count cell, Jobs group (closed), a dismissed entry | `Dismissed` | § 5.3 Jobs :1053 | Given |
-| P17 | Home, Jobs, Documents | a count beside a label (0 shows as 0 on Home) | `<n>` | § 5.3 Home :919 | Given |
-| P18 | Home, Applications | the minutes pill on a plan line in C § 18.1's form | `<n> min` | § 5.3 The plan item :1293 | Given |
-| H1 | Home | label over Ten's last reply | `Ten · last reply` | § 5.3 Home :951 | Given |
-| H2 | Home | added where the quote is cut at 280 code points | `…` | § 5.3 Home :949 | Given |
-| H3 | Home | button in the band; also Home's empty state | `Continue with Ten` | § 5.3 Home :923 | Given |
-| H4 | Home | the band's label when no reply shows (H1 when one does) | `Talk to Ten` | § 5.6 Home layout :2513; C10 | Given |
-| H5 | Home | plan section heading | `Waiting on you` | § 5.3 Home :976 | Given |
-| H6 | Home | plan section heading | `To do` | § 5.3 Home :976 | Given |
-| H7 | Home | a plan section with no items | `Nothing here right now.` | § 5.3 Home :983 | Given |
-| H8 | Home | To do's header, only when every item has minutes and the budget is per day | `<N> of your <M> min a day` | § 5.3 Home :987 | Given |
-| H9 | Home | card title | `Active application` | § 5.3 Home :1001 | Given |
-| H10 | Home | card header, when more than one live entry | `The most recently changed of <N>` | § 5.3 Home :1006 | Given |
-| H11 | Home | the link beside H10, to Applications | `See all in Applications` | this table; § 5.3 says "with a link to Applications", no words | NEW |
-| H12 | Home, Jobs | date labels (the row's Seen, Updated, Evaluated) | `Added` | § 5.3 Home :1011 | Changed (C3) |
-| H13 | Home, Jobs | date label | `Updated` | § 5.3 Home :1012 | Given |
-| H14 | Jobs | date label, detail header | `Evaluated` | § 5.3 Jobs detail :1080; written with C3's edit | NEW |
-| H15 | Home, Applications | heading over the matching plan lines | `Next, from you` | § 5.3 Home :1014 | Given |
-| H16 | Home | card link to the entry in Applications | `Open` | § 5.3 Home :1014 | Given |
-| H17 | Home | empty state, first sentence | `Nothing here yet.` | § 5.3 Home :1035 | Given |
-| H18 | Home | empty state, rest | `Ten writes your plan and your job list as you work together.` | § 5.3 Home :1035 | Changed (C2) |
-| J1 | Jobs | a row with no verdict | `Not evaluated yet` | § 5.3 Jobs :1057 | Given |
-| J2 | Jobs | label on a row with a verdict, and in the detail | `Dealbreakers` | § 5.3 Jobs :1061 | Given |
-| J3 | Jobs | Dealbreakers, when the row has none | `none` | § 5.3 Jobs :1061 | Given |
-| J4 | Jobs | label before the date part of Posted | `Posted` | this table; § 5.3 names the field, no label | NEW |
-| J5 | Jobs | a dismissed row, from its `Was` field | `Dismissed from <stage>` | this table; § 5.3 says "the stage it was in", no words | NEW |
-| J6 | Jobs | row and detail control | `Open analysis` | § 5.3 Jobs :1067 | Given |
-| J7 | Jobs | a row with no `Analysis` field | `No analysis file linked` | § 5.3 Jobs :1068; C § 6.2's own words | Given |
-| J8 | Jobs | detail: label before the posting's link | `Posting` | this table; § 5.3 names the link, no label | NEW |
-| J9 | Jobs | detail section label | `What they're asking for` | § 5.3 Jobs detail :1093 | Given |
-| J10 | Jobs | detail section label, then the heading's rest as written | `How you fit` | § 5.3 Jobs detail :1096 | Given |
-| J11 | Jobs | detail section label | `About <Company>` | § 5.3 Jobs detail :1101 | Given |
-| J12 | Jobs | detail section label | `Culture and hiring signals` | § 5.3 Jobs detail :1103 | Given |
-| J13 | Jobs | detail: a field names a file that isn't there | `<path> isn't in your workspace.` | § 5.3 Jobs detail :1129 | Given |
-| J14 | Jobs | detail control | `Open company notes` | § 5.3 Jobs detail :1119 | Given |
-| J15 | Jobs | detail control | `Open application` | § 5.3 Jobs detail :1120 | Given |
-| J16 | Jobs | phone: back from the detail to the list | `Back to Jobs` | this table; § 5.3 says "a back control", no words | NEW |
-| J17 | Jobs | empty state, first sentence | `No roles yet.` | § 5.3 Jobs :1155 | Given |
-| J18 | Jobs | empty state, rest (until the web app loads search) | `Paste a job link or a posting's text into the conversation.` | § 5.3 Jobs :1155 | Changed (C1) |
-| J19 | Jobs | empty state, rest (from the release that loads search, not before) | `Ask Ten to look for roles, or paste a job link or a posting's text into the conversation.` | § 5.3 Jobs :1160; C1 | Given |
-| A1 | Applications | entry and detail, no linked row | `Not linked to a role on your job list.` | § 5.3 Applications :1171 | Changed (C2) |
-| A2 | Applications | the role label when no row links, as written | `<file key>` | § 5.3 Applications :1169; e.g. `acme-staff-pm` | Given |
-| A3 | Applications | detail control, opens Jobs at the row | `Role details` | § 5.3 Applications detail :1187 | Given |
-| A4 | Applications | detail section label | `What the posting asks for, and your evidence` | § 5.3 Applications detail :1203 | Given |
-| A5 | Applications | coverage column: the requirement | `They ask for` | this table; the mockup's words | NEW |
-| A6 | Applications | coverage column: the evidence | `Your evidence` | this table; the mockup's words | NEW |
-| A7 | Applications | coverage column: the status (A9–A11) | `Status` | this table; the mockup's words | NEW |
-| A8 | Applications | coverage column: the decision, shown as written (`open`, `answered`, `skipped`) | `Question to you` | this table; § 5.3 gives the values, no header | NEW |
-| A9 | Applications | coverage status `have` | `Covered` | § 5.3 Applications detail :1206 | Given |
-| A10 | Applications | coverage status `shown-but-unnamed` | `Shown, not named` | § 5.3 Applications detail :1207 | Given |
-| A11 | Applications | coverage status `gap` (any other value: as written) | `Gap` | § 5.3 Applications detail :1207 | Given |
-| A12 | Applications | detail section label | `What Ten cut, weakest fit first` | § 5.3 Applications detail :1213 | Given |
-| A13 | Applications | each cut bullet: which past role it came from | `From <role>` | this table; § 5.3 shows the role cell, no words | NEW |
-| A14 | Applications | detail, an entry with both notes files | `This role has two notes files, <a> and <b>, so this page shows neither's tables.` | § 5.3 Applications detail :1221 | Given |
-| A15 | Applications | phone: back from the detail to the list | `Back to Applications` | this table; as J16 | NEW |
-| A16 | Applications | empty state, first sentence | `No applications yet.` | § 5.3 Applications :1258 | Given |
-| A17 | Applications | empty state, rest | `When you decide to apply for a role, Ten drafts the materials and they show here.` | § 5.3 Applications :1258 | Given |
-| D1 | Documents | group: files at the top level | `Your records` | § 5.3 Documents :1266 | Given |
-| D2 | Documents | group: folder `documents` | `Your uploads` | § 5.3 Documents :1269 | Given |
+| F23 | Header | balance chip, balance not known (shown) | `—` | this table; never an invented number (rule 8) | Kept |
+| F24 | Header | balance chip, balance not known (visually hidden, read aloud) | `Balance not known` | this table | NEW |
+| F25 | Header | button inside the balance chip (desktop) | `Buy credit` | § 5.6 Balance chip :2637 | Given |
+| F26 | Header | accessible name of the `⋯` button | `Menu` | this table | Kept |
+| F27 | Header | `⋯` menu item | `Export workspace` | § 1.1 wireframe :68 | Given |
+| F28 | Header | `⋯` menu item | `Import workspace` | § 1.1 :77; named in § 1.1 (lead ruling 3) | Kept |
+| F29 | Header | `⋯` menu item | `Buy credit` | § 1.11 :389 | Given |
+| F30 | Header | `⋯` menu item, after a divider | `Delete my beta data` | § 5.6 The `⋯` menu :2648 | Given |
+| F31 | Header | `⋯` menu item | `Set a new password` | § 1.10 :331 | Given |
+| F32 | Header | `⋯` menu item; also the setup error screen and not-a-member | `Sign out` | § 1.10 :331 | Given |
+| F33 | Header | `⋯` menu link, above the model line | `Privacy` | `design-web-agent.md` § 13.6 :1809 | Given |
+| F34 | Header | `⋯` menu, last line, plain text (real app only) | `Model: <model name>` | `design-web-agent.md` § 13.3 :1692; e.g. `Model: DeepSeek V4.1 Flash (testing)` | Given |
+| F35 | Home, Jobs, Applications, Documents | one neutral line above the page while a turn runs | `Ten is working. This page updates when it finishes.` | § 5.2 rule 4 :864 | Given |
+| F36 | Every member page | new-version notice | `Ten has been updated. Reload to use the new version. Your files and this conversation are saved.` | § 1.8 :288 | Given |
+| F37 | Every member page | the notice after a blocked send | `Not sent: Ten has been updated since this page opened. Copy your message if you want to keep it, then reload and send it again. Your files and this conversation are saved.` | § 1.8 :290 | Given |
+| F38 | Every member page | the notice's button | `Reload` | § 1.8 :288 | Given |
+| F39 | Every member page | the notice's ending when this tab's latest save failed | `Your files are saved; your latest messages weren't saved and will clear from the screen.` | § 1.8 :294 | Given |
+| F40 | Home, Jobs, Applications, Documents | a file that can't be read (not a missing one) | `Couldn't read <path>. Try again in a moment.` | § 5.2 rule 6 :883 | Given |
+| F41 | Home, Jobs, Applications, Documents | the button beside F40 | `Retry` | § 5.2 rule 6 :884 | Given |
+| F42 | Home, Jobs, Applications, Documents | above lines a reader can't parse, with a link to the file | `This page couldn't read these lines of <path>:` | § 5.2 rule 6 :885 | Changed (C21) |
+| F43 | Viewer (Talk to Ten, Jobs, Applications, Documents; Home while a file is open) | nothing open (not on Home, where the viewer shows only with a file) | `Nothing open yet.` | § 1.1 :89 | Given |
+| F44 | Viewer (Talk to Ten, Jobs, Applications, Documents; Home while a file is open) | a file it can't show | `This file can't be previewed here.` | § 5.2 rule 8 :902 | Changed (C5) |
+| F45 | Viewer (Talk to Ten, Jobs, Applications, Documents; Home while a file is open); the document card | print button on an `.html` file | `Print / Save as PDF` | § 2.3 :470 | Changed (C6) |
+| F46 | Viewer (Talk to Ten, Jobs, Applications, Documents; Home while a file is open) | accessible name of the ✕ (Home) and the phone's back arrow | `Close` | this table | Kept |
+| F47 | Viewer (Talk to Ten, Jobs, Applications, Documents; Home while a file is open) | the viewer's accessible name | `File preview` | this table | Kept |
+| P1 | Jobs, Applications, Documents | a row, entry, detail or file control | `Ask Ten about this` | § 5.3 Jobs :1073 | Given |
+| P2 | Jobs, Applications, Documents | the draft P1 puts in an empty composer; `<label>` is P4 or the path | `About <label>: ` | § 5.4 :2079 | Given |
+| P3 | Jobs, Applications, Documents; Home when no conversation is saved | empty state's button | `Talk to Ten` | § 5.6 Empty state :2827 | Given |
+| P4 | Home, Jobs, Applications | a role's label, from its row as written | `<Company> — <Title>` | § 5.3 Jobs :1059 | Given |
+| P5 | Home, Jobs, Applications; the verdict card | tier label (§ 2.1's table) | `Strong Fit` | § 5.6 tier pills :2733 | Given |
+| P6 | Home, Jobs, Applications; the verdict card | tier label (§ 2.1's table) | `Investable Stretch` | § 5.6 tier pills :2734 | Given |
+| P7 | Home, Jobs, Applications; the verdict card | tier label (§ 2.1's table) | `Long-Shot Stretch` | § 5.6 tier pills :2735 | Given |
+| P8 | Home, Jobs, Applications; the verdict card | tier label (§ 2.1's table) | `Weak Fit` | § 5.6 tier pills :2736 | Given |
+| P9 | Jobs; the verdict card | badge on a Reason that begins `quick-scan:` | `Quick scan` | § 5.6 tier pills :2737; the card said `quick-scan` | Changed (C18) |
+| P10 | Home, Jobs, Applications | the score, when the row has one | `<n>/100` | § 5.3 Jobs detail :1086; one form on every page (N1) | Given |
+| P11 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `To Review` | § 5.3 stage steps :1317; C8 | Given |
+| P12 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Interested` | § 5.3 stage steps :1317 | Given |
+| P13 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Applied` | § 5.3 stage steps :1317 | Given |
+| P14 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Interviewing` | § 5.3 stage steps :1318 | Given |
+| P15 | Home, Jobs, Applications | stage: Home count cell, Jobs group, stage steps, stage pill | `Offer` | § 5.3 stage steps :1318 | Given |
+| P16 | Home, Jobs, Applications | Home count cell, Jobs group (closed), a dismissed entry | `Dismissed` | § 5.3 Jobs :1057 | Given |
+| P17 | Home, Jobs, Documents | a count beside a label (0 shows as 0 on Home) | `<n>` | § 5.3 Home :922 | Given |
+| P18 | Home, Applications | the minutes pill on a plan line in C § 18.1's form | `<n> min` | § 5.3 The plan item :1299 | Given |
+| H1 | Home | label over Ten's last reply | `Ten · last reply` | § 5.3 Home :954 | Given |
+| H2 | Home | added where the quote is cut at 280 code points | `…` | § 5.3 Home :952 | Given |
+| H3 | Home | the band's button; the empty state's button once a conversation is saved | `Continue with Ten` | § 5.3 Home :926 | Given |
+| H4 | Home | the band's label when no reply shows (H1 when one does) | `Talk to Ten` | § 5.6 Home layout :2874; C10 | Given |
+| H5 | Home | plan section heading | `Waiting on you` | § 5.3 Home :979 | Given |
+| H6 | Home | plan section heading | `To do` | § 5.3 Home :979 | Given |
+| H7 | Home | a plan section with no items | `Nothing here right now.` | § 5.3 Home :986 | Given |
+| H8 | Home | To do's header, only when every item has minutes and the budget is per day | `<N> of your <M> min a day` | § 5.3 Home :990 | Given |
+| H9 | Home | card title | `Active application` | § 5.3 Home :1004 | Given |
+| H10 | Home | card header, when more than one live entry | `The most recently changed of <N> active applications` | § 5.3 Home :1009 | Changed (C26) |
+| H11 | Home | the link beside H10, to Applications | `See all in Applications` | this table; § 5.3 gives no words | NEW |
+| H12 | Home, Jobs | date label for the row's `Seen` date | `Added` | § 5.3 Home :1014 | Changed (C3) |
+| H13 | Home, Jobs | date label for the row's `Updated` date | `Updated` | § 5.3 Home :1015 | Given |
+| H14 | Jobs | date label for the row's `Evaluated` date, detail header | `Evaluated` | § 5.3 Jobs detail :1084 | NEW |
+| H15 | Home, Applications | heading over the matching plan lines | `Next, from you` | § 5.3 Home :1017 | Given |
+| H16 | Home | card link to the entry in Applications | `Open` | § 5.3 Home :1017 | Given |
+| H17 | Home | empty state, first sentence | `Nothing here yet.` | § 5.3 Home :1038 | Given |
+| H18 | Home | empty state, rest | `Talk to Ten to start your plan and your job list; they show here.` | § 5.3 Home :1038 | Changed (C2, C11) |
+| J1 | Jobs | a row with no verdict | `Not evaluated yet` | § 5.3 Jobs :1061 | Given |
+| J2 | Jobs | label on a row with a verdict, and in the detail | `Dealbreakers` | § 5.3 Jobs :1065 | Given |
+| J3 | Jobs; the verdict card | Dealbreakers, when the row has none | `none` | § 5.3 Jobs :1065 | Given |
+| J4 | Jobs | label before the date part of Posted | `Posted` | this table; § 5.3 names the field only | NEW |
+| J5 | Jobs | a dismissed row, from its `Was` field | `Dismissed from <stage>` | this table; § 5.3 gives no words | NEW |
+| J6 | Jobs | row and detail control | `Open analysis` | § 5.3 Jobs :1071 | Given |
+| J7 | Jobs; the verdict card | a row or card with no analysis file | `No analysis file linked` | § 5.3 Jobs :1072; C § 6.2's words; the card said it in lower case (C18) | Given |
+| J8 | Jobs | detail: label before the posting's link | `Posting` | this table; § 5.3 names the link only | NEW |
+| J9 | Jobs | detail section label | `What the posting asks for` | § 5.3 Jobs detail :1097 | Changed (C17) |
+| J10 | Jobs | detail section label (the heading's rest isn't shown, C4) | `How you fit` | § 5.3 Jobs detail :1100 | Given |
+| J11 | Jobs | detail section label | `About <Company>` | § 5.3 Jobs detail :1105 | Given |
+| J12 | Jobs | detail section label | `Culture and hiring signals` | § 5.3 Jobs detail :1107 | Given |
+| J13 | Jobs | detail: a field names a file that isn't there | `<path> isn't in your workspace.` | § 5.3 Jobs detail :1133 | Given |
+| J14 | Jobs | detail control | `Open company notes` | § 5.3 Jobs detail :1123 | Given |
+| J15 | Jobs | detail control | `Open application` | § 5.3 Jobs detail :1124 | Given |
+| J16 | Jobs | phone: back from the detail to the list | `Back to Jobs` | this table | NEW |
+| J17 | Jobs | empty state, first sentence | `No roles yet.` | § 5.3 Jobs :1159 | Given |
+| J18 | Jobs | empty state, rest (until the web app loads search) | `Paste a job link or a posting's text into the conversation.` | § 5.3 Jobs :1159 | Changed (C1) |
+| J19 | Jobs | empty state, rest (from `design-web-search.md` § 9 S5, never before; not in the bundle until then) | `Ask Ten to look for roles, or paste a job link or a posting's text into the conversation.` | § 5.3 Jobs :1164; C1 | Given |
+| AP1 | Applications | entry and detail, no linked row | `Not linked to a role on your job list.` | § 5.3 Applications :1176 | Changed (C2) |
+| AP2 | Applications | the role label when no row links: the notes file's path, else the first file's | `<path>` | § 5.3 Applications :1173; was the file key, e.g. `acme-staff-pm` | Changed (C20) |
+| AP3 | Applications | detail control, opens Jobs at the row | `Role details` | § 5.3 Applications detail :1192 | Given |
+| AP4 | Applications | detail section label | `What the posting asks for, and your evidence` | § 5.3 Applications detail :1208 | Given |
+| AP5 | Applications | coverage column: the requirement | `Asked for` | this table; C17 | NEW |
+| AP6 | Applications | coverage column: the evidence | `Your evidence` | this table; the mockup's words | NEW |
+| AP7 | Applications | coverage column: the status (AP9–AP11) | `Status` | this table; the mockup's words | NEW |
+| AP8 | Applications | coverage column: the decision (AP18–AP20) | `Question to you` | this table | NEW |
+| AP9 | Applications | coverage status `have` | `Covered` | § 5.3 Applications detail :1211 | Given |
+| AP10 | Applications | coverage status `shown-but-unnamed` | `Shown, not in their words` | § 5.3 Applications detail :1212 | Changed (C17) |
+| AP11 | Applications | coverage status `gap` (any other value: as written) | `Gap` | § 5.3 Applications detail :1212 | Given |
+| AP18 | Applications | coverage decision `open` | `Not answered yet` | § 5.3 Applications detail :1214; was the raw `open` | Changed (C17) |
+| AP19 | Applications | coverage decision `answered` | `Answered` | § 5.3 Applications detail :1214 | Changed (C17) |
+| AP20 | Applications | coverage decision `skipped` (any other value: as written) | `Skipped` | § 5.3 Applications detail :1215 | Changed (C17) |
+| AP12 | Applications | detail section label | `What Ten cut, weakest fit first` | § 5.3 Applications detail :1219 | Given |
+| AP13 | Applications | each cut bullet: which past role it came from | `From <role>` | this table | NEW |
+| AP14 | Applications | detail, an entry with both notes files | `This role has two notes files, <a> and <b>, so this page shows neither's tables. Ask Ten which one to keep.` | § 5.3 Applications detail :1227 | Changed (C11) |
+| AP15 | Applications | phone: back from the detail to the list | `Back to Applications` | this table | NEW |
+| AP16 | Applications | empty state, first sentence | `No applications yet.` | § 5.3 Applications :1264 | Given |
+| AP17 | Applications | empty state, rest | `Ask Ten to draft a résumé and letter for a role, and they show here.` | § 5.3 Applications :1264 | Changed (C11) |
+| D1 | Documents | group: files at the top level | `Your records` | § 5.3 Documents :1272 | Given |
+| D2 | Documents | group: folder `documents` | `Your uploads` | § 5.3 Documents :1275 | Given |
 | D3 | Documents | group: folder `applications` | `Applications` | this table | NEW |
 | D4 | Documents | group: folder `jd-analysis` | `Role analyses` | this table | NEW |
 | D5 | Documents | group: folder `jd-inbox` | `Saved postings` | this table | NEW |
@@ -1555,17 +1573,178 @@ word.
 | D10 | Documents | group: folder `stories` | `Your stories` | this table | NEW |
 | D11 | Documents | group: folder `courses` | `Courses` | this table | NEW |
 | D12 | Documents | group: folder `negotiation` | `Pay notes` | this table | NEW |
-| D13 | Documents | group: any other folder | `<folder name>` | § 5.3 Documents :1273; as written | Given |
-| D14 | Documents | empty state, first sentence | `No files yet.` | § 5.3 Documents :1283 | Given |
-| D15 | Documents | empty state, rest | `Drop your résumé into the conversation to start.` | § 5.3 Documents :1283 | Given |
-| T1 | Talk to Ten | composer placeholder | `Message Ten…` | § 1.1 wireframe :70 | Given |
+| D13 | Documents | group: any other folder, as written | `<folder name>` | § 5.3 Documents :1279 | Given |
+| D14 | Documents | empty state, first sentence | `No files yet.` | § 5.3 Documents :1289 | Given |
+| D15 | Documents | empty state, rest | `Drop your résumé into the conversation to start.` | § 5.3 Documents :1289 | Given |
+| K1 | Talk to Ten | composer placeholder | `Message Ten…` | § 1.1 wireframe :70 | Given |
+| K2 | Talk to Ten | composer: attach button's accessible name | `Attach` | this table | Kept |
+| K3 | Talk to Ten | composer: send button's accessible name (an icon button, § 5.6) | `Send` | this table | Kept |
+| K4 | Talk to Ten | composer: the send button while a turn runs | `Stop` | § 5.6 Composer :2660 | Given |
+| K5 | Talk to Ten | composer: the job-link pill | `Job link` | § 5.6 Composer :2656 | Changed (C22) |
+| K6 | Talk to Ten | offer shown for a pasted link (not built yet) | `evaluate this?` | § 1.1 :86 | Given |
+| K7 | Talk to Ten | name above your turns | `You` | § 5.6 Messages :2778 | Given |
+| K8 | Talk to Ten | name above Ten's turns | `Ten` | § 5.6 Messages :2777 | Given |
+| K9 | Talk to Ten | an attached file with no name | `attachment` | this table | Kept |
+| K10 | Talk to Ten | first run, before anything has run (§ 1.5) | `I don't have anything of yours yet. Drop in a résumé, or tell me the job you're going for, and that starts your workspace.` | § 1.5 :207 | Changed (C11) |
+| K11 | Talk to Ten | older turns not kept | `Older messages from this conversation weren't kept. Everything Ten saved is in your files.` | § 1.9 :308 | Given |
+| K12 | Talk to Ten | a save failed | `The latest reply couldn't be saved. Your files are saved. The app tries again after your next message.` | § 1.9 :310 | Given |
+| K13 | Talk to Ten | stale tab, before a send | `Not sent: this conversation continued in another tab or device. Reload to see it, then send again.` | § 1.9 :313 | Given |
+| K14 | Talk to Ten | save conflict | `This reply wasn't saved: the conversation continued in another tab or device. Your files are saved. Reload to see the latest.` | § 1.9 :315 | Given |
+| W1 | Header | avatar working words for `load_skill` | `Ten is reading its instructions` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W2 | Header | avatar working words for `read_file` | `Ten is reading your files` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W3 | Header | avatar working words for `write_file` | `Ten is saving to your files` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W4 | Header | avatar working words for `list_files` | `Ten is looking through your files` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W5 | Header | avatar working words for `web_search` | `Ten is searching the web` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W6 | Header | avatar working words for `fetch_job` | `Ten is opening the posting` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W7 | Header | avatar working words for `estimate_cost` | `Ten is estimating the cost` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W8 | Header | avatar working words for `check_language` | `Ten is running the wording check` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W9 | Header | avatar working words for `bash: check_materials` | `Ten is running the automatic checks` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W10 | Header | avatar working words for `bash: render_resume` | `Ten is laying out your résumé` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W11 | Header | avatar working words for `bash: record_verdict` | `Ten is adding the verdict to your job list` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W12 | Header | avatar working words for `bash: proposal_block` | `Ten is listing the résumé changes` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W13 | Header | avatar working words for `bash: check_files` | `Ten is checking your files are in order` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W14 | Header | avatar working words for `bash: check_closeout` | `Ten is checking your plan` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W15 | Header | avatar working words for `bash: update_job` | `Ten is updating your job list` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W16 | Header | avatar working words for `bash: check_knowledge` | `Ten is checking your learning notes` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W17 | Header | avatar working words for `bash: check_messages` | `Ten is checking your outreach drafts` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W18 | Header | avatar working words for `bash: check_stories` | `Ten is checking your stories` | this table; C24; `TOOL_LABELS` matches in the Stage 4 build | NEW |
+| W19 | Header | avatar working words for any other tool or script | `Ten is working` | this table; C24 | NEW |
+| L1 | Talk to Ten; Home's activity line | a finished step, `load_skill` | `Read its instructions` | this table; C24 | NEW |
+| L2 | Talk to Ten; Home's activity line | a finished step, `read_file` | `Read a file` | this table; C24 | NEW |
+| L3 | Talk to Ten; Home's activity line | a finished step, `write_file` | `Saved a file` | this table; C24 | NEW |
+| L4 | Talk to Ten; Home's activity line | a finished step, `list_files` | `Looked through your files` | this table; C24 | NEW |
+| L5 | Talk to Ten; Home's activity line | a finished step, `web_search` | `Searched the web` | this table; C24 | NEW |
+| L6 | Talk to Ten; Home's activity line | a finished step, `fetch_job` | `Opened the posting` | this table; C24 | NEW |
+| L7 | Talk to Ten; Home's activity line | a finished step, `estimate_cost` | `Estimated the cost` | this table; C24 | NEW |
+| L8 | Talk to Ten; Home's activity line | a finished step, `check_language` | `Ran the wording check` | this table; C24 | NEW |
+| L9 | Talk to Ten; Home's activity line | a finished step, `bash: check_materials` | `Ran the automatic checks` | this table; C24 | NEW |
+| L10 | Talk to Ten; Home's activity line | a finished step, `bash: render_resume` | `Laid out your résumé` | this table; C24 | NEW |
+| L11 | Talk to Ten; Home's activity line | a finished step, `bash: record_verdict` | `Added the verdict to your job list` | this table; C24 | NEW |
+| L12 | Talk to Ten; Home's activity line | a finished step, `bash: proposal_block` | `Listed the résumé changes` | this table; C24 | NEW |
+| L13 | Talk to Ten; Home's activity line | a finished step, `bash: check_files` | `Checked your files are in order` | this table; C24 | NEW |
+| L14 | Talk to Ten; Home's activity line | a finished step, `bash: check_closeout` | `Checked your plan` | this table; C24 | NEW |
+| L15 | Talk to Ten; Home's activity line | a finished step, `bash: update_job` | `Updated your job list` | this table; C24 | NEW |
+| L16 | Talk to Ten; Home's activity line | a finished step, `bash: check_knowledge` | `Checked your learning notes` | this table; C24 | NEW |
+| L17 | Talk to Ten; Home's activity line | a finished step, `bash: check_messages` | `Checked your outreach drafts` | this table; C24 | NEW |
+| L18 | Talk to Ten; Home's activity line | a finished step, `bash: check_stories` | `Checked your stories` | this table; C24 | NEW |
+| L19 | Talk to Ten; Home's activity line | a finished step, any other tool or script | `Worked on a step` | this table; C24 | NEW |
+| L20 | Talk to Ten; Home's activity line | after a step that repeats, its count | `×<n>` | § 3 :616; steps joined by ` · ` | Given |
+| L21 | Talk to Ten | expanded: a saved file | `Saved <path>` | this table; was `wrote <path>` | Changed (C24) |
+| L22 | Talk to Ten | expanded: after L21, one line | `1 line` | this table; was `1 lines` | Changed (C24) |
+| L23 | Talk to Ten | expanded: after L21 | `<N> lines` | this table | Kept |
+| L24 | Talk to Ten | expanded: label over the step's literal input | `What Ten sent` | this table; was `input` | Changed (C24) |
+| L25 | Talk to Ten | expanded: label over the step's literal output | `What came back` | this table; was `output` | Changed (C24) |
+| L26 | Talk to Ten | expanded: label over the step's literal error | `What went wrong` | this table; was `error` | Changed (C24) |
+| R1 | Talk to Ten | a card's link to its file | `Open in panel →` | § 1.2 :93 | Given |
+| R2 | Talk to Ten | verdict card kicker | `Verdict · <Company> — <Title>` | this table | Kept |
+| R3 | Talk to Ten | verdict card, after the score | `/100` | § 5.6 Cards :2723 | Given |
+| R4 | Talk to Ten | verdict card dealbreakers line (J3 when none) | `Dealbreakers: <dealbreakers>.` | this table | Kept |
+| R5 | Talk to Ten | plan card kicker | `Plan` | this table | Kept |
+| R6 | Talk to Ten | plan card: an item's link to its file | `Open` | this table; was `open` | Changed (C18) |
+| R7 | Talk to Ten | document card kicker, and its title when it has no file | `Document` | this table | Kept |
 | T2 | Talk to Ten | document card's meta line | `<W> words · automatic checks: <badge>` | this table; was `<W> words · checker <badge>` | Changed (C7) |
-| T3 | Talk to Ten | badge: a pass with no findings | `clean` | § 2.4 :487 | Given |
-| T4 | Talk to Ten | badge: a pass with warnings | `no failures, <N> warning(s)` | `design-honest-ceilings.md` § 6A :594 | Given |
+| T3 | Talk to Ten | badge, and the checker card's body, with no findings | `clean` | § 2.4 :488 | Given |
+| T4 | Talk to Ten | badge: a pass with one warning | `no failures, 1 warning` | `design-honest-ceilings.md` § 6A :594 | Changed (C19) |
+| T8 | Talk to Ten | badge: a pass with 2 or more warnings | `no failures, <N> warnings` | `design-honest-ceilings.md` § 6A :594 | Changed (C19) |
 | T5 | Talk to Ten | badge: a FAIL | `fail` | `design-honest-ceilings.md` § 6A :588 | Given |
 | T6 | Talk to Ten | badge: the automatic checks haven't run on this file | `not run` | this table; was `not-run` | Changed (C7) |
-| T7 | Talk to Ten, pages | a document row, when the wording check hasn't run | `Wording check not run` | § 5.6 Document row :2343; deferred (lead ruling Q4): not shown in this step and not in the bundle test; waits for § 2.4's rule | Given |
-| S1 | Sign-in | the headline (lime underline on "actually want.") | `Help you get a job offer you actually want.` | § 1.4 :115; C9 | Given |
+| T7 | Talk to Ten | a document row, when the wording check hasn't run | `Wording check not run` | § 5.6 Document row :2704; deferred (lead ruling 4): not shown in this step, not in the bundle test | Given |
+| R8 | Talk to Ten | checker card kicker; `<label>` is the script's own file label | `Automatic checks · <label>` | this table; was `Checker · <label>` | Changed (C18) |
+| R9 | Talk to Ten | checker card status: pass | `passed` | this table; was `pass` | Changed (C18) |
+| R10 | Talk to Ten | checker card status: FAIL | `failed` | this table; was `FAIL` | Changed (C18) |
+| R11 | Talk to Ten | checker card counts, after R9/R10 | `(<failures>, <warnings>)` | this table; was `(<n> fail, <m> warn)`; `<warnings>` is R14 or R15 | Changed (C18) |
+| R12 | Talk to Ten | checker card count, one | `1 failure` | this table | Changed (C18) |
+| R13 | Talk to Ten | checker card count, 0 or 2+ | `<N> failures` | this table | Changed (C18) |
+| R14 | Talk to Ten | checker card count, one | `1 warning` | this table | Changed (C18, C19) |
+| R15 | Talk to Ten | checker card count, 0 or 2+ | `<N> warnings` | this table | Changed (C18, C19) |
+| R16 | Talk to Ten | cost card kicker | `Cost estimate` | this table | Kept |
+| R17 | Talk to Ten | cost card: label of the range | `Estimated range` | this table | Kept |
+| R18 | Talk to Ten | cost card: the range, never one number (§ 2.6) | `$<low>–$<high>` | this table | Kept |
+| R19 | Talk to Ten | cost card: label of the balance | `Your balance` | this table | Kept |
+| R20 | Talk to Ten | a card of a type the app doesn't know | `This item can't be shown here.` | this table; was `Unknown card` | Changed (C18) |
+| G1 | Talk to Ten | spend card band, waiting (F7's words) | `Needs your yes` | this table; was `Needs your word` | Changed (C13) |
+| G2 | Talk to Ten | spend card band, approved | `You said yes` | this table; C13 | NEW |
+| G3 | Talk to Ten | spend card band, declined | `You said no` | this table; C13 | NEW |
+| G4 | Talk to Ten | spend card band, closed by a newer request | `Closed without a yes. Nothing started.` | this table; C13 | NEW |
+| G5 | Talk to Ten | spend card instruction, while waiting | `Type yes below to go ahead. There is no button.` | this table | Kept |
+| E1 | Talk to Ten | error card title, `over_balance` | `Credit used up` | this table; C12; never the code itself | NEW |
+| E2 | Talk to Ten | error card title, `model_error` | `Ten couldn't reply` | this table; C12; never the code itself | NEW |
+| E3 | Talk to Ten | error card title, `tool_error` | `A step didn't finish` | this table; C12; never the code itself | NEW |
+| E4 | Talk to Ten | error card title, `offline` | `No connection` | this table; C12; never the code itself | NEW |
+| E5 | Talk to Ten | error card title, `step_cap` | `Stopped before finishing` | this table; C12; never the code itself | NEW |
+| E6 | Talk to Ten | error card title, `cut_off` | `Reply cut off` | this table; C12; never the code itself | NEW |
+| E7 | Talk to Ten | error card title, `too_large` | `Too big to send` | this table; C12; never the code itself | NEW |
+| E8 | Talk to Ten | error card title, `any other code` | `Something went wrong` | this table; C12; never the code itself | NEW |
+| E9 | Talk to Ten | error card next step, `offline` | `Check your connection and try again.` | this table | Kept |
+| E10 | Talk to Ten | error card next step, `step_cap` and `too_large` | `Say continue to carry on from what's already saved.` | § 2.7 :585 | Given |
+| E11 | Talk to Ten | error card, when the error can be retried | `This can be retried.` | this table | Kept |
+| E12 | Talk to Ten | error card message, `step_cap` | `This turn ran out of steps before finishing.` | § 2.7 :583 | Given |
+| E13 | Talk to Ten | error card message, `too_large` | `This turn got too big to send, so it stopped partway.` | § 2.7 :596 | Given |
+| E14 | Talk to Ten | error card message, the beta's daily limit (`model_error`) | `The beta has reached today's limit. Try again tomorrow.` | § 2.7 :543 | Given |
+| E15 | Talk to Ten | error card message, `over_balance` | `Your credit is used up. You can buy more from your balance at the top.` | § 1.11 :413; C16 | Given |
+| U1 | Talk to Ten, under the composer | an upload that failed | `<name> isn't a file type Ten can use yet — only .pdf and .docx.` | this table | Kept |
+| U2 | Talk to Ten, under the composer | an upload that failed | `<name> is over the 10 MB upload limit.` | this table | Kept |
+| U3 | Talk to Ten, under the composer | an upload that failed | `<name> is over the size limit.` | this table | Kept |
+| U4 | Talk to Ten, under the composer | an upload that failed | `That name is reserved and can't be uploaded to.` | this table | Kept |
+| U5 | Talk to Ten, under the composer | an upload that failed | `<name> clashes with an existing file or folder (a name that only differs by capitalization counts as a clash).` | this table | Kept |
+| U6 | Talk to Ten, under the composer | an upload that failed | `Your workspace is at its file limit, so this upload can't be added.` | this table; was "… Remove something before uploading more." | Changed (C25) |
+| U7 | Talk to Ten, under the composer | an upload that failed | `<name> already exists.` | this table | Kept |
+| U8 | Talk to Ten, under the composer | an upload that failed | `<name> isn't a valid file name.` | this table | Kept |
+| U9 | Talk to Ten, under the composer | an upload that failed | `That upload would land outside your workspace.` | this table | Kept |
+| U10 | Talk to Ten, under the composer | an upload that failed | `<name> could not be found.` | this table | Kept |
+| U11 | Talk to Ten, under the composer | an upload that failed | `<name> changed since you last saw it.` | this table | Kept |
+| U12 | Talk to Ten, under the composer | an upload that failed | `<name> couldn't be uploaded. Check the name (a matching file may already exist, even with different capitalization) and try again.` | this table | Kept |
+| U13 | Talk to Ten, under the composer | an upload that failed | `Couldn't upload <name>. Try again.` | this table | Kept |
+| U14 | Talk to Ten, under the composer | an upload that failed | `Couldn't upload that file. Try again.` | this table | Kept |
+| I1 | Talk to Ten, after Import workspace | the workspace isn't empty | `Nothing was imported: import works only into an empty workspace.` | this table; was the raw error text | Changed (C25) |
+| I2 | Talk to Ten, after Import workspace | one entry refused; `<entry>` is its path, or "that file" for the zip itself; `<reason>` is I3–I11 | `Nothing was imported: <entry> <reason>.` | this table; was `Import refused: <path> — <reason>` | Changed (C25) |
+| I3 | Talk to Ten, after Import workspace | `<reason>` for `path_conflict` | `clashes with another file in the import` | this table; C25 | NEW |
+| I4 | Talk to Ten, after Import workspace | `<reason>` for `workspace_full` | `would put more in your workspace than it can hold` | this table; C25 | NEW |
+| I5 | Talk to Ten, after Import workspace | `<reason>` for `content_too_large` | `is over the size limit` | this table; C25 | NEW |
+| I6 | Talk to Ten, after Import workspace | `<reason>` for `upload_too_large` | `is over the 10 MB upload limit` | this table; C25 | NEW |
+| I7 | Talk to Ten, after Import workspace | `<reason>` for `unsupported_type` | `isn't a file type Ten can use` | this table; C25 | NEW |
+| I8 | Talk to Ten, after Import workspace | `<reason>` for `not_editable` | `has a name Ten keeps for itself` | this table; C25 | NEW |
+| I9 | Talk to Ten, after Import workspace | `<reason>` for `not a valid zip` | `isn't a zip file Ten can read` | this table; C25 | NEW |
+| I10 | Talk to Ten, after Import workspace | `<reason>` for `CRC32 mismatch` | `is damaged` | this table; C25 | NEW |
+| I11 | Talk to Ten, after Import workspace | `<reason>` for `any other reason` | `couldn't be read` | this table; C25 | NEW |
+| I12 | Talk to Ten, after Import workspace | stopped after one file | `Import stopped partway, after 1 file. Your Documents page shows what arrived.` | this table; was `Import stopped partway (<n> file(s) written): …` | Changed (C25) |
+| I13 | Talk to Ten, after Import workspace | stopped after 2 or more files | `Import stopped partway, after <N> files. Your Documents page shows what arrived.` | this table | Changed (C25) |
+| I14 | Talk to Ten, after Import workspace | any other failure | `Couldn't import that file. Try again in a moment.` | this table; was `Import failed.` | Changed (C25) |
+| Q1 | Setup error screen | membership check failed | `Couldn't check your membership. Try again in a moment.` | this table | Kept |
+| Q2 | Setup error screen | workspace setup failed | `Couldn't set up your workspace. Try again in a moment.` | this table | Kept |
+| Q3 | Setup error screen | balance check failed | `Couldn't check your balance. Try again in a moment.` | this table | Kept |
+| Q4 | Setup error screen | conversation load failed | `Couldn't load your conversation. Try again in a moment.` | § 1.9 :319 | Given |
+| Q5 | Setup error screen | button (with F32 Sign out) | `Retry` | § 1.9 :318 | Given |
+| Q6 | Site not set up | the site is missing its settings | `This copy of Ten isn't set up yet, so it can't start.` | this table; was `Ten isn't configured: <setting names> missing.` | Changed (C25) |
+| Q7 | Not a member (§ 1.6) | the one line | `You're signed in, but this beta is invite-only. Ask the person who invited you to add you.` | § 1.6 :223 | Given |
+| Q8 | After delete (§ 1.7) | the report-back | `Deleted. You're signed out of Ten — your sign-in for the older app is untouched.` | § 1.7 :255 | Given |
+| Q9 | After delete (§ 1.7) | its button | `OK` | this table | Kept |
+| X1 | Delete dialog (⋯ menu) | title | `Delete my beta data` | § 1.7 :233 | Given |
+| X2 | Delete dialog (⋯ menu) | the complete thing; `<list>` is X3 | `This deletes <list>.` | this table | Kept |
+| X3 | Delete dialog (⋯ menu) | the list | `your workspace files, your conversation, and your record of cost approvals` | § 1.7 :241; was `… and your gate log` | Changed (C15) |
+| X4 | Delete dialog (⋯ menu) | the one plain sentence | `This deletes your Ten beta data. Your sign-in stays because it's shared with the older app. Your credit stays, and so do your payment and usage records, which show only amounts and no content.` | § 1.7 :248 | Given |
+| X5 | Delete dialog (⋯ menu) | instruction | `Type yes, then press Enter or Submit.` | this table | Kept |
+| X6 | Delete dialog (⋯ menu) | button (sends only what was typed) | `Submit` | this table | Kept |
+| X7 | Delete dialog (⋯ menu); password dialog | button | `Cancel` | § 1.10 :343 | Given |
+| X8 | Delete dialog (⋯ menu) | the delete call failed | `Couldn't finish deleting your data. Nothing outside the list above was touched. Try again.` | this table; was `Something went wrong deleting your data. Nothing more was deleted than the summary above — try again.` | Changed (C25) |
+| X9 | Delete dialog (⋯ menu) | anything but yes | `You said no, so nothing was deleted.` | this table; was `Declined — nothing was deleted.` | Changed (C13) |
+| X10 | Delete dialog (⋯ menu); Buy credit | button | `Close` | this table | Kept |
+| B1 | Buy credit dialog | title and accessible name | `Buy credit` | § 1.11 :393 | Given |
+| B2 | Buy credit dialog | the terms | `Credit pays for Ten's work. You pay in PayPal's window; Ten adds what arrives after PayPal's fee, a few percent plus a fixed amount. This is a one-time payment: nothing renews, and Ten never charges you on its own.` | § 1.11 :393 | Given |
+| B3 | Buy credit dialog | a credit pack | `$10` | § 1.11 :396 | Given |
+| B4 | Buy credit dialog | a credit pack | `$20` | § 1.11 :396 | Given |
+| B5 | Buy credit dialog | a credit pack | `$40` | § 1.11 :396 | Given |
+| B6 | Buy credit dialog | accessible name of the packs | `Choose a credit pack` | this table | Kept |
+| B7 | Buy credit dialog | under the packs | `Paid credit stays if you delete your beta data. The beta has a shared daily limit, so on a busy day Ten can pause until tomorrow even with credit. For a refund, email support@10xjobs.co.` | § 1.11 :397 | Given |
+| B8 | Buy credit dialog | while PayPal confirms | `Confirming your payment…` | this table | Kept |
+| B9 | Buy credit dialog; the toast | credited | `Added $<credited> of credit. PayPal charged $<charged>; its fee was $<fee>.` | § 1.11 :400 | Given |
+| B10 | Buy credit dialog | pending | `PayPal is still clearing this payment. The credit is added when it clears.` | § 1.11 :402 | Given |
+| B11 | Buy credit dialog | declined | `PayPal declined this payment. No money moved.` | § 1.11 :404 | Given |
+| B12 | Buy credit dialog | window closed | `No payment was made.` | § 1.11 :405 | Given |
+| B13 | Buy credit dialog | create-order failed | `Couldn't start a payment. No money moved.` | § 1.11 :406 | Given |
+| B14 | Buy credit dialog | not confirmed yet | `Ten couldn't confirm the credit yet. If PayPal took your payment, it's added automatically, usually within minutes. If not by tomorrow, email support@10xjobs.co with PayPal's receipt.` | § 1.11 :407 | Given |
+| B15 | Buy credit dialog | button after declined, window closed or failed | `Try again` | this table | Kept |
+| S1 | Sign-in | the headline (lime underline on "actually want.") | `Help you get a job offer you actually want.` | § 1.4 :115 | Changed (C9) |
 | S2 | Sign-in | the lead paragraph | `Ten runs your search with you: it scores the roles you bring it, tailors your résumé from your own facts, and keeps a short plan of the few things only you can do.` | § 1.4 :134; owner-approved 2026-09-26 | Given |
 | S3 | Sign-in | proof point 1, title | `A verdict on every role, with the reasons.` | § 1.4 :147 | Given |
 | S4 | Sign-in | proof point 1, body | `Paste a posting. Ten researches the company, scores the fit out of 100, and says why in plain words.` | § 1.4 :147 | Given |
@@ -1573,16 +1752,68 @@ word.
 | S6 | Sign-in | proof point 2, body | `Ten picks from what you gave it, never states a claim stronger than that, and shows you what it cut.` | § 1.4 :156 | Given |
 | S7 | Sign-in | proof point 3, title | `No big run without your yes.` | § 1.4 :162; owner-approved 2026-09-26 | Given |
 | S8 | Sign-in | proof point 3, body | `Bigger jobs show a cost range first, and only your typed yes starts them. In this app, you send and submit, not Ten.` | § 1.4 :166; owner-approved 2026-09-26 | Given |
-| S9 | Sign-in | link under the form | `Prefer local? Run it from your terminal` | § 1.4 :116 | Given |
+| S9 | Sign-in | a line under the form (plain text; no address is named) | `Prefer local? Run it from your terminal.` | § 1.4 :116; was called a link, with no period | Changed (C23) |
 | S10 | Sign-in | the preview's one text alternative | `A preview of Ten's Home page, with sample data` | § 1.4 :184 | Given |
 | S11 | Sign-in | the preview's visible caption | `Sample data` | § 1.4 :185 | Given |
-| S12 | Sign-in | trust line, first item (after the `lock` icon) | `Your files stay yours` | this table; lead ruling Q2 | NEW |
-| S13 | Sign-in | trust line, second item (after a dot) | `Export anytime` | this table; lead ruling Q2; the mockup's "Delete anytime" is dropped | NEW |
+| S12 | Sign-in | trust line, first item (after the `lock` icon) | `Your files stay yours` | this table; lead ruling 2 | NEW |
+| S13 | Sign-in | trust line, second item (after a dot) | `Export anytime` | this table; lead ruling 2; "Delete anytime" dropped | NEW |
+| Y1 | Sign-in | email-link mode: the submit button | `Email me a sign-in link` | § 5.6 Sign-in :2947; C14; the code says `Send me a link` | Given |
+| Y2 | Sign-in | email-link mode: switches to password mode | `Use a password instead` | § 5.6 Sign-in :2948; C14; replaces the `Email link` / `Email + password` toggle | Given |
+| Y3 | Sign-in | password mode: switches back | `Use an email link instead` | this table; C14 | NEW |
+| Y4 | Sign-in; Reset your password | field label | `Email` | this table | Kept |
+| Y5 | Sign-in | field label, password mode | `Password` | this table | Kept |
+| Y6 | Sign-in | password mode: the submit button | `Sign in` | this table | Kept |
+| Y7 | Sign-in | password mode, new account: the submit button | `Create account` | this table | Kept |
+| Y8 | Sign-in | password mode: switch to a new account | `New here? Create an account` | this table | Kept |
+| Y9 | Sign-in | new-account mode: switch back | `Already have an account? Sign in` | this table | Kept |
+| Y10 | Sign-in | after a sign-in link is sent | `Check <email> for a link to sign in.` | this table | Kept |
+| Y11 | Sign-in | after a new account is made | `Check <email> for a link to confirm your account.` | this table | Kept |
+| Y12 | Sign-in | error `invalid_credentials` | `That email and password don't match. Try again, or use an email link instead.` | this table; C14; never Supabase's own text | NEW |
+| Y13 | Sign-in | error `email_not_confirmed` | `Confirm your email first: open the link we sent, then sign in.` | this table; C14 | NEW |
+| Y14 | Sign-in | error `email_address_invalid` | `That email address can't be used here. Try a different one.` | this table; C14 | NEW |
+| Y15 | Sign-in | error: signing in, anything else | `Couldn't sign you in. Try again in a moment.` | this table; C14 | NEW |
+| Y16 | Sign-in | error: making an account, anything else | `Couldn't create the account. If you already have one, sign in instead.` | this table; C14; true whether or not the account exists | NEW |
+| Y17 | Sign-in | error: sending a link, anything else | `Couldn't send the link. Try again in a moment.` | this table; C14 | NEW |
+| Y20 | Sign-in | under the password field | `Forgot or never set a password?` | § 1.10 :363 | Given |
+| Y21 | Passwords (§ 1.10) | reset: title | `Reset your password` | § 1.10 :366 | Given |
+| Y22 | Passwords (§ 1.10) | reset: line | `Enter the email you sign in with to get a link for choosing a new password.` | § 1.10 :366 | Given |
+| Y23 | Passwords (§ 1.10) | reset: button | `Send reset link` | § 1.10 :367 | Given |
+| Y24 | Passwords (§ 1.10) | reset: link | `Back to sign in` | § 1.10 :368 | Given |
+| Y25 | Passwords (§ 1.10) | reset: after a success or a 429 | `If an account exists for <email>, a link to choose a new password should arrive within a few minutes. Check spam too. Only a few emails can be sent each hour, so if nothing comes, try again later.` | § 1.10 :370 | Given |
+| Y26 | Passwords (§ 1.10) | reset: any other failure | `Couldn't send the request. Try again in a moment.` | § 1.10 :374 | Given |
+| Y27 | Sign-in | an email link that came back with an error | `That email link has expired or was already used. Ask for a new one below.` | § 1.10 :375 | Given |
+| Y28 | Passwords (§ 1.10) | dialog title (F31's words) | `Set a new password` | § 1.10 :341 | Given |
+| Y29 | Passwords (§ 1.10) | dialog line | `This password also works for the older app, which shares your sign-in.` | § 1.10 :341 | Given |
+| Y30 | Passwords (§ 1.10) | field label | `New password` | § 1.10 :336 | Given |
+| Y31 | Passwords (§ 1.10) | field label | `Type it again` | § 1.10 :337 | Given |
+| Y32 | Passwords (§ 1.10) | show both fields | `Show` | § 1.10 :337 | Given |
+| Y33 | Passwords (§ 1.10) | hide both fields | `Hide` | § 1.10 :337 | Given |
+| Y34 | Passwords (§ 1.10) | check before any call | `Use at least 8 characters.` | § 1.10 :338 | Given |
+| Y35 | Passwords (§ 1.10) | check before any call | `The two passwords don't match.` | § 1.10 :338 | Given |
+| Y36 | Passwords (§ 1.10) | button | `Save password` | § 1.10 :342 | Given |
+| Y37 | Passwords (§ 1.10) | success | `Password saved. Use it next time you sign in, here or in the older app.` | § 1.10 :343 | Given |
+| Y38 | Passwords (§ 1.10) | button after success (dialog) | `Done` | § 1.10 :344 | Given |
+| Y39 | Passwords (§ 1.10) | code step | `For your security, we emailed a 6-digit code to <email>. Enter it to save your new password.` | § 1.10 :345 | Given |
+| Y40 | Passwords (§ 1.10) | code field label | `Code` | § 1.10 :347 | Given |
+| Y41 | Passwords (§ 1.10) | code step button | `Send a new code` | § 1.10 :347 | Given |
+| Y42 | Passwords (§ 1.10) | after a resend | `A new code is on its way to <email>. Use the newest one.` | § 1.10 :348 | Given |
+| Y43 | Passwords (§ 1.10) | error `reauthentication_not_valid` | `That code didn't work. It may be mistyped or expired: check the newest email, or send a new code.` | § 1.10 :354 | Given |
+| Y44 | Passwords (§ 1.10) | error `weak_password`, length | `That password is too short for the sign-in rules. Try a longer one.` | § 1.10 :355 | Given |
+| Y45 | Passwords (§ 1.10) | error `weak_password`, characters | `That password needs more kinds of characters, such as capitals, digits or symbols.` | § 1.10 :356 | Given |
+| Y46 | Passwords (§ 1.10) | error `weak_password`, pwned | `That password has appeared in a known data leak. Choose a different one.` | § 1.10 :357 | Given |
+| Y47 | Passwords (§ 1.10) | error `same_password` | `That's already your password. Choose a different one.` | § 1.10 :358 | Given |
+| Y48 | Passwords (§ 1.10); sign-in (rate limits) | error HTTP 429, `over_email_send_rate_limit`, `over_request_rate_limit` | `Too many tries. Wait a minute, then try again.` | § 1.10 :359 | Given |
+| Y49 | Passwords (§ 1.10) | error, anything else | `Couldn't save your password. Try again in a moment.` | § 1.10 :360 | Given |
+| Y50 | Passwords (§ 1.10) | recovery screen title | `Choose a new password` | § 1.10 :378 | Given |
+| Y51 | Passwords (§ 1.10) | recovery screen line | `You're signed in from your reset link. This password also works for the older app, which shares your sign-in.` | § 1.10 :380 | Given |
+| Y52 | Passwords (§ 1.10) | recovery screen button after success | `Continue` | § 1.10 :383 | Given |
 
 **Conflicts, and the pick.** Each names the two sides, the pick and
 why. Where the pick changed words, the source line changed in the same
 commit, so the doc says one thing. **The lead accepted every pick, C1–C7,
-C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
+C9 and C10, as made (2026-09-28), and ruled on C8 (below).** C11–C26
+answer the independent string review of the same day, as the lead ruled
+on it.
 
 - **C1. The Jobs empty state asked for search the web app doesn't
   have.** § 5.3 said "Ask Ten to look for roles, or paste …" (the words
@@ -1598,7 +1829,7 @@ C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
   another. `apps/web/src/components/Frame.tsx:149` already ships J19's
   words.
 - **C2. "your pipeline" or "your job list".** § 5.3 said "your
-  pipeline" (H18, A1); `design-plain-replies.md` § 1–§ 2 calls the same
+  pipeline" (H18, AP1); `design-plain-replies.md` § 1–§ 2 calls the same
   file "your job list" in every reply. **Pick:** "your job list".
   **Why:** the candidate reads the page and Ten's reply side by side:
   one thing, one name (rules 12 and 18). "Pipeline" stays in this doc's
@@ -1607,8 +1838,12 @@ C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
   date "Seen" (Home's card, the Jobs detail). It is `jobs.md`'s field
   name, and it doesn't say seen by whom. **Pick:** "Added". The field is
   the date the role went on the job list: `record_verdict.py:76` and
-  `search_ats.py:853` set it only when they add the row. "Updated" and
-  "Evaluated" are plain words and stay.
+  `search_ats.py:853` and `:1291` set it only when they add the row.
+  **Caveat (rule 8):** on a row carried over by `migrate_jobs_db.py:37`,
+  `Seen` is the old database's last-updated date, so "Added" can be
+  later than the day the role really arrived. Accepted: it is never
+  earlier, and those rows are one-time. "Updated" and "Evaluated" are
+  plain words and stay.
 - **C4. Track as a bare letter.** § 5.3 and § 5.6 showed Track on each
   Jobs row and in the detail. `design-plain-replies.md` § 5 removed the
   same field from the verdict card (" (Track A)"): the letter means
@@ -1616,8 +1851,9 @@ C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
   form, and a name needs a structured source first. **Pick:** no Track
   field on any page. **Why:** the plain-voice ruling (no schema
   labels), and the card and the page must agree (rule 12). The "How you
-  fit" heading's rest, such as "(Track A lens)", stays: it is the
-  analysis file's own words, shown with a body that says the same.
+  fit" heading's rest, such as "(Track A lens)", is not shown either:
+  the label and the body carry the section, and the rest would put the
+  same bare letter back (rule 18).
 - **C5. "Binary file — no preview."** (§ 5.2 rule 8,
   `SidePanel.tsx:72`). "Binary" is a word a candidate would need
   defined (rule 18), and a PDF résumé is the file most likely to show
@@ -1635,8 +1871,8 @@ C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
   "checker" and "not-run" are a component name and a schema value, and
   § 5.6 says check names follow `design-plain-replies.md` ("the
   automatic checks"). **Pick:** T2's line, with "automatic checks" for
-  "checker" and "not run" for `not-run`; T4 exactly as § 6A gives it;
-  "clean" and "fail" unchanged. **Why:** the plain-voice ruling; § 6A's
+  "checker" and "not run" for `not-run`; T4 and T8 as § 6A now gives
+  them (C19); "clean" and "fail" unchanged. **Why:** the plain-voice ruling; § 6A's
   point, never "clean" beside a warning, is kept whole.
   `design-honest-ceilings.md` § 6A now says its badge words come from
   this table (same commit, lead ruling), so the two docs agree.
@@ -1644,19 +1880,118 @@ C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
   `jobs.md`'s stage words for the pages (§ 5.10, owner question 3);
   `design-plain-replies.md` § 3 lists "To Review" as a HARD leak in
   Ten's replies. **Lead ruling (2026-09-28):** the owner approved
-  `jobs.md`'s stage words for the pages (§ 5.10, Q3). A stage name the
+  `jobs.md`'s stage words for the pages (§ 5.10, owner question 3). A stage name the
   candidate sees on their own Jobs page is their vocabulary, not
   jargon. So the pages keep "To Review", replies may say it too, and
-  `scan_voice.py` moves "To Review" from HARD to REVIEW. That scanner
-  change is carried out by the plain-replies follow-up, not here. The
-  owner may reverse this ruling.
+  `scan_voice.py` moves "To Review" from HARD to REVIEW. The chain is
+  fixed in this commit: `design-plain-replies.md` § 1's "Words that
+  stay" adds the job list's stage words, and its § 3 moves "To Review"
+  to REVIEW. The scanner and its tests change in the plain-replies
+  follow-up build, not here. The owner may reverse this ruling.
 - **C9. The headline's period.** § 1.4 quotes rule 1's line with no
   period; § 5.6 underlines "actually want." with one, as the code does
-  (`SignIn.tsx:144`). **Pick:** with the period. No meaning changes.
+  (`SignIn.tsx:144`). **Pick:** with the period, and § 1.4 now quotes
+  it so. No meaning changes.
 - **C10. The band's label.** § 5.6's Home layout labels the band "Talk
   to Ten"; the restore ruling puts Ten's last reply there, under "Ten ·
   last reply". **Pick:** H1 when a reply shows, H4 when none does. Each
   is true in its case.
+
+- **C11. Lines that said what Ten will do.** § 2.7's rule is what's
+  true and what the candidate can do, never what the agent will do.
+  Four lines broke it: Applications' empty state ("Ten drafts the
+  materials"), Home's ("Ten writes your plan …"), § 1.5's first-run
+  line ("and I'll start your workspace") and the two-notes line, which
+  said what's wrong but not what to do. **Pick:** AP17 "Ask Ten to draft
+  a résumé and letter for a role, and they show here."; H18 "Talk to
+  Ten to start your plan and your job list; they show here."; K10 "…,
+  and that starts your workspace."; AP14 adds "Ask Ten which one to
+  keep." (lead ruling on the review). Each source line is edited.
+- **C12. The error card showed the raw code.** `ErrorPart.tsx:58`
+  renders "Error — <code>", so a candidate reads "Error — model_error"
+  (plain-voice ruling; rule 18). **Pick:** a plain title per code,
+  E1–E8, never the code. The message under it stays the sender's (§ 2.7).
+- **C13. One pending spend, two names.** The rail says "Needs your yes"
+  (F7) while the card's band said "Needs your word" (`GateCard.tsx:20`),
+  and the card showed the raw "Status: pending" (`:26`) (rule 12;
+  plain voice). **Pick:** the band carries the state in plain words
+  (G1–G4); the status line is dropped. The delete dialog's "Declined —"
+  line reads as G3 does (X9).
+- **C14. The sign-in form.** § 5.6 (the owner-reviewed direction) gives
+  "Email me a sign-in link" as the main button and "Use a password
+  instead" as a text link; the code has a two-button toggle ("Email
+  link" / "Email + password") and "Send me a link" (`SignIn.tsx:151-156`,
+  `:204`). **Pick:** § 5.6, which breaks no rule; the rest of the
+  password mode keeps the code's words (Y4–Y11), with Y3 to switch back.
+  The form showed Supabase's own error text (`auth.ts:102-126` passes
+  `error.message` through), which § 1.10 already rules out; Y12–Y17
+  give plain lines per Supabase error code (codes checked against
+  Supabase's error-code list, 2026-09-28).
+- **C15. "your gate log"** in § 1.7's list of what a delete removes:
+  "gate" is on the plain-voice ruling's list. **Pick:** "your record of
+  cost approvals" (X3); § 1.7 is edited.
+- **C16. Two `over_balance` messages.** § 2.7 quotes "Your beta credit
+  is used up. Ask the person who invited you for more."; § 1.11's later
+  amendment replaces it with "Your credit is used up. You can buy more
+  from your balance at the top." **Pick:** § 1.11's (E15), the newer
+  ruling; § 2.7 now says so.
+- **C17. Three ways to say one thing, and raw decision values.** "What
+  they're asking for" (Jobs), "What the posting asks for" (Applications)
+  and "They ask for" (the mockup's column); the coverage decision showed
+  `open`, `answered`, `skipped` raw beside a status column that has a
+  label table; "Shown, not named" needs defining (rules 12 and 18).
+  **Pick:** "What the posting asks for" (J9), "Asked for" (AP5); a second
+  static table for the decision (AP18–AP20), which § 5.2 rule 3's list now
+  names; "Shown, not in their words" (AP10).
+- **C18. Card words that differ from the pages'.** The verdict card says
+  "quick-scan" and "no analysis file linked"; the checker card's kicker
+  says "Checker", its status shows the raw `pass`/`FAIL` and "(1 fail,
+  0 warn)"; the plan card's link says "open"; an unknown card says
+  "Unknown card". **Pick:** the pages' words (P9, J7) and plain forms
+  (R6, R8–R15, R20).
+- **C19. "warning(s)".** `design-honest-ceilings.md` § 6A's badge and
+  script line said "N warning(s)", which reads as code (rule 18).
+  **Pick:** "1 warning" and "<N> warnings" (T4, T8, R14, R15); § 6A's
+  badge, render test and script line change to the same forms in this
+  commit (the script line: "no failures, 1 warning above …" / "no
+  failures, N warnings above …").
+- **C20. A slug as a role's name.** An unlinked entry was labelled by
+  its file key (`acme-staff-pm`), a piece of a file name the candidate
+  can't open. **Pick:** the path of its notes file, or of its first file
+  when it has none (AP2), which they can open.
+- **C21. "Ten couldn't read these lines."** The page's reader failed,
+  not Ten, and Ten can read the file as prose (rule 8). **Pick:** "This
+  page couldn't read these lines of <path>:" (F42); § 5.2 rule 6 and
+  § 5.3 are edited.
+- **C22. The composer's "/skills" and "link".** The code shows a
+  disabled "/skills" button, while § 5.6 says there is no visible
+  "/skills" label and no picker is built: a control that does nothing
+  (rule 8). § 5.6's pill says only "link". **Pick:** no "/skills" on
+  screen; the pill reads "Job link" (K5); § 5.6 and the § 1.1 wireframe
+  are edited.
+- **C23. S9 is a line, not a link.** § 1.4 called it a link, but no
+  address is named anywhere and the code renders plain text with a
+  period (`SignIn.tsx:218`). **Pick:** a line, with the period; § 1.4
+  and § 5.6 are edited.
+- **C24. The activity line and the working words used tool names.**
+  The collapsed line reads "ran bash" or "ran write file ×2"
+  (`ToolRun.tsx:102`), the expanded rows say "wrote", "input", "output",
+  "error" and "1 lines", and the avatar said "Ten is running a checker"
+  while a résumé rendered (`helpers.ts:37-49`). **Pick:** one plain
+  present form (W1–W19) and past form (L1–L19) per tool and per script,
+  a plain fallback for anything else, and plain labels over the literal
+  input and output (L21–L26), which stay word for word (rule 11). This
+  is the words of the § 3 amendment `design-plain-replies.md` § 5
+  names; § 3 now points here.
+- **C25. Raw error text on screen.** Import errors showed the store's
+  codes and byte counts ("Import refused: … workspace_full: …",
+  `RealChatShell.tsx:454-458`); the site-not-set-up screen listed
+  setting names (`main.tsx:40`); one upload line told the candidate to
+  "Remove something", which no page or tool lets them do; the delete
+  error was hard to parse. **Pick:** I1–I14, Q6, U6, X8.
+- **C26. "The most recently changed of N"** had no noun (rule 18).
+  **Pick:** "… of <N> active applications" (H10); § 5.3, § 5.7 and
+  § 5.9 are edited.
 
 **Decisions where the doc had a slot but no words** (the NEW rows):
 
@@ -1668,17 +2003,18 @@ C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
   résumé …"), but a label per file suffix would be a new computed table
   outside § 5.2 rule 3's list; the name is a path the candidate can
   open.
-- **N3. The avatar's words** (F17–F21) put § 1.3's labels in a short
-  sentence. Today's code shows the state's code name ("needs-you — …",
-  `Avatar.tsx:13`), which the plain-voice ruling rules out.
+- **N3. The avatar's words** (F17–F21, W1–W19) put § 1.3's labels in a
+  short sentence. Today's code shows the state's code name ("needs-you
+  — …", `Avatar.tsx:13`), which the plain-voice ruling rules out.
 - **N4. The Documents labels** (D3–D12) say what each folder holds,
   from its owning skill's schema: evaluate's analyses and company
   briefs, search's saved postings, interview's prep, practice and pay
   record (`negotiation/`, "stated comp record"), storybank's stories,
   learn's courses, outreach's contacts. "Company notes" matches Jobs'
   "Open company notes"; "Role analyses" matches "Open analysis".
-- Rows F9, F23, F25, F27, F44 and F45 keep today's code words, which no
-  doc gave (F27 is now named in § 1.1 too, lead ruling 3).
+- **N5. Counts read as English:** "1 line", "1 file", "1 failure", "1
+  warning"; "<N> lines", "<N> files" and so on for 0 or 2 and more.
+  Never "(s)" (C19).
 
 **Lead rulings on the open questions (2026-09-28):**
 
@@ -1687,15 +2023,40 @@ C9 and C10, as made (2026-09-28), and ruled on C8 (below).**
    anytime" (S12, S13). The mockup's "Delete anytime" is dropped: it
    would need § 1.7's caveat (the sign-in and paid credit stay) to be
    true.
-3. **"Import workspace"** stays, with today's label (F27), and § 1.1's
+3. **"Import workspace"** stays, with today's label (F28), and § 1.1's
    menu list now names it.
 4. **"Wording check not run"** (T7) is deferred: not shown in this
    step. It waits for § 2.4's rule on when it shows.
 5. **The avatar's working words** use the plain forms now: "Ten is
-   running the automatic checks" (F46) and "Ten is running the wording
-   check" (F47). `TOOL_LABELS` (today "running a checker", "checking
-   language") changes to match in the Stage 4 build; for `bash` it is
-   keyed by the script's name, as `design-plain-replies.md` § 5 says.
+   running the automatic checks" (W9) and "Ten is running the wording
+   check" (W8), and every other tool and script has its row (W1–W19,
+   C24). `TOOL_LABELS` (today "running a checker", "checking language",
+   "loading a skill" …) changes to match in the Stage 4 build; for
+   `bash` it is keyed by the script's name, as
+   `design-plain-replies.md` § 5 says.
+
+**Removed from the screen** (proof 4 checks none of these shows):
+"Error — <code>"; "Needs your word"; "Status: <status>";
+"warning(s)"; "Binary file — no preview."; "Download PDF"; "/skills";
+"Checker · "; "Unknown card"; "Import refused"; "Ten isn't configured";
+"your gate log"; "Declined — nothing was deleted."; "Send me a link";
+the "Email link" / "Email + password" toggle; "Ask Ten to look for
+roles" until S5; the "ran" prefix and raw tool names on the activity
+line; "loading a skill"; "Remove something before uploading more."; a
+file key as a role's name; the Track field on a Jobs row or detail
+(the words inside a file's own section body are the file's).
+
+**What the Stage 4 build changes in code** (each with the tests that pin
+today's words, which change with it): `Frame.tsx` (H18, AP17, J18/J19,
+Home's empty button); `SidePanel.tsx` (F44); `Header.tsx` and
+`Avatar.tsx` (F17–F24); `helpers.ts` `TOOL_LABELS` and `ToolRun.tsx`
+(W, L; `tests/web/e2e.mjs:86-91`); `Composer.tsx` (K3, K5, "/skills");
+`Transcript.tsx` (unchanged words); `GateCard.tsx` (G1–G5);
+`ErrorPart.tsx` (E1–E11); `Cards.tsx` (P9, J7, R6–R20, T2–T8);
+`RealChatShell.tsx` (I1–I14, K10; `tests/e2e-real/e2e.ts:545`);
+`upload-errors.ts` (U6); `main.tsx` (Q6); `DeleteBetaDataConfirm.tsx`
+(X3, X8, X9; `tests/e2e-real/e2e.ts:957`, `:1006`); `SignIn.tsx` and
+`auth.ts` (S1, S9, S12–S13, Y1–Y17).
 
 ### 5.4 How the conversation and the pages link
 
@@ -2292,7 +2653,7 @@ The sections below name only what differs.
   12px 10px 16px.
 - The input is `--type-body` at 15.5px/24px, with the placeholder in
   `--fg-subtle`.
-- The row below holds the attach icon button, then a "link" sm pill,
+- The row below holds the attach icon button, then a "Job link" sm pill (§ 5.3.1, C22),
   then the send button at the far right. The pill: 32px high, radius
   full, `inset 0 0 0 1px var(--border)`, `--type-small`.
 - **Send:** 34×34px, radius 10px, pri colors. Empty input: disabled.
@@ -2587,7 +2948,7 @@ page):
   - "Use a password instead" is a text link.
   - Then the trust line in `--type-small` with `lock`; its words are
     § 5.3.1's rows S12–S13.
-  - Then "Prefer local? Run it from your terminal" (§ 1.4).
+  - Then the line "Prefer local? Run it from your terminal." (§ 1.4).
 - **Not in § 1.4.** The mockup also has a lead paragraph, three proof
   points and a product preview. None of these is in § 1.4. They wait
   for an owner-approved § 1.4 amendment and are not built from this
@@ -2672,7 +3033,7 @@ application notes file with `## Coverage` (all three statuses) and
 `## Selection` (at least two `out` rows), whose output
 `proposal_block` produces cleanly when run in the `mktemp -d`
 workspace; a second live application, so Home's card says "The most
-recently changed of 2"; `plan.md` To do lines in C § 18.1's minutes
+recently changed of 2 active applications"; `plan.md` To do lines in C § 18.1's minutes
 form, one line without minutes, a `Budget: <N> min/day` line, and a
 Waiting on you or To do line whose backticked path is an application
 file; and a `messages` array (§ 4's shape: the conversation, invented)
@@ -2808,7 +3169,7 @@ first):
   reader: it combines `load()`, `groupApplications`, `readPlanBoard`
   and 3d's stage steps and "Next, from you". *Exit:* § 5.3's Active
   application tests (the first linked live entry, "The most recently
-  changed of 2"); § 5.1's rail counts equal their pages' counts on the
+  changed of 2 active applications"); § 5.1's rail counts equal their pages' counts on the
   fixture, no number at 0, no number on a failing read; § 5.4's
   page-to-page links, one e2e case each, on the spy store and spy
   transport.
@@ -2830,7 +3191,7 @@ labels included, with its source line and the conflicts found.
 The restore ruling's new strings are in it too: § 1.4's lead paragraph
 and proof points, and § 5.1 and § 5.3's new labels and lines ("Ten ·
 last reply", "<N> of your <M> min a day", "Active application",
-"The most recently changed of N", "Next, from you", the detail
+"The most recently changed of N active applications", "Next, from you", the detail
 section labels, the coverage-status table, "<path> isn't in your
 workspace.", the two-notes-files line, "Sample data").
 Every page line, label and empty state

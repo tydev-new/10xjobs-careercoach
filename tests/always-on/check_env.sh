@@ -99,7 +99,7 @@ fi
 # 8. No real browser in a harness run (owner ruling 2026-09-26): lib_env.sh
 #    points RENDER_RESUME_CHROME at a per-trial staged copy, and that copy
 #    exists and is executable — a runner without this wired in would let
-#    render_resume.py's to_pdf() reach for a REAL headless Chrome again.
+#    render_resume.mjs's toPdf() reach for a REAL headless Chrome again.
 if [ -x "$ROOT/fixtures/fake-chrome" ]; then
   say ok "fixtures/fake-chrome present and executable"
 else

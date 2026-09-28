@@ -89,7 +89,7 @@ for case_name in $CASES; do
     cp "$WS"/*.md "$out-ws/" 2>/dev/null
     [ -d "$WS/courses" ] && cp -r "$WS/courses" "$out-ws/"
     ls -R "$WS" | grep -v '^\.claude' > "$out-ws/_listing.txt" 2>/dev/null
-    python3 "$RUNNER_SKILLS_DIR/profile/scripts/check_files.py" --workspace "$WS" \
+    node "$RUNNER_SKILLS_DIR/profile/scripts/check_files.mjs" --workspace "$WS" \
       --skills "$RUNNER_SKILLS_DIR" > "$out-ws/_schema_check.txt" 2>&1
     grep -ho '"skill": *"[^"]*"' "$out".turn*.stream.json 2>/dev/null | sort -u > "$out.skills.txt"
     record_served_models "$out"

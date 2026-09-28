@@ -65,8 +65,8 @@ for (const name of NAMES) {
     for (const { p } of assistantParts(fx)) {
       if (p.type.startsWith("tool-")) {
         lastTool = p;
-        if (p.type === "tool-bash" && /check_materials\.py/.test(p.input.command)) pendingCheckers.push(...parseChecker(p.output.stdout));
-        if (p.type === "tool-bash" && /record_verdict\.py/.test(p.input.command) && p.output?.exitCode === 0) expectedVerdicts++;
+        if (p.type === "tool-bash" && /check_materials\.mjs/.test(p.input.command)) pendingCheckers.push(...parseChecker(p.output.stdout));
+        if (p.type === "tool-bash" && /record_verdict\.mjs/.test(p.input.command) && p.output?.exitCode === 0) expectedVerdicts++;
         continue;
       }
       if (p.type !== "data-card") continue;
@@ -87,7 +87,7 @@ for (const name of NAMES) {
         latestChecker.set(ref, props.status === "pass" ? "clean" : "fail");
       }
       if (card === "document") {
-        const rr = [...assistantParts(fx)].map((x) => x.p).filter((x) => x.type === "tool-bash" && /render_resume\.py/.test(x.input.command) && x.output.exitCode === 0);
+        const rr = [...assistantParts(fx)].map((x) => x.p).filter((x) => x.type === "tool-bash" && /render_resume\.mjs/.test(x.input.command) && x.output.exitCode === 0);
         const src = rr.find((x) => x.input.command.includes(`--md ${ref}`));
         if (!src) { problems.push(`document card for ${ref} with no exit-0 render_resume --md ${ref}`); continue; }
         const w = src.output.stdout.match(/^words: (\d+)  ->  (\S+)/m);
@@ -98,7 +98,7 @@ for (const name of NAMES) {
       }
       if (card === "verdict") {
         verdictCards++;
-        const cmd = [...assistantParts(fx)].map((x) => x.p).find((x) => x.type === "tool-bash" && /record_verdict\.py/.test(x.input.command) && x.input.command.includes(`--company ${props.company}`) || (x.type === "tool-bash" && x.input.command?.includes(`--company "${props.company}"`)));
+        const cmd = [...assistantParts(fx)].map((x) => x.p).find((x) => x.type === "tool-bash" && /record_verdict\.mjs/.test(x.input.command) && x.input.command.includes(`--company ${props.company}`) || (x.type === "tool-bash" && x.input.command?.includes(`--company "${props.company}"`)));
         if (!cmd) problems.push(`verdict card ${props.company} with no record_verdict call`);
         else {
           const jd = cmd.input.command.match(/--jd-file (\S+)/)?.[1];
@@ -111,7 +111,7 @@ for (const name of NAMES) {
       }
       if (card === "plan") {
         const cc = lastTool;
-        if (!(cc?.type === "tool-bash" && /check_closeout\.py/.test(cc.input.command) && cc.output.exitCode === 0)) problems.push("plan card not right after an exit-0 check_closeout");
+        if (!(cc?.type === "tool-bash" && /check_closeout\.mjs/.test(cc.input.command) && cc.output.exitCode === 0)) problems.push("plan card not right after an exit-0 check_closeout");
         const stage = cc?.input.command.match(/--stage (\S+)/)?.[1];
         if (props.stage !== stage) problems.push(`plan stage ${props.stage} != --stage ${stage}`);
         try { assert.deepEqual(props.items, parsePlanTodo(fx.files["plan.md"])); } catch { problems.push("plan items != parsePlanTodo(files['plan.md'])"); }

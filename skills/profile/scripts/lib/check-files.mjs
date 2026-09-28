@@ -73,7 +73,7 @@ export const HISTORY_HEADERS = {
 };
 const LOOP_HISTORY = new Set(Object.keys(HISTORY_HEADERS));
 
-const MANIFEST_FILES = new Map([
+export const MANIFEST_FILES = new Map([
   ["CLAUDE.md", "profile (written at setup from the template)"],
   ["jobs.md", "search scripts"],
   ["companies.md", "search scripts"],

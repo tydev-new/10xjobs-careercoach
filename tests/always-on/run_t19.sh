@@ -78,6 +78,10 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
   CASE_SKILLS="profile storybank"
   [ -f "$CASE/skills.txt" ] && CASE_SKILLS="$(cat "$CASE/skills.txt" | tr '\n' ' ')"
   for sk in $CASE_SKILLS; do cp -r "$RUNNER_SKILLS_DIR/$sk" "$WS/.claude/skills/"; done
+  # coach ships in every real workspace, on top of the case's own list
+  # above (never in place of it) — an agent without it hunts the disk and
+  # finds the owner's DEPLOYED coach (env contract rule 1).
+  [ -d "$WS/.claude/skills/coach" ] || cp -r "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
   echo "=== $case_name / trial $trial -> $WS"
   # Tripwire (2026-08-20: a trial overwrote the founder's REAL ~/job-search
   # through an absolute path): fingerprint the real workspace; any change

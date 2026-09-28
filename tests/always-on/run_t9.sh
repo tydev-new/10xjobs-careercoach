@@ -65,7 +65,9 @@ for case_name in $CASES; do
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     if [ "$cond" = "full" ]; then
       mkdir -p "$WS/.claude/skills"
-      cp -r "$RUNNER_SKILLS_DIR/learn" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
+      # coach ships in every real workspace — an agent without it hunts the
+      # disk and finds the owner's DEPLOYED coach (env contract rule 1).
+      cp -r "$RUNNER_SKILLS_DIR/learn" "$RUNNER_SKILLS_DIR/profile" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
     fi
     echo "=== $case_name / $cond / trial $trial -> $WS"
     sandbox_home_setup

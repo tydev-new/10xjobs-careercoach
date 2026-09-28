@@ -36,7 +36,9 @@ for trial in $(seq 1 "$TRIALS"); do
     cp -r "$CASE/ws-extra/." "$WS/"
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$RUNNER_SKILLS_DIR/outreach" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
+    # coach ships in every real workspace — an agent without it hunts the
+    # disk and finds the owner's DEPLOYED coach (env contract rule 1).
+    cp -r "$RUNNER_SKILLS_DIR/outreach" "$RUNNER_SKILLS_DIR/profile" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
     echo "=== t13-ceiling / trial $trial -> $WS"
     sandbox_home_setup
     : > "$out.err"

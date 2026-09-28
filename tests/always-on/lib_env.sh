@@ -130,8 +130,28 @@ export RENDER_RESUME_CHROME="$ROOT/fixtures/fake-chrome"
 # Chrome itself, outside render_resume.py entirely, or route a kill/pkill
 # through a `sh -c`/`bash -c` wrapper — the reviewer's own probe found
 # CLAUDE_KILL_GUARD_ARGS's first cut did not deny `sh -c "/usr/bin/pkill
-# ..."`. Every run_*.sh / judge_*.sh / check_env.sh `claude -p` call gets
-# this whole array spliced in right after `--setting-sources project`.
+# ..."`.
+#
+# BLOCKING finding, fix round 5 (independent review): the bare `Bash(*sh
+# -c*)` false-positived on ORDINARY text that merely CONTAINS "sh -c" as a
+# substring with no shell wrapper involved at all — e.g. `echo "refresh
+# -c"` ends in "...re-sh -c..." (the tail of "refresh" plus " -c"), which
+# an unanchored infix pattern cannot tell apart from an actual `sh -c`
+# invocation. Replaced with patterns anchored to COMMAND POSITION: a
+# plain prefix (`Bash(sh -c*)` — the command itself STARTS with "sh -c",
+# never true of "echo ...") for the shell wrapper as the whole command,
+# and after the three ways one command follows another on one line
+# (`;`, `&&`, `|`) so `echo hi; sh -c "..."` is still caught. `Bash(/bin/
+# *sh -c*)` is one pattern that covers /bin/sh, /bin/bash AND /bin/zsh at
+# once (the `*` falls between "/bin/" and "sh -c", matching "" for sh,
+# "ba" for bash, "z" for zsh). RE-VERIFIED LIVE (2026-09-27, one more
+# Haiku call, same session): `echo "refresh -c"` is no longer denied
+# (false positive fixed); `sh -c "echo hi"` alone is still denied
+# (prefix form); `echo hi; sh -c "echo hi"` is denied too (after-`;` form
+# — VERIFIES this row genuinely provides coverage the plain prefix
+# form doesn't, not just a redundant repeat of it).
+# Every run_*.sh / judge_*.sh / check_env.sh `claude -p` call gets this
+# whole array spliced in right after `--setting-sources project`.
 CLAUDE_KILL_GUARD_ARGS=(
   --disallowedTools
   "Bash(pkill*)" "Bash(killall*)" "Bash(kill*)" "Bash(pgrep*)"
@@ -142,7 +162,10 @@ CLAUDE_KILL_GUARD_ARGS=(
   "Bash(xargs kill*)"
   "Bash(*Google Chrome*)" "Bash(*Chromium*)" "Bash(*chromium*)"
   "Bash(*google-chrome*)" "Bash(open -a*Chrome*)" "Bash(open -a*chrome*)"
-  "Bash(sh -c*)" "Bash(bash -c*)" "Bash(*sh -c*)" "Bash(*bash -c*)"
+  "Bash(sh -c*)" "Bash(bash -c*)" "Bash(zsh -c*)" "Bash(/bin/*sh -c*)"
+  "Bash(*; sh -c*)" "Bash(*; bash -c*)" "Bash(*; zsh -c*)"
+  "Bash(*&& sh -c*)" "Bash(*&& bash -c*)" "Bash(*&& zsh -c*)"
+  "Bash(*| sh -c*)" "Bash(*| bash -c*)" "Bash(*| zsh -c*)"
 )
 
 # --- Clean environment (2026-09-26; widened 2026-09-27) --------------------
@@ -343,7 +366,16 @@ vault_lock() {
   _vault_mutex_acquire
   _vault_prune_holders
   if [ ! -s "$_VAULT_HOLDERS" ]; then
-    find "$REALJS" -type f -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null
+    # BLOCKING finding (independent review): `-type f` only marked FILES
+    # immutable — on macOS, chflags uchg on a DIRECTORY (VERIFIED live:
+    # create/delete/rename all refused after) is what stops a session
+    # from adding a new top-level file, a file in a subdirectory, or a
+    # new directory entirely, none of which touch an EXISTING file's own
+    # flag. `-depth` visits a directory's own CONTENTS before the
+    # directory itself (deepest-first) — locks the vault root LAST, after
+    # everything under it, so the walk is never blocked by a directory
+    # it just locked.
+    find "$REALJS" -depth -not -path '*/.damaged*' -exec chflags uchg {} + 2>/dev/null
   fi
   echo "$_VAULT_MY_PID" >> "$_VAULT_HOLDERS"
   _VAULT_HELD=1
@@ -362,6 +394,9 @@ vault_unlock() {
   fi
   _vault_prune_holders
   if [ ! -s "$_VAULT_HOLDERS" ]; then
+    # Reverse of the lock: no `-depth`, so this is PRE-order — the vault
+    # root is unlocked FIRST, then the walk descends. The lock took the
+    # root last (after everything under it); the unlock takes it first.
     find "$REALJS" -flags +uchg -exec chflags nouchg {} + 2>/dev/null
     # $_VAULT_STATE_DIR itself is left in place (just an empty holders
     # file) rather than rm -rf'd here — removing the whole state dir while

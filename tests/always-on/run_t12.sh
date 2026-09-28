@@ -61,8 +61,10 @@ for case_name in $CASES; do
     [ -d "$CASE/ws-extra" ] && cp -r "$CASE/ws-extra/." "$WS/"
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
+    # coach ships in every real workspace — an agent without it hunts the
+    # disk and finds the owner's DEPLOYED coach (env contract rule 1).
     cp -r "$RUNNER_SKILLS_DIR/interview" "$RUNNER_SKILLS_DIR/profile" \
-          "$RUNNER_SKILLS_DIR/storybank" "$WS/.claude/skills/"
+          "$RUNNER_SKILLS_DIR/storybank" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
     sandbox_home_setup
     : > "$out.err"

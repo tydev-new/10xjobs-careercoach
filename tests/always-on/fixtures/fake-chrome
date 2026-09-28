@@ -38,11 +38,24 @@ from what was actually written, not guessed), and a text layer built from
 the INPUT HTML's own visible text — <head> (title/meta/style, never shown
 on screen) is dropped, remaining tags are stripped, HTML entities are
 decoded, and what's left is word-wrapped and paginated. This is a
-STAND-IN, not a layout engine: the wrap width and lines-per-page below are
-a fixed, documented rule, not real_resume.py's own CSS page metrics — the
-INTENT is only that more input text means more output pages, so a 2-page
-base predictably renders 2 pages and a short one renders 1, not that the
-page break falls in the same place a real render would choose.
+STAND-IN, not a layout engine: the wrap width, lines-per-page and heading
+weights below are a fixed, documented rule, not real_resume.py's own CSS
+page metrics — the INTENT is only that more input text means more output
+pages, so a 2-page base predictably renders 2 pages and a short one
+renders 1, not that the page break falls in the same place a real render
+would choose.
+
+BLOCKING finding #2 (independent review, 2026-09-27): the first version
+joined ALL visible text into one continuous stream before wrapping — a
+heading and the paragraph after it, or two adjacent bullets, could land
+on the SAME wrapped line, so page count tracked TOTAL CHARACTERS, not
+the render's actual block structure. t10-over-budget's base (480 words
+across ~50 headings/bullets, "measured at 2 rendered pages") rendered as
+1 page. Fixed: each block (a heading, a paragraph, a bullet) starts its
+OWN line — never shares a wrapped line with its neighbor, matching how
+render_resume.py's own to_html() emits one tag per block. A heading also
+COUNTS EXTRA (a bigger font and the margin above/below it cost more
+vertical space than one text line) — see HEADING_EXTRA_LINES.
 
 Size is derived from what the content actually needs (no artificial
 padding by default). FAKE_CHROME_PDF_BYTES still overrides/pads the size
@@ -60,21 +73,42 @@ import sys
 
 WRAP_WIDTH = 95      # characters per wrapped line — a fixed stand-in rule,
 LINES_PER_PAGE = 50  # not real_resume.py's own font metrics/CSS page math.
+# A heading costs more vertical space than one text line (bigger font,
+# margin above and below) — extra BLANK lines charged after it, on top of
+# its own wrapped line(s). Calibrated (not measured from real CSS) so
+# tests/always-on/cases/t10-over-budget/base-resume.md — "measured at 2
+# rendered pages" — renders 2+ pages through this fake, and a clean,
+# already-tailored one-page résumé still renders 1.
+HEADING_EXTRA_LINES = {"h1": 3, "h2": 2, "h3": 2}
+# The exact block tags render_resume.py's own to_html() ever emits for
+# body content (blocks() in that file: heading levels, paragraphs, list
+# items) — this fake is a stand-in for THAT renderer's output specifically,
+# not a general HTML parser.
+_BLOCK_TAGS = ("h1", "h2", "h3", "p", "li")
 
 
-def html_to_visible_text(html_text):
-    """Strips <head> (title/meta/style — never shown on screen) whole,
-    then remaining tags, then decodes entities. What's left is what a
-    reader would actually see, in source order."""
+def html_to_blocks(html_text):
+    """Extracts (tag, text) blocks in source order — <head> (title/meta/
+    style — never shown on screen) dropped whole first. Blocks, not one
+    joined stream: a heading, a paragraph and a bullet are each their OWN
+    line below, the same as they are each their own tag in the real
+    render, so two adjacent blocks never share a wrapped line just
+    because both are short."""
     no_head = re.sub(r"(?is)<head\b.*?</head>", " ", html_text)
-    no_tags = re.sub(r"(?s)<[^>]+>", " ", no_head)
-    return html_module.unescape(no_tags)
+    blocks = []
+    tag_pat = "|".join(_BLOCK_TAGS)
+    for m in re.finditer(rf"(?is)<({tag_pat})\b[^>]*>(.*?)</\1>", no_head):
+        tag = m.group(1).lower()
+        inner = re.sub(r"(?s)<[^>]+>", " ", m.group(2))
+        text = " ".join(html_module.unescape(inner).split())
+        blocks.append((tag, text))
+    return blocks
 
 
 def wrap_lines(text, width=WRAP_WIDTH):
     """Word-wrap into lines of at most `width` characters. Never splits a
     word. An empty/whitespace-only text still yields one blank line, so a
-    page always has at least one line."""
+    block always contributes at least one line."""
     words = text.split()
     if not words:
         return [""]
@@ -89,9 +123,21 @@ def wrap_lines(text, width=WRAP_WIDTH):
     return lines
 
 
+def blocks_to_lines(blocks, width=WRAP_WIDTH):
+    """Each block's own wrapped line(s), in order, with a heading's extra
+    weight (HEADING_EXTRA_LINES) charged right after it. At least one
+    line always comes back, even for a document with no recognized
+    blocks at all."""
+    lines = []
+    for tag, text in blocks:
+        lines.extend(wrap_lines(text, width))
+        lines.extend([""] * HEADING_EXTRA_LINES.get(tag, 0))
+    return lines or [""]
+
+
 def paginate(lines, per_page=LINES_PER_PAGE):
-    """Groups wrapped lines into pages of `per_page` lines each. At least
-    one page always comes back, even for empty text."""
+    """Groups lines into pages of `per_page` lines each. At least one page
+    always comes back, even for empty text."""
     if not lines:
         lines = [""]
     pages = [lines[i:i + per_page] for i in range(0, len(lines), per_page)]
@@ -190,8 +236,8 @@ def main(argv):
     if html_path and os.path.exists(html_path):
         with open(html_path, encoding="utf-8") as f:
             html_text = f.read()
-    text = html_to_visible_text(html_text)
-    pages = paginate(wrap_lines(text))
+    blocks = html_to_blocks(html_text)
+    pages = paginate(blocks_to_lines(blocks))
     pad_to = os.environ.get("FAKE_CHROME_PDF_BYTES")
     pdf_bytes = build_pdf_bytes(pages, pad_to=int(pad_to) if pad_to else None)
     with open(pdf_path, "wb") as f:

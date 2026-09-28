@@ -68,7 +68,9 @@ for case_name in $CASES; do
     [ -d "$CASE/jd-analysis" ] && cp "$CASE/jd-analysis/"*.md "$WS/jd-analysis/"
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
-    cp -r "$RUNNER_SKILLS_DIR/apply" "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
+    # coach ships in every real workspace — an agent without it hunts the
+    # disk and finds the owner's DEPLOYED coach (env contract rule 1).
+    cp -r "$RUNNER_SKILLS_DIR/apply" "$RUNNER_SKILLS_DIR/profile" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
     sandbox_home_setup
     : > "$out.err"

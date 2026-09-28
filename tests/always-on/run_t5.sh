@@ -56,6 +56,12 @@ for case_name in $CASES; do
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
     cp -r "$RUNNER_SKILLS_DIR/search" "$WS/.claude/skills/"
+    # coach ships in every real workspace (the daily driver, always loaded)
+    # — an agent that lacks it hunts the disk for it, which found (and ran)
+    # the owner's DEPLOYED coach scripts by absolute path (env contract
+    # rule 1). Every conduct-probe workspace gets it alongside the case's
+    # own skills, never in place of them.
+    cp -r "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
     echo "=== $case_name / trial $trial -> $WS"
     sandbox_home_setup   # one FAKEHOME per trial — --continue below needs the SAME one turn1 used
     : > "$out.err"

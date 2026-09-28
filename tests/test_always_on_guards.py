@@ -228,8 +228,21 @@ def test_kill_guard_args_array_is_populated_behaviourally():
     for must in ("Bash(pkill*)", "Bash(killall*)", "Bash(/usr/bin/pkill*)",
                  "Bash(/usr/bin/killall*)", "Bash(kill*)", "Bash(pgrep*)",
                  "Bash(*Google Chrome*)", "Bash(*Chromium*)",
-                 "Bash(sh -c*)", "Bash(bash -c*)"):
+                 "Bash(sh -c*)", "Bash(bash -c*)", "Bash(zsh -c*)",
+                 "Bash(/bin/*sh -c*)",
+                 "Bash(*; sh -c*)", "Bash(*&& sh -c*)", "Bash(*| sh -c*)"):
         assert must in lines, (must, lines)
+    # Fix round 5 (BLOCKING, independent review): the earlier `Bash(*sh -c*)`
+    # / `Bash(*bash -c*)` infix forms false-positived on ordinary text that
+    # merely CONTAINS "sh -c" as a substring (e.g. `echo "refresh -c"`, whose
+    # tail is "...re" + "sh -c" + "\""). They must be gone; command-position
+    # anchored forms above replace the coverage they were meant to provide.
+    for banned in ("Bash(*sh -c*)", "Bash(*bash -c*)"):
+        assert banned not in lines, (
+            f"{banned} is an unanchored infix pattern that false-positives "
+            "on ordinary text containing the substring 'sh -c' with no "
+            "shell wrapper involved at all", lines
+        )
 
 
 def test_every_claude_p_invocation_site_splices_in_the_kill_guard_args():
@@ -339,3 +352,33 @@ def test_every_claude_p_site_that_uses_fakehome_also_cleans_it_up():
         if "sandbox_home_setup" in text and "sandbox_home_cleanup" not in text:
             missed.append(os.path.basename(path))
     assert missed == [], f"runner(s) call sandbox_home_setup with no matching cleanup: {missed}"
+
+
+# --- Every conduct-probe workspace ships coach (fix round 5) ---------------
+# A re-test found an agent under test `find`-ing and RUNNING the owner's
+# DEPLOYED ~/.claude/skills/coach/scripts/check_closeout.py by absolute
+# path — the product ships coach in every real workspace (the daily
+# driver), and a conduct-probe workspace missing it is unrealistic enough
+# to invite exactly this hunt, contaminating the measurement (env contract
+# rule 1). t4 and run_replay.sh are DELIBERATE exceptions: they are
+# attribution/isolation experiments whose whole point is testing WITHOUT
+# extra skills (model alone / +guardrails / +guardrails+ONE skill) — the
+# coordinator's instruction is read as "conduct-probe runners", not these
+# two, since adding coach there would change what they measure. run_t15.sh
+# never installs any skills at all (materials inlined into the prompt, no
+# tools needed) — there is no `.claude/skills/` for it to add coach to.
+_CONDUCT_PROBE_RUNNERS = [
+    "run_t5.sh", "run_t6.sh", "run_t7.sh", "run_t8.sh", "run_t9.sh",
+    "run_t10.sh", "run_t12.sh", "run_t13.sh", "run_t14.sh", "run_t19.sh",
+    "run_t21.sh",
+]
+
+
+def test_every_conduct_probe_runner_installs_coach():
+    for name in _CONDUCT_PROBE_RUNNERS:
+        text = open(os.path.join(ALWAYS_ON, name), encoding="utf-8").read()
+        assert ("RUNNER_SKILLS_DIR/coach" in text
+                or 'RUNNER_SKILLS_DIR"/*' in text), (
+            f"{name} installs a partial skill set without coach — an agent "
+            "without it hunts the disk for the owner's deployed copy"
+        )

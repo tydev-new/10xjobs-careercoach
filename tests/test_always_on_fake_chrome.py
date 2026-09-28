@@ -300,6 +300,57 @@ def test_fake_chrome_two_pages_for_long_content():
     os.remove(pdf)
 
 
+def _render_md_through_real_renderer(md_path):
+    """The exact path an agent takes: render_resume.py's own to_html() on
+    a REAL .md fixture, then to_pdf() through the harness fake — never a
+    hand-built HTML string, so this exercises the actual block shapes
+    (h1/h2/h3/p/li) render_resume.py emits, not an approximation of them."""
+    md_text = open(md_path, encoding="utf-8").read()
+    html = _tmp(".html")
+    open(html, "w", encoding="utf-8").write(rr.to_html(md_text))
+    pdf = _tmp(".pdf")
+    ok, err = rr.to_pdf(html, pdf, chrome=FAKE_CHROME)
+    assert ok, err
+    return pdf
+
+
+def test_calibration_t10_over_budget_base_renders_two_pages():
+    """BLOCKING finding #2 (independent review, 2026-09-27): the fake used
+    to join all visible text into one stream before wrapping, so headings
+    and bullet breaks added no lines — this exact fixture (480 words,
+    ~50 headings/bullets across three roles, expected.md: "measured at 2
+    rendered pages") rendered as 1 page, meaning the case could never
+    express the failure it exists to bait. Now block-aware and
+    calibrated against this fixture directly."""
+    base = os.path.join(AO, "cases", "t10-over-budget", "base-resume.md")
+    pdf = _render_md_through_real_renderer(base)
+    assert rr.pdf_pages(pdf) >= 2, rr.pdf_pages(pdf)
+    if _HAS_PDFTOTEXT:
+        r = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True, timeout=10)
+        assert r.returncode == 0, r.stderr
+        assert len(r.stdout.split()) > 100, "the text layer looks empty/truncated"
+    if _HAS_PYPDF:
+        assert len(_pypdf.PdfReader(pdf).pages) >= 2
+    os.remove(pdf)
+
+
+def test_calibration_clean_one_page_resume_renders_one_page():
+    """The other half of the calibration: a short, already-tailored,
+    genuinely one-page résumé must NOT be inflated to 2+ pages by the
+    same heading-weighting that fixed the case above."""
+    tailored = os.path.join(AO, "cases", "t21-plain-report", "applications",
+                            "acme-senior-data-analyst-resume.md")
+    pdf = _render_md_through_real_renderer(tailored)
+    assert rr.pdf_pages(pdf) == 1, rr.pdf_pages(pdf)
+    if _HAS_PDFTOTEXT:
+        r = subprocess.run(["pdftotext", pdf, "-"], capture_output=True, text=True, timeout=10)
+        assert r.returncode == 0, r.stderr
+        assert "Alex Chen" in r.stdout or "ALEX CHEN" in r.stdout.upper()
+    if _HAS_PYPDF:
+        assert len(_pypdf.PdfReader(pdf).pages) == 1
+    os.remove(pdf)
+
+
 def test_fake_chrome_over_limit_pdf_still_parses_with_correct_page_count():
     """FAKE_CHROME_PDF_BYTES pads via a PDF comment appended AFTER every
     object's offset is already computed — the padded file must still be a

@@ -20,7 +20,7 @@ function basename(p: string): string {
   return p.split("/").pop() ?? p;
 }
 
-/** command argv, e.g. `python3 evaluate/scripts/record_verdict.py --company 'Acme Labs' --title "Staff PM" --reasons "a; b"`
+/** command argv, e.g. `node evaluate/scripts/record_verdict.mjs --company 'Acme Labs' --title "Staff PM" --reasons "a; b"`
  *  — via the shared shell tokenizer (L8, fix round 2), so single-quoted,
  *  double-quoted, and mixed-quoted values all parse the way just-bash
  *  (and a real shell) would, not a hand-rolled regex. */
@@ -79,20 +79,20 @@ export class CardBuilder {
     const flags = parseFlags(input.command);
 
     // § 6.2's table: record_verdict/render_resume/check_closeout each say
-    // "exit 0"; check_materials.py's row has NO exit-0 condition — a
+    // "exit 0"; check_materials.mjs's row has NO exit-0 condition — a
     // checker card is a receipt of what the script FOUND, including a
     // FAIL (exit 1). Only check_materials runs regardless of exit code.
-    if (name === "check_materials.py") {
+    if (name === "check_materials.mjs") {
       return this.#checkerCards(input.command, output, flags);
     }
     if (output.exitCode !== 0) return [];
-    if (name === "record_verdict.py") {
+    if (name === "record_verdict.mjs") {
       return this.#verdictCard(flags, workspace);
     }
-    if (name === "render_resume.py") {
+    if (name === "render_resume.mjs") {
       return this.#documentCard(output, flags);
     }
-    if (name === "check_closeout.py") {
+    if (name === "check_closeout.mjs") {
       return this.#planCard(flags, workspace);
     }
     return [];
@@ -170,7 +170,7 @@ export class CardBuilder {
     const wordsMatch = output.stdout.match(/words:\s*(\d+)\s*->\s*(\S+)/);
     const words = wordsMatch ? Number.parseInt(wordsMatch[1], 10) : 0;
     // htmlPath only when the CALLER named an in-workspace --html path
-    // (tester's own finding): without --html, render_resume.py writes to
+    // (tester's own finding): without --html, render_resume.mjs writes to
     // a tempdir OUTSIDE the workspace and prints that path in stdout —
     // trusting the parsed stdout path there would point the side panel
     // at a file the workspace store can't read.

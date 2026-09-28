@@ -187,7 +187,7 @@ test("bash: a write-back, then a write_file on the SAME path, succeeds", async (
   const workspace = createInMemoryWorkspaceStore({ "jobs.md": "# Pipeline\n" });
   const scripts = createFakeScriptRunner([
     {
-      name: "record_verdict.py",
+      name: "record_verdict.mjs",
       run: () => ({
         result: { stdout: "recorded", stderr: "", exitCode: 0 },
         changedFiles: { "jobs.md": "# Pipeline\n\n### Acme — Staff PM\n- Verdict: strong\n" },
@@ -196,7 +196,7 @@ test("bash: a write-back, then a write_file on the SAME path, succeeds", async (
   ]);
   const { tools, ctx } = await makeCtx({ workspace, scripts });
   const bashOut: any = await (tools.bash.execute as any)(
-    { command: "python3 evaluate/scripts/record_verdict.py --company Acme --title \"Staff PM\" --verdict strong" },
+    { command: "node evaluate/scripts/record_verdict.mjs --company Acme --title \"Staff PM\" --verdict strong" },
     {},
   );
   assert.equal(bashOut.exitCode, 0);

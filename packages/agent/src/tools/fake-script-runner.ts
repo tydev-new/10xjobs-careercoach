@@ -7,16 +7,21 @@
 // `bash` tool or Deps shape.
 //
 // Dispatch matches spike 2's proven mechanism (docs/spikes/spike-2-just-
-// bash-commands.md): the FIRST argv token after "python3" is matched by
-// file name (basename), so "scripts/x.py", "../apply/scripts/x.py", and
-// "skills/apply/scripts/x.py" all reach the same canned script, exactly
-// as § 5's dispatch rule specifies. Unrecognized commands exit 127 with
-// "not available in the web app: <name>", per § 5.
+// bash-commands.md; docs/design-js-only.md § 3.5, J2 — "node" is the real
+// dispatcher now, "python3" only points at it): the FIRST argv token
+// after "node" (or, leniently, "python3" — this FAKE is a test double,
+// not the production dispatch contract in packages/checkers/src/
+// dispatch.mjs, so it accepts either prefix rather than reproducing
+// python3's real pointer-only 127) is matched by file name, so
+// "scripts/x.mjs", "../apply/scripts/x.mjs", and
+// "skills/apply/scripts/x.mjs" all reach the same canned script.
+// Unrecognized commands exit 127 with "not available in the web app:
+// <name>", per § 5.
 import { tokenizeCommand } from "../shell-tokenize.ts";
 import type { RunResult, ScriptRunner } from "../types.ts";
 
 export interface CannedScript {
-  /** matched against the basename of argv[1] when argv[0] === "python3" */
+  /** matched against the basename of argv[1] when argv[0] is "node" or "python3" */
   name: string;
   run(
     argv: string[],
@@ -37,7 +42,7 @@ export function createFakeScriptRunner(scripts: CannedScript[]): ScriptRunner {
       // split the way just-bash/a real shell would.
       const argv = tokenizeCommand(command);
       const [bin, scriptPath] = argv;
-      if (bin !== "python3" || !scriptPath) {
+      if ((bin !== "node" && bin !== "python3") || !scriptPath) {
         return {
           result: { stdout: "", stderr: `not available in the web app: ${command}\n`, exitCode: 127, changed: [] },
           changedFiles: {},

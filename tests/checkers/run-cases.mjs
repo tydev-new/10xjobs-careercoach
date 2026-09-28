@@ -628,12 +628,18 @@ async function selfTest(cases) {
   await must("a planted wrong after file fails (web, timestamps masked)", m, "web");
   m = clone(noHtml); m.expect[0].stdout = m.expect[0].stdout.replace("<tmp>/resume.html", "<tmp>/resume.htm");
   await must("the masked temp path still catches a changed file name (node)", m, "node");
+  // docs/design-js-only.md § 6 (J2): the seven ported scripts' Python
+  // originals are deleted -- the "python" path can no longer replay
+  // render_resume cases at all (there is no skills/apply/scripts/
+  // render_resume.py left to run). "node" is the equivalent, correct
+  // check post-J2 (render_resume.mjs's own Chrome path, added this
+  // stage, is what runs these stub-Chrome cases now).
   m = clone(tmpCase); m.expect[0].stdout = m.expect[0].stdout.replace("<tmp>/resume.html", "<tmp>/cv.html");
-  await must("the masked temp path still catches a changed file name (python, stub Chrome)", m, "python");
-  await mustPass("control: the stub Chrome case passes (python)", pdf, "python");
+  await must("the masked temp path still catches a changed file name (node, stub Chrome)", m, "node");
+  await mustPass("control: the stub Chrome case passes (node)", pdf, "node");
   m = clone(pdf); m.expect[0].stdout = m.expect[0].stdout.replace("pages: 2", "pages: 3");
   if (m.expect[0].stdout === pdf.expect[0].stdout) throw new Error("self-test: stub case has no 'pages: 2' line");
-  await must("the stub Chrome case fails if the page line changes (python)", m, "python");
+  await must("the stub Chrome case fails if the page line changes (node)", m, "node");
   let bad = 0;
   for (const x of checks) {
     console.log(`[${x.ok ? "ok" : "NOT OK"}] ${x.label}${x.ok ? "" : `  diffs=${JSON.stringify(x.diffs)}`}`);

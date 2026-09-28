@@ -121,7 +121,7 @@ any of them can end it.
   titles, then dates, then education. **Put the strongest material where
   the eye lands** — top of the page, left margin, bolded bullet openers.
   (`../../apply/references/patterns.md` turns those 7–11 seconds into
-  the ≤50-word case budget that `check_materials.py` enforces.)
+  the ≤50-word case budget that `check_materials.mjs` enforces.)
 - **Level has to be readable in one pass.** The verb ladder: IC
   developed / built / implemented · Manager managed / led / coordinated ·
   Director directed / scaled / established · VP championed /

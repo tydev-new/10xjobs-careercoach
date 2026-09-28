@@ -48,14 +48,14 @@ channel, follow-up cadence).
 ## Gmail / outcome sync
 
 On ask, or when useful: search recent application/recruiting mail;
-update `jobs.md` via `../search/scripts/update_job.py` (confirms stay
+update `jobs.md` via `../search/scripts/update_job.mjs` (confirms stay
 Applied; rejections and interviews move stage); surface action items
 (surveys, scheduling links) separately from noise; one honest digest, no
 fabricated conversion rates.
 
 ## Session close
 
-Run `../profile/scripts/check_files.py --workspace .`; fix a FAIL
+Run `../profile/scripts/check_files.mjs --workspace .`; fix a FAIL
 before the reply ends. Report outcomes, never narration.
 
 ## Guardrails

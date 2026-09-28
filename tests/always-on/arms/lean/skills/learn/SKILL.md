@@ -44,7 +44,7 @@ Curriculum research, quiz formats, and topic depth standards live in `references
 Owned: `knowledge.md` and `courses/` (shapes in `references/schema.md`).
 
 - **Hands back:** Format courses and frameable gaps → `interview` (scored reps & concern counters).
-- **Session close:** Run `../profile/scripts/check_files.py --workspace .` and `scripts/check_knowledge.py --workspace .`. No checker-subagent is spawned (coach voice). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `../profile/scripts/check_files.mjs --workspace .` and `scripts/check_knowledge.py --workspace .`. No checker-subagent is spawned (coach voice). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

@@ -5,9 +5,9 @@ reached, and who checks.
 
 ## Who checks what
 
-- **Structure and counts → the scripts.** `scripts/record_verdict.py`
+- **Structure and counts → the scripts.** `scripts/record_verdict.mjs`
   owns the verdict row: four tiers, the upsert key, the printed
-  created-or-updated line that catches a drifted company string. `../../profile/scripts/check_files.py` checks the
+  created-or-updated line that catches a drifted company string. `../../profile/scripts/check_files.mjs` checks the
   manifest (`jd-analysis/`, `company/`) at session close.
 - **Language against written rules → no checker-subagent.** The analyses
   are the analyst's voice, not the candidate's; nothing here is checked

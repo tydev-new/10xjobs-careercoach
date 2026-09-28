@@ -222,7 +222,9 @@ for (const vp of [{ width: 1280, height: 800, tag: "desktop" }, { width: 375, he
   const backToTalk = async () => {
     if (await page.locator(".composer-input").isVisible().catch(() => false)) return true;
     for (const role of ["button", "link", "tab"]) {
-      const nav = page.getByRole(role, { name: /^(Talk to Ten|Ten)$/ });
+      // a prefix, not the whole name: with a gate pending the item's name
+      // also carries § 5.1's "Needs your yes" marker ("Ten. Needs your yes.")
+      const nav = page.getByRole(role, { name: /^(Talk to Ten|Ten)\b/ });
       for (let i = 0; i < (await nav.count()); i++) {
         if (!(await nav.nth(i).isVisible().catch(() => false))) continue;
         await nav.nth(i).click({ timeout: 2000 }).catch(() => {});
@@ -236,12 +238,16 @@ for (const vp of [{ width: 1280, height: 800, tag: "desktop" }, { width: 375, he
   const clicked = [];
   const lost = [];
   for (const b of handles) {
-    const txt = ((await b.innerText().catch(() => "")) || (await b.getAttribute("aria-label").catch(() => "")) || "").trim();
+    const txt = ((await b.innerText().catch(() => "")) || (await b.getAttribute("aria-label").catch(() => "")) || "").replace(/\s+/g, " ").trim();
     if (/Autoplay/.test(txt)) continue;
     if (!(await b.isVisible().catch(() => false))) continue;
     await b.click({ timeout: 2000 }).catch(() => {}); clicked.push(txt); await page.waitForTimeout(80);
     if (await page.locator(".side-panel-back").isVisible() && phone) await page.locator(".side-panel-back").click().catch(() => {});
     if (!(await backToTalk())) lost.push(txt);
+    // re-opening Talk to Ten focuses the composer, which hides the phone's
+    // tab bar (§ 5.5 "Keyboard up"); blur it so the next tabs stay clickable
+    await page.evaluate(() => document.activeElement?.blur?.());
+    await page.waitForTimeout(40);
   }
   await page.waitForTimeout(300);
   rec(lost.length === 0, T("after every button click, Talk to Ten can be re-opened by name"), lost.length ? `no way back after: ${lost.join(",")}` : `${clicked.length} clicks`);

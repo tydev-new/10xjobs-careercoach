@@ -79,6 +79,10 @@ candidate sees them on screen:
   shows them, `design-web-ui.md` § 2.1);
 - the stage names (groundwork, searching, applying, interviewing,
   deciding);
+- the job list's stage words that the workspace pages show (To Review,
+  Interested, Applied, Interviewing, Offer, Dismissed): a stage name the
+  candidate sees on their own Jobs page is their vocabulary (lead ruling,
+  2026-09-28, `design-web-ui.md` § 5.3.1 C8; the owner may reverse it);
 - "base résumé";
 - "your plan" and "your job list".
 
@@ -312,11 +316,14 @@ It prints hits in two classes:
     `fit_verdict`, `jd_file`) without a list that could drift;
   - any `*.py`;
   - a short list of coined words: "mechanical check", "language check",
-    `Track [A-Z]\b`, "To Review", `\b\d+/\d+ held\b`, `DECISION` /
+    `Track [A-Z]\b`, `\b\d+/\d+ held\b`, `DECISION` /
     `ARTIFACT` / `STATUS` / `TO-DO` in capitals, "shown-but-unnamed",
     `§`.
 - **REVIEW** (the judge decides):
   - workspace file names (`*.md`, `*.html`) and "JD";
+  - "To Review", a page word since the 2026-09-28 lead ruling
+    (`design-web-ui.md` § 5.3.1 C8): moved from HARD. The scanner and
+    its tests change in the follow-up build;
   - `gate`;
   - a snake_case token inside a file name or path, or one that appears
     in the candidate's own files or messages.

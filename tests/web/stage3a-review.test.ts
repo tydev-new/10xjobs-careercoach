@@ -905,35 +905,59 @@ test("§ 5.6 'Escape closes the top-most first: dialog, then menu, then sheet' a
   assert.deepEqual(bad, []);
 });
 
-test("§ 5.6 'Breakpoint' at 900px (the 761-1100px drawer) on Documents: the drawer's close ✕ closes it, so the rows and header controls it overlays — each row's 'Ask Ten about this', the ⋯ menu — can be reached", async () => {
+test("§ 5.6 'Breakpoint' at 900px (the 761-1100px drawer) on Documents: with nothing open the drawer covers no row control and not the ⋯ menu; a file opens it; its close ✕ closes it and every row's controls (each 'Ask Ten about this') can be reached again", async () => {
   const ctx = await ctxFor({ width: 900, height: 800 });
   const r = await openReal(ctx, EDGE);
   const page = r.page;
   await go(page, "Documents");
+  // The page scrolls inside .frame-page, not the document, so each control is
+  // scrolled into view first; a row that still hit-tests to something else
+  // is covered, and the covering element is named.
   const reachable = () =>
-    pane(page).evaluate((root) => {
+    pane(page).evaluate(async (root) => {
+      const name = (el: Element | null) => (el ? `${el.tagName.toLowerCase()}.${String((el as HTMLElement).className).split(" ").join(".")}${el.closest(".side-panel") ? " (inside .side-panel)" : ""}` : "null");
       const els = Array.from(root.querySelectorAll<HTMLElement>(".doc-row button"));
-      const hit = els.filter((e) => {
+      const covered: string[] = [];
+      for (const e of els) {
+        e.scrollIntoView({ block: "center" });
+        await new Promise((res) => requestAnimationFrame(() => res(null)));
         const b = e.getBoundingClientRect();
-        const top = document.elementFromPoint(Math.min(b.right - 4, window.innerWidth - 1), b.top + b.height / 2);
-        return !!top && e.contains(top);
-      });
+        for (const x of [b.left + 4, b.left + b.width / 2, Math.min(b.right - 4, window.innerWidth - 1)]) {
+          const top = document.elementFromPoint(x, b.top + b.height / 2);
+          if (!top || !e.contains(top)) {
+            covered.push(`${(e.textContent ?? "").trim().slice(0, 28)} @x${Math.round(x)},y${Math.round(b.top + b.height / 2)} -> ${name(top)}`);
+            break;
+          }
+        }
+      }
+      root.closest(".frame-page")?.scrollTo(0, 0);
       const m = document.querySelector<HTMLElement>(".menu-trigger")!.getBoundingClientRect();
       const mt = document.elementFromPoint(m.left + m.width / 2, m.top + m.height / 2);
-      return { hit: hit.length, of: els.length, menu: !!mt && !!mt.closest(".menu-trigger"), drawerText: (document.querySelector(".side-panel")?.textContent ?? "").trim().slice(0, 40) };
+      return { of: els.length, covered, menu: !!mt && !!mt.closest(".menu-trigger"), menuHit: name(mt) };
     });
-  const before = await reachable();
-  await shot(page, "r2-900-documents");
+  const idle = await reachable();
+  await shot(page, "r3-900-documents-nothing-open");
+  await pane(page).locator(".doc-row", { hasText: "profile.md" }).first().getByRole("button").first().click({ position: { x: 24, y: 12 } });
+  await page.waitForTimeout(300);
+  const opened = await page.locator(".side-panel").evaluate((e) => ({ open: e.classList.contains("side-panel--open"), path: e.querySelector(".side-panel-path")?.textContent, w: Math.round(e.getBoundingClientRect().width) }));
+  await shot(page, "r3-900-documents-file-open");
   const close = page.locator(".side-panel").getByRole("button", { name: "Close" });
   const hasClose = await close.isVisible();
   if (hasClose) await close.click();
   await page.waitForTimeout(300);
   const after = await reachable();
-  await shot(page, "r2-900-documents-after-close");
+  await shot(page, "r3-900-documents-after-close");
   await ctx.close();
-  console.log(`# 900px: row controls reachable ${before.hit}/${before.of}, ⋯ ${before.menu}, with the drawer showing "${before.drawerText}"; after ✕ ${after.hit}/${after.of}, ⋯ ${after.menu}`);
-  assert.ok(hasClose, "no close ✕ on the drawer");
-  assert.deepEqual({ rows: after.of - after.hit, menu: after.menu }, { rows: 0, menu: true }, "after the drawer's ✕, controls are still under the drawer");
+  console.log(`# 900px nothing open: ${idle.of - idle.covered.length}/${idle.of} row controls reachable, ⋯ ${idle.menu}; file open: ${JSON.stringify(opened)}; after ✕: ${after.of - after.covered.length}/${after.of}, ⋯ ${after.menu}`);
+  const bad: string[] = [];
+  for (const c of idle.covered) bad.push(`nothing open: covered: ${c}`);
+  if (!idle.menu) bad.push(`nothing open: ⋯ hit-tests to ${idle.menuHit}`);
+  if (!opened.open || opened.path !== "profile.md") bad.push(`a row did not open the drawer: ${JSON.stringify(opened)}`);
+  if (!hasClose) bad.push("no close ✕ on the open drawer");
+  for (const c of after.covered) bad.push(`after ✕: covered: ${c}`);
+  if (!after.menu) bad.push(`after ✕: ⋯ hit-tests to ${after.menuHit}`);
+  if (idle.of < 20) bad.push(`only ${idle.of} row controls — vacuous`);
+  assert.deepEqual(bad, []);
 });
 
 test("desktop 1440 (no sheet): after a file was opened, Escape pressed while typing in Talk to Ten's composer leaves focus and text in the composer", async () => {

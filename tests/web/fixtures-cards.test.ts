@@ -61,6 +61,7 @@ for (const name of NAMES) {
     let lastTool: any = null;
     const pendingCheckers: any[] = [];
     let expectedVerdicts = 0, verdictCards = 0;
+    const exemptedMissingAnalysis: string[] = [];
     const latestChecker = new Map<string, string>();
     for (const { p } of assistantParts(fx)) {
       if (p.type.startsWith("tool-")) {
@@ -105,20 +106,25 @@ for (const name of NAMES) {
           // design-web-agent.md § 6.2: the card's ref is the row's
           // `analysis_file` now, never `jd_file` (design-web-ui.md § 5.9
           // Stage 3b moved cards.ts's own mapping to match).
+          // KNOWN SPEC CONFLICT (tester ruling, Stage 3b review, reported
+          // to the lead for the architect): C § 6.2 gives a verdict card
+          // `ref` = the row's `analysis_file` whenever the row has one;
+          // ui § 4 says every card `ref` must exist in `files`; ui § 5.7
+          // wants one row whose `Analysis` names a file that isn't there,
+          // and only record_verdict writes `Analysis`, so that row always
+          // comes with a card. No fixture can satisfy all three, and ui
+          // § 5.3's "<path> isn't in your workspace." is the Jobs detail's
+          // line, not a card rule — it does not license a ref-less card
+          // (which would read "No analysis file linked" over a row that
+          // links one). Until the chain is fixed, exactly ONE card may
+          // omit its ref: the § 5.7 row whose `Analysis` names a missing
+          // file, confirmed against the fixture's own jobs.md. Any other
+          // ref-less card with an `--analysis-file` still fails here.
           const analysisFile = cmd.input.command.match(/--analysis-file (\S+)/)?.[1];
-          // A fixture is allowed to omit the ref when `--analysis-file`
-          // names a file this fixture's own `files` never wrote (the
-          // deliberate "missing analysis file" case, § 5.3 Jobs: a field
-          // that names a file which doesn't exist is a normal, designed
-          // state, not a fixture bug) — the OTHER check above ("every
-          // card ref ... exists in files", ui § 4) already refuses a ref
-          // to a phantom file, so a card built to satisfy BOTH checks
-          // correctly has no ref here even though real cards.ts would
-          // set one from the row.
-          const analysisFileIsPhantom = analysisFile !== undefined && !(analysisFile in fx.files);
-          if (analysisFile !== ref && !(analysisFileIsPhantom && ref === undefined)) {
-            problems.push(`verdict ref ${ref} != --analysis-file ${analysisFile}`);
-          }
+          const rowAnalysis = (fx.files["jobs.md"] ?? "").split(/\n(?=### )/).find((b: string) => b.startsWith(`### ${props.company} — ${props.title}\n`))?.match(/^- Analysis: (.+)$/m)?.[1];
+          const designatedMissing = analysisFile !== undefined && !(analysisFile in fx.files) && rowAnalysis === analysisFile && ref === undefined;
+          if (designatedMissing) exemptedMissingAnalysis.push(`${props.company} — ${props.title}`);
+          else if (analysisFile !== ref) problems.push(`verdict ref ${ref} != --analysis-file ${analysisFile}`);
           const v = cmd.input.command.match(/--verdict (\S+)/)?.[1];
           if (v !== props.verdict) problems.push(`verdict ${props.verdict} != --verdict ${v}`);
           const r = cmd.input.command.match(/--reasons "([^"]*)"/)?.[1];
@@ -135,6 +141,8 @@ for (const name of NAMES) {
       }
     }
     if (pendingCheckers.length) problems.push(`${pendingCheckers.length} check_materials result(s) with no checker card: ${pendingCheckers.map((c) => c.name)}`);
+    if (exemptedMissingAnalysis.length > 1) problems.push(`more than one ref-less verdict card excused by the § 5.7 missing-Analysis conflict: ${exemptedMissingAnalysis.join(", ")}`);
+    if (exemptedMissingAnalysis.length && name !== "workspace-pages.json") problems.push(`${name}: only the § 5.7 page fixture may carry the missing-Analysis card`);
     if (expectedVerdicts !== verdictCards) problems.push(`${expectedVerdicts} exit-0 record_verdict call(s) but ${verdictCards} verdict card(s)`);
     assert.deepEqual(problems, []);
   });

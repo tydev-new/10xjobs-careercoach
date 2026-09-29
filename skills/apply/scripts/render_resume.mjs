@@ -334,14 +334,24 @@ async function main() {
 // path first, then compare those directly — mirrored in every other
 // Node CLI entry under skills/*/scripts/*.mjs (grepped one at a time,
 // § 6 J2's tester check).
+//
+// J2 second review: `await main()` must stay OUTSIDE this try/catch. The
+// catch here exists ONLY to swallow a realpathSync() failure (e.g.
+// process.argv[1] doesn't resolve — this file was imported, not run);
+// putting `await main()` inside it as well silently swallowed every
+// error `main()` itself throws (e.g. writing the HTML to a path that is
+// actually a directory) — exit 0, nothing printed, the exact silent
+// failure this whole guard exists to prevent. An error `main()` throws
+// must surface the way every other command's does: uncaught, an exit 1
+// with the error on stderr.
+let isEntry = false;
 try {
-  if (
+  isEntry = Boolean(
     process.argv[1] &&
     realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
-  ) {
-    await main();
-  }
+  );
 } catch {
   // process.argv[1] doesn't resolve (e.g. this file was imported, not
   // run) — never treat that as "run main()".
 }
+if (isEntry) await main();

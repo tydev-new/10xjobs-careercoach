@@ -10,7 +10,7 @@ reached, and who checks.
   counts, arrow glyphs and ASCII arrow chains (code, comments, and URLs
   exempt), draft scoping, channel length notes, the
   rubric-PINNED state (a PROPOSED rubric is a WARN — pinning is a state
-  check, not a language read). `../../profile/scripts/check_files.py`
+  check, not a language read). `../../profile/scripts/check_files.mjs`
   checks the manifest at session close.
 - **Language against written rules → an INDEPENDENT checker-subagent**
   on `../../profile/references/language-check.md` with the drafts,

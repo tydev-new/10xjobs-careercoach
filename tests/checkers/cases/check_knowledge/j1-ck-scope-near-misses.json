@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): scope forms one character off",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| a | track- | s | gap |\n| b | role:  x | s | gap |\n| c | role: X | s | gap |\n| d | Track-A | s | gap |\n| e | role: -x | s | gap |\n| f | track-A B | s | gap |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  a: bad scope 'track-' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  b: bad scope 'role:  x' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  c: bad scope 'role: X' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  d: bad scope 'Track-A' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  e: bad scope 'role: -x' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  f: bad scope 'track-A B' — `track-<lane>` or `role: <key>` (plain hyphens)\n\n6 map row(s); 6 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

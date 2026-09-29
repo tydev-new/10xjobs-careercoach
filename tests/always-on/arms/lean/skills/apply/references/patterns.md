@@ -11,13 +11,13 @@ candidate binds. Rules live in `../SKILL.md`; the standard in
 One piece of the résumé's shape is enforced, not judgment: **`##
 Summary` is the single opening section** — never stack a narrative
 summary paragraph AND a bulleted "Core Expertise" list; choose one.
-`scripts/check_materials.py` FAILs a second opening section.
+`scripts/check_materials.mjs` FAILs a second opening section.
 
 ## Assembly
 
 One rule here is enforced: **experience bullets are the base's own
 sentences** — selection, order, and depth ARE the tailoring.
-`scripts/check_materials.py --base` FAILs a non-verbatim bullet.
+`scripts/check_materials.mjs --base` FAILs a non-verbatim bullet.
 
 ## Rewording for the JD's vocabulary
 
@@ -32,7 +32,7 @@ reworded off the record."
 
 ## The PDF — ATS-safe rendering
 
-`scripts/render_resume.py` owns the markup, the escaping, and the
+`scripts/render_resume.mjs` owns the markup, the escaping, and the
 measurement — never hand-roll HTML at delivery. Template contract:
 single column; no tables, text boxes, images, icons, headers/footers;
 standard fonts only, never embedded font files; plain `•` bullets; real

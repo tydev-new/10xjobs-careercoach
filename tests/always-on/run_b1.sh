@@ -20,9 +20,15 @@
 #   PAR           forwarded to each runner/judge (bounded concurrency
 #                 within ONE suite; suites themselves never run concurrently).
 #
-# lean sets RUNNER_SKILLS_DIR to tests/always-on/arms/lean/skills — the
-# JUDGE always grades against the frozen, unablated snapshot each runner
-# takes of the real skills/ tree (lib_env.sh), never against the lean tree.
+# lean sets RUNNER_SKILLS_DIR to a FRESH TEMP COPY of
+# tests/always-on/arms/lean/skills, with skills/*/scripts/ (the real ones)
+# copied in over it (docs/design-js-only.md § 6 J2, § 8): the arm itself
+# carries no scripts/ of its own any more, so the two arms can never drift
+# in SCRIPTS, only in prose, which is what B1 measures. The temp copy is
+# removed when this script exits; the arm on disk
+# (tests/always-on/arms/lean/) is never written to. The JUDGE always
+# grades against the frozen, unablated snapshot each runner takes of the
+# real skills/ tree (lib_env.sh), never against the lean tree.
 set -u
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$ROOT/../.." && pwd)"
@@ -35,13 +41,31 @@ if [ -z "$TAG" ] || [ -z "$ARM" ]; then
   exit 2
 fi
 
+LEAN_TMP=""
+cleanup_lean_tmp() { [ -n "$LEAN_TMP" ] && rm -rf "$LEAN_TMP"; }
+trap cleanup_lean_tmp EXIT
+
 case "$ARM" in
   baseline) RUNNER_SKILLS_DIR="$REPO/skills" ;;
-  lean)     RUNNER_SKILLS_DIR="$ROOT/arms/lean/skills" ;;
+  lean)
+    LEAN_TMP="$(mktemp -d)"
+    cp -R "$ROOT/arms/lean/skills" "$LEAN_TMP/skills"
+    for skill_dir in "$REPO"/skills/*/; do
+      skill="$(basename "$skill_dir")"
+      [ -d "${skill_dir}scripts" ] || continue
+      mkdir -p "$LEAN_TMP/skills/$skill"
+      cp -R "${skill_dir}scripts" "$LEAN_TMP/skills/$skill/scripts"
+    done
+    RUNNER_SKILLS_DIR="$LEAN_TMP/skills"
+    ;;
   *) echo "arm must be 'baseline' or 'lean', got '$ARM'" >&2; exit 2 ;;
 esac
 [ -d "$RUNNER_SKILLS_DIR" ] || { echo "RUNNER_SKILLS_DIR does not exist: $RUNNER_SKILLS_DIR" >&2; exit 2; }
 export RUNNER_SKILLS_DIR
+if [ "$ARM" = "lean" ]; then
+  echo "lean arm: scripts copied into the temp copy from $REPO/skills —" >&2
+  find "$RUNNER_SKILLS_DIR" -path '*/scripts/*' -type f | sed "s#^$RUNNER_SKILLS_DIR/##" | sort >&2
+fi
 
 # JUDGE_MODEL is required to even START — the wrapper runs the runner AND
 # the judge per suite, so a run that got 6 suites in before discovering the

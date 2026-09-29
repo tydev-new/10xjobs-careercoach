@@ -1,0 +1,32 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: s1-rv-refuses-empty-company-with-existing-file-present",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    " ",
+    "--title",
+    "New Role",
+    "--verdict",
+    "weak"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n- URL: https://board/acme\n- Location: Remote\n- Seen: 2026-01-01T00:00:00+00:00\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: empty company or title after cleaning; nothing written\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

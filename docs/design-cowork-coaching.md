@@ -123,7 +123,7 @@ invisible from inside a turn:
 | Enter | nothing — the loop happens because the artifact is a **file**; round 2 happens next time it comes up |
 | Execute | re-read the brief **in full** before each round — drift is only visible across rounds |
 | Exit | say the round count up front; **say plainly when it clears** — a coach who never says *done* teaches distrust of the praise; **third exit (added 2026-08-15, built #12): the measured ceiling** — two consecutive rounds without movement against the standard → document the honest rate and change strata or escalate as a DECISION; never grind, never relax |
-| Self-loop | fix what's checkable before showing (`check_materials.py`), **at most two passes** |
+| Self-loop | fix what's checkable before showing (`check_materials.mjs`), **at most two passes** |
 
 **Where each standard comes from** — an unsourced standard is the bug:
 
@@ -381,7 +381,7 @@ delisting detection.
 ## 7. Data lifecycle
 
 The schemas (which sections each file has) live with their owning skill,
-enforced by `check_files.py`. These are the rules *around* them:
+enforced by `check_files.mjs`. These are the rules *around* them:
 
 **One file per writer, per rate of change.** Combine two things only if
 the same step always writes both. The test: if a routine action rewrites
@@ -439,18 +439,18 @@ and tests: `design-web-ui.md` § 5.
 
 | Invariant | How | Where |
 |---|---|---|
-| Structure limits (lengths, sections, glyphs, verbatim bullets) | **code — FAIL/WARN per the earned-FAIL bar** | `check_materials.py` / `check_messages.py` (shipped) |
+| Structure limits (lengths, sections, glyphs, verbatim bullets) | **code — FAIL/WARN per the earned-FAIL bar** | `check_materials.mjs` / `check_messages.py` (shipped) |
 | Never-say, ⚠ struck forms, confirm-tier — any wording incl. paraphrase | **independent checker-subagent** — severities in the contract | `profile/references/language-check.md` (shipped, #29; measured t15) |
-| Required sections exist; no section in the wrong file | **code — FAIL** | `check_files.py` (shipped) |
-| Duplicate pipeline rows | **code — loud-fail** | `update_job.py`/`record_verdict.py` (shipped) |
+| Required sections exist; no section in the wrong file | **code — FAIL** | `check_files.mjs` (shipped) |
+| Duplicate pipeline rows | **code — loud-fail** | `update_job.mjs`/`record_verdict.mjs` (shipped) |
 | Judgment calls code can detect cheaply | **code flags → model defends — WARN**; silence is not a pass | both checkers |
 | Conceded claims: struck at the concession moment, then enforced any-wording | the checker-subagent's contract, severity fix-before-delivery | shipped (#11 fold + #29) |
 | Provenance on every candidate claim; never invent a number/listing; ask-before-diagnosing | **discipline** — workspace `CLAUDE.md`, measured | shipped |
 | Re-read the brief in full; say when it's done | **discipline** — Loop A prose | built (#12; inline per loop since 2026-08-21) |
 
 **Anything that later becomes checkable moves up to code** — and the
-receipt moves with it, into the commit or the docstring, out of the prose
-(goal 4's deletion valve).
+receipt moves with it, into the commit or the script's opening comment,
+out of the prose (goal 4's deletion valve).
 
 ## 10. Assumptions still live
 

@@ -1,0 +1,28 @@
+{
+ "note": "packages/checkers/test/parity.mjs: singular-plural-fold (covers: test_singular_plural_folds)",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "profile.md": "# P\n## Snapshot\n## Experience\n## Intake findings\n### Positioning strengths\n### Likely interviewer concerns\n### Career-narrative gaps\n### Story seeds\n## Interview history\n## Constraints\n## Application defaults\n## Target\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  profile.md: section \"Target\" belongs to criteria.md — content in the wrong file breaks its consumers\n\n1 file(s) checked against 11 schema(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

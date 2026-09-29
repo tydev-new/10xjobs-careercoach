@@ -1,0 +1,34 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-rv-arg-abbrev-with-equals",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--sco=50",
+    "--trac=B"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "recorded (created NEW role): Acme — Staff Engineer → strong (50)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- Seen: 2026-09-23T12:34:56+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- Score: 50\n- Track: B\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+ }
+}

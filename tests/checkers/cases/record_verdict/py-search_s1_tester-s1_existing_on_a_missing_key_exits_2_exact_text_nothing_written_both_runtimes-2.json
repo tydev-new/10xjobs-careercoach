@@ -1,0 +1,31 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_existing_on_a_missing_key_exits_2_exact_text_nothing_written_both_runtimes",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Gamma",
+    "--title",
+    "Data Lead",
+    "--verdict",
+    "weak",
+    "--existing"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: no role Gamma — Data Lead in jobs.md; nothing written\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

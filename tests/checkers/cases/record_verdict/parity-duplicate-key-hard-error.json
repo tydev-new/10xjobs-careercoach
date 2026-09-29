@@ -1,0 +1,32 @@
+{
+ "note": "packages/checkers/test/parity.mjs: duplicate-key-hard-error (covers: jobs_md.py: SystemExit on canonical collision)",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Cursor",
+    "--title",
+    "Regional Director",
+    "--verdict",
+    "strong"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-08-01\n\n## To Review\n\n### Cursor — Regional Director\n- Seen: 2026-08-01T00:00:00+00:00\n\n### Cursor, Inc — Regional Director\n- Seen: 2026-08-01T00:00:00+00:00\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "jobs.md: duplicate role Cursor, Inc — Regional Director (canonical collision with Cursor — Regional Director)\n",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

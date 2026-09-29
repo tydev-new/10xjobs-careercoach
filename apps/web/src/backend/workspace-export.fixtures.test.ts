@@ -1,7 +1,7 @@
 // Step 2 exit: "an import->export round trip byte-identical on
 // tests/always-on/fixtures/apply/ (+ fixtures/profile.md, criteria.md),
 // and the exported folder works with local Claude Code skills (at least:
-// check_files.py passes on it)."
+// check_files.mjs passes on it)."
 //
 // NODE-ONLY (fs, child_process, os) — a test file, never bundled into the
 // browser app (apps/web's vite build only bundles what main.tsx reaches).
@@ -23,7 +23,7 @@ const REPO_ROOT = path.resolve(HERE, "../../../../"); // apps/web/src/backend ->
 const FIXTURES_APPLY = path.join(REPO_ROOT, "tests/always-on/fixtures/apply");
 const FIXTURE_PROFILE = path.join(REPO_ROOT, "tests/always-on/fixtures/profile.md");
 const FIXTURE_CRITERIA = path.join(REPO_ROOT, "tests/always-on/fixtures/criteria.md");
-const CHECK_FILES_PY = path.join(REPO_ROOT, "skills/profile/scripts/check_files.py");
+const CHECK_FILES_MJS = path.join(REPO_ROOT, "skills/profile/scripts/check_files.mjs");
 const SKILLS_DIR = path.join(REPO_ROOT, "skills");
 
 /** Reads every file under `dir` (fixtures/apply/ is at most 2 levels deep —
@@ -84,10 +84,10 @@ test("import -> export round trip is byte-identical on the step 2 fixture", asyn
   }
 });
 
-/** Runs check_files.py against a directory, returning { exitCode, stdout }. */
+/** Runs check_files.mjs against a directory, returning { exitCode, stdout }. */
 function runCheckFiles(workspaceDir: string): { exitCode: number; stdout: string } {
   try {
-    const stdout = execFileSync("python3", [CHECK_FILES_PY, "--workspace", workspaceDir, "--skills", SKILLS_DIR], {
+    const stdout = execFileSync("node", [CHECK_FILES_MJS, "--workspace", workspaceDir, "--skills", SKILLS_DIR], {
       encoding: "utf8",
     });
     return { exitCode: 0, stdout };
@@ -97,7 +97,7 @@ function runCheckFiles(workspaceDir: string): { exitCode: number; stdout: string
   }
 }
 
-test("the exported step 2 fixture works with local Claude Code skills: check_files.py sees the SAME result as on the raw fixture (parity — the export layer introduces no new failures)", async () => {
+test("the exported step 2 fixture works with local Claude Code skills: check_files.mjs sees the SAME result as on the raw fixture (parity — the export layer introduces no new failures)", async () => {
   const original = loadStep2Fixture();
   const { zipSync } = await import("fflate");
   const zipIn = zipSync(original);
@@ -123,28 +123,28 @@ test("the exported step 2 fixture works with local Claude Code skills: check_fil
     const onRaw = runCheckFiles(rawDir);
     const onExported = runCheckFiles(exportedDir);
 
-    // The mechanism (import -> export) must not change check_files.py's
+    // The mechanism (import -> export) must not change check_files.mjs's
     // verdict at all versus running it on the fixture folder directly.
     assert.equal(onExported.exitCode, onRaw.exitCode, `exit code differs: raw=${onRaw.exitCode} exported=${onExported.exitCode}\nraw stdout:\n${onRaw.stdout}\nexported stdout:\n${onExported.stdout}`);
-    assert.equal(onExported.stdout, onRaw.stdout, "check_files.py output differs between the raw fixture and the round-tripped export");
+    assert.equal(onExported.stdout, onRaw.stdout, "check_files.mjs output differs between the raw fixture and the round-tripped export");
 
     // KNOWN GAP (see the coder's hand-back): the raw fixture itself does
-    // NOT pass check_files.py today (profile.md/criteria.md are invented
+    // NOT pass check_files.mjs today (profile.md/criteria.md are invented
     // personas for the LLM-judged always-on harness, not schema-conformant
     // files) — so `onRaw.exitCode` is 1, not 0, independent of anything
     // this slice builds. This test proves PARITY (no NEW failures from
     // export/import), which is the part within this slice's control.
-    console.log(`check_files.py on the raw fixture: exit ${onRaw.exitCode}`);
-    console.log(`check_files.py on the round-tripped export: exit ${onExported.exitCode} (same as raw: ${onExported.exitCode === onRaw.exitCode})`);
+    console.log(`check_files.mjs on the raw fixture: exit ${onRaw.exitCode}`);
+    console.log(`check_files.mjs on the round-tripped export: exit ${onExported.exitCode} (same as raw: ${onExported.exitCode === onRaw.exitCode})`);
   } finally {
     rmSync(exportedDir, { recursive: true, force: true });
     rmSync(rawDir, { recursive: true, force: true });
   }
 });
 
-test("check_files.py passes on a MINIMAL schema-conformant workspace round-tripped through import/export (proves the mechanism itself, independent of the fixture's own content)", async () => {
+test("check_files.mjs passes on a MINIMAL schema-conformant workspace round-tripped through import/export (proves the mechanism itself, independent of the fixture's own content)", async () => {
   // A tiny, schema-conformant workspace built from the schemas
-  // check_files.py itself reads (skills/profile/references/schema.md) —
+  // check_files.mjs itself reads (skills/profile/references/schema.md) —
   // not the step 2 fixture, which is intentionally NOT schema-conformant
   // (see the test above and the hand-back).
   const conformant: Record<string, string> = {
@@ -190,7 +190,7 @@ test("check_files.py passes on a MINIMAL schema-conformant workspace round-tripp
       writeFileSync(abs, bytes);
     }
     const result = runCheckFiles(exportedDir);
-    assert.equal(result.exitCode, 0, `check_files.py should pass on a schema-conformant round-tripped workspace:\n${result.stdout}`);
+    assert.equal(result.exitCode, 0, `check_files.mjs should pass on a schema-conformant round-tripped workspace:\n${result.stdout}`);
   } finally {
     rmSync(exportedDir, { recursive: true, force: true });
   }

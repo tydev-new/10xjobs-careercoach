@@ -1,0 +1,21 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): argparse with no arguments",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_messages.py [-h] --workspace WORKSPACE --contacts CONTACTS\ncheck_messages.py: error: the following arguments are required: --workspace, --contacts\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

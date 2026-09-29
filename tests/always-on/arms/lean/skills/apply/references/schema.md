@@ -4,7 +4,7 @@ What the files must hold. The application file is cross-session state
 with five readers (this skill writes; the verifier, a later session, the
 coach's board, prep, and the harness judge read), so its shape is
 declared here, not remembered. Its four tables — coverage, selection,
-rounds, panel — are checked by `../../profile/scripts/check_files.py`
+rounds, panel — are checked by `../../profile/scripts/check_files.mjs`
 (header, cell count, enums — WARN until an incident promotes it); the
 script's enum sets are the authority and the declarations below match
 them.
@@ -23,7 +23,7 @@ outreach-plan summary.
   never edited to fit a draft. **A bulleted list, and each bullet is
   one item — M is the bullet count.** Each of the JD's top requirements
   is its own bullet, in the JD's order; then one bullet each for the
-  band call, the page target, the word budget, "check_materials.py
+  band call, the page target, the word budget, "check_materials.mjs
   clean", and "language checker clean". It is the tailoring loop's
   FIXED — one job, one file, so it lives here instead of in a brief.
 - `## Coverage` — one row per requirement in the jd-analysis:
@@ -33,7 +33,7 @@ outreach-plan summary.
   (the knowledge-map em-dash incident).
 - `## Selection` — every bullet in play, in or out:
   `| # | role | bullet | in/out | source | words | why |` — `in/out` one
-  of `in` / `out`; `source` one of `base` / `story` / `new`. The `out`  rows ARE the cut list, written weakest-first for THIS posting.  `scripts/proposal_block.py` prints the candidate's decisions from both tables as the reply's short block (cuts, placements, gaps) and checks them; the tables themselves are the record and never go in the reply. A `base` row whose `[source: …]` names a session
+  of `in` / `out`; `source` one of `base` / `story` / `new`. The `out`  rows ARE the cut list, written weakest-first for THIS posting.  `scripts/proposal_block.mjs` prints the candidate's decisions from both tables as the reply's short block (cuts, placements, gaps) and checks them; the tables themselves are the record and never go in the reply. A `base` row whose `[source: …]` names a session
   or storybank origin says so in `why`; when the base carries no
   annotations at all, `why` says provenance is UNKNOWN, never nothing.
 - `## Rounds` — the round record, one row per round, a round that
@@ -74,18 +74,18 @@ uploaded. Sections in `patterns.md § Shape` order. Experience bullets are
 the base's own sentences except the declared `## Reworded` pairs.
 
 - `## Reworded` — IN THE RÉSUMÉ FILE: each approved rewording as a
-  `base:` / `tailored:` pair. `scripts/check_materials.py` exempts
+  `base:` / `tailored:` pair. `scripts/check_materials.mjs` exempts
   exactly these lines and still FAILs any other non-verbatim bullet;
   the language checker reads the same block.
 
-- The PDF is rendered by `scripts/render_resume.py` only — it owns the
+- The PDF is rendered by `scripts/render_resume.mjs` only — it owns the
   markup, the escaping, and the measurement (words · pages against the
   target · file size against the upload limit the script states). Its filename is
   the one human-facing name: `<Candidate Name> - <Company> - Resume.pdf`.
 
 ## `applications/<company_key>-<title_key>-cover-letter.md`
 
-Length bounds are `check_materials.py`'s advisory WARNs. Opens on the pitch's core
+Length bounds are `check_materials.mjs`'s advisory WARNs. Opens on the pitch's core
 statement when `pitch.md` exists. Gets a PDF only when a form takes one.
 
 ## The rubric line — shipped with every artifact, each artifact's OWN rubric
@@ -109,5 +109,5 @@ tradeoff, never dropped.
   a standing line there and returns next session — write skipped rows
   `skipped`.
 - `jobs.md` — the row moves to Applied via
-  `../../search/scripts/update_job.py` after a confirmed submit only; a
+  `../../search/scripts/update_job.mjs` after a confirmed submit only; a
   closed posting is dismissed with reason "posting closed".

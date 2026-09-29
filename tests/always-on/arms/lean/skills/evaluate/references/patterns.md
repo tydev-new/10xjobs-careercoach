@@ -14,15 +14,15 @@ The JD and the company name. A swept role's JD is already in
 
 For a pasted role with no row yet:
 ```
-python3 scripts/record_verdict.py --workspace . --company <company> --title <title> --verdict weak --score 0 --reasons "dq: <quote>"
-python3 ../../search/scripts/update_job.py --workspace . --company <company> --title <title> --dismiss --reason "dq: <quote>"
+node scripts/record_verdict.mjs --workspace . --company <company> --title <title> --verdict weak --score 0 --reasons "dq: <quote>"
+node ../../search/scripts/update_job.mjs --workspace . --company <company> --title <title> --dismiss --reason "dq: <quote>"
 ```
 Same reason, both times. An existing row (already swept) skips straight
 to the second command.
 
 ## Recording the verdict
 
-`python3 scripts/record_verdict.py --workspace . --company … --title …
+`node scripts/record_verdict.mjs --workspace . --company … --title …
 --verdict … --score … --reasons … --dealbreakers …` (`--help` for all
 flags) — on the row's exact strings; a fresh spelling forks the record.
 

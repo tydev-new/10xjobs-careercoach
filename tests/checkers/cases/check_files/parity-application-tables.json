@@ -1,0 +1,28 @@
+{
+ "note": "packages/checkers/test/parity.mjs: application-tables (covers: test_selection_table_enums_and_cell_count, test_a_realistic_multi_table_application_is_silent)",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/acme-role.md": "# Acme — Staff Engineer\n\n## Coverage\n\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| Python | have | bullet 3 | answered |\n| Payments | sort of | — | maybe |\n\n## Selection\n\n| # | role | bullet | in/out | source | words | why |\n|---|---|---|---|---|---|---|\n| 1 | Northwind Labs | Built the deployment machine | in | base | 42 | org scale |\n| 2 | Cheetah | Ad platform features | dropped | invented | 22 |\n"
+ },
+ "expect": [
+  {
+   "stdout": "WARN  applications/acme-role.md: \"sort of\" is not one of ['gap', 'have', 'shown-but-unnamed'] — apply/references/schema.md declares the enum\nWARN  applications/acme-role.md: \"maybe\" is not one of ['answered', 'open', 'skipped'] — apply/references/schema.md declares the enum\nWARN  applications/acme-role.md: row has 6 cells, the header has 7: \"| 2 | Cheetah | Ad platform features | dropped | invented | \"\n\n1 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

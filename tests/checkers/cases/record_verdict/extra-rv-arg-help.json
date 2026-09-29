@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: rv-arg-help",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "-h"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "usage: record_verdict.mjs [-h] --workspace WORKSPACE --company COMPANY\n                         --title TITLE\n                         --verdict {strong,investable_stretch,long_shot,weak}\n                         [--score SCORE] [--reasons REASONS]\n                         [--dealbreakers DEALBREAKERS] [--url URL]\n                         [--location LOCATION] [--jd-file JD_FILE]\n                         [--analysis-file ANALYSIS_FILE]\n                         [--company-file COMPANY_FILE] [--track {A,B,C}]\n                         [--existing]\n\nRecord an evaluation verdict in the pipeline record (jobs.md).\n\nThe evaluate skill's ONE structured write. Upserts on the canonical\n(company, title) key — re-evaluating updates the role instead of duplicating\nit. Re-verdict semantics: verdict/score/reason/dealbreakers are REPLACED on\nre-evaluation; pass the full set every time. To avoid duplicate roles, pass\nthe EXISTING role's exact company/title when it was already swept (\"Baseten\nAI\" != \"Baseten\" — canon() strips inc/llc/labs, not \"AI\").\n\nStorage moved from jobs.db to jobs.md 2026-08-14; the shared record library\nlives with the search skill (the pipeline's writer of first entry).\n\n`--analysis-file` records the evaluate decode (`jd-analysis/`); the LATEST\nvalue given wins, unlike `--jd-file` (the raw posting), which keeps the\nfirst. `--existing` is the search quick pass's write: the role must\nalready be a row with the same (company, title) key — nothing is created,\nand `--url`/`--location`/`--jd-file` are refused, so a quick pass can never\ncreate a second, model-typed row or replace the link/location the board\nsupplied.\n\n  node record_verdict.mjs --workspace . --company \"Writer\"     --title \"Director, solutions architecture\" --verdict investable_stretch     --score 85 --reasons \"...\" --dealbreakers \"...\" --url \"...\"     --jd-file \"jd-analysis/...\" --company-file \"company/writer.md\"\n  node record_verdict.mjs --workspace . --company \"Writer\"     --title \"Director, solutions architecture\" --verdict long_shot     --score 40 --reasons \"quick-scan: ...\" --existing\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n  --company COMPANY\n  --title TITLE\n  --verdict {strong,investable_stretch,long_shot,weak}\n  --score SCORE\n  --reasons REASONS\n  --dealbreakers DEALBREAKERS\n  --url URL\n  --location LOCATION\n  --jd-file JD_FILE\n  --analysis-file ANALYSIS_FILE\n  --company-file COMPANY_FILE\n  --track {A,B,C}\n  --existing\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

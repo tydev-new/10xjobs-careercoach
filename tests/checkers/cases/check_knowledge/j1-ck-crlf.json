@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): CRLF file",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\r\n\r\n## Map\r\n\r\n| Topic | Scope | Source | Status |\r\n|---|---|---|---|\r\n| X | track-A | s | gap |\r\n| Y | bad | s | gap |\r\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  Y: bad scope 'bad' — `track-<lane>` or `role: <key>` (plain hyphens)\n\n2 map row(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

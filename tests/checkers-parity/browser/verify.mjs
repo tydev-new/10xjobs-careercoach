@@ -1,5 +1,5 @@
 // Tester-owned browser proof: builds this page with Vite, runs all seven
-// ports through the python3 dispatch in headless Chromium, runs the SAME
+// ports through the node dispatch in headless Chromium, runs the SAME
 // commands in Node, and diffs the two (timestamps masked: both use a real clock).
 //   node tests/checkers-parity/browser/verify.mjs <outDir>
 import { createServer } from "node:http";
@@ -13,7 +13,7 @@ const OUT = process.argv[2];
 execFileSync("node", [join(PKG, "node_modules", "vite", "bin", "vite.js"), "build", HERE, "--outDir", OUT, "--emptyOutDir", "--config", join(HERE, "vite.config.mjs")], { stdio: "inherit" });
 const { chromium } = await import(pathToFileURL(join(PKG, "node_modules", "playwright", "index.mjs")).href);
 const { Bash } = await import(pathToFileURL(join(PKG, "node_modules", "just-bash", "dist", "bundle", "index.js")).href);
-const { python3Command } = await import(pathToFileURL(join(PKG, "src", "just-bash-command.mjs")).href);
+const { nodeCommand } = await import(pathToFileURL(join(PKG, "src", "just-bash-command.mjs")).href);
 const { runAll } = await import(pathToFileURL(join(HERE, "cases.mjs")).href);
 const server = createServer(async (req, res) => {
   try { const p = req.url === "/" ? "/index.html" : req.url.split("?")[0]; const b = await readFile(join(OUT, p));
@@ -32,7 +32,7 @@ const hasNodeGlobals = await page.evaluate(() => typeof process !== "undefined" 
 await browser.close(); server.close();
 if (state !== "ok") { console.log("BROWSER ERROR", text, errs); process.exit(1); }
 const inBrowser = JSON.parse(text);
-const inNode = await runAll(Bash, python3Command);
+const inNode = await runAll(Bash, nodeCommand);
 const MASK = (s) => s.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+00:00/g, "<TS>").replace(/updated \d{4}-\d{2}-\d{2}/g, "updated <D>");
 let bad = 0;
 inBrowser.forEach((b, i) => {

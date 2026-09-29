@@ -1,0 +1,27 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): covers: tests/test_check_stories.py::test_row_without_file_and_orphan_file_fail",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "stories/S002-b.md": "# story\n",
+  "storybank.md": "# Storybank\n\n## Coverage\n\n| Competency | Source | Covered by |\n|---|---|---|\n| X | [inferred] | S001 |\n\n## Stories\n\n| ID | Title | Strength | Status | Notes |\n|---|---|---|---|---|\n| S001 | A | 4 | confirmed | |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  S001: index row has no stories/S001-*.md file\nFAIL  stories/S002-b.md: no index row\n\n1 index row(s), 1 story file(s); 2 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

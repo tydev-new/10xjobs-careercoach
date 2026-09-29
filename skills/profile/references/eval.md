@@ -10,7 +10,7 @@ The split runs on what the check must read (goal 2's table, measured
 t15: an independent checker caught 10/10 language violations where
 self-check caught 1/7).
 
-- **Structure and counts → `scripts/check_files.py`**: schemas, history
+- **Structure and counts → `scripts/check_files.mjs`**: schemas, history
   tables, the file manifest, stray files. Run at session close.
 - **Language against written rules → the checker-subagent**
   (`language-check.md`): runs inside the base-résumé loop's self-loop —

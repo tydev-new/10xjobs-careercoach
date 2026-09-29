@@ -1,0 +1,21 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): argparse with no arguments",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: update_job.mjs [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.mjs: error: the following arguments are required: --workspace, --company, --title\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

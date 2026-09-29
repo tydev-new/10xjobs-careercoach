@@ -1,0 +1,32 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: rv-duplicate-rows-in-file",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n*x*\n\n**Active: 2** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Beta Inc — PM\n\n### Beta — PM\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "jobs.md: duplicate role Beta — PM (canonical collision with Beta Inc — PM)\n",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_three_lens_review.py::test_messages_cli_fails_an_ascii_arrow_in_a_draft_with_the_spec_message",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--contacts",
+    "<ws>/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "acme.md": "# Acme\n\n> Grew signal 80%->90% this quarter across teams.\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: FAIL (1 fail, 1 warn, 1 drafts)\n  [WARN] pitch.md Messages rubric is PROPOSED/absent — drafts need the candidate's pin before finalizing (WATCH forms enforced anyway)\n  [FAIL] draft 1: arrow chain \"->\" — write it in words (\"from 80% to under 1%\"); a reader sees an arrow as notes, not a sentence\n  [INFO] draft 1: 47 chars / 7 words\n✘ fix the FAILs before finalizing\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

@@ -10,9 +10,9 @@ that a decode without it matches an unskilled read.
 1. **Intake.** The JD and the company name. A swept role's JD is
    already in `jd-inbox/` — read it from the row's `jd_file`.
 2. **Dealbreakers** (the sequence's rule 2). Two steps for a pasted
-   role with no row: `scripts/record_verdict.py --workspace . --company
+   role with no row: `scripts/record_verdict.mjs --workspace . --company
    <company> --title <title> --verdict weak --score 0 --reasons
-   "dq: <quote>"` (creates the row), then `../../search/scripts/update_job.py
+   "dq: <quote>"` (creates the row), then `../../search/scripts/update_job.mjs
    --workspace . --company <company> --title <title> --dismiss --reason
    "dq: <quote>"`, same reason — the script's four tiers stay untouched.
    An existing row (already swept) skips straight to the second command.
@@ -34,14 +34,14 @@ that a decode without it matches an unskilled read.
    tiers`) plus a fit score (0–100); Flags carry the softer caveats
    (location vs profile geo, role-type mismatch, a criterion the JD
    leaves unverifiable).
-7. **Record it:** `python3 scripts/record_verdict.py --workspace .
+7. **Record it:** `node scripts/record_verdict.mjs --workspace .
    --company … --title … --verdict … --score … --reasons …
    --dealbreakers …` `--analysis-file jd-analysis/<file>.md` (the
    analysis you just wrote) (`--help` for all flags) — on the row's
    exact strings (rule 6).
 
    In a run over several roles, record each one as soon as its verdict is
-   decided (its analysis file and its `record_verdict.py` call), then move
+   decided (its analysis file and its `record_verdict.mjs` call), then move
    to the next role. Never hold verdicts back to write together at the end:
    a batch cut off partway (a reply limit, a closed session) saves nothing,
    and the next session finds no sign the work was done. *(Receipt: web

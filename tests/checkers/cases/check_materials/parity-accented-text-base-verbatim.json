@@ -1,0 +1,29 @@
+{
+ "note": "packages/checkers/test/parity.mjs: accented-text-base-verbatim (covers: design-web-agent.md § 5 known risk: accented text)",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--resume",
+    "<ws>/resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "base-resume.md": "# Base\n\n## Experience\n- Wrote the café pipeline in Montréal for the finance team.\n",
+  "resume.md": "# A\n\n## Summary\n\nok café.\n\n## Experience\n\n- Wrote the café pipeline in Montréal for the finance team.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: pass (0 fail, 0 warn)\n\n✔ automatic checks clean\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

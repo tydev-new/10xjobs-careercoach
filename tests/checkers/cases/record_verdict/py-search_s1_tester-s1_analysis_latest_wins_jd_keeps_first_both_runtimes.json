@@ -1,0 +1,115 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_analysis_latest_wins_jd_keeps_first_both_runtimes (4 calls on one workspace)",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--jd-file",
+    "jd-inbox/1.md",
+    "--analysis-file",
+    "jd-analysis/1.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  },
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--jd-file",
+    "jd-inbox/2.md",
+    "--analysis-file",
+    "jd-analysis/2.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  },
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--analysis-file",
+    "jd-analysis/3.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  },
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "recorded (created NEW role): Acme — Staff Engineer → strong (None)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0,
+   "after": {
+    "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- Seen: 2026-09-23T12:34:56+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- JD: jd-inbox/1.md\n- Analysis: jd-analysis/1.md\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+   }
+  },
+  {
+   "stdout": "recorded (updated existing role): Acme — Staff Engineer → strong (None)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0,
+   "after": {
+    "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- Seen: 2026-09-23T12:34:56+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- JD: jd-inbox/1.md\n- Analysis: jd-analysis/2.md\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+   }
+  },
+  {
+   "stdout": "recorded (updated existing role): Acme — Staff Engineer → strong (None)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0,
+   "after": {
+    "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- Seen: 2026-09-23T12:34:56+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- JD: jd-inbox/1.md\n- Analysis: jd-analysis/3.md\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+   }
+  },
+  {
+   "stdout": "recorded (updated existing role): Acme — Staff Engineer → strong (None)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0,
+   "after": {}
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- Seen: 2026-09-23T12:34:56+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- JD: jd-inbox/1.md\n- Analysis: jd-analysis/3.md\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+ }
+}

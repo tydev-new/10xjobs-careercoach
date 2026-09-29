@@ -1,0 +1,26 @@
+{
+ "note": "tests/test_check_knowledge.py::test_clean_map_passes",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "<ws>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| X | track-A | [inferred] | gap |\n| Y | role: mesh-head-of-fde | Mesh JD | studying |\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n2 map row(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

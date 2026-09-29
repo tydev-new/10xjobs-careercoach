@@ -60,7 +60,7 @@ for case_name in ${CASES:-t19-intake t19-folder-repo}; do
   # the owner's ENTIRE `.claude/` dir, including skills/ (the DEPLOYED
   # skills, not the build under test) and history.jsonl/sessions/. A
   # re-test found an agent `find`-ing and RUNNING the owner's deployed
-  # ~/.claude/skills/coach/scripts/check_closeout.py from exactly this
+  # ~/.claude/skills/coach/scripts/check_closeout.mjs from exactly this
   # copy. Now uses the shared, minimal sandbox_home_setup (lib_env.sh) —
   # verified live to still authenticate with nothing copied but the
   # top-level .claude.json and an EMPTY .claude/ dir.

@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: pb-arg-help",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--help"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "usage: proposal_block.mjs [-h] --workspace WORKSPACE --application APPLICATION\n                         [--base BASE]\n\nPrint the candidate's DECISIONS as the short block the reply carries\nbeside the delivered document — and check the two things prose kept\nfailing (t10, ~20 trials across 2026-08):\n\n  1. the cut list never reached the reply (pointed at, retyped loosely, or\n     a 26-row table the model would not paste) → this script prints a\n     SHORT list from the file's rows: each cut with what it buys, each\n     shown-but-unnamed word with its placement, each gap as a question —\n     the full seven-column tables stay in the file as the record;\n  2. a requirement true in the base but missing the JD's own word was filed\n     `have` instead of `shown-but-unnamed` → for every `have` row, the\n     requirement's content words are looked up in the base résumé; absent\n     words are named as a WARN.\n\nStructure tier (the READ-split): what a script can see. Whether a cut is\nthe weakest for THIS posting stays the agent's judgment — the script only\nnotices when the `out` rows are in base order (their # strictly rising)\nand says so.\n\n    node proposal_block.mjs --workspace . --application applications/<key>.md\n      [--base base-resume.md]\n\nExit 0 = clean or WARNs only; 1 = at least one FAIL (an `out` row with no\n`why` or no `words` — a cut nobody can weigh).\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n  --application APPLICATION\n                        applications/<key>.md (relative to workspace or\n                        absolute)\n  --base BASE           base résumé path; defaults to <workspace>/base-\n                        resume.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

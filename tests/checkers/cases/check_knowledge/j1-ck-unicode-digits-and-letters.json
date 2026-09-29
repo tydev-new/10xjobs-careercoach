@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): A-Za-z0-9 are ASCII only",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| X | track-Ａ | s | gap |\n| Y | role: é-x | s | gap |\n| Z | track-٣ | s | gap |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  X: bad scope 'track-Ａ' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  Y: bad scope 'role: é-x' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  Z: bad scope 'track-٣' — `track-<lane>` or `role: <key>` (plain hyphens)\n\n3 map row(s); 3 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

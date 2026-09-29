@@ -1,0 +1,35 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: s1-rv-existing-with-jd-file-refused",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--jd-file",
+    "jd-inbox/x.md",
+    "--existing"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n- URL: https://board/acme\n- Location: Remote\n- Seen: 2026-01-01T00:00:00+00:00\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: --existing refuses --url/--location/--jd-file\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

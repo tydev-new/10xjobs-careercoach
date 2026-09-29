@@ -1,0 +1,27 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cf-arg-unrecognized",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--skill",
+    "<skills>",
+    "--x"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_files.mjs [-h] --workspace WORKSPACE [--skills SKILLS]\ncheck_files.mjs: error: unrecognized arguments: --x\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

@@ -1,0 +1,36 @@
+{
+ "note": "packages/checkers/test/parity.mjs: updates-existing-role-reverdict (covers: record_verdict.py docstring: re-verdict semantics upsert)",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Writer",
+    "--title",
+    "Staff Infrastructure Engineer",
+    "--verdict",
+    "long_shot",
+    "--score",
+    "40"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-08-01\n\n## To Review\n\n### Writer — Staff Infrastructure Engineer\n- Seen: 2026-08-01T00:00:00+00:00\n"
+ },
+ "expect": [
+  {
+   "stdout": "recorded (updated existing role): Writer — Staff Infrastructure Engineer → long_shot (40)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Writer — Staff Infrastructure Engineer\n- Seen: 2026-08-01T00:00:00+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: long_shot\n- Score: 40\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+ }
+}

@@ -36,7 +36,7 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 - **Each round:** Read `## Standard` and earlier `## Rounds` rows first. Reshape-only from `base-resume.md` (selection, order, depth — never invented facts). Run the checks and the three-lens panel (`references/eval.md § The panel — three lenses`). Score round as `N/M held` count and append row to `## Rounds`.
 - **Obligations:**
   1. *Facts need a yes:* Voluntarily surfaced facts go to `storybank.md`, not directly into a résumé without an explicit yes.
-  2. *Deliver & Disclose:* Present the deliverable beside the proposal block (`scripts/proposal_block.py` list of cuts and placed words with easy reversal).
+  2. *Deliver & Disclose:* Present the deliverable beside the proposal block (`scripts/proposal_block.mjs` list of cuts and placed words with easy reversal).
   3. *Exact edits:* Apply candidate edits directly in place and re-render.
 - **Exits:** When the round scores M/M held with every lens at Pass and the candidate accepts; at the budget; or at the ceiling: two `## Rounds` rows with the same count and lens verdicts. At the budget or the ceiling, stop and present a decision for the candidate to make, showing each lens still at Revise or Fail with its `## Panel` rows; the package is not ready until every lens passes or the candidate waives it in chat. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
 
@@ -72,7 +72,7 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 Owned: `applications/` (shapes in `references/schema.md`).
 
 - **Hands back:** Outreach sends go to `outreach`; interview prep goes to `interview`; confirmed story leads go to `storybank`; base updates go to `profile`.
-- **Session close:** Run `python3 scripts/check_materials.py`, `python3 scripts/proposal_block.py`, and `python3 ../profile/scripts/check_files.py --workspace .`. Wording check subagent runs on every delivered document. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `node scripts/check_materials.mjs`, `node scripts/proposal_block.mjs`, and `node ../profile/scripts/check_files.mjs --workspace .`. Wording check subagent runs on every delivered document. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

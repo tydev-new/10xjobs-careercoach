@@ -1,7 +1,7 @@
 # Coach — the file shapes
 
 Coach owns one file and its annex. `plan.md` is declared here and
-enforced by `../../profile/scripts/check_files.py` (sections and their
+enforced by `../../profile/scripts/check_files.mjs` (sections and their
 order); `plan-log.md` is append-only history. Two sanctioned outside
 writers, stated on both sides: profile's intake seeds the head once
 (goal, date, time floor); apply's tailoring adds or removes ONE "gap
@@ -65,4 +65,4 @@ Everything: `jobs.md` (stage, staleness, `posted_at`), `contacts/`
 application defaults), `criteria.md` (targets, target companies), the
 workspace `CLAUDE.md` (its version marker vs the shipped template), the
 inbox and calendar (read-only, the dedicated job-search account).
-Pipeline changes go through `../../search/scripts/update_job.py`.
+Pipeline changes go through `../../search/scripts/update_job.mjs`.

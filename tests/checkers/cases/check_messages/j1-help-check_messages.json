@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): help text names the script (§ 5.5's rename check)",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "-h"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "usage: check_messages.py [-h] --workspace WORKSPACE --contacts CONTACTS\n\nMechanical floor for outreach drafts — the checkable slice of the rubric.\n\nScans the draft blockquotes in a contacts/<company>.md file (each blockquote\ngroup is one draft; blank lines don't split it). FAILs scope to the DRAFTS —\nthe rest of the file legitimately quotes third parties. Judgment\n(hook choice, voice, ask) stays in the written rubric line; this floor is what\nLoop A fixes before showing (design: outreach message self-loop, ≤2 passes).\n\n    python3 check_messages.py --workspace <dir> --contacts contacts/foo.md\n\nStructure tier ONLY since #29 (the READ-split, measured by t15: the\nlanguage tier — never-say phrases, WATCH-tier struck forms — moved to the\nindependent checker, profile/references/language-check.md, which catches\nparaphrases this floor's exact-match never could). The rubric-PINNED state\nstays here: a PROPOSED rubric yields a WARN (pinning is a state check, not\na language read).\n\nEarned 2026-08-16 (first live plan, Lindy): a drafted connect request opened\n\"I've spent 20 years\" — an aggregate-year age tag banned by the proposed\nrubric's own WATCH row — and carried an arrow glyph; nothing mechanical could\ncatch either. Exit 0 = clean, 1 = at least one FAIL.\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n                        dir holding voice.md + pitch.md\n  --contacts CONTACTS   contacts/<company>.md to check\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

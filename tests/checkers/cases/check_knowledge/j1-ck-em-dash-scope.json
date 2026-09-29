@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): covers: tests/test_check_knowledge.py::test_em_dash_scope_fails",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| X | role: mesh—head-of-fde | Mesh JD | gap |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  X: bad scope 'role: mesh—head-of-fde' — `track-<lane>` or `role: <key>` (plain hyphens)\n\n1 map row(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

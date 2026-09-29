@@ -1,0 +1,39 @@
+{
+ "note": "packages/checkers/test/parity.mjs: existing-on-present-key-changes-only-verdict-fields (covers: design-web-search.md § 4.3: --existing on a present key changes only the verdict fields and Evaluated/Updated)",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--score",
+    "62",
+    "--reasons",
+    "quick-scan: fits",
+    "--existing"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — Staff Engineer\n- URL: https://board/acme\n- Location: Remote\n- Seen: 2026-01-01T00:00:00+00:00\n- Company file: company/acme.md\n- Track: A\n"
+ },
+ "expect": [
+  {
+   "stdout": "recorded (updated existing role): Acme — Staff Engineer → strong (62)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- URL: https://board/acme\n- Location: Remote\n- Seen: 2026-01-01T00:00:00+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- Score: 62\n- Reason: quick-scan: fits\n- Track: A\n- Company file: company/acme.md\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+ }
+}

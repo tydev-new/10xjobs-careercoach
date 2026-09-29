@@ -1,0 +1,31 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-cc-arg-asked-equals-dash",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--s",
+    "applying",
+    "--ask=--comp floor",
+    "--ask",
+    "floor"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "## Board\nWaiting on you\n- the comp floor\nTo do\n- x\n"
+ },
+ "expect": [
+  {
+   "stdout": "close-out clean: stage applying; plan.md written; 2 question(s) each have a row\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

@@ -1,4 +1,0 @@
-WARN  `have` row "SQL modeling experience": their word(s) ['preferred'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move
-WARN  `have` row "stakeholder communication": their word(s) ['communication'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move
-WARN  `have` row "cross-functional partnership": their word(s) ['partnership'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move
-All checks clean. Here's the package.

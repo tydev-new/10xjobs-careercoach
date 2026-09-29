@@ -72,7 +72,7 @@ Extended craft and form automation in `references/patterns.md`. File shapes in `
 Owned: `applications/` (shapes in `references/schema.md`).
 
 - **Hands back:** Outreach sends go to `outreach`; interview prep goes to `interview`; confirmed story leads go to `storybank`; base updates go to `profile`.
-- **Session close:** Run `node scripts/check_materials.mjs`, `node scripts/proposal_block.mjs`, and `node ../profile/scripts/check_files.mjs --workspace .`. Wording check subagent runs on every delivered document. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `node scripts/check_materials.mjs`, `node scripts/proposal_block.mjs`, and `node ../profile/scripts/check_files.mjs --workspace .`. Wording check subagent runs on every delivered document. Report outcomes, never narration (clean is 1 line, and only when nothing failed or warned; fix FAILs before the reply ends; fix each WARN or tell it to the candidate).
 
 ## Guardrails
 

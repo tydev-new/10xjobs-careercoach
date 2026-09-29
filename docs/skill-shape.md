@@ -19,7 +19,7 @@ something goes, ask which question it answers.
 | `references/eval.md` | how to tell whether you got there, and who checks | at a loop's exit and at session close |
 | `references/schema.md` | what shape the records take | before writing a record |
 | `references/patterns.md` | how to do a specific task well | before the task |
-| `scripts/*.py` | the checks with one right answer | executed, never read into context |
+| `scripts/*.mjs` | the checks with one right answer, in JavaScript, run with `node`, no packages to install (outreach, learn and storybank move at J3; search's four at S4) | executed, never read into context |
 
 **All five, no exceptions** — with one sanctioned form of sharing: a
 skill whose mechanical checks live in another skill's script (positioning

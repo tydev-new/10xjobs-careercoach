@@ -84,6 +84,10 @@ export async function run(argv, io) {
   if (cov === null) findings.push(["FAIL", "no coverage table under the declared header — write it to the file first"]);
   if (sel === null) findings.push(["FAIL", "no selection table under the declared header — write it to the file first"]);
 
+  // The block is the candidate's DECISIONS, short, beside the delivered
+  // document (founder 2026-08-21: deliver first, disclose beside, silence
+  // is a yes). The full seven-column tables stay in the file as the
+  // record; ~20 trials showed a 26-row table never reaches a reply.
   if (sel !== null) {
     const outs = sel.filter((r) => r.length === 7 && stripChars(r[3].toLowerCase(), "`*_ ") === "out");
     const ins = sel.filter((r) => r.length === 7 && stripChars(r[3].toLowerCase(), "`*_ ") === "in");

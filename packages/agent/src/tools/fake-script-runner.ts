@@ -9,19 +9,20 @@
 // Dispatch matches spike 2's proven mechanism (docs/spikes/spike-2-just-
 // bash-commands.md; docs/design-js-only.md § 3.5, J2 — "node" is the real
 // dispatcher now, "python3" only points at it): the FIRST argv token
-// after "node" (or, leniently, "python3" — this FAKE is a test double,
-// not the production dispatch contract in packages/checkers/src/
-// dispatch.mjs, so it accepts either prefix rather than reproducing
-// python3's real pointer-only 127) is matched by file name, so
-// "scripts/x.mjs", "../apply/scripts/x.mjs", and
-// "skills/apply/scripts/x.mjs" all reach the same canned script.
-// Unrecognized commands exit 127 with "not available in the web app:
-// <name>", per § 5.
+// after "node" is matched by file name, so "scripts/x.mjs",
+// "../apply/scripts/x.mjs", and "skills/apply/scripts/x.mjs" all reach
+// the same canned script. "python3 <name>.py" is never dispatched — it
+// behaves like the production dispatch's pointer
+// (packages/checkers/src/dispatch.mjs's dispatchPython3): if a canned
+// script named "<name>.mjs" exists, it exits 127 naming the "node
+// <name>.mjs" command to run instead; otherwise the plain unrecognized-
+// command message. Unrecognized commands exit 127 with "not available
+// in the web app: <name>", per § 5.
 import { tokenizeCommand } from "../shell-tokenize.ts";
 import type { RunResult, ScriptRunner } from "../types.ts";
 
 export interface CannedScript {
-  /** matched against the basename of argv[1] when argv[0] is "node" or "python3" */
+  /** matched against the basename of argv[1] when argv[0] is "node" */
   name: string;
   run(
     argv: string[],
@@ -42,7 +43,30 @@ export function createFakeScriptRunner(scripts: CannedScript[]): ScriptRunner {
       // split the way just-bash/a real shell would.
       const argv = tokenizeCommand(command);
       const [bin, scriptPath] = argv;
-      if ((bin !== "node" && bin !== "python3") || !scriptPath) {
+      if (bin === "python3" && scriptPath) {
+        // The pointer-only path (never a real runner): point at the
+        // equivalent "node …mjs" command when one exists, otherwise fall
+        // through to the plain unrecognized-command message below.
+        const name = basename(scriptPath);
+        const mjsName = name.endsWith(".py") ? name.slice(0, -3) + ".mjs" : null;
+        if (mjsName && byName.has(mjsName)) {
+          const nodePath = scriptPath.endsWith(".py") ? scriptPath.slice(0, -3) + ".mjs" : scriptPath;
+          return {
+            result: {
+              stdout: "",
+              stderr: `python3 is not available here. Run the same check with node: node ${nodePath}\n`,
+              exitCode: 127,
+              changed: [],
+            },
+            changedFiles: {},
+          };
+        }
+        return {
+          result: { stdout: "", stderr: `not available in the web app: ${name}\n`, exitCode: 127, changed: [] },
+          changedFiles: {},
+        };
+      }
+      if (bin !== "node" || !scriptPath) {
         return {
           result: { stdout: "", stderr: `not available in the web app: ${command}\n`, exitCode: 127, changed: [] },
           changedFiles: {},

@@ -100,8 +100,11 @@ def test_evaluate_summary_card_lines_without_outer_backticks_inside_the_fence():
 
 
 def test_proposal_block_strings_both_runtimes():
-    for rel in (("skills", "apply", "scripts", "proposal_block.py"),
-                ("packages", "checkers", "src", "proposal-block.mjs")):
+    # J2 (docs/design-js-only.md § 2, § 6): one copy, the lib that both the
+    # node command and the web dispatch import. Both hosts import it:
+    assert 'from "./lib/proposal-block.mjs"' in _read("skills", "apply", "scripts", "proposal_block.mjs")
+    assert "apply/scripts/lib/proposal-block.mjs" in _read("packages", "checkers", "src", "dispatch.mjs")
+    for rel in (("skills", "apply", "scripts", "lib", "proposal-block.mjs"),):
         src = _read(*rel)
         assert "and the bullet's name or number to bring one back." in src, rel
         assert "Say \\\"keep\\\"" in src or 'Say "keep"' in src, rel
@@ -122,8 +125,9 @@ def test_t6_and_t13_expectations_and_judge():
 
 def test_conditional_rows_untouched():
     # § 2 "Fixes that land only on a measured miss" — none may ship unmeasured.
-    assert "✔ automatic checks clean" in _read("skills", "apply", "scripts", "check_materials.py")
-    assert "✔ automatic checks clean" in _read("packages", "checkers", "src", "check-materials.mjs")
+    # J2: one copy (skills/apply/scripts/lib/check-materials.mjs, § 2); the
+    # Python file and packages/checkers/src/ are gone.
+    assert "✔ automatic checks clean" in _read("skills", "apply", "scripts", "lib", "check-materials.mjs")
     assert "A spend gate you opened earlier this chat" in _read("packages", "agent", "src", "coach.ts")
     assert "The only gate is spend" in _read("skills", "profile", "templates", "web-host-note.md")
 
@@ -386,7 +390,7 @@ def test_t21_planted_files_trip_exactly_the_letter_band_warn():
         shutil.copytree(os.path.join(case, "applications"), os.path.join(d, "applications"))
         R = glob.glob(os.path.join(d, "applications", "*-resume.md"))[0]
         L = glob.glob(os.path.join(d, "applications", "*cover-letter*.md"))[0]
-        r = subprocess.run([sys.executable, os.path.join(REPO, "skills", "apply", "scripts", "check_materials.py"),
+        r = subprocess.run(["node", os.path.join(REPO, "skills", "apply", "scripts", "check_materials.mjs"),
                             "--workspace", d, "--resume", R, "--letter", L], capture_output=True, text=True)
         out = r.stdout + r.stderr
         flagged = [l for l in out.splitlines() if "[WARN]" in l or "[FAIL]" in l]
@@ -484,11 +488,11 @@ def test_mvp_journey_proposal_block_output_is_the_real_script_output():
             with open(p, "w", encoding="utf-8") as f:
                 f.write(v)
         parts = [p for m in fx["messages"] for p in m.get("parts", [])
-                 if p.get("type") == "tool-bash" and "proposal_block.py" in p["input"]["command"]]
+                 if p.get("type") == "tool-bash" and "proposal_block" in p["input"]["command"]]
         assert len(parts) == 1
         cmd = parts[0]["input"]["command"].split()
-        assert cmd[:2] == ["python3", "apply/scripts/proposal_block.py"]
-        r = subprocess.run([sys.executable, os.path.join(REPO, "skills", "apply", "scripts", "proposal_block.py"), *cmd[2:]],
+        assert cmd[:2] == ["node", "apply/scripts/proposal_block.mjs"]
+        r = subprocess.run(["node", os.path.join(REPO, "skills", "apply", "scripts", "proposal_block.mjs"), *cmd[2:]],
                            capture_output=True, text=True, cwd=d)
         assert r.stdout.rstrip("\n") == parts[0]["output"]["stdout"].rstrip("\n")
         assert r.returncode == parts[0]["output"]["exitCode"]

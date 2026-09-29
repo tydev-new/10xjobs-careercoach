@@ -141,6 +141,9 @@ The scripts the MVP journey uses: `check_materials`, `check_files`,
 - [ ] the parity test is wired into `tests/run.py`, so drift fails loudly
 - [ ] the ports have no Node-only or browser-only imports (they run in both)
 
+Superseded at J2: the parity test was replaced by the expected-output cases
+(design-js-only.md § 5), wired into `tests/run.py`.
+
 ### Step 4 - The agent package, headless first · Co ×2 (loader+tools ∥ just-bash+commands), Te
 
 `createCoach`, the staged skill loader, just-bash with the checker commands, the
@@ -356,6 +359,9 @@ MVP's default model; the judge stays pinned.
 - Step 3 ports scripts, so it is unaffected.
 - Step 4's conduct parity compares the web runtime and `claude -p` **on the same
   skills commit**. Every B1 batch merge re-runs that parity.
+- **During the JavaScript switch** (`docs/design-js-only.md` § 8), no B1
+  batch is open from the start of J1 (or from the day J2 branches, if
+  that is earlier) to the end of J5.
 
 **Exit:**
 
@@ -396,8 +402,9 @@ Every target host reads `SKILL.md` and connects to a custom remote MCP server
 | Grok | skills + connectors, "Bring your own MCP" (May 2026) | yes | xAI says it reads Claude Code plugins with no configuration; must be verified |
 | Gemini Spark | can be taught skills; MCP connections | yes | how it loads skills must be verified |
 
-The prose ports; the scripts don't, because consumer hosts can't be relied on to
-run local Python against a folder that persists. The remote MCP server serves the
+The prose ports; the scripts didn't, because at the time consumer hosts couldn't
+be relied on to run local Python against a folder that persists (from J2, the
+scripts run on Node; design-js-only.md). The remote MCP server serves the
 same JS tools as the web app: workspace files, checkers, and
 `get_active_context`. **No MCP tool sends or submits anything** (rule 7).
 

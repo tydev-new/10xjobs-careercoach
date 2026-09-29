@@ -255,6 +255,120 @@ def _jobs_md_afters():
     return out
 
 
+def _arg_value(argv, flag):
+    for i, tok in enumerate(argv):
+        if tok == flag and i + 1 < len(argv):
+            return argv[i + 1]
+    return None
+
+
+def _jobs_md_after_steps():
+    """Every (case path, step index, script, argv, pre-text-or-None,
+    post-text) where a record_verdict/update_job STEP's own write touched
+    jobs.md. `pre` is the jobs.md text immediately BEFORE that step (None
+    if the file did not exist yet); `post` is the FULL jobs.md text
+    immediately after — tests/checkers/run-cases.mjs's diffStates() (the
+    recorder) stores the full new content of a changed file per step, not
+    a line-level diff, so expect[i]["after"]["jobs.md"] is already exactly
+    that step's own complete output. Steps whose own diff did not touch
+    jobs.md are skipped (an ambiguous update_job match writes nothing,
+    for one); `pre`/`post` for the NEXT step that does touch it carry the
+    carried-forward state, the same way run-cases.mjs's own `expState`
+    accumulates per-step diffs (applyTree) rather than replaying the
+    top-level "after" for multi-step cases — that field is redundant,
+    informational only, and not what run-cases.mjs verifies against."""
+    out = []
+    for group in ("record_verdict", "update_job"):
+        for path in sorted(glob.glob(os.path.join(ROOT, "tests", "checkers", "cases", group, "*.json"))):
+            case = json.load(open(path, encoding="utf-8"))
+            steps = case.get("steps") or []
+            multi = len(steps) > 1
+            current = _decode_entry((case.get("before") or {}).get("jobs.md"))
+            for i, step in enumerate(steps):
+                if multi:
+                    exp = (case.get("expect") or [None] * len(steps))[i]
+                    after_tree = (exp or {}).get("after") or {}
+                else:
+                    after_tree = case.get("after") or {}
+                if "jobs.md" in after_tree:
+                    post = _decode_entry(after_tree["jobs.md"])
+                    if post is not None:
+                        out.append((os.path.relpath(path, ROOT), i, step["script"], step["argv"], current, post))
+                        current = post
+    return out
+
+
+def _derive_write_key(script, argv, pre_text):
+    """The write_key a real invocation of `script` would have used — the
+    SAME way the retired script derived it, not a re-invention: record_
+    verdict.py: `k = (jm.canon(a.company), jm.canon(a.title))` straight
+    from argv (a plain upsert key, no fuzzy matching). update_job.py:
+    `jm.save(..., write_key=jm.key(r))` where `r = jm.find(rows, a.company,
+    a.title)[0]` — company must canon-match exactly but title is a
+    SUBSTRING match (jm.find's own docstring), so the key must come from
+    the MATCHED row's own full title, never the raw --title fragment."""
+    company = _arg_value(argv, "--company")
+    title = _arg_value(argv, "--title")
+    name = os.path.basename(script)
+    if name.startswith("record_verdict"):
+        return (jm.canon(company), jm.canon(title))
+    if name.startswith("update_job"):
+        ws = tempfile.mkdtemp()
+        if pre_text is not None:
+            with open(jm.path(ws), "w", encoding="utf-8") as f:
+                f.write(pre_text)
+        hits = jm.find(jm.load(ws), company, title)
+        if len(hits) != 1:
+            raise AssertionError(f"jm.find matched {len(hits)} role(s) for --company {company!r} --title {title!r}, expected exactly 1")
+        return jm.key(hits[0])
+    raise AssertionError(f"unexpected script {script!r}")
+
+
+def test_jobs_md_save_of_load_with_the_targeted_write_key_reproduces_every_step_byte_for_byte():
+    """Lead's M2 ruling (js-only J2 review, on the earlier, weaker
+    write_key=None version of this test): the spec's point is that the
+    surviving jobs_md.py duplicate stays byte-identical to what the
+    WRITERS produce. The writers save with the TARGETED write_key — S1
+    review, third pass, the lead ruling captured in jobs_md.py's own
+    `_block()` comment: write_key=None always cleans/re-canonicalizes
+    EVERY row (a full-file rewrite), where write_key=<key> echoes every
+    OTHER row's cached `_raw` byte for byte and only cleans the targeted
+    one — so the faithful round trip uses the SAME key: for each
+    record_verdict/update_job step that wrote jobs.md,
+    `jm.save(jm.load(after), write_key=<the row key that step targeted>)`,
+    the key derived from that step's own --company/--title arguments
+    exactly the way the retired script itself derived it (see
+    _derive_write_key's docstring).
+
+    No case excluded, and not weakened to work around a failure: any
+    step that still disagrees with its own key is collected and reported
+    (case + step + reason), not papered over."""
+    steps = _jobs_md_after_steps()
+    assert len(steps) >= 20, f"expected many record_verdict/update_job steps that touched jobs.md, found {len(steps)}"
+    failures = []
+    for rel_path, i, script, argv, pre_text, post_text in steps:
+        try:
+            write_key = _derive_write_key(script, argv, pre_text)
+        except AssertionError as e:
+            failures.append(f"{rel_path} step {i + 1} ({os.path.basename(script)}): could not derive write_key: {e}")
+            continue
+        ws = tempfile.mkdtemp()
+        with open(jm.path(ws), "w", encoding="utf-8") as f:
+            f.write(post_text)
+        try:
+            rows = jm.load(ws)
+            jm.save(ws, rows, write_key=write_key)
+            written = open(jm.path(ws), encoding="utf-8").read()
+        except SystemExit as e:
+            failures.append(f"{rel_path} step {i + 1} ({os.path.basename(script)}): "
+                             f"jm.save(jm.load(after), write_key={write_key!r}) raised SystemExit({e.code})")
+            continue
+        if _mask(written) != _mask(post_text):
+            failures.append(f"{rel_path} step {i + 1} ({os.path.basename(script)}): "
+                             f"save(load(after), write_key={write_key!r}) != after")
+    assert not failures, f"{len(failures)}/{len(steps)} step(s) fail the ruled spec:\n" + "\n".join(failures)
+
+
 def test_jobs_md_round_trip_matches_the_js_ports_round_trip_byte_for_byte():
     """"Match byte for byte" is cross-ENGINE: this guards the duplicate
     (jobs_md.py vs skills/search/scripts/lib/jobs-md.mjs), so what must

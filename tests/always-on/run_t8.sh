@@ -6,7 +6,7 @@
 # needs every description present.
 #
 # Environment contract (README): --setting-sources project, fresh mktemp,
-# full permissions (rule 4 — update_job.py must be runnable for the
+# full permissions (rule 4 — update_job.mjs must be runnable for the
 # recording obligations to be expressible).
 # Usage: ./run_t8.sh <run-tag>   (TRIALS=n RUNNER_MODEL=<dated-id> overridable — bare aliases like `sonnet` are rejected; see README Pinned models)
 set -u

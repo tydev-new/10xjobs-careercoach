@@ -126,7 +126,7 @@ any of them can end it.
   the eye lands** — top of the page, left margin, bolded bullet openers.
   (`../../apply/references/patterns.md § The Summary` turns those 7–11
   seconds into the Summary's shape, for the base résumé too;
-  `check_materials.py` FAILs more than 50 words of Summary prose.)
+  `check_materials.mjs` FAILs more than 50 words of Summary prose.)
 - **Level has to be readable in one pass.** The verb ladder: IC
   developed / built / implemented · Manager managed / led / coordinated ·
   Director directed / scaled / established · VP championed /

@@ -187,7 +187,7 @@ test("bash: a write-back, then a write_file on the SAME path, succeeds", async (
   const workspace = createInMemoryWorkspaceStore({ "jobs.md": "# Pipeline\n" });
   const scripts = createFakeScriptRunner([
     {
-      name: "record_verdict.py",
+      name: "record_verdict.mjs",
       run: () => ({
         result: { stdout: "recorded", stderr: "", exitCode: 0 },
         changedFiles: { "jobs.md": "# Pipeline\n\n### Acme — Staff PM\n- Verdict: strong\n" },
@@ -196,7 +196,7 @@ test("bash: a write-back, then a write_file on the SAME path, succeeds", async (
   ]);
   const { tools, ctx } = await makeCtx({ workspace, scripts });
   const bashOut: any = await (tools.bash.execute as any)(
-    { command: "python3 evaluate/scripts/record_verdict.py --company Acme --title \"Staff PM\" --verdict strong" },
+    { command: "node evaluate/scripts/record_verdict.mjs --company Acme --title \"Staff PM\" --verdict strong" },
     {},
   );
   assert.equal(bashOut.exitCode, 0);
@@ -211,7 +211,7 @@ test("bash: a refused write-back (skills/) fails the command with exit 1 and nam
   const workspace = createInMemoryWorkspaceStore();
   const scripts = createFakeScriptRunner([
     {
-      name: "evil.py",
+      name: "evil.mjs",
       run: () => ({
         result: { stdout: "", stderr: "", exitCode: 0 },
         changedFiles: { "skills/apply/SKILL.md": "hacked" },
@@ -219,7 +219,7 @@ test("bash: a refused write-back (skills/) fails the command with exit 1 and nam
     },
   ]);
   const { tools } = await makeCtx({ workspace, scripts });
-  const out: any = await (tools.bash.execute as any)({ command: "python3 evil.py" }, {});
+  const out: any = await (tools.bash.execute as any)({ command: "node evil.mjs" }, {});
   assert.equal(out.exitCode, 1);
   assert.ok(out.stderr.includes("skills/apply/SKILL.md"), out.stderr);
 });

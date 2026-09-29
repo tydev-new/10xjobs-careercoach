@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_check_files.py::test_inlined_rounds_table_enforced",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "base-resume.md": "# Base\n## Experience\n- Staff Eng\n## Claim rules\n- x\n## Rounds\n| date | round | driver | scored vs FIXED | what changed |\n|---|---|---|---|---|\n| 2026-08-24 | 1 | improve | 5/5 held | trimmed intro |\n| 2026-08-24 | 2 | improve | short row |\n"
+ },
+ "expect": [
+  {
+   "stdout": "WARN  base-resume.md: row has 4 cells, the header has 5: \"| 2026-08-24 | 2 | improve | short row |\"\n\n1 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

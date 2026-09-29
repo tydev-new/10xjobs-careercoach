@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): a heading starting with map (any case) opens a map; any other ## closes it",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## MAP of topics\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| X | bad | s | gap |\n\n## Notes\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| Y | bad | s | gap |\n\n## map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| Z | track-A | s | nope |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  X: bad scope 'bad' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  Z: bad status 'nope' — gap/studying/credible/retired, bare (notes go in source)\n\n2 map row(s); 2 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

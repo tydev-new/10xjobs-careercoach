@@ -1,0 +1,40 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: rv-reverdict-updates-existing",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--score",
+    "90",
+    "--url",
+    "https://new",
+    "--jd-file",
+    "jd-analysis/other.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n*x*\n\n**Active: 2** · dismissed: 0 · updated 2026-01-01\n\n## Applied\n\n### ACME, Inc. — Staff Engineer\n- URL: https://old\n- Score: 50\n- JD: jd-analysis/acme.md\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "recorded (updated existing role): ACME, Inc. — Staff Engineer → strong (90)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## Applied\n\n### ACME, Inc. — Staff Engineer\n- URL: https://new\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: strong\n- Score: 90\n- JD: jd-analysis/acme.md\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+ }
+}

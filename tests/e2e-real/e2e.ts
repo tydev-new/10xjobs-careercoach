@@ -99,11 +99,11 @@ const cmdOf = (needle: string): string => {
   for (const m of FX.messages) for (const p of m.parts) if (p.type === "tool-bash" && p.input.command.includes(needle)) return p.input.command;
   throw new Error("no fixture command " + needle);
 };
-const CMD_RECORD = cmdOf("record_verdict.py");
-const CMD_CHECK = cmdOf("check_materials.py");
-const CMD_RENDER = cmdOf("render_resume.py");
-const CMD_CLOSEOUT = cmdOf("check_closeout.py");
-const CMD_CHECK_FILES = "python3 profile/scripts/check_files.py --workspace .";
+const CMD_RECORD = cmdOf("record_verdict.mjs");
+const CMD_CHECK = cmdOf("check_materials.mjs");
+const CMD_RENDER = cmdOf("render_resume.mjs");
+const CMD_CLOSEOUT = cmdOf("check_closeout.mjs");
+const CMD_CHECK_FILES = "node profile/scripts/check_files.mjs --workspace .";
 const INITIAL_PLAN = "Goal: an offer by 2026-11-30\nBudget: 45 min/day\n\n## Board\n\nWaiting on you\n\nTo do\n\nDoing\n\nDone";
 
 function scenarios(extra: Scenario[] = []): Scenario[] {
@@ -483,7 +483,9 @@ const failShots: string[] = [];
 // B1 (fix round 1): every fetch capture site in the app is bound. Static
 // part: no bare `fetch` handed out as a default or stored on an object in
 // the browser-shipped sources (apps/web/src, packages/agent/src,
-// packages/checkers/src), tests excluded.
+// packages/checkers/src, skills/*/scripts/lib — docs/design-js-only.md
+// § 6 J2: the ported checkers' logic moved there, still bundled into the
+// site via script-runner.ts), tests excluded.
 {
   const offenders: string[] = [];
   const walk = (d: string) => {
@@ -499,7 +501,11 @@ const failShots: string[] = [];
       }
     }
   };
+  const skillsLibDirs = readdirSync(path.join(REPO, "skills"))
+    .map((skill) => path.join(REPO, "skills", skill, "scripts", "lib"))
+    .filter((d) => existsSync(d));
   for (const d of ["apps/web/src", "packages/agent/src", "packages/checkers/src"]) walk(path.join(REPO, d));
+  for (const d of skillsLibDirs) walk(d);
   rec(offenders.length === 0, "B1 static: no unbound `fetch` stored/defaulted in browser-shipped sources", offenders.slice(0, 8).join(" | "));
 }
 if (SHIM) console.log("\n*** E2E_FETCH_SHIM=1: window.fetch is shimmed to ignore its receiver (diagnostic run; see B1) ***");

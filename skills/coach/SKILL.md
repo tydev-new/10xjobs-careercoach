@@ -57,7 +57,7 @@ Detailed craft, goal math, and briefing templates live in `references/patterns.m
 
 **Runs when** they report an outcome (rejection, recruiter outreach, interview, offer).
 
-- **Pipeline updates:** Map to pipeline row via `../search/scripts/update_job.py`. Update `plan.md` in the same reply (mark completed items done, backfill from Queue).
+- **Pipeline updates:** Map to pipeline row via `../search/scripts/update_job.mjs`. Update `plan.md` in the same reply (mark completed items done, backfill from Queue).
 - **Safe negotiation boundaries (Rule 10):** For offer/comp calls, celebrate first, then observe boundaries: never accept/walk on the live call (24–48h window); never invent comp numbers (candidate provides market data); never fabricate leverage; refer legal/tax questions to licensed professionals.
 
 **Exits** with the pipeline row updated, `plan.md` current, and next move prescribed.
@@ -75,7 +75,7 @@ Detailed craft, goal math, and briefing templates live in `references/patterns.m
 Owned: `plan.md` and `plan-log.md` (shapes in `references/schema.md`). Coach routes across all stages and owns none of their domain files.
 
 - **Hands back:** Everything — coach routes and hands back immediately after recording.
-- **Session close:** Before every reply ends, run `python3 scripts/check_closeout.py --workspace . --stage <stage> --asked "<each question>"` (fixes any FAIL before sending) and `python3 ../profile/scripts/check_files.py --workspace .`. No checker-subagent is spawned (coach's voice). Report outcomes, never narration (clean is one line).
+- **Session close:** Before every reply ends, run `node scripts/check_closeout.mjs --workspace . --stage <stage> --asked "<each question>"` (fixes any FAIL before sending) and `node ../profile/scripts/check_files.mjs --workspace .`. No checker-subagent is spawned (coach's voice). Report outcomes, never narration (clean is one line).
 
 ## Guardrails
 

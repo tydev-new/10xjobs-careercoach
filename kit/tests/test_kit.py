@@ -1,25 +1,12 @@
-"""The kit's guarded copies: shapecheck.py's functions are byte-identical to
-the host checker's, and PRINCIPLES-core.md is PRINCIPLES.md Part 2 verbatim."""
-import ast, os
+"""The kit's guarded copy: PRINCIPLES-core.md is PRINCIPLES.md Part 2
+verbatim. docs/design-js-only.md § 2.1 (J2): the checker-core guarded copy
+(kit/shapecheck.py, this file's former test_shapecheck_matches_the_host_checker)
+is gone — the kit now VENDORS skills/profile/scripts/lib/shapecheck.mjs
+directly (kit/README.md "Adopting it"), so there is no second copy to keep
+byte-identical."""
+import os
 HERE = os.path.dirname(__file__)
 ROOT = os.path.join(HERE, "..", "..")
-
-def _defs(path):
-    src = open(path, encoding="utf-8").read()
-    out = {}
-    for n in ast.parse(src).body:
-        if isinstance(n, ast.FunctionDef):
-            out[n.name] = ast.dump(n)
-        elif isinstance(n, ast.Assign) and hasattr(n.targets[0], "id"):
-            out[n.targets[0].id] = ast.dump(n)
-    return out
-
-def test_shapecheck_matches_the_host_checker():
-    kit = _defs(os.path.join(ROOT, "kit", "shapecheck.py"))
-    host = _defs(os.path.join(ROOT, "skills", "profile", "scripts", "check_files.py"))
-    for name in ("load_schemas", "headings", "norm", "check_file", "check_table",
-                 "check_history", "check_skill_prose", "FILE_RE", "FREEFORM", "SECTION_RE"):
-        assert kit[name] == host[name], f"{name}: kit/shapecheck.py and check_files.py differ — fix both"
 
 def test_principles_core_is_part_two_verbatim():
     p = open(os.path.join(ROOT, "PRINCIPLES.md"), encoding="utf-8").read()

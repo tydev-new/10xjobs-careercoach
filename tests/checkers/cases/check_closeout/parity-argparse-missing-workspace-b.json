@@ -1,0 +1,24 @@
+{
+ "note": "packages/checkers/test/parity.mjs: argparse-missing-workspace (covers: argparse: --workspace required)",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--stage",
+    "applying"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.mjs: error: the following arguments are required: --workspace\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

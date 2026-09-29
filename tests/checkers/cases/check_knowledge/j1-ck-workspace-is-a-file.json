@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): a file as the workspace: no knowledge.md under it",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "f"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "f": "x"
+ },
+ "expect": [
+  {
+   "stdout": "no knowledge.md — nothing to check\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

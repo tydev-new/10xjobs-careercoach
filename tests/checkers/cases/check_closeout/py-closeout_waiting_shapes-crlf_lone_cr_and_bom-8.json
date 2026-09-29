@@ -1,0 +1,30 @@
+{
+ "note": "tests/test_closeout_waiting_shapes.py::test_crlf_lone_cr_and_bom",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--stage",
+    "applying",
+    "--asked",
+    "follow up with the Acme recruiter"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "﻿# Plan — Test Candidate\r\nGoal: an offer by 2026-12-01\r\nBudget: 60 min/day\r\n\r\n## Board\r\nWaiting on you\r\n- the comp floor — criteria.md § Compensation\r\n\r\n## Standing floor\r\n- 1 rep\r\n\r\n## Queue\r\n- timer: follow up Acme recruiter 10-02\r\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  asked \"follow up with the Acme recruiter\" — no Waiting-on-you row shares a word with it; write the row this turn\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

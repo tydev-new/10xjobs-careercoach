@@ -78,8 +78,8 @@ test("H5: read_file on .pdf/.docx -> unsupported_type telling the model to ask f
 
 test("L8: a record_verdict call with single-quoted flags still yields its verdict card", async () => {
   const jobs = "# Pipeline\n\n## To Review\n\n### Acme Labs — Data Analyst\n- Verdict: long_shot\n- Score: 40\n- Reason: stretch on python\n";
-  const runner = createFakeScriptRunner([{ name: "record_verdict.py", run: () => ({ result: { stdout: "recorded\n", stderr: "", exitCode: 0 }, changedFiles: { "jobs.md": jobs } }) }]);
-  const m = scriptedModel([toolStep([{ name: "bash", input: { command: "python3 record_verdict.py --workspace . --company 'Acme Labs' --title 'Data Analyst' --verdict long_shot --score 40" } }]), textStep("ok")]);
+  const runner = createFakeScriptRunner([{ name: "record_verdict.mjs", run: () => ({ result: { stdout: "recorded\n", stderr: "", exitCode: 0 }, changedFiles: { "jobs.md": jobs } }) }]);
+  const m = scriptedModel([toolStep([{ name: "bash", input: { command: "node record_verdict.mjs --workspace . --company 'Acme Labs' --title 'Data Analyst' --verdict long_shot --score 40" } }]), textStep("ok")]);
   const { chunks } = await runTurn(makeCoach({ model: m.model, scripts: runner, files: { "jobs.md": "# Pipeline\n" } }).coach, "c1", [user("u1", "x")]);
   const v = dataChunks(chunks, "data-card").filter((c) => c.data.card === "verdict");
   assert.equal(v.length, 1);

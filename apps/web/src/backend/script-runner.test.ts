@@ -27,7 +27,7 @@ test("dispatches python3 <script> by file name and runs the REAL check_materials
   const runner = createRealScriptRunner();
   const files = { "resume.md": RESUME_CLEAN };
   const { result, changedFiles } = await runner.run(
-    "python3 skills/apply/scripts/check_materials.py --workspace . --resume resume.md",
+    "node skills/apply/scripts/check_materials.mjs --workspace . --resume resume.md",
     files,
   );
   assert.equal(result.exitCode, 0, result.stderr);
@@ -39,7 +39,7 @@ test("dispatches python3 <script> by file name and runs the REAL check_materials
 test("a script's write-back (record_verdict.py rewriting jobs.md) is reported as a changed file", async () => {
   const runner = createRealScriptRunner();
   const { result, changedFiles } = await runner.run(
-    'python3 skills/evaluate/scripts/record_verdict.py --workspace . --company "Acme" --title "Staff Engineer" --verdict strong --score 90',
+    'node skills/evaluate/scripts/record_verdict.mjs --workspace . --company "Acme" --title "Staff Engineer" --verdict strong --score 90',
     {},
   );
   assert.equal(result.exitCode, 0, result.stderr);
@@ -62,7 +62,7 @@ test("an unchanged snapshotted file (equal content) is never reported as changed
   const runner = createRealScriptRunner();
   const files = { "resume.md": RESUME_CLEAN, "jobs.md": "# Jobs\n" };
   const { changedFiles } = await runner.run(
-    "python3 skills/apply/scripts/check_materials.py --workspace . --resume resume.md",
+    "node skills/apply/scripts/check_materials.mjs --workspace . --resume resume.md",
     files,
   );
   assert.deepEqual(changedFiles, {});
@@ -71,8 +71,8 @@ test("an unchanged snapshotted file (equal content) is never reported as changed
 test("the same script reached via a different relative prefix dispatches to the same port (§ 5 file-name dispatch)", async () => {
   const runner = createRealScriptRunner();
   const files = { "resume.md": RESUME_CLEAN };
-  const a = await runner.run("python3 scripts/check_materials.py --workspace . --resume resume.md", files);
-  const b = await runner.run("python3 ../apply/scripts/check_materials.py --workspace . --resume resume.md", files);
+  const a = await runner.run("node scripts/check_materials.mjs --workspace . --resume resume.md", files);
+  const b = await runner.run("node ../apply/scripts/check_materials.mjs --workspace . --resume resume.md", files);
   assert.equal(a.result.exitCode, b.result.exitCode);
   assert.equal(a.result.stdout, b.result.stdout);
 });
@@ -81,7 +81,7 @@ test("a FAIL from a real checker is reported with exit 1 and the finding in stdo
   const runner = createRealScriptRunner();
   const badResume = "no headings, no bullets, just one short line of text that is not structured.";
   const { result } = await runner.run(
-    "python3 skills/apply/scripts/check_materials.py --workspace . --resume resume.md",
+    "node skills/apply/scripts/check_materials.mjs --workspace . --resume resume.md",
     { "resume.md": badResume },
   );
   // Whatever the real port decides (pass/WARN/FAIL) is asserted against the

@@ -1,7 +1,7 @@
 // Mirrors tests/test_render_resume.py against the JS port's pure functions.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { toHtml, wordCount, run } from "../../src/render-resume.mjs";
+import { toHtml, wordCount, run } from "../../../../skills/apply/scripts/lib/render-resume.mjs";
 import { makeFakeIo } from "./fake-io.mjs";
 
 const WRAPPED = `# ALEX CHEN

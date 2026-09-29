@@ -1,0 +1,32 @@
+{
+ "note": "packages/checkers/test/parity.mjs: stray-file-and-dir (covers: test_stray_file_and_dir_warn_but_never_fail)",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "random-notes/": {
+   "dir": true
+  },
+  "Old_Master_Resume.md": "# stray\n",
+  "profile.md": "# ok\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  profile.md: missing required section \"## Snapshot\"\nFAIL  profile.md: missing required section \"## Experience\"\nFAIL  profile.md: missing required section \"## Intake findings\"\nFAIL  profile.md: missing required section \"### Positioning strengths\"\nFAIL  profile.md: missing required section \"### Likely interviewer concerns\"\nFAIL  profile.md: missing required section \"### Career-narrative gaps\"\nFAIL  profile.md: missing required section \"### Story seeds\"\nFAIL  profile.md: missing required section \"## Interview history\"\nFAIL  profile.md: missing required section \"## Constraints\"\nFAIL  profile.md: missing required section \"## Application defaults\"\nWARN  stray file \"Old_Master_Resume.md\" — no skill reads or writes it. A second source of truth starts exactly here: if the candidate dropped it, move it to documents/ and capture it; if it holds real facts, it needs an owner; if it is scratch, move it out\nWARN  stray directory \"random-notes/\" — no skill owns it\n\n1 file(s) checked against 11 schema(s); 10 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

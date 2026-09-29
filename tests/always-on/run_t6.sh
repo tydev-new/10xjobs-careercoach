@@ -5,7 +5,7 @@
 # Conditions (CONDS): full = evaluate+search skills project-local;
 # bare = same workspace, no skills (the decode-value falsifier from the
 # t6 design gate: if bare matches full, patterns.md is deadweight).
-# The search skill ships too because record_verdict.py imports jobs_md
+# The search skill ships too because record_verdict.mjs imports jobs-md.mjs
 # from ../../search/scripts — the relative layout must survive the copy.
 #
 # Environment contract (README): --setting-sources project, fresh mktemp

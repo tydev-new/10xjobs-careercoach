@@ -72,7 +72,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       "bash",
       {
         command:
-          'python3 evaluate/scripts/record_verdict.py --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --track A --reasons "8 years of B2B SaaS platform PM experience matches the core ask" --url ' +
+          'node evaluate/scripts/record_verdict.mjs --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --track A --reasons "8 years of B2B SaaS platform PM experience matches the core ask" --url ' +
           JD_URL +
           " --jd-file jd-analysis/acme-staff-pm.md",
       },
@@ -85,10 +85,10 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
     toolCallStep("write_file", { path: "applications/acme-letter.md", content: "Dear Acme Hiring Team,\n..." }, "c5"),
     toolCallStep(
       "bash",
-      { command: "python3 apply/scripts/check_materials.py --workspace . --resume applications/acme-resume.md --letter applications/acme-letter.md --base base-resume.md" },
+      { command: "node apply/scripts/check_materials.mjs --workspace . --resume applications/acme-resume.md --letter applications/acme-letter.md --base base-resume.md" },
       "c6",
     ),
-    toolCallStep("bash", { command: "python3 apply/scripts/render_resume.py --md applications/acme-resume.md --html applications/acme-resume.html" }, "c7"),
+    toolCallStep("bash", { command: "node apply/scripts/render_resume.mjs --md applications/acme-resume.md --html applications/acme-resume.html" }, "c7"),
     textStep("Résumé is 109 words. Both documents pass the automatic checks — nothing failed, nothing flagged."),
 
     // ---- turn 3: what's next ----
@@ -97,7 +97,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       { path: "plan.md", content: "Goal: an offer\n\n## Board\n\nWaiting on you\n\nTo do\n- Send the Acme cover letter (`applications/acme-letter.md`) — 5 min\n\nDoing\n\nDone" },
       "c8",
     ),
-    toolCallStep("bash", { command: "python3 coach/scripts/check_closeout.py --workspace . --stage applying" }, "c9"),
+    toolCallStep("bash", { command: "node coach/scripts/check_closeout.mjs --workspace . --stage applying" }, "c9"),
     textStep("That's your plan: send the letter, and tell me if you want more roles found."),
   ];
   // loosely-typed mock chunk script (matches spike 1's own pattern);
@@ -107,7 +107,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
 
   const scripts = createFakeScriptRunner([
     {
-      name: "record_verdict.py",
+      name: "record_verdict.mjs",
       run: (argv) => {
         const f = flagsOf(argv);
         const row = [
@@ -127,7 +127,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       },
     },
     {
-      name: "check_materials.py",
+      name: "check_materials.mjs",
       run: (argv) => {
         const f = flagsOf(argv);
         const base = (p: string) => p.split("/").pop();
@@ -143,7 +143,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       },
     },
     {
-      name: "render_resume.py",
+      name: "render_resume.mjs",
       run: (argv) => {
         const f = flagsOf(argv);
         return {
@@ -153,7 +153,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       },
     },
     {
-      name: "check_closeout.py",
+      name: "check_closeout.mjs",
       run: (argv) => {
         const f = flagsOf(argv);
         return { result: { stdout: `close-out clean: stage ${f.stage}`, stderr: "", exitCode: 0 }, changedFiles: {} };

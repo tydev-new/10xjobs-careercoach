@@ -6,17 +6,60 @@ they fail on every `tests/run.py`, instead of needing a reviewer.
 Structure only — what code can see. Conduct stays with the harness.
 """
 import glob
+import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 SKILLS = os.path.join(ROOT, "skills")
-sys.path.insert(0, os.path.join(SKILLS, "profile", "scripts"))
-import check_files as cf  # noqa: E402
+PROFILE_LIB = os.path.join(SKILLS, "profile", "scripts", "lib")
 
 ALL = sorted(os.path.basename(d) for d in glob.glob(os.path.join(SKILLS, "*")) if os.path.isdir(d))
 STAGES_OF_A_SECTION = ("Runs when", "Exits")
+
+# docs/design-js-only.md § 6 (J2): check_files.py is gone — the schemas,
+# manifest and link check now come from running node on
+# skills/profile/scripts/lib/{check-files,shapecheck}.mjs (a small `node -e`
+# import), never by importing Python.
+NODE = shutil.which("node")
+
+
+def _node_json(js_body):
+    """Runs `js_body` under node -e and parses its one line of JSON stdout.
+    `js_body` may use top-level await."""
+    assert NODE, "no `node` on PATH — required for test_invariants.py's schema/manifest/link checks"
+    wrapped = f"(async () => {{\n{js_body}\n}})();"
+    r = subprocess.run([NODE, "--input-type=module", "-e", wrapped], capture_output=True, text=True)
+    assert r.returncode == 0, f"node -e failed:\n{r.stderr}"
+    return json.loads(r.stdout)
+
+
+def cf_load_schemas():
+    return _node_json(f"""
+      const {{ loadSchemas }} = await import({json.dumps("file://" + os.path.join(PROFILE_LIB, "shapecheck.mjs"))});
+      const {{ nodeIo }} = await import({json.dumps("file://" + os.path.join(PROFILE_LIB, "io-node.mjs"))});
+      const schemas = await loadSchemas(nodeIo, {json.dumps(SKILLS)});
+      console.log(JSON.stringify(schemas));
+    """)
+
+
+def cf_manifest_files():
+    return _node_json(f"""
+      const {{ MANIFEST_FILES }} = await import({json.dumps("file://" + os.path.join(PROFILE_LIB, "check-files.mjs"))});
+      console.log(JSON.stringify(Object.fromEntries(MANIFEST_FILES)));
+    """)
+
+
+def cf_check_skill_prose():
+    return _node_json(f"""
+      const {{ checkSkillProse }} = await import({json.dumps("file://" + os.path.join(PROFILE_LIB, "shapecheck.mjs"))});
+      const {{ nodeIo }} = await import({json.dumps("file://" + os.path.join(PROFILE_LIB, "io-node.mjs"))});
+      const res = await checkSkillProse(nodeIo, {json.dumps(os.path.abspath(SKILLS))});
+      console.log(JSON.stringify(res));
+    """)
 
 
 def read(*parts):
@@ -72,27 +115,51 @@ def test_loop_sections_stay_short():
 
 
 def test_one_owner_per_schema_file_and_manifest_agrees():
-    schemas = cf.load_schemas(SKILLS)
+    schemas = cf_load_schemas()
     for name, s in schemas.items():
         assert s.get("owner") in ALL, f"{name}: owner {s.get('owner')!r} is not a skill"
-    for fname, owner in cf.MANIFEST_FILES.items():
+    for fname, owner in cf_manifest_files().items():
         if fname in schemas:
             assert schemas[fname]["owner"] in owner, f"{fname}: schema owner {schemas[fname]['owner']} vs manifest '{owner}'"
 
 
 def test_cross_skill_links_resolve():
-    problems = [f"{l}: {m}" for l, m in cf.check_skill_prose(os.path.abspath(SKILLS)) if l == "FAIL"]
+    problems = [f"{l}: {m}" for l, m in cf_check_skill_prose() if l == "FAIL"]
     assert not problems, "\n".join(problems)
 
 
 def test_session_close_names_its_scripts_and_the_subagent_fact():
+    # docs/design-js-only.md § 3.7 (J2): three skills (learn, outreach,
+    # storybank) still name a J3 script (check_knowledge.py/check_messages.py/
+    # check_stories.py) in their Session close; the rest already say .mjs.
     for skill in ALL:
         t = read(skill, "SKILL.md")
         m = re.search(r"\*\*Session close[^*]*\*\*(.*?)(?=^## |\Z)", t, re.S | re.M)
         assert m, f"{skill}: no Session close"
         close = m.group(1)
-        assert ".py" in close, f"{skill}: Session close names no script"
+        assert re.search(r"scripts/\w+\.(mjs|py)\b", close), f"{skill}: Session close names no script"
         assert "subagent" in close or "checker" in close.lower(), f"{skill}: Session close does not state the subagent fact"
+
+
+# docs/design-js-only.md § 3.7 (J2): no `python3` in skills/**/*.md except
+# on a line naming the three J3 scripts (check_knowledge.py, check_messages.py,
+# check_stories.py), the four S4 scripts (search_ats.py, discover_hn.py,
+# discover_trackb.py, autopilot_sweep.py) or jobs_md.py (search_ats.py's
+# library until S4). Tightens to "none" at J3 and S4.
+J3_SCRIPTS = ("check_knowledge.py", "check_messages.py", "check_stories.py")
+S4_SCRIPTS = ("search_ats.py", "discover_hn.py", "discover_trackb.py", "autopilot_sweep.py")
+STILL_PY_ALLOWED_ON_PYTHON3_LINE = J3_SCRIPTS + S4_SCRIPTS + ("jobs_md.py",)
+
+
+def test_python3_in_skill_prose_only_names_a_not_yet_ported_script():
+    problems = []
+    for path in sorted(glob.glob(os.path.join(SKILLS, "**", "*.md"), recursive=True)):
+        for i, line in enumerate(open(path, encoding="utf-8"), start=1):
+            if "python3" not in line:
+                continue
+            if not any(name in line for name in STILL_PY_ALLOWED_ON_PYTHON3_LINE):
+                problems.append(f"{os.path.relpath(path, SKILLS)}:{i}: {line.strip()}")
+    assert not problems, "\n".join(problems)
 
 
 def test_eval_is_verdict_bearing_and_patterns_has_the_proposal_rule():

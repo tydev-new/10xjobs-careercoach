@@ -38,7 +38,18 @@ PROSE_DIRS = ("docs", "agents")
 # into the site, and the deployed Edge Functions + migrations. Test dirs
 # under packages/ are left out on purpose: the just-bash sandbox's own fake
 # home (/home/user/) is a fixture there, not a builder's path.
-EXTRA_CODE = ("packages/agent/src", "packages/checkers/src", "packages/checkers/bin", "supabase")
+# docs/design-js-only.md § 6 (J2): the ported checkers' logic moved out of
+# packages/checkers/src into skills/*/scripts/lib/ (still bundled into the
+# site — apps/web/src/backend/script-runner.ts imports it) — the scan
+# gains every skill's lib/ folder. packages/checkers/bin/ is gone (the
+# command scripts moved to skills/*/scripts/ too, already covered by
+# test_invariants.py's SHIPPED scan).
+EXTRA_CODE = ("packages/agent/src", "packages/checkers/src", "supabase") + tuple(
+    sorted(
+        os.path.relpath(p, ROOT)
+        for p in glob.glob(os.path.join(ROOT, "skills", "*", "scripts", "lib"))
+    )
+)
 
 LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 FENCE = re.compile(r"^\s*```.*?^\s*```", re.S | re.M)

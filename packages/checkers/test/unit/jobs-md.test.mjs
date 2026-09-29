@@ -3,7 +3,7 @@
 // parity is proved here, in-process, rather than by subprocess diffing).
 import test from "node:test";
 import assert from "node:assert/strict";
-import * as jm from "../../src/jobs-md.mjs";
+import * as jm from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import { makeFakeIo } from "./fake-io.mjs";
 
 function rows2() {

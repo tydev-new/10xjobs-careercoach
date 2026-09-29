@@ -1,0 +1,7 @@
+python: Python 3.14.0
+commit: c8d6898681c9a3e4d4811ec6af11a8429473d2f2
+date: 2026-09-28
+platform: darwin-arm64
+clock: 2026-09-23T12:34:56+00:00 (writers; datetime frozen as tests/checkers-parity/extra.mjs does)
+previous: 051a529dbddd4fab0c9f54e0eda1541c64a123fa (f49978b); re-recorded at c8d6898, 60 cases moved, each by a change on main (the closing line in #20; main's t21 base-resume.md and workspace-CLAUDE.md template as inputs)
+recorder: tests/checkers/freeze.mjs at 1944e21 (deleted at the end of J1, § 5.2; git show 1944e21:tests/checkers/freeze.mjs)

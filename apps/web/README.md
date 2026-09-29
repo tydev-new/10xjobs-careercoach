@@ -238,10 +238,12 @@ real key):
 - `balance.ts` — `createBalanceFn(...)`: `deps.balance()` via the
   `ten_balance()` RPC.
 - `script-runner.ts` — `createRealScriptRunner()`: the real `ScriptRunner`
-  the `bash` tool calls, backed by `just-bash` + `packages/checkers`'
-  file-name `python3` dispatch (`packages/checkers/src/just-bash-command.mjs`).
-  Its own tests run the REAL ported checkers (`check_materials.py`,
-  `record_verdict.py`, …), not canned output.
+  the `bash` tool calls, backed by `just-bash` + the skills' own ported
+  checkers' file-name `node` dispatch (`packages/checkers/src/
+  just-bash-command.mjs`, importing `skills/*/scripts/lib/`; `python3`
+  only points at the equivalent `node` command). Its own tests run the
+  REAL ported checkers (`check_materials.mjs`, `record_verdict.mjs`, …),
+  not canned output.
 - `web-search.ts` — `createWebSearch({ modelId, ... })`: `deps.webSearch`,
   one raw `ten-model-proxy` call with `model` (§ 13.2: "web search passes
   the model too") and `plugins: [{ id: "web" }]`, parsing the

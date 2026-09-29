@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): Python repr() of the bad cell: quote choice, escapes, a non-printable character",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| q1 | it's | s | gap |\n| q2 | say \"hi\" it's | s | gap |\n| q3 | tab\there | s | gap |\n| q4 | café | s | gap  |\n| q5 | a b | s | gap |\n| q6 | back\\slash | s | gap |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  q1: bad scope \"it's\" — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  q2: bad scope 'say \"hi\" it\\'s' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  q3: bad scope 'tab\\there' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  q4: bad scope 'café' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  q5: bad scope 'a\\u2028b' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  q6: bad scope 'back\\\\slash' — `track-<lane>` or `role: <key>` (plain hyphens)\n\n6 map row(s); 6 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

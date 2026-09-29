@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): an escaped pipe still splits the row (plain split)",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope | Source | Status |\n|---|---|---|---|\n| a \\| b | track-A | s | gap |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  a \\: bad scope 'b' — `track-<lane>` or `role: <key>` (plain hyphens)\nFAIL  a \\: bad status 's' — gap/studying/credible/retired, bare (notes go in source)\n\n1 map row(s); 2 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

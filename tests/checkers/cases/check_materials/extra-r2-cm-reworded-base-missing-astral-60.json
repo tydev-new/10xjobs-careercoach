@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-cm-reworded-base-missing-astral-60",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "base-resume.md": "# Base\n\n## Experience\n- Wrote SQL pipelines in Postgres for the finance team.\n",
+  "resume.md": "# A\n\n## Summary\n\nok.\n\n## Experience\n\n- x\n\n## Reworded\n\n- base: 𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀 gone\n  tailored: x\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: FAIL (1 fail, 1 warn)\n  [FAIL] § Reworded declares a base line that is not in the base: \"𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀…\" — the exemption cannot be self-issued\n  [WARN] non-standard section name \"Reworded\" — ATS parsers rank on standard names ('Professional Experience', not 'Where I've Made Impact'); put the ambition in a subtitle line instead\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

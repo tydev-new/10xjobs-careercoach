@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-duplicate-rows",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "base-resume.md": "# Base\n\n## Experience\n- Wrote SQL pipelines in Postgres for the finance team.\n",
+  "resume.md": "# A\n\n## Summary\n\nCut costs 40% and then cut costs 40% again with 3x speed and 3x scale.\n\n## Experience\n\n- Wrote SQL pipelines in Postgres for the finance team.\n- Wrote SQL pipelines in Postgres for the finance team.\n\n## Experience\n\n- dup section\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: pass (0 fail, 1 warn)\n  [WARN] claim number repeated inside the Summary: ['3x', '40%'] — the Summary carries each number once; a repeat carries next-best evidence instead (labels make a defended repeat legitimate)\n\n✔ automatic checks clean\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

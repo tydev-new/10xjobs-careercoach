@@ -508,7 +508,7 @@ export const TOOL_DESCRIPTIONS = {
   read_file: "Read a workspace file by path, or a skill file under skills/. .pdf/.docx are not extractable yet.",
   write_file: "Write a workspace text file (.md/.txt/.json/.html). Read the file first if it already exists.",
   list_files: "List workspace files, optionally under one directory.",
-  bash: "Run one shell command in the workspace sandbox — used only to run a skill's ported checker script (python3 <script> ...args).",
+  bash: "Run one shell command in the workspace sandbox — used only to run a skill's ported checker script (node <script> ...args).",
   web_search: "Search the web (up to 5 results) for current, outside-the-workspace information.",
   fetch_job:
     "Fetch a job posting's text from a supported board's public API (Greenhouse, Lever, Ashby, SmartRecruiters). Optionally save it into the workspace.",

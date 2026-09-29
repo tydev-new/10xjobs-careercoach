@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_check_files.py::test_escape_hatch_contents_are_not_policed",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "profile.md": "# P\n## Snapshot\n## Experience\n## Intake findings\n### Positioning strengths\n### Likely interviewer concerns\n### Career-narrative gaps\n### Story seeds\n## Interview history\n## Constraints\n## Application defaults\n## Other notes\n### Anything At All\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n1 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

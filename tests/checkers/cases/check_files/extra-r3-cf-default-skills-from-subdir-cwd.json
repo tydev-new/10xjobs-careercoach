@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r3-cf-default-skills-from-subdir-cwd — agent cd's below the workspace; Python still resolves skills from __file__",
+ "webSkillsInWorkspace": true,
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    ".."
+   ],
+   "cwd": "applications",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/a.md": "# a\n",
+  "profile.md": "# P\n## Snapshot\n## Experience\n## Intake findings\n### Positioning strengths\n### Likely interviewer concerns\n### Career-narrative gaps\n### Story seeds\n## Interview history\n## Constraints\n## Application defaults\n"
+ },
+ "expect": [
+  {
+   "stdout": "\n2 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

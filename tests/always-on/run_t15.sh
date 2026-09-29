@@ -33,7 +33,7 @@ for case_name in $(ls "$FIX/cases"); do
   for n in 1 2 3; do
     out="$RESULTS/$case_name.py.$n.txt"
     [ -s "$out" ] && continue
-    python3 "$RUNNER_SKILLS_DIR/apply/scripts/check_materials.py" \
+    node "$RUNNER_SKILLS_DIR/apply/scripts/check_materials.mjs" \
       --workspace "$WS" \
       --resume "$WS/applications/resume.md" \
       --letter "$WS/applications/letter.md" > "$out" 2>&1

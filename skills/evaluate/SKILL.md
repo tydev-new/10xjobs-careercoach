@@ -36,7 +36,7 @@ Decoding lenses, fit algebra, and company research craft live in `references/pat
 2. **Dealbreaker gate:** Evaluate against `criteria.md § Dealbreakers` / `§ Compensation` / `§ Geo`. Hard hit $\rightarrow$ record the DQ immediately (no row yet → create it first; exact commands in `references/patterns.md` step 2, "Dealbreakers") and stop before research spend.
 3. **Track assignment:** Assign track from `criteria.md § Targets` before judging.
 4. **Company research & Decode:** Research company signals and decode JD across the 6 lenses (`references/patterns.md`).
-5. **Verdict & Record:** Combine into final verdict tier — Strong Fit (`strong`) / Investable Stretch (`investable_stretch`) / Long-Shot Stretch (`long_shot`) / Weak Fit (`weak`). Record via `scripts/record_verdict.py --verdict <value>`.
+5. **Verdict & Record:** Combine into final verdict tier — Strong Fit (`strong`) / Investable Stretch (`investable_stretch`) / Long-Shot Stretch (`long_shot`) / Weak Fit (`weak`). Record via `scripts/record_verdict.mjs --verdict <value>`.
 6. **Deliver summary card:** Present the evaluation card in chat (`references/schema.md § The summary card`).
 
 **Exits** with `jobs.md` row updated, analyses persisted to disk, and summary card delivered.
@@ -57,7 +57,7 @@ Decoding lenses, fit algebra, and company research craft live in `references/pat
 Owned: `jd-analysis/` and `company/` (shapes in `references/schema.md`).
 
 - **Hands back:** Strong verdict → `apply`; interview booked → `interview`; competency extractions → `storybank`.
-- **Session close:** Run `../profile/scripts/check_files.py --workspace .`. No checker-subagent is spawned (analyst voice). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `../profile/scripts/check_files.mjs --workspace .`. No checker-subagent is spawned (analyst voice). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

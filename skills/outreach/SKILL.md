@@ -81,7 +81,7 @@ Extended search tactics and message frameworks live in `references/patterns.md`.
 Owned: `contacts/` (shapes in `references/schema.md`).
 
 - **Hands back:** Interview booked → `interview`; low response rate → `profile`.
-- **Session close:** Run `../profile/scripts/check_files.py --workspace .`. Wording check subagent runs on every displayed draft. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `../profile/scripts/check_files.mjs --workspace .`. Wording check subagent runs on every displayed draft. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

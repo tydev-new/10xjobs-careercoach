@@ -34,16 +34,16 @@ async function makeCtx(overrides: Partial<Deps> = {}, ctxOverrides: Partial<Tool
     checkLanguage: overrides.checkLanguage,
   };
   const turnState: TurnState = { measuredSteps: [], spentSoFarUsd: 0, estimateCostRanThisTurn: true, ...ctxOverrides.turnState };
+  const { turnState: _ignoredPartialTurnState, ...restOverrides } = ctxOverrides;
   const ctx: ToolContext = {
     chatId: "chat-1",
     writer,
     versionTracker: new VersionTracker(),
     cardBuilder: new CardBuilder(),
-    turnState,
     gateGrammarMd: skills["skills/coach/references/gate-grammar.md"],
     idFor: () => "gate-1",
-    ...ctxOverrides,
-    turnState, // keep the merged one even if ctxOverrides also had a partial
+    ...restOverrides,
+    turnState, // always the merged one, never a raw (possibly partial) override
   };
   return { deps, ctx, writer, tools: createTools(deps, ctx) };
 }
@@ -266,8 +266,11 @@ test("list_board: toModelOutput is compact text, not JSON — one line per board
   );
   const modelOut = (tools.list_board as any).toModelOutput({ output, toolCallId: "x", input: {} });
   assert.equal(modelOut.type, "text");
-  assert.ok(modelOut.value.includes("Acme · ok · 2 postings · 1 match · 0 already on the list · showing 1"), modelOut.value);
+  // Lead ruling, 2026-09-28 (S2 review): M3 gains "board name <boardName>"
+  // and requestsLeftThisTurn.
+  assert.ok(modelOut.value.includes("Acme · board name Acme, Inc. · ok · 2 postings · 1 match · 0 already on the list · showing 1"), modelOut.value);
   assert.ok(modelOut.value.includes("https://boards.greenhouse.io/acme/jobs/111 | Forward Deployed Engineer | NYC | 2026-09-01"), modelOut.value);
+  assert.ok(modelOut.value.includes("59 board requests left this turn"), modelOut.value);
   assert.ok(!modelOut.value.startsWith("{"), "must not be JSON");
 });
 

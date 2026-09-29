@@ -270,7 +270,7 @@ async function listBoardExecute(deps: Deps, ctx: ToolContext, input: ListBoardIn
     let alreadyCount = 0;
     const notDup: any[] = [];
     for (const it of matchedItems) {
-      const found = findInJobList({ company: ref.company, title: it.title, postingUrl: it.postingUrl }, rows);
+      const found = findInJobList({ company: ref.company, title: it.title, postingUrl: it.postingUrl, applyUrl: it.applyUrl }, rows);
       if (found) alreadyCount++;
       else notDup.push(it);
     }
@@ -306,13 +306,22 @@ function listBoardCompactText(output: ListBoardOutput): string {
   const lines: string[] = [];
   for (const b of output.boards) {
     const partial = b.status === "ok" && b.read < b.total ? ` · read ${b.read} of ${b.total}` : "";
+    // Lead ruling, 2026-09-28 (S2 review): the model is told to check
+    // boardName and to put `gone` rows in the prune batch, and on the
+    // web the compact form is all it reads — so both must be IN it.
+    // `board name <boardName>` only appears when the board gives one.
+    const boardNamePart = b.boardName ? ` · board name ${b.boardName}` : "";
     lines.push(
-      `${b.company} · ${b.status} · ${b.total} postings · ${b.matched} match · ${b.alreadyInJobList} already on the list · showing ${b.shown}${partial}`,
+      `${b.company}${boardNamePart} · ${b.status} · ${b.total} postings · ${b.matched} match · ${b.alreadyInJobList} already on the list · showing ${b.shown}${partial}`,
     );
     for (const p of b.postings) {
       lines.push(`${p.posting} | ${p.title} | ${p.location} | ${p.postedAt ?? ""}`);
     }
+    for (const g of b.gone) {
+      lines.push(`gone: ${g.company} — ${g.title}`);
+    }
   }
+  lines.push(`${output.requestsLeftThisTurn} board requests left this turn`);
   return lines.join("\n");
 }
 
@@ -403,7 +412,7 @@ async function addRolesExecute(deps: Deps, ctx: ToolContext, input: AddRolesInpu
       continue;
     }
     // § 4.2 item 6: link or company-and-title key, dismissed included.
-    const dup = findInJobList({ company: role.company, title: read.title, postingUrl: read.postingUrl }, rows);
+    const dup = findInJobList({ company: role.company, title: read.title, postingUrl: read.postingUrl, applyUrl: read.applyUrl }, rows);
     if (dup) {
       alreadyInJobList.push({ company: role.company, title: dup.title, stage: dup.dismissed ? "dismissed" : dup.stage });
       continue;

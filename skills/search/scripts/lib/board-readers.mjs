@@ -30,6 +30,11 @@ const NAMED_ENTITIES = {
   quot: '"',
   apos: "'",
   nbsp: " ",
+  // Lead ruling, 2026-09-28 (S2 review follow-up): common in postings,
+  // and a literal &mdash;/&ndash; shown to the candidate is a visible
+  // defect (84 of a live GitLab board's 199 postings carried one).
+  mdash: "—",
+  ndash: "–",
 };
 const ENTITY_RE = /&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z][a-zA-Z0-9]*);/g;
 
@@ -61,9 +66,16 @@ const TAG_RE = /<[^>]+>/g;
  *  (never `\s`), so a posting is cleaned identically here and in
  *  `jobs_md.save()`. */
 export function htmlToText(html) {
-  const decoded = decodeEntities(html);
-  const stripped = decoded.replace(TAG_RE, " ");
-  return cleanValue(stripped) ?? "";
+  // Lead ruling, 2026-09-28 (S2 review): Greenhouse's `content` is
+  // encoded TWICE (a live GitLab board, 2026-09-28: &amp;nbsp; &amp;amp;
+  // &amp;mdash; inside 199 postings' text) — one decode leaves `&nbsp;`
+  // and `&amp;` in the saved posting. Decode, strip tags, then decode
+  // ONCE more (never until nothing changes — one extra pass, the same
+  // steps for every board system), then collapse whitespace.
+  const decodedOnce = decodeEntities(html);
+  const stripped = decodedOnce.replace(TAG_RE, " ");
+  const decodedTwice = decodeEntities(stripped);
+  return cleanValue(decodedTwice) ?? "";
 }
 
 // ---------------------------------------------------------------------
@@ -122,11 +134,16 @@ export function withinPostedWindow(postedAt, postedWithinDays, now = new Date())
  *  key matches any row, dismissed rows included. Returns the matching row,
  *  or null. */
 export function findInJobList(posting, existingRows) {
+  // § 4.1: "a posting whose link (the hosted address OR the board's
+  // application link)... matches any row" — a live row saved under its
+  // /apply link must match here too, not just the hosted address.
   const postingLink = (posting.postingUrl || "").trim();
+  const applyLink = (posting.applyUrl || "").trim();
   const postingKeyStr = jobsMdKey({ company: posting.company ?? "", title: posting.title ?? "" });
   for (const row of existingRows) {
     const rowLink = (row.url || "").trim();
     if (postingLink && rowLink && rowLink === postingLink) return row;
+    if (applyLink && rowLink && rowLink === applyLink) return row;
     if (jobsMdKey(row) === postingKeyStr) return row;
   }
   return null;
@@ -150,8 +167,10 @@ export function computeGone({ company }, items, existingRows) {
     if (canon(row.company) !== boardCompanyKey) continue;
     const present = items.some((it) => {
       const link = (it.postingUrl || "").trim();
+      const apply = (it.applyUrl || "").trim();
       const rowLink = (row.url || "").trim();
       if (link && rowLink && link === rowLink) return true;
+      if (apply && rowLink && apply === rowLink) return true;
       return jobsMdKey({ company: row.company, title: row.title }) === jobsMdKey({ company, title: it.title });
     });
     if (!present) gone.push({ company: row.company, title: row.title });
@@ -399,6 +418,30 @@ export function createRequestBudget({ max = 60, concurrency = 4, timeoutMs = 150
     active--;
     runNext();
   };
+  // Runs `task(signal)` as one budgeted, concurrency-limited, timed,
+  // no-retry unit — the abort signal/timer stay alive for whatever
+  // `task` does (S2 review blocker 2: a stalled BODY, not just stalled
+  // headers, must also time out at 15s, so the timer can't clear the
+  // moment fetch() itself resolves). Never throws — every outcome is a
+  // tagged return value.
+  async function run(task) {
+    if (remaining <= 0) return { ok: false, reason: "request_limit" };
+    remaining -= 1;
+    await acquire();
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await task(controller.signal);
+      } catch (e) {
+        return { ok: false, reason: "error", detail: e instanceof Error ? e.message : String(e) };
+      } finally {
+        clearTimeout(timer);
+      }
+    } finally {
+      release();
+    }
+  }
   return {
     get remaining() {
       return remaining;
@@ -406,28 +449,33 @@ export function createRequestBudget({ max = 60, concurrency = 4, timeoutMs = 150
     get used() {
       return max - remaining;
     },
-    /** Performs one budgeted, concurrency-limited, timed-out, no-retry
-     *  fetch. `redirect: "error"` always (§ 4.8: "a board answer can't
-     *  send the browser's request elsewhere"). Never throws — every
-     *  outcome is a tagged return value. */
+    /** One budgeted fetch, headers only. `redirect: "error"` always
+     *  (§ 4.8: "a board answer can't send the browser's request
+     *  elsewhere"). */
     async fetch(fetchImpl, url, init = {}) {
-      if (remaining <= 0) return { ok: false, reason: "request_limit" };
-      remaining -= 1;
-      await acquire();
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
-        try {
-          const response = await fetchImpl(url, { ...init, redirect: "error", signal: controller.signal });
-          return { ok: true, response };
-        } catch (e) {
-          return { ok: false, reason: "error", detail: e instanceof Error ? e.message : String(e) };
-        } finally {
-          clearTimeout(timer);
-        }
-      } finally {
-        release();
-      }
+      return run(async (signal) => {
+        const response = await fetchImpl(url, { ...init, redirect: "error", signal });
+        return { ok: true, response };
+      });
+    },
+    /** Fetch AND parse the JSON body as one budgeted, timed unit — every
+     *  production board read uses this (not `fetch` + a separate
+     *  `.json()` afterward), so the 15s timer covers the whole request,
+     *  headers and body (§ 4.8, S2 review blocker 2). A non-2xx response
+     *  is reported as `{ ok: true, status, notOk: true }` (the caller
+     *  maps the status, e.g. 404 -> not_found); a malformed body (an HTML
+     *  error page is never valid JSON, whatever its content-type header
+     *  says — no separate content-type check, so a bare stubbed/real
+     *  Response with no header set still parses fine), a network
+     *  failure, an abort, or a stalled body is `{ ok: false, reason:
+     *  "error" }`. */
+    async fetchJson(fetchImpl, url, init = {}) {
+      return run(async (signal) => {
+        const response = await fetchImpl(url, { ...init, redirect: "error", signal });
+        if (!response.ok) return { ok: true, status: response.status, notOk: true };
+        const json = await response.json();
+        return { ok: true, status: response.status, json };
+      });
     },
   };
 }
@@ -459,6 +507,9 @@ function extractLeverItem(boardSlug, j) {
     title: htmlToText(j.text ?? ""),
     location: htmlToText(j.categories?.location ?? ""),
     postingUrl: j.hostedUrl ?? "",
+    // § 4.1: dedupe/gone also match a row saved under the application
+    // link, not just the hosted address.
+    applyUrl: j.applyUrl || undefined,
     postedAt: (() => {
       const ms = j.createdAt;
       if (!ms) return undefined;
@@ -479,6 +530,7 @@ function extractAshbyItem(boardSlug, j) {
     title: htmlToText(j.title ?? ""),
     location: htmlToText(j.locationName ?? j.location ?? ""),
     postingUrl: j.jobUrl ?? "",
+    applyUrl: j.applyUrl || undefined,
     postedAt: isoDateOnly(j.publishedDate ?? j.publishedAt),
     companyName: undefined, // Ashby gives no company name either (§ 6)
     text: htmlToText(j.descriptionPlain ?? j.descriptionHtml ?? j.description ?? ""),
@@ -495,10 +547,17 @@ function extractAshbyItem(boardSlug, j) {
 function extractSmartRecruitersItem(boardSlug, j) {
   const sections = j.jobAd?.sections ?? {};
   const text = [sections.jobDescription?.text, sections.qualifications?.text].filter(Boolean).join("\n\n");
+  // § 4.2 item 4 (S2 review, checked live 2026-09-28): the row's link is
+  // built from the posting's OWN company.identifier, never from the
+  // address the model typed — the API answers "SmartRecruiters" and
+  // "smartrecruiters" alike, so a link built from `boardSlug` could save
+  // one posting under two different links.
+  const identifier = j.company?.identifier || boardSlug;
   return {
     title: htmlToText(j.name ?? ""),
     location: htmlToText(j.location?.city ?? ""),
-    postingUrl: `https://jobs.smartrecruiters.com/${boardSlug}/${j.id ?? ""}`,
+    postingUrl: `https://jobs.smartrecruiters.com/${identifier}/${j.id ?? ""}`,
+    applyUrl: j.applyUrl || undefined,
     postedAt: isoDateOnly(j.releasedDate),
     companyName: j.company?.name ? htmlToText(j.company.name) : undefined,
     text: htmlToText(text),
@@ -530,14 +589,24 @@ export async function readBoardList({ system, boardSlug }, { fetchImpl, budget, 
   return result;
 }
 
+// Maps a budgeted fetchJson() outcome to a list-read status. `notOk`
+// covers a non-2xx response (404 -> not_found, anything else -> error);
+// `!ok` covers request_limit and every network/timeout/parse failure
+// (the 15s timer now covers the whole request, headers and body —
+// § 4.8, S2 review blocker 2).
+function statusFromFetchJson(r) {
+  if (!r.ok) return { status: r.reason === "request_limit" ? "request_limit" : "error", total: 0, read: 0, items: [] };
+  if (r.notOk) return { status: r.status === 404 ? "not_found" : "error", total: 0, read: 0, items: [] };
+  return null; // ok, has JSON — caller continues
+}
+
 async function readBoardListUncached({ system, boardSlug }, { fetchImpl, budget }) {
   const extractor = EXTRACTORS[system];
   if (system !== "smartrecruiters") {
-    const r = await budget.fetch(fetchImpl, listApiUrl(system, boardSlug));
-    if (!r.ok) return statusFromFailure(r);
-    const status = await statusFromResponse(r.response);
-    if (status.status !== "json") return status;
-    const json = status.json;
+    const r = await budget.fetchJson(fetchImpl, listApiUrl(system, boardSlug));
+    const failed = statusFromFetchJson(r);
+    if (failed) return failed;
+    const json = r.json;
     const items = (system === "lever" ? json : json?.jobs ?? json) ?? [];
     const list = Array.isArray(items) ? items : [];
     const extracted = list.map((raw) => extractor(boardSlug, raw));
@@ -554,17 +623,13 @@ async function readBoardListUncached({ system, boardSlug }, { fetchImpl, budget 
   let allItems = [];
   let totalFound = 0;
   for (let page = 1; page <= SMARTRECRUITERS_MAX_PAGES; page++) {
-    const r = await budget.fetch(fetchImpl, listApiUrl(system, boardSlug, page));
-    if (!r.ok) {
-      if (page === 1) return statusFromFailure(r);
+    const r = await budget.fetchJson(fetchImpl, listApiUrl(system, boardSlug, page));
+    const failed = statusFromFetchJson(r);
+    if (failed) {
+      if (page === 1) return failed;
       break; // a later page failing still reports what was read
     }
-    const status = await statusFromResponse(r.response);
-    if (status.status !== "json") {
-      if (page === 1) return status;
-      break;
-    }
-    const json = status.json;
+    const json = r.json;
     totalFound = Number.isFinite(json?.totalFound) ? json.totalFound : totalFound;
     const content = Array.isArray(json?.content) ? json.content : [];
     allItems = allItems.concat(content.map((raw) => extractor(boardSlug, raw)));
@@ -578,26 +643,6 @@ async function readBoardListUncached({ system, boardSlug }, { fetchImpl, budget 
     read: allItems.length,
     items: allItems,
   };
-}
-
-function statusFromFailure(r) {
-  if (r.reason === "request_limit") return { status: "request_limit", total: 0, read: 0, items: [] };
-  return { status: "error", total: 0, read: 0, items: [] };
-}
-
-async function statusFromResponse(response) {
-  if (response.status === 404) return { status: "not_found", total: 0, read: 0, items: [] };
-  if (!response.ok) return { status: "error", total: 0, read: 0, items: [] };
-  const contentType = response.headers?.get?.("content-type") ?? "";
-  if (contentType && !contentType.includes("json")) {
-    return { status: "error", total: 0, read: 0, items: [] };
-  }
-  try {
-    const json = await response.json();
-    return { status: "json", json };
-  } catch {
-    return { status: "error", total: 0, read: 0, items: [] };
-  }
 }
 
 // ---------------------------------------------------------------------
@@ -616,16 +661,10 @@ export async function readPosting({ system, boardSlug, postingId }, { fetchImpl,
     if (!found) return { ok: false, reason: "not_found" };
     return { ok: true, board: system, boardSlug, ...found };
   }
-  const r = await budget.fetch(fetchImpl, postingApiUrl(system, boardSlug, postingId));
+  const r = await budget.fetchJson(fetchImpl, postingApiUrl(system, boardSlug, postingId));
   if (!r.ok) return { ok: false, reason: r.reason === "request_limit" ? "request_limit" : "error" };
-  if (r.response.status === 404) return { ok: false, reason: "not_found" };
-  if (!r.response.ok) return { ok: false, reason: "error" };
-  let json;
-  try {
-    json = await r.response.json();
-  } catch {
-    return { ok: false, reason: "error" };
-  }
+  if (r.notOk) return { ok: false, reason: r.status === 404 ? "not_found" : "error" };
+  const json = r.json;
   const extractor = EXTRACTORS[system];
   const extracted = extractor(boardSlug, json);
   // § 4.4's Lever fix is what extractLeverItem does NOT do: it never reads

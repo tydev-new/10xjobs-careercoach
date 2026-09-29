@@ -13,6 +13,8 @@
 //
 // New in S2 (not ported from a Python original) — no captured `-h` text in
 // help-text.mjs; its own USAGE string lives here.
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { nodeIo } from "../../profile/scripts/lib/io-node.mjs";
 import { join } from "../../profile/scripts/lib/path-util.mjs";
 import * as jm from "./lib/jobs-md.mjs";
@@ -91,59 +93,118 @@ function parseWorkdayUrl(url) {
   return { tenant, dc, site };
 }
 
-async function fetchWorkdayList({ tenant, dc, site }, { fetchImpl, budget }) {
-  const base = `https://${tenant}.${dc}.myworkdayjobs.com`;
-  let out = [];
-  let offset = 0;
-  let total = 0;
-  while (offset <= 60) {
-    // 4 pages x 20, same bound the sweep used.
-    const r = await budget.fetch(fetchImpl, `${base}/wday/cxs/${tenant}/${site}/jobs`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ appliedFacets: {}, limit: 20, offset, searchText: "" }),
-    });
-    if (!r.ok) {
-      if (offset === 0) return r.reason === "request_limit" ? { status: "request_limit", total: 0, read: 0, items: [] } : { status: "error", total: 0, read: 0, items: [] };
-      break;
-    }
-    if (!r.response.ok) {
-      if (offset === 0) return r.response.status === 404 ? { status: "not_found", total: 0, read: 0, items: [] } : { status: "error", total: 0, read: 0, items: [] };
-      break;
-    }
-    let json;
-    try {
-      json = await r.response.json();
-    } catch {
-      if (offset === 0) return { status: "error", total: 0, read: 0, items: [] };
-      break;
-    }
-    total = Number.isFinite(json?.total) ? json.total : total;
-    const page = Array.isArray(json?.jobPostings) ? json.jobPostings : [];
-    for (const p of page) {
-      out.push({
-        title: cleanValue(p.title ?? "") ?? "",
-        location: cleanValue(p.locationsText ?? "") ?? "",
-        postingUrl: `${base}/en-US/${site}${p.externalPath ?? ""}`,
-        postedAt: undefined, // Workday's list gives a relative string ("Posted 3 Days Ago"), not a date — never guessed (rule 11).
-        companyName: undefined,
-        text: "",
-        _id: p.externalPath ?? undefined,
-      });
-    }
-    if (page.length < 20) break;
-    offset += 20;
+const WORKDAY_PAGE_SIZE = 20;
+// list's own default read depth — unchanged (4 pages), so `boards.mjs
+// list` keeps its "read 80 of N" behaviour. `add`'s single-posting
+// lookup pages PAST this (S2 review blocker 6) — capping it the same way
+// was reporting a real posting `not_found`, a false answer.
+const WORKDAY_LIST_DEFAULT_ITEMS = 80;
+
+/** § 4.1's Ashby rule, applied to Workday's list-only reader: one cache
+ *  entry per board, per turn (the CLI's one `run()` call), shared by
+ *  `list` and `add` and only ever grown, never re-fetched from scratch. */
+function getWorkdayCacheEntry(workdayCache, key) {
+  if (!workdayCache) return { items: [], total: undefined, nextOffset: 0, exhausted: false, failure: null };
+  let entry = workdayCache.get(key);
+  if (!entry) {
+    entry = { items: [], total: undefined, nextOffset: 0, exhausted: false, failure: null };
+    workdayCache.set(key, entry);
   }
-  return { status: out.length === 0 ? "empty" : "ok", boardName: undefined, total: total || out.length, read: out.length, items: out };
+  return entry;
 }
 
-async function readWorkdayPosting({ tenant, dc, site }, postingPath, { fetchImpl, budget }) {
-  const board = await fetchWorkdayList({ tenant, dc, site }, { fetchImpl, budget });
-  if (board.status === "request_limit") return { ok: false, reason: "request_limit" };
-  if (board.status === "not_found" || board.status === "error") return { ok: false, reason: board.status };
-  const found = board.items.find((it) => it.postingUrl.endsWith(postingPath));
-  if (!found) return { ok: false, reason: "not_found" };
-  return { ok: true, board: "workday", boardSlug: site, ...found, companyName: undefined };
+async function loadWorkdayPage(base, tenant, site, offset, { fetchImpl, budget }) {
+  const r = await budget.fetchJson(fetchImpl, `${base}/wday/cxs/${tenant}/${site}/jobs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ appliedFacets: {}, limit: WORKDAY_PAGE_SIZE, offset, searchText: "" }),
+  });
+  if (!r.ok) return { ok: false, reason: r.reason === "request_limit" ? "request_limit" : "error" };
+  if (r.notOk) return { ok: false, reason: r.status === 404 ? "not_found" : "error" };
+  const json = r.json;
+  const page = Array.isArray(json?.jobPostings) ? json.jobPostings : [];
+  return { ok: true, total: json?.total, page };
+}
+
+/** Loads pages into `entry` until it holds at least `minItems`, the list
+ *  is exhausted (a page shorter than the page size), or a failure/
+ *  request_limit stops it. `entry.total` is set ONLY from the very
+ *  first page (offset 0) and never overwritten by a later page — S2
+ *  review item 6, defensive: Workday's `cxs` list is widely reported to
+ *  return `total` only on that first page (no live POST to confirm
+ *  either way, so this can't regress even if that report is wrong). */
+async function ensureWorkdayItems(base, tenant, site, entry, minItems, deps) {
+  while (entry.items.length < minItems && !entry.exhausted && !entry.failure) {
+    const r = await loadWorkdayPage(base, tenant, site, entry.nextOffset, deps);
+    if (!r.ok) {
+      entry.failure = r.reason;
+      break;
+    }
+    if (entry.total === undefined) entry.total = r.total;
+    entry.items.push(...r.page);
+    entry.nextOffset += WORKDAY_PAGE_SIZE;
+    if (r.page.length < WORKDAY_PAGE_SIZE) entry.exhausted = true;
+  }
+}
+
+function extractWorkdayItem(base, site, raw) {
+  return {
+    title: cleanValue(raw.title ?? "") ?? "",
+    location: cleanValue(raw.locationsText ?? "") ?? "",
+    postingUrl: `${base}/en-US/${site}${raw.externalPath ?? ""}`,
+    postedAt: undefined, // Workday's list gives a relative string ("Posted 3 Days Ago"), not a date — never guessed (rule 11).
+    companyName: undefined,
+    text: "",
+    _id: raw.externalPath ?? undefined,
+  };
+}
+
+function workdayFailureStatus(entry) {
+  if (entry.failure === "request_limit") return "request_limit";
+  if (entry.failure === "not_found") return "not_found";
+  return "error";
+}
+
+async function fetchWorkdayList({ tenant, dc, site }, deps) {
+  const base = `https://${tenant}.${dc}.myworkdayjobs.com`;
+  const key = `${tenant}.${dc}/${site}`;
+  const entry = getWorkdayCacheEntry(deps.workdayCache, key);
+  // The cache only ever grows: if `add` already read further this turn,
+  // `list` reuses that (no re-fetch), but list's OWN bound stays 80.
+  await ensureWorkdayItems(base, tenant, site, entry, Math.max(entry.items.length, WORKDAY_LIST_DEFAULT_ITEMS), deps);
+  if (entry.items.length === 0 && entry.failure) {
+    return { status: workdayFailureStatus(entry), total: 0, read: 0, items: [] };
+  }
+  const items = entry.items.slice(0, WORKDAY_LIST_DEFAULT_ITEMS).map((raw) => extractWorkdayItem(base, site, raw));
+  return {
+    status: items.length === 0 ? "empty" : "ok",
+    boardName: undefined,
+    total: entry.total ?? items.length,
+    read: items.length,
+    items,
+  };
+}
+
+async function readWorkdayPosting({ tenant, dc, site }, postingPath, deps) {
+  const base = `https://${tenant}.${dc}.myworkdayjobs.com`;
+  const key = `${tenant}.${dc}/${site}`;
+  const entry = getWorkdayCacheEntry(deps.workdayCache, key);
+  const matches = (raw) => `${base}/en-US/${site}${raw.externalPath ?? ""}`.endsWith(postingPath);
+  let found = entry.items.find(matches);
+  // S2 review blocker 6: page through the FULL list, within the request
+  // budget — not capped at list's own 80, so a real posting further in
+  // is found, not falsely reported not_found.
+  while (!found && !entry.exhausted && !entry.failure) {
+    const before = entry.items.length;
+    await ensureWorkdayItems(base, tenant, site, entry, before + WORKDAY_PAGE_SIZE, deps);
+    found = entry.items.slice(before).find(matches);
+    if (entry.items.length === before) break; // safety: no progress made
+  }
+  if (!found) {
+    if (entry.failure) return { ok: false, reason: workdayFailureStatus(entry) };
+    return { ok: false, reason: "not_found" };
+  }
+  return { ok: true, board: "workday", boardSlug: site, ...extractWorkdayItem(base, site, found), companyName: undefined };
 }
 
 // ---------------------------------------------------------------------
@@ -254,6 +315,7 @@ async function runList(a, io, { fetchImpl, now }) {
   const rows = await jm.load(io, a.workspace);
   const budget = createRequestBudget();
   const ashbyCache = new Map();
+  const workdayCache = new Map();
   const showBudget = createShowBudget(120);
 
   const lines = [];
@@ -265,7 +327,7 @@ async function runList(a, io, { fetchImpl, now }) {
       lines.push(`${company} · unsupported_url · not a job board Ten can read here`);
       continue;
     }
-    const read = await readAnyBoardList(parsed, { fetchImpl, budget, ashbyCache });
+    const read = await readAnyBoardList(parsed, { fetchImpl, budget, ashbyCache, workdayCache });
     if (read.status !== "ok" && read.status !== "empty") {
       lines.push(`${company} · ${read.status} · 0 postings`);
       continue;
@@ -274,15 +336,19 @@ async function runList(a, io, { fetchImpl, now }) {
     let alreadyCount = 0;
     const notDup = [];
     for (const it of matchedItems) {
-      const found = findInJobList({ company, title: it.title, postingUrl: it.postingUrl }, rows);
+      const found = findInJobList({ company, title: it.title, postingUrl: it.postingUrl, applyUrl: it.applyUrl }, rows);
       if (found) alreadyCount++;
       else notDup.push(it);
     }
     const shownItems = applyShowCap(notDup, showBudget, 40);
     const gone = read.status === "ok" && read.read === read.total ? computeGone({ company }, read.items, rows) : [];
     const partial = read.status === "ok" && read.read < read.total ? ` · read ${read.read} of ${read.total}` : "";
+    // § 4.1: "prints the same facts" as list_board's own compact text —
+    // boardName so the candidate/model can check the right company's
+    // board was reached (also fix item 7, S2 review).
+    const boardNamePart = read.boardName ? ` · board name ${read.boardName}` : "";
     lines.push(
-      `${company} · ${read.status} · ${read.total} postings · ${matchedItems.length} match · ${alreadyCount} already on the list · showing ${shownItems.length}${partial}`,
+      `${company}${boardNamePart} · ${read.status} · ${read.total} postings · ${matchedItems.length} match · ${alreadyCount} already on the list · showing ${shownItems.length}${partial}`,
     );
     for (const it of shownItems) {
       lines.push(`  ${it.postingUrl} | ${it.title} | ${it.location} | ${it.postedAt ?? ""}`);
@@ -321,6 +387,7 @@ async function runAdd(a, io, { fetchImpl, now }) {
 
   const budget = createRequestBudget();
   const ashbyCache = new Map();
+  const workdayCache = new Map();
   const nowDate = now();
   const todayStr = nowDate.toISOString().slice(0, 10);
 
@@ -344,7 +411,7 @@ async function runAdd(a, io, { fetchImpl, now }) {
       anyFailed = true;
       continue;
     }
-    const read = await readAnyPosting(parsed, { fetchImpl, budget, ashbyCache });
+    const read = await readAnyPosting(parsed, { fetchImpl, budget, ashbyCache, workdayCache });
     if (!read.ok) {
       lines.push(`failed: ${posting} — ${read.reason}`);
       anyFailed = true;
@@ -362,7 +429,7 @@ async function runAdd(a, io, { fetchImpl, now }) {
       anyFailed = true;
       continue;
     }
-    const dup = findInJobList({ company, title: read.title, postingUrl: read.postingUrl }, rows);
+    const dup = findInJobList({ company, title: read.title, postingUrl: read.postingUrl, applyUrl: read.applyUrl }, rows);
     if (dup) {
       lines.push(`already in job list: ${company} — ${dup.title} (${dup.dismissed ? "dismissed" : dup.stage})`);
       continue;
@@ -412,7 +479,10 @@ async function runAdd(a, io, { fetchImpl, now }) {
     lines.push(`added: ${company} — ${read.title}`);
   }
 
-  return { stdout: lines.join("\n") + (lines.length ? "\n" : ""), stderr: "", exitCode: 0 };
+  // S2 review, also-fix 8: a run with any failed role exits non-zero —
+  // silently exiting 0 on a partial failure would let a scripted/
+  // unattended caller miss it.
+  return { stdout: lines.join("\n") + (lines.length ? "\n" : ""), stderr: "", exitCode: anyFailed ? 1 : 0 };
 }
 
 // ---------------------------------------------------------------------
@@ -435,9 +505,15 @@ export async function run(argv, io = nodeIo, { fetchImpl = fetch, now = () => ne
   return runAdd(a, io, { fetchImpl, now });
 }
 
+// S2 review blocker 3: the same robust fix as J2 — compare realpath'd
+// paths on BOTH sides. import.meta.url and argv[1] can each be given
+// through a symlink (macOS mktemp: /var -> /private/var is the common
+// case), and Node does NOT resolve either one for us; a raw string
+// comparison then silently mismatches and this guard never runs (exit 0,
+// no output, no error — the worst kind of failure).
 const isMain = (() => {
   try {
-    return import.meta.url === new URL(process.argv[1], "file://").href;
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
   } catch {
     return false;
   }

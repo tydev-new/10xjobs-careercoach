@@ -5,7 +5,9 @@
 // live network call to any board — every fetch is a stub. "There is no
 // second language to agree with" (§ 4.4): these are the specification.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -472,4 +474,30 @@ test("boards.mjs add: adds a posting, writes jobs.md and the JD file, create-onl
   assert.equal(result2.exitCode, 0);
   assert.ok(result2.stdout.includes("already in job list"));
   assert.equal(io._files.get("jd-inbox/acme-engineer.md"), jdBefore, "an existing JD file is kept");
+});
+
+// ---------------------------------------------------------------------
+// Coordinator follow-up on the main-guard fix (blocker 3): the J2 review
+// caught the SAME fix regressing render_resume by wrapping `await
+// main()` inside the guard's own try/catch, silently swallowing every
+// error (exit 0, nothing printed). boards.mjs's guard keeps the
+// try/catch scoped to ONLY the realpath comparison; `run()`'s own call
+// sits outside it, so an unexpected internal error still exits non-zero
+// with a message on stderr, not swallowed. Proved here against the REAL
+// CLI subprocess (spawnSync, like the tester's own symlink test), by
+// forcing a genuine unexpected error with no fetch/network involved: a
+// directory named "jobs.md" makes fs.readFile throw EISDIR, uncaught by
+// io-node.mjs.
+test("boards.mjs (main guard follow-up): an unexpected internal error exits non-zero with a message on stderr, never swallowed", () => {
+  const dir = mkdtempSync(join(tmpdir(), "s2t-boards-err-"));
+  mkdirSync(join(dir, "jobs.md")); // a DIRECTORY, not a file
+  const boardsPath = join(ROOT, "skills/search/scripts/boards.mjs");
+  const r = spawnSync(
+    process.execPath,
+    [boardsPath, "list", "--workspace", dir, "--board", "https://boards.greenhouse.io/acme", "--company", "Acme"],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(r.status, 0, `expected a non-zero exit; got ${r.status}; stdout=${JSON.stringify(r.stdout)}`);
+  assert.ok(r.stderr.length > 0, "expected an error message on stderr, not silence");
+  assert.equal(r.stdout, "", "nothing printed to stdout on an unexpected failure");
 });

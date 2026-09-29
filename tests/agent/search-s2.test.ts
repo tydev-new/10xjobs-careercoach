@@ -259,7 +259,10 @@ test("§ 4.1 M3 (the named S2 test): the model's prompt carries list_board's com
     assert.equal(results.length, 1, `${where}: one list_board result in the prompt`);
     const o = results[0].output;
     assert.equal(o.type, "text", `${where}: the model got ${o.type}, want text`);
-    assert.ok(o.value.includes("Acme · ok · 2 postings · 1 match · 0 already on the list · showing 1"), `${where}: ${o.value}`);
+    // Lead ruling, 2026-09-28 (S2 review): M3's compact line now carries
+    // `board name <boardName>` (the model is told to check it) — updated
+    // here per the coordinator's explicit go-ahead for this one test.
+    assert.ok(o.value.includes("Acme · board name Acme, Inc. · ok · 2 postings · 1 match · 0 already on the list · showing 1"), `${where}: ${o.value}`);
     assert.ok(o.value.includes("https://job-boards.greenhouse.io/acme/jobs/1 | Forward Deployed Engineer | Berlin | 2026-09-20"), `${where}: ${o.value}`);
     assert.ok(!o.value.includes("requestsLeftThisTurn") && !o.value.trim().startsWith("{"), `${where}: JSON leaked`);
   };

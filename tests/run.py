@@ -114,6 +114,21 @@ else:
     else:
         passed += 1
 
+# tests/search-s2-local.test.mjs — the INDEPENDENT tester's own suite for
+# skills/search/scripts/boards.mjs (S2 review), separate from the coder's
+# own tests/boards.test.mjs above. Same node --test pattern; skips
+# loudly when `node` isn't on PATH.
+if not node:
+    print("\nSKIPPED tests/search-s2-local.test.mjs: no `node` on PATH")
+else:
+    print("\n--- node --test tests/search-s2-local.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(HERE, "search-s2-local.test.mjs")], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/search-s2-local.test.mjs (node --test) — see output above")
+    else:
+        passed += 1
+
 # packages/checkers: the JS ports' own unit tests (docs/design-web-agent.md
 # § 5). The parity machinery (parity.mjs, coverage-gate.mjs) is gone at J2
 # (docs/design-js-only.md § 6): tests/checkers/run-cases.mjs's

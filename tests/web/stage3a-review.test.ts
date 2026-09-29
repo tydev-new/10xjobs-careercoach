@@ -34,7 +34,7 @@ import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Browser, type BrowserContext, type Page, type Route } from "../../apps/web/node_modules/playwright/index.mjs";
+import { chromium, webkit, type Browser, type BrowserContext, type Page, type Route } from "../../apps/web/node_modules/playwright/index.mjs";
 import { textReply } from "../agent/_openrouter_stub.ts";
 import { buildAskTenDraft } from "../../apps/web/src/workspace/ask-ten.ts";
 import { matchGateReply } from "../../packages/agent/src/helpers.ts";
@@ -717,9 +717,9 @@ test("PRINCIPLES rule 12 (§ 5.2 rule 4's first half): Documents reads list() ea
   assert.ok(got.some((g) => g.rows.some((x) => x.path === "prep/new-sheet.md")), "the new file is not listed");
 });
 
-// Rule 4's second half and its neutral line are NOT in 3a's exit list (§ 5.9);
-// measured and reported, not gating (lead's instruction).
-test("§ 5.2 rule 4 (not in 3a's exit): while a turn runs, Documents shows 'Ten is working. This page updates when it finishes.', and at turn end it re-reads (a file written mid-turn shows with no navigation)", { todo: "rule 4 is outside 3a's exit list; reported, not gating" }, async () => {
+// Rule 4's second half and its neutral line are not in 3a's exit list
+// (§ 5.9); the fix round built them, so this is a real test from round 2.
+test("§ 5.2 rule 4: while a turn runs, Documents shows 'Ten is working. This page updates when it finishes.', and at turn end it re-reads (a file written mid-turn shows with no navigation)", async () => {
   const ctx = await ctxFor(DESK);
   const r = await openReal(ctx, EDGE, { holdTurns: true });
   const page = r.page;
@@ -788,6 +788,208 @@ test("§ 5.5 at 375px on Documents: the list alone; a file opens the full-screen
     await closeViewer(page);
   }
   await ctx.close();
+  assert.deepEqual(bad, []);
+});
+
+
+// ---------------------------------------------------------------- fix round 1 re-review (round 2)
+
+test("§ 5.2 rule 6 'Missing is empty': a viewed file whose read() is resource_missing shows the viewer's ordinary empty state, never the loud line", async () => {
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, EDGE);
+  const page = r.page;
+  await go(page, "Documents");
+  await page.evaluate(() => ((window as any).__ctl.readMissing = ["profile.md"]));
+  await openRow(page, "profile.md");
+  const viewer = squash(await page.locator(".side-panel").innerText());
+  const retry = await page.locator(".side-panel").getByRole("button", { name: "Retry" }).count();
+  await ctx.close();
+  const [pre] = RULE6.split("<path>");
+  assert.ok(!viewer.includes(pre), `a missing file is loud: "${viewer}"`);
+  assert.equal(retry, 0, "a missing file shows Retry");
+  assert.match(viewer, /Nothing open yet\./);
+});
+
+test("§ 5.2 rule 6 at 375px: a failed read opens the sheet with \"Couldn't read <path>. Try again in a moment.\" and Retry; Retry shows the file", async () => {
+  const ctx = await ctxFor(PHONE);
+  const r = await openReal(ctx, EDGE);
+  const page = r.page;
+  await go(page, "Documents");
+  await page.evaluate(() => ((window as any).__ctl.readFail = ["stories/launch.md"]));
+  await openRow(page, "stories/launch.md");
+  const text = squash(await page.locator(".side-panel").innerText());
+  const sheet = await page.locator(".side-panel").evaluate((e) => ({ z: getComputedStyle(e).zIndex, w: e.getBoundingClientRect().width }));
+  await shot(page, "r2-read-error-sheet-375x812");
+  await page.evaluate(() => ((window as any).__ctl.readFail = []));
+  await page.locator(".side-panel").getByRole("button", { name: "Retry" }).click();
+  await page.waitForTimeout(250);
+  const md = await page.locator(".side-panel .markdown-view").count();
+  await ctx.close();
+  assert.ok(text.includes(RULE6.replace("<path>", "stories/launch.md")), `sheet shows "${text}"`);
+  assert.deepEqual([sheet.z, Math.round(sheet.w)], ["30", PHONE.width]);
+  assert.equal(md, 1, "Retry did not show the file");
+});
+
+test("§ 5.4 'only when the composer is empty' (N6): a composer holding only spaces is unsent text and is kept", async () => {
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, EDGE);
+  const page = r.page;
+  await go(page, "Talk to Ten");
+  await page.locator(".composer-input").fill("   ");
+  await go(page, "Documents");
+  await pane(page).locator(".doc-row", { hasText: "company/beta-co.md" }).getByRole("button", { name: ASK }).click();
+  await page.waitForTimeout(200);
+  const v = await page.locator(".composer-input").inputValue();
+  await ctx.close();
+  assert.equal(v, "   ");
+});
+
+test("§ 5.5 'A long path or URL wraps' (N5): at 375px the sheet's header shows the whole path, wrapped, beside the print button; no horizontal scroll", async () => {
+  const long = `applications/${"northwind-grid-staff-product-manager-".repeat(3)}resume.html`;
+  const files = { ...EDGE, [long]: "<!doctype html><p>invented</p>" };
+  const ctx = await ctxFor(PHONE);
+  const r = await openReal(ctx, files);
+  const page = r.page;
+  await go(page, "Documents");
+  await openRow(page, long);
+  const h = await page.locator(".side-panel-path").evaluate((e) => {
+    const cs = getComputedStyle(e);
+    return { text: e.textContent, over: e.scrollWidth - e.clientWidth, ellipsis: cs.textOverflow === "ellipsis" && cs.overflow !== "visible", sw: document.documentElement.scrollWidth, vw: window.innerWidth, lines: Math.round(e.getBoundingClientRect().height / parseFloat(cs.lineHeight || "16")) };
+  });
+  const print = await page.locator(".side-panel").getByRole("button", { name: PRINT }).isVisible();
+  await shot(page, "r2-long-path-sheet-375x812");
+  await ctx.close();
+  const bad: string[] = [];
+  if (h.text !== long) bad.push(`path text "${h.text}"`);
+  if (h.over > 1 || h.ellipsis) bad.push(`path cut: overflow ${h.over}px, ellipsis ${h.ellipsis}`);
+  if (h.sw > h.vw) bad.push(`scrollWidth ${h.sw} > ${h.vw}`);
+  if (!print) bad.push("no print button beside the wrapped path");
+  assert.deepEqual(bad, []);
+});
+
+test("§ 5.6 'Escape closes the top-most first: dialog, then menu, then sheet' at 375px (keyboard): with the sheet up and the ⋯ menu opened over it, one Escape closes the menu only; with a dialog, the dialog only", async () => {
+  const ctx = await ctxFor(PHONE);
+  const r = await openReal(ctx, EDGE);
+  const page = r.page;
+  const bad: string[] = [];
+  await go(page, "Documents");
+  await openRow(page, "profile.md");
+  const sheetUp = () => page.locator(".side-panel--open").count().then((n) => n > 0);
+  if (!(await sheetUp())) bad.push("the sheet did not open");
+  // the sheet covers the header, so the menu is reached the way a keyboard
+  // user reaches it (a phone with a hardware keyboard): focus, Enter
+  const openMenu = async () => {
+    await page.locator(".menu-trigger").focus();
+    await page.keyboard.press("Enter");
+    await page.locator(".menu-panel").waitFor();
+  };
+  await openMenu();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  if (await page.locator(".menu-panel").count()) bad.push("menu: Escape left the menu open");
+  if (!(await sheetUp())) bad.push("menu: one Escape closed the menu AND the sheet under it");
+  if (!(await sheetUp())) await openRow(page, "profile.md");
+  await openMenu();
+  await page.getByRole("menuitem", { name: "Buy credit" }).focus();
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(200);
+  const dialog = page.locator("[role=dialog]");
+  if (!(await dialog.count())) bad.push("no Buy credit dialog");
+  else {
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    if (await dialog.count()) bad.push("dialog: Escape left the dialog open");
+    if (!(await sheetUp())) bad.push("dialog: one Escape closed the dialog AND the sheet under it");
+  }
+  await ctx.close();
+  assert.deepEqual(bad, []);
+});
+
+test("§ 5.6 'Breakpoint' at 900px (the 761-1100px drawer) on Documents: the drawer's close ✕ closes it, so the rows and header controls it overlays — each row's 'Ask Ten about this', the ⋯ menu — can be reached", async () => {
+  const ctx = await ctxFor({ width: 900, height: 800 });
+  const r = await openReal(ctx, EDGE);
+  const page = r.page;
+  await go(page, "Documents");
+  const reachable = () =>
+    pane(page).evaluate((root) => {
+      const els = Array.from(root.querySelectorAll<HTMLElement>(".doc-row button"));
+      const hit = els.filter((e) => {
+        const b = e.getBoundingClientRect();
+        const top = document.elementFromPoint(Math.min(b.right - 4, window.innerWidth - 1), b.top + b.height / 2);
+        return !!top && e.contains(top);
+      });
+      const m = document.querySelector<HTMLElement>(".menu-trigger")!.getBoundingClientRect();
+      const mt = document.elementFromPoint(m.left + m.width / 2, m.top + m.height / 2);
+      return { hit: hit.length, of: els.length, menu: !!mt && !!mt.closest(".menu-trigger"), drawerText: (document.querySelector(".side-panel")?.textContent ?? "").trim().slice(0, 40) };
+    });
+  const before = await reachable();
+  await shot(page, "r2-900-documents");
+  const close = page.locator(".side-panel").getByRole("button", { name: "Close" });
+  const hasClose = await close.isVisible();
+  if (hasClose) await close.click();
+  await page.waitForTimeout(300);
+  const after = await reachable();
+  await shot(page, "r2-900-documents-after-close");
+  await ctx.close();
+  console.log(`# 900px: row controls reachable ${before.hit}/${before.of}, ⋯ ${before.menu}, with the drawer showing "${before.drawerText}"; after ✕ ${after.hit}/${after.of}, ⋯ ${after.menu}`);
+  assert.ok(hasClose, "no close ✕ on the drawer");
+  assert.deepEqual({ rows: after.of - after.hit, menu: after.menu }, { rows: 0, menu: true }, "after the drawer's ✕, controls are still under the drawer");
+});
+
+test("desktop 1440 (no sheet): after a file was opened, Escape pressed while typing in Talk to Ten's composer leaves focus and text in the composer", async () => {
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, EDGE);
+  const page = r.page;
+  await go(page, "Documents");
+  await openRow(page, "profile.md");
+  await go(page, "Talk to Ten");
+  await page.locator(".composer-input").click();
+  await page.keyboard.type("half a thought");
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  const f = await page.evaluate(() => ({ inComposer: !!document.activeElement?.closest(".composer"), el: `${document.activeElement?.tagName}.${document.activeElement?.className}` }));
+  const v = await page.locator(".composer-input").inputValue();
+  await ctx.close();
+  assert.ok(f.inComposer, `Escape moved focus out of the composer to ${f.el}`);
+  assert.equal(v, "half a thought");
+});
+
+test("§ 5.5 focus return in WebKit (the phone engine § 5.5's rules are written for: iOS Safari), 375px, a tap on the row: Back and Escape return focus to the row that opened the sheet", async (t) => {
+  let wk: Browser;
+  try {
+    wk = await webkit.launch();
+  } catch (e) {
+    t.skip(`WebKit not launchable here: ${String(e).slice(0, 80)}`);
+    return;
+  }
+  const bad: string[] = [];
+  const ctx = await wk.newContext({ viewport: PHONE, hasTouch: true, isMobile: false, reducedMotion: "reduce" });
+  try {
+    const page = await ctx.newPage();
+    await page.route("**/stub-proxy/**", (route: Route) => route.fulfill({ status: 500, body: "no model in this test" }));
+    await page.route("**/version.json", async (route: Route) => route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ id: await page.evaluate(() => (window as any).__builtId).catch(() => "") }) }));
+    await page.route("**/seed.json", (route: Route) => route.fulfill({ status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ files: EDGE, seed: "saved", updatedAt: UPDATED_AT }) }));
+    await page.goto(realBase);
+    await page.locator(".frame").waitFor();
+    await page.locator(".tabbar").getByRole("button", { name: /^Documents/ }).tap();
+    await page.waitForTimeout(300);
+    for (const how of ["Back", "Escape"] as const) {
+      const opener = pane(page).locator(".doc-row", { hasText: "profile.md" }).getByRole("button").first();
+      await opener.tap();
+      await page.waitForTimeout(300);
+      const openedFrom = await page.evaluate(() => `${document.activeElement?.tagName}.${document.activeElement?.className}`);
+      if (how === "Back") await page.locator(".side-panel-back").tap();
+      else await page.keyboard.press("Escape");
+      await page.waitForTimeout(300);
+      const closed = !(await page.locator(".side-panel--open").count());
+      const onOpener = await opener.evaluate((e) => document.activeElement === e);
+      if (!closed) bad.push(`${how}: the sheet did not close`);
+      if (!onOpener) bad.push(`${how}: focus on ${await page.evaluate(() => `${document.activeElement?.tagName}.${document.activeElement?.className}`)} (activeElement right after the tap that opened it: ${openedFrom})`);
+    }
+  } finally {
+    await ctx.close();
+    await wk.close();
+  }
   assert.deepEqual(bad, []);
 });
 

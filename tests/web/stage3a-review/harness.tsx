@@ -13,6 +13,8 @@
 //   - list() and read() are counted; list() hands its files back in
 //     REVERSE order, so the page's own "sorted by path" is what's tested,
 //     never the store's;
+//   - window.__ctl.readMissing makes read(<path>) throw the store's own
+//     WorkspaceError("resource_missing") (§ 5.2 rule 6: missing is empty);
 //   - window.__ctl.listFail / readFail make list() / read(<path>) throw a
 //     non-missing error (§ 5.2 rule 6), toggled by the test at run time.
 // A seeded `.pdf` / `.docx` goes in through the inner store's own upload()
@@ -28,6 +30,7 @@ import { createCoach } from "../../../packages/agent/src/index.ts";
 import { createInMemoryGate } from "../../../packages/agent/src/gate.ts";
 import { createInMemoryWorkspaceStore } from "../../../packages/agent/src/workspace/in-memory-store.ts";
 import { isUploadExt } from "../../../packages/agent/src/workspace/path-rules.ts";
+import { WorkspaceError } from "../../../packages/agent/src/types.ts";
 import { createFakeScriptRunner } from "../../../packages/agent/src/tools/fake-script-runner.ts";
 import { createCoachModel } from "../../../apps/web/src/backend/model.ts";
 import { CLAUDE_COACH_MODEL } from "../../../apps/web/src/backend/coach-model.ts";
@@ -48,13 +51,13 @@ interface Seed {
 declare global {
   interface Window {
     __spy: { writes: string[]; uploads: string[]; reads: string[]; lists: number; saves: number };
-    __ctl: { listFail: boolean; readFail: string[] };
+    __ctl: { listFail: boolean; readFail: string[]; readMissing: string[] };
     __inner: any;
     __ready: boolean;
   }
 }
 window.__spy = { writes: [], uploads: [], reads: [], lists: 0, saves: 0 };
-window.__ctl = { listFail: false, readFail: [] };
+window.__ctl = { listFail: false, readFail: [], readMissing: [] };
 (window as any).__builtId = BUILT_VERSION_ID;
 
 async function main() {
@@ -81,6 +84,7 @@ async function main() {
     read: async (p: string) => {
       window.__spy.reads.push(p);
       if (window.__ctl.readFail.includes(p)) throw fail(`read(${p})`);
+      if (window.__ctl.readMissing.includes(p)) throw new WorkspaceError("resource_missing", `${p} does not exist.`);
       return inner.read(p);
     },
     write: (p: string) => {

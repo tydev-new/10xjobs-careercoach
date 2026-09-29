@@ -16,7 +16,6 @@ export { createInMemoryWorkspaceStore } from "./workspace/in-memory-store.ts";
 export { validateRef, isReadOnlyPath, isEditableExt, isUploadExt } from "./workspace/path-rules.ts";
 export { createInMemoryGate, buildGateLine, textHashOf, sha256Hex, findSpendLineTemplate } from "./gate.ts";
 export { CardBuilder } from "./cards.ts";
-export { parseJobsMdRows, findJobsMdRow } from "./jobs-md.ts";
 export {
   computeCostEstimate,
   needsGate,

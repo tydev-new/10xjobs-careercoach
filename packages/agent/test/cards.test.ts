@@ -64,7 +64,11 @@ test("bash record_verdict.py, exit 0 -> verdict card from the jobs.md row it wro
 test("bash record_verdict.py: no jd_file row -> card has no ref (never guesses a path)", async () => {
   const cb = new CardBuilder();
   const ws = createInMemoryWorkspaceStore({
-    "jobs.md": ["### Beta — PM", "- Verdict: weak", "- Score: 40", "- Reason: no fit", ""].join("\n"),
+    // A stage heading is required for the real port's load() to parse a
+    // row at all (S2 review blocker 4: the verdict card now reads jobs.md
+    // through skills/search/scripts/lib/jobs-md.mjs, not the retired
+    // stub's lenient regex) — a real jobs.md always has one.
+    "jobs.md": ["## To Review", "", "### Beta — PM", "- Verdict: weak", "- Score: 40", "- Reason: no fit", ""].join("\n"),
   });
   const cards = await cb.forToolResult(
     "bash",

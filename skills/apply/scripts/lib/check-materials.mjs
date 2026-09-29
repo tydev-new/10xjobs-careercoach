@@ -1,10 +1,13 @@
-// A faithful JS port of skills/apply/scripts/check_materials.py.
+// A faithful JS port of the retired check_materials.py (J2; the Python is
+// deleted — see docs/receipts.md and this file's own comments for the
+// prose it carried).
 //
 // Runs in Node AND in the browser — no node:fs, no node:path, nothing
-// platform-specific. See skills/apply/scripts/check_materials.py for the
-// prose this mirrors; this file intentionally keeps the same shape,
-// comments, and message text so a diff against the Python original stays
-// readable, and so the parity test's byte-for-byte comparison has a chance.
+// platform-specific. This file intentionally kept the same shape,
+// comments, and message text as the Python original so a diff against
+// it stayed readable during the port, and so the parity test's
+// byte-for-byte comparison against the frozen expected-output cases has
+// a chance.
 import { join, basename } from "../../../profile/scripts/lib/path-util.mjs";
 import { pySplit, normSpace, pyListRepr, pySplitlines, restoreLineSeparators, cpSlice, pyStrip, PY_S, PY_NOT_S, PY_B_START, PY_B_END } from "../../../profile/scripts/lib/py-text.mjs";
 import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx.mjs";

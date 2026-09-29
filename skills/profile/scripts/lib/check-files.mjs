@@ -23,15 +23,15 @@
 // `resolveInvokedScriptPath(workspace)` — a function, not a bare string,
 // because the answer can depend on where the caller resolves things from:
 //
-//   - `bin/check_files.mjs` (a Node-only file, like io-node.mjs) ignores
-//     the workspace argument and always returns its own real position on
-//     disk (there is deliberately no `import.meta.url`/host-disk-path
-//     fallback IN THIS SHARED PORT FILE: that was fix round 1's
-//     mistake — it silently pointed at wherever THIS PACKAGE happens to
-//     live on the machine running the code, meaningless inside
-//     just-bash's in-memory filesystem). A raw `new URL(...).pathname`
-//     also percent-encodes a space in the path (`%20`); bin/check_files.mjs
-//     decodes with `fileURLToPath` instead.
+//   - `skills/profile/scripts/check_files.mjs` (a Node-only CLI file,
+//     like io-node.mjs) ignores the workspace argument and always
+//     returns its own real position on disk (there is deliberately no
+//     `import.meta.url`/host-disk-path fallback IN THIS SHARED PORT
+//     FILE: that was fix round 1's mistake — it silently pointed at
+//     wherever THIS PACKAGE happens to live on the machine running the
+//     code, meaningless inside just-bash's in-memory filesystem). A raw
+//     `new URL(...).pathname` also percent-encodes a space in the path
+//     (`%20`); check_files.mjs decodes with `fileURLToPath` instead.
 //   - `dispatch.mjs`'s `dispatchPython3` reconstructs it from where
 //     docs/design-web-agent.md § 4 guarantees the skills bundle is
 //     mounted: `<workspace>/skills/...` — joined against THIS SCRIPT'S

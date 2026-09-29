@@ -47,11 +47,14 @@ function countChar(s, ch) {
 // altered-header case check_history FAILs on; here it WARNs (2026-08-21
 // alignment review, L1). `opts.columnValidators` maps a column index to
 // a function `(cellValue) => message|null` for a check an enum set
-// can't express (e.g. apply's panel-outcome column) — both maps are
-// supplied by the host, since the titles/headers/extra rules are
-// domain-specific, not part of this domain-neutral core.
+// can't express (e.g. apply's panel-outcome column). `opts.enumSourceHint`
+// names, in the enum-mismatch WARN below, where the enum is declared
+// (e.g. "apply/references/schema.md") — this domain-neutral core has no
+// business knowing which skill's file that is, so the host supplies the
+// text (J2 review, L4). All three are supplied by the host, since the
+// titles/headers/extra rules are domain-specific.
 export async function checkTable(io, path, header, enums, opts = {}) {
-  const { titleForHeader = new Map(), columnValidators = new Map() } = opts;
+  const { titleForHeader = new Map(), columnValidators = new Map(), enumSourceHint = "the schema" } = opts;
   const res = [];
   const rawFile = await io.readFile(path);
   const raw = rawFile.split("\\|").join("");
@@ -88,7 +91,7 @@ export async function checkTable(io, path, header, enums, opts = {}) {
     for (const [i2, allowed] of enums) {
       const v = stripChars(cells[i2].toLowerCase(), "`*_ ");
       if (v && !allowed.has(v)) {
-        res.push(["WARN", `"${cells[i2]}" is not one of ${pyListRepr(pySortStrings([...allowed]))} — apply/references/schema.md declares the enum`]);
+        res.push(["WARN", `"${cells[i2]}" is not one of ${pyListRepr(pySortStrings([...allowed]))} — ${enumSourceHint} declares the enum`]);
       }
     }
     for (const [i2, validate] of columnValidators) {

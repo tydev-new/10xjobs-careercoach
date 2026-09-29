@@ -166,6 +166,11 @@ async function checkTableHere(io, path, header, enums) {
   return checkTable(io, path, header, enums, {
     titleForHeader: TITLE_FOR_HEADER,
     columnValidators: header === PANEL_HEADER ? PANEL_COLUMN_VALIDATORS : undefined,
+    // Every table this file checks via checkTable (COVERAGE_HEADER,
+    // SELECTION_HEADER, ROUNDS_HEADER, PANEL_HEADER) is declared by
+    // apply/references/schema.md — the domain-neutral core in
+    // shapecheck.mjs never hardcodes that file name itself (J2 review, L4).
+    enumSourceHint: "apply/references/schema.md",
   });
 }
 

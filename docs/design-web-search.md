@@ -20,6 +20,16 @@ after J2, the one implementation both hosts use), with no new script; § 7.1,
 `JD` keeps meaning the raw posting and a new `Analysis` field holds the
 analysis; § 7.2, the leads wording. Each is applied below.
 
+**Lead rulings (2026-09-28, S2 independent review):** § 4.4, Greenhouse's
+`content` is encoded twice, so the readers decode entities, strip tags,
+then decode once more; § 4.1 (M3), the compact form the model reads
+carries `boardName` and the `gone` rows; § 4.2, a failed role gains an
+optional `message`, so a `company_mismatch` names both companies. Each is
+applied below, with two facts the review confirmed that the text did not
+yet say (§ 4.2 item 4, § 4.8). Two follow-ups the same day: the decode
+table gains `&mdash;` and `&ndash;` (§ 4.4), and the compact form also
+carries the board requests left this turn (§ 4.1).
+
 **Precedence:** `PRINCIPLES.md` → `design-cowork-coaching-goals.md` →
 `design-cowork-coaching.md` → `skill-shape.md`. This design changes what
 `design-cowork-coaching.md` § 6 says about search, so § 7.3 carries that
@@ -244,11 +254,21 @@ facts, one line per posting.
   partial read ("300 of N") yields no `gone` at all.
 - **What the model reads (web, M3).** The tool sets `toModelOutput`
   (`ai` 7.0.111, from `@ai-sdk/provider-utils`) so the model gets a
-  compact text: one line per board (`<company> · <status> · <total>
-  postings · <matched> match · <alreadyInJobList> already on the list ·
-  showing <shown>`, plus "read 300 of N" when partial) and one line per
-  posting (`<posting> | <title> | <location> | <postedAt>`). The full
-  output stays in the UI message for the card and the "ran" line.
+  compact text: one line per board (`<company> · board name <boardName>
+  · <status> · <total> postings · <matched> match · <alreadyInJobList>
+  already on the list · showing <shown>`; the `board name` part only when
+  the board gives one, and "read 300 of N" added when partial), then one
+  line per posting (`<posting> | <title> | <location> | <postedAt>`), then
+  one line per `gone` row (`gone: <company> — <title>`, the row's own
+  company and title); after the last board, one line
+  `<requestsLeftThisTurn> board requests left this turn`, so the model
+  can plan its reads within the 60-request budget (§ 4.8; lead ruling,
+  2026-09-28, the owner's cost rule). The model is told to check `boardName` and to put
+  `gone` rows in the prune batch (both above), and on the web the compact
+  form is all it reads, so both must be in it (lead ruling, 2026-09-28).
+  *Prevents:* on the web, a wrong company's board read as the right one,
+  and a delisted row that never reaches the prune batch. The full output
+  stays in the UI message for the card and the "ran" line.
   UNVERIFIED: that the package converts saved messages with the same
   tools, so a replayed turn also sends the compact form (an S2 test).
 
@@ -262,7 +282,10 @@ date, dedupe by link and by key including a dismissed row, the 40 and 120
 caps with `matched` intact, SmartRecruiters `empty` and "read 300 of N",
 Ashby read once for three postings, `gone` only after a full read, each
 failure status; a web test that turn 2's model prompt carries the compact
-form, not the JSON.
+form, not the JSON: with `board name` for a Greenhouse board and without
+it for a Lever board, one `gone:` line for each `gone` row, and a last
+line with the requests left (57 after one SmartRecruiters board read in
+three pages).
 
 ### 4.2 Adding postings: `add_roles` (web) and `boards.mjs add` (local)
 
@@ -272,8 +295,13 @@ output: { added: { company: string; title: string; url: string }[];
           alreadyInJobList: { company: string; title: string; stage: string }[];
           failed: { posting: string;
                     reason: "unsupported_url" | "not_found" | "company_mismatch" | "empty_field"
-                          | "company_limit" | "active_cap" | "error" | "request_limit" }[] }
+                          | "company_limit" | "active_cap" | "error" | "request_limit";
+                    message?: string }[] }   // plain words; on company_mismatch, both names
 ```
+
+A failed role's `message` (`AddRolesFailure` in the package's types) is
+optional and in plain words. It exists because `reason` alone can't name
+the two companies item 3 requires (lead ruling, 2026-09-28).
 
 For each role, code, not the model:
 
@@ -284,13 +312,21 @@ For each role, code, not the model:
    sweep). **Where this differs from the sweep:** when the board gives
    its own name (Greenhouse `company_name`, SmartRecruiters
    `company.name`) and it doesn't match `company` under `jobs_md`
-   `canon()`, the role fails `company_mismatch`, naming both. The sweep
-   never checked. *Proved by:* "Acme" against "Acme, Inc." adds; "Acme"
-   against "Beta Corp" fails with both names; a Lever posting (no board
-   name) adds under `company`.
+   `canon()`, the role fails `company_mismatch`, naming both in its
+   `message`. The sweep never checked. *Proved by:* "Acme" against "Acme,
+   Inc." adds; "Acme" against "Beta Corp" fails with both names in
+   `message`; a Lever posting (no board name) adds under `company`.
 4. Takes title, location, posting date and application link from the
    board, the same fields the sweep reads (`search_ats.py` `extract`,
-   `posted_iso`; § 4.4).
+   `posted_iso`; § 4.4). A SmartRecruiters link is built from the
+   posting's own `company.identifier` and id
+   (`jobs.smartrecruiters.com/<identifier>/<id>`), as the sweep builds it
+   (`search_ats.py:516`), never from the address as the model typed it:
+   the API answers `SmartRecruiters` and `smartrecruiters` alike (S2
+   review, checked live 2026-09-28). *Prevents:* one posting saved under
+   two links, so the link check misses it. *Proved by:* a posting added
+   as `jobs.smartrecruiters.com/SmartRecruiters/<id>-…` is saved as
+   `jobs.smartrecruiters.com/smartrecruiters/<id>`.
 5. Saves the posting text to `jd-inbox/<slug>.md` in the sweep's shape
    (`# Company — Title`, `# Source: <link>`, blank line, text; the slug is
    the sweep's rule), create-only; an existing file is kept.
@@ -398,10 +434,24 @@ agree with.
   sends `content` HTML-entity-encoded, and both the sweep
   (`search_ats.py:481`) and `fetch_job` (`packages/agent/src/tools/index.ts:80`)
   strip tags without decoding first, so saved postings keep
-  `&lt;div…&gt;` (checked, § 12). The new readers decode, then strip.
+  `&lt;div…&gt;` (checked, § 12). **And it is encoded twice** (lead
+  ruling, 2026-09-28): the S2 review's live read of the GitLab board,
+  2026-09-28, 199 postings, found `&amp;nbsp;`, `&amp;amp;` and
+  `&amp;mdash;` inside the text (my re-read the same day: the first two in
+  all 199, `&amp;mdash;` in 84, no other doubled name), so one decode
+  leaves `&nbsp;` and `&amp;` in the saved posting. The new readers
+  decode entities, strip tags, then decode once more (once, not until
+  nothing changes), then collapse whitespace; the same steps for every
+  board system. *Proved by:* a table test with those samples: `a&amp;nbsp;b`
+  gives `a b`, `R&amp;amp;D` gives `R&D`, `a&amp;mdash;b` gives `a—b`,
+  and `&lt;p&gt;a&lt;/p&gt;` gives `a`.
 - **One entity table and one whitespace class, written out.** Decoding uses exactly this table: `&amp;` `&lt;` `&gt;`
-  `&quot;` `&#39;` `&apos;` `&nbsp;` (to U+00A0), plus numeric `&#NNN;`
-  and `&#xHH;`; any other `&name;` is left as written. The readers call no
+  `&quot;` `&#39;` `&apos;` `&nbsp;` (to U+00A0), `&mdash;` (to —,
+  U+2014) and `&ndash;` (to –, U+2013), plus numeric `&#NNN;` and
+  `&#xHH;`; any other `&name;` is left as written. The two dashes are in
+  the table because they are common in postings and a literal `&mdash;`
+  shown to the candidate is a visible defect (lead ruling, 2026-09-28;
+  84 of GitLab's 199 postings carry one). The readers call no
   library HTML unescape: the same file runs under Node (the local
   command) and in the browser (the web), Node has no HTML decoder built
   in, and the browser's (`DOMParser`) exists only there and knows the
@@ -566,11 +616,13 @@ model extracting a title or link is how invented data gets in).
 - **A per-turn budget of 60 board requests,** shared by `list_board`,
   `add_roles` and `fetch_job`, counted in the turn state. Past it, the
   rest returns `request_limit` and the reply names what wasn't read. Four
-  requests at a time, 15 seconds each, no retries in the same turn.
+  requests at a time, 15 seconds each, counted until the body is read,
+  not only the headers; no retries in the same turn.
   *Prevents:* the browser acting as a crawler (the boards publish no
   limits, UNVERIFIED); a turn that never ends; a silent partial result.
   *Proved by:* 70 requested reads give 60 answers and 10
-  `request_limit`; a hanging stub times out at 15 s; a redirecting stub
+  `request_limit`; a hanging stub times out at 15 s, and so does one that
+  sends headers and then never finishes the body; a redirecting stub
   gives `error`; a board answering HTML gives `error`, with no throw.
 - `boards.ts` (the package's lint rule) and `board-readers.mjs` (the
   browser-safety lint, which covers `skills/*/scripts/lib/` from J2)
@@ -1257,7 +1309,8 @@ by the lead's rulings (§ 7).
 - Fields: a Greenhouse list item has `company_name`, `requisition_id`,
   `first_published`, `absolute_url`; `absolute_url` can be the company's
   own careers site (the hosted `job-boards` address redirected there,
-  302). Greenhouse `content` is entity-encoded HTML. A Lever posting has
+  302). Greenhouse `content` is entity-encoded HTML, encoded twice
+  (checked 2026-09-28, § 4.4). A Lever posting has
   no company field (`categories`: team, location, commitment,
   allLocations). An Ashby board has `apiVersion` and `jobs`, no company
   name. A SmartRecruiters posting has `company` with `identifier` and

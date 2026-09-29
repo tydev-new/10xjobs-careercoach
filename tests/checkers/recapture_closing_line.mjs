@@ -8,9 +8,15 @@
 // case file's CURRENT (working-tree) stdout exactly. Any other difference
 // fails — the substitution is the only allowed change.
 //
-//   node tests/checkers/recapture_closing_line.mjs           # check mode (default)
-//   node tests/checkers/recapture_closing_line.mjs --write   # apply the rule, write files
-//   node tests/checkers/recapture_closing_line.mjs --base=<ref>   # git ref for "old" (default HEAD)
+//   node tests/checkers/recapture_closing_line.mjs --base=<ref>            # check mode (default)
+//   node tests/checkers/recapture_closing_line.mjs --base=<ref> --write    # apply the rule, write files
+//
+// --base is REQUIRED (honest-ceilings review): once this tool's own
+// recapture commit lands, the case files ARE the "new" state — a
+// default of "HEAD" would silently compare the committed tree against
+// itself and report a false "0 mismatches" forever after. --base names
+// the commit BEFORE the recapture (this repo: the closing-line script
+// change's own commit, one before the case-file recapture commit).
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { join, relative, dirname } from "node:path";
@@ -23,7 +29,7 @@ const CASES_DIR = join(HERE, "cases");
 const args = process.argv.slice(2);
 const WRITE = args.includes("--write");
 const baseArg = args.find((a) => a.startsWith("--base="));
-const BASE = baseArg ? baseArg.slice("--base=".length) : "HEAD";
+const BASE = baseArg ? baseArg.slice("--base=".length) : null;
 
 // The scripts this recapture touches, and which stdout each rule applies
 // to (matched by the case's own `steps[i].script`, index-aligned with
@@ -125,6 +131,11 @@ function apply(oldText) {
 }
 
 function main() {
+  if (!BASE) {
+    console.error("usage: recapture_closing_line.mjs --base=<commit before the recapture> [--write]");
+    process.exitCode = 2;
+    return;
+  }
   const files = allCaseFiles();
   let filesChanged = 0, filesUnchanged = 0, mismatches = 0;
   const changedList = [];

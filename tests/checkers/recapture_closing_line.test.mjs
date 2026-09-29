@@ -5,8 +5,15 @@
 //
 //   node --test tests/checkers/recapture_closing_line.test.mjs
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { substituteCheckMaterials, substituteCheckMessages, substituteProposalBlock } from "./recapture_closing_line.mjs";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, "..", "..");
+const SCRIPT = join(HERE, "recapture_closing_line.mjs");
 
 test("check_materials: a WARN-only pass swaps the clean line for the new one", () => {
   const before = "RESUME r.md: pass (0 fail, 1 warn)\n  [WARN] letter is 3 words\n\n✔ automatic checks clean\n";
@@ -55,4 +62,24 @@ test("proposal_block: a FAIL present -> untouched, no closing line added", () =>
 test("proposal_block: no findings at all -> untouched (the existing clean line stays)", () => {
   const before = "Otherwise this is the version.\n\n---\nclean: proposal block printed; no FAIL, no WARN\n";
   assert.equal(substituteProposalBlock(before), before);
+});
+
+// --------------------------------------------------------- CLI: --base is required (honest-ceilings review)
+
+test("CLI: no --base -> usage error, exit 2 (never silently defaults to HEAD)", () => {
+  let threw = null;
+  try {
+    execFileSync("node", [SCRIPT], { cwd: ROOT, encoding: "utf8" });
+  } catch (e) {
+    threw = e;
+  }
+  assert.ok(threw, "must exit non-zero with no --base");
+  assert.equal(threw.status, 2);
+  assert.match(threw.stderr, /--base=<commit before the recapture>/);
+});
+
+test("CLI: --base=<the commit before the recapture landed> reports 0 mismatches against the committed tree", () => {
+  const out = execFileSync("node", [SCRIPT, "--base=8da873b"], { cwd: ROOT, encoding: "utf8" });
+  assert.match(out, /0 mismatch\(es\)/);
+  assert.match(out, /62 case file\(s\) differ/);
 });

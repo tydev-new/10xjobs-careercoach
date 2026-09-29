@@ -4,7 +4,22 @@
 // Python script.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkResume, checkLetter } from "../../../../skills/apply/scripts/lib/check-materials.mjs";
+import { checkResume, checkLetter, run } from "../../../../skills/apply/scripts/lib/check-materials.mjs";
+
+// A minimal in-memory `io` (see README.md "The io interface") for the
+// closing-line cases below, which exercise run() itself, not just the
+// pure checkResume/checkLetter functions.
+function fakeIo(files) {
+  return {
+    async exists(p) {
+      return p in files;
+    },
+    async readFile(p) {
+      if (!(p in files)) throw new Error(`ENOENT: ${p}`);
+      return files[p];
+    },
+  };
+}
 
 const RESUME_TWO_SECTIONS = `# Alex Chen
 
@@ -160,4 +175,31 @@ test("accented text: an é in a bullet does not break the base-verbatim word bou
   const base = "# Base\n\n## Experience\n- Wrote the café pipeline in Montréal for the finance team.\n";
   const doc = "# A\n\n## Summary\n\nok.\n\n## Experience\n\n- Wrote the café pipeline in Montréal for the finance team.\n";
   assert.deepEqual(fails(checkResume(doc, base)), []);
+});
+
+// -------------------------------------------------- run(): the closing line (design-honest-ceilings.md § 6A)
+
+test("run(): warnings only -> the new closing line, and 'clean' never appears anywhere in stdout", async () => {
+  const warnOnly = RESUME_CLEAN.replace("## Experience", "## Impact"); // non-standard section name -> 1 WARN, 0 FAIL
+  const files = { "/w/resume.md": warnOnly };
+  const { stdout, exitCode } = await run(["--workspace", "/w", "--resume", "/w/resume.md"], fakeIo(files));
+  assert.equal(exitCode, 0, stdout);
+  assert.ok(stdout.includes("no failures, 1 warning above — fix each one or tell the candidate"), stdout);
+  assert.ok(!stdout.toLowerCase().includes("clean"), stdout);
+});
+
+test("run(): no findings -> the clean line, unchanged", async () => {
+  const files = { "/w/resume.md": RESUME_CLEAN };
+  const { stdout, exitCode } = await run(["--workspace", "/w", "--resume", "/w/resume.md"], fakeIo(files));
+  assert.equal(exitCode, 0, stdout);
+  assert.ok(stdout.includes("✔ automatic checks clean"), stdout);
+  assert.ok(!stdout.includes("no failures,"), stdout);
+});
+
+test("run(): a FAIL -> unchanged, even beside its own WARN", async () => {
+  const files = { "/w/letter.md": LETTER_INFORMAL }; // FAIL (DM register) + WARN (block count)
+  const { stdout, exitCode } = await run(["--workspace", "/w", "--letter", "/w/letter.md"], fakeIo(files));
+  assert.equal(exitCode, 1, stdout);
+  assert.ok(stdout.includes("✘ fix the FAILs before delivering"), stdout);
+  assert.ok(!stdout.split("✘")[1].toLowerCase().includes("clean"), stdout);
 });

@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers/freeze.mjs (honest-ceilings): covers: tests/test_check_messages.py::test_rubric_note_glyph_is_not_a_mark",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "contacts/acme.md": "> Your postmortems-for-data-incidents post matched how I work. Just applied for the Analytics Engineer role.\n(rubric: specificity ✓ · brevity ✓ (~280/300 chars) · ask ✓ · value ✓ (the ⚠ WATCH claim left out) · voice ✓)\n",
+  "pitch.md": "# P\n\n## Messages rubric\n\nPINNED 2026-08-17\n| tier | claim |\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: pass (0 fail, 0 warn, 1 drafts)\n  [INFO] draft 1: 106 chars / 14 words\n✔ message floor clean\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

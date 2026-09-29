@@ -157,7 +157,16 @@ export async function run(argv, io) {
 
   let stdout = out.join("\n") + "\n\n--- paste everything above this line into the reply, beside the delivered document ---\n";
   for (const [level, msg] of findings) stdout += `${level}  ${msg}\n`;
-  if (!findings.length) stdout += "clean: proposal block printed; no FAIL, no WARN\n";
-  const exitCode = findings.some(([l]) => l === "FAIL") ? 1 : 0;
+  const failCount = findings.filter(([l]) => l === "FAIL").length;
+  const warnCount = findings.length - failCount;
+  // design-honest-ceilings.md § 6A: never say "clean" beside a standing
+  // WARN. A FAIL prints no closing line here (unchanged); exit codes
+  // don't change either way.
+  if (!findings.length) {
+    stdout += "clean: proposal block printed; no FAIL, no WARN\n";
+  } else if (failCount === 0) {
+    stdout += `no failures, ${warnCount === 1 ? "1 warning" : `${warnCount} warnings`} above — fix each one or tell the candidate\n`;
+  }
+  const exitCode = failCount > 0 ? 1 : 0;
   return { stdout: restoreLineSeparators(stdout), stderr: "", exitCode };
 }

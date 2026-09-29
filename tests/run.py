@@ -166,6 +166,22 @@ else:
         else:
             passed += 1
 
+# tests/checkers/recapture_closing_line.mjs: the mechanical-substitution
+# proof for design-honest-ceilings.md § 6A's frozen-corpus recapture
+# (design-js-only.md § 5.5's rename pattern). Its own .test.mjs covers
+# the substitution rules AND the CLI's --base contract (honest-ceilings
+# review: --base is required, never silently defaults to HEAD).
+if not node:
+    print("\nSKIPPED tests/checkers/recapture_closing_line.test.mjs: no `node` on PATH")
+else:
+    print("\n--- node --test tests/checkers/recapture_closing_line.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(CASES, "recapture_closing_line.test.mjs")], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers/recapture_closing_line.test.mjs — see output above")
+    else:
+        passed += 1
+
 # packages/agent's own suite (node --test) — plan step 4. Run with cwd
 # set to packages/agent so its own node_modules (ai,
 # @openrouter/ai-sdk-provider) resolve; `node --test` with no path args

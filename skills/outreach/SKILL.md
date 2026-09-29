@@ -57,10 +57,10 @@ Extended search tactics and message frameworks live in `references/patterns.md`.
 
 **Runs when** drafting any outreach message, connect note, follow-up, or thank-you note.
 
-- **Standard:** Channel limit (`references/eval.md`), recipient's sourced hook, top posting competency, 5-criterion rubric, and `voice.md`.
+- **Standard:** Channel limit (`references/eval.md`), recipient's sourced hook, top posting competency, 5-criterion rubric, and `voice.md` — plus any bar the candidate sets ("all four claims"), where a claim counts only with its evidence from `pitch.md § Messages rubric`.
 - **Budget:** 2 self-passes.
 - **Each round:** Apply recipient hook (recipient's own words open, positioning closes). Draft inside limit. Self-loop with `python3 scripts/check_messages.py` and the wording check subagent (`../profile/references/language-check.md`). Write rubric line next to draft.
-- **Exits:** Clears standard; or **the ceiling: two passes without clearing** → stop, record honest score (UNMET), and present tradeoff as a decision for them to make. Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
+- **Exits:** Clears the standard — say so plainly; or **the ceiling: two passes without clearing** → stop, write UNMET and what didn't fit on the rubric line, and hand them the choice of which claims lead (two variants, their pick) as a decision for them to make. **A list is not a message: claims that fit the limit only as one-clause items strung together are brevity ✗ and voice ✗ — UNMET, even when the hook survived.** Never relax the standard — **cutting a claim's supporting evidence to fit a limit IS relaxing it: a claim-name without its number is not the claim.**
 
 ### Plan close-out (a sequence)
 

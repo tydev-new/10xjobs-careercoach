@@ -24,6 +24,20 @@ maybe_dry_run runner "$RESULTS" && exit 0
 CONDS="${CONDS:-bare guardrails full}"
 TRIALS="${TRIALS:-1}"
 
+# The vault (2026-08-20 incident class): the founder's real ~/job-search is
+# immutable for the whole run, same as run_t13/t19/t21.
+vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM
+
+# design-honest-ceilings.md § 6 "The case": keep acceptEdits, and let the
+# skill's own scripts run so a close-time check CAN run (§ 5 "The
+# environment": acceptEdits alone blocks Bash in -p mode). The spec names
+# "Bash(python3 .claude/skills/*)"; profile's scripts are node since the JS
+# switch (check_files.mjs), so the same relative pattern is given for node.
+# PROBED 2026-09-28 (Haiku, sandbox HOME, -p, acceptEdits): both RELATIVE
+# forms run; the ABSOLUTE form (node /var/.../.claude/skills/...) is
+# DENIED (permission_denials). Not widened, per the spec.
+ALLOW_SCRIPTS=(--allowedTools "Bash(python3 .claude/skills/*)" "Bash(node .claude/skills/*)")
+
 for trial in $(seq 1 "$TRIALS"); do
 for cond in $CONDS; do
   out="$RESULTS/$cond-t$trial"
@@ -36,16 +50,17 @@ for cond in $CONDS; do
   esac
   if [ "$cond" = "full" ]; then
     mkdir -p "$WS/.claude/skills"
-    cp -r "$RUNNER_SKILLS_DIR/profile" "$WS/.claude/skills/"
+    # coach ships in every real workspace (design-honest-ceilings.md § 3/§ 6)
+    cp -r "$RUNNER_SKILLS_DIR/profile" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
   fi
   echo "=== t4 / $cond / trial $trial -> $WS"
   sandbox_home_setup   # one FAKEHOME per trial — turn 2's --continue needs the SAME one turn 1 used
   ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$CASE/turn1.md")" \
-      --model "$MODEL" --permission-mode acceptEdits \
+      --model "$MODEL" --permission-mode acceptEdits "${ALLOW_SCRIPTS[@]}" \
       --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$out.turn1.stream.json" 2> "$out.err"
   ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p --continue "$(cat "$CASE/turn2.md")" \
-      --model "$MODEL" --permission-mode acceptEdits \
+      --model "$MODEL" --permission-mode acceptEdits "${ALLOW_SCRIPTS[@]}" \
       --setting-sources project "${CLAUDE_KILL_GUARD_ARGS[@]}" --output-format stream-json --verbose \
     ) > "$out.turn2.stream.json" 2>> "$out.err"
   sandbox_home_cleanup

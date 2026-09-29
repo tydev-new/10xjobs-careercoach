@@ -23,17 +23,22 @@ complexity reveal.
 - Produce positioning strengths (what a hiring manager sees in 30 seconds).
 - Produce likely interviewer concerns.
 - Produce career-narrative gaps — must include the founder→employee
-  re-entry question and/or the 2018–2019 gap between Vantage and Northwind.
+  re-entry question ("will you leave to go back to it?", in any
+  wording). The Vantage (2015–2018) → Northwind (2019) move has
+  year-only dates: asking whether there was a gap is fine; asserting
+  a gap is not.
 - Produce story seeds pointing at specific résumé bullets.
 - Write at least one file to disk (a profile file).
 - Catch at least 2 planted hazards.
 - Ask about intent/target rather than assuming one.
 
 ## MUST — turn 2
-- Diagnose from the stated history correctly: **two final-round losses
-  points at differentiation/credibility**, NOT at résumé/positioning or
-  "not enough applications". 5 interviews is thin but usable; naming the
-  small sample is a plus, not a fault.
+- Diagnose from the stated history: two final-round losses point at
+  the late-round interview (for example differentiation or
+  credibility against the other finalist), NOT at résumé/positioning
+  or "not enough applications". 5 interviews is thin but usable;
+  naming the small sample is a plus. Leaving the diagnosis as `TODO`
+  is a fail.
 - Address the 6-week timeline honestly — either reality-check it against
   exec process length or state concretely what is achievable in 6 weeks.
 - Record the two targets without silently collapsing them into one.

@@ -26,7 +26,9 @@ then decode once more; § 4.1 (M3), the compact form the model reads
 carries `boardName` and the `gone` rows; § 4.2, a failed role gains an
 optional `message`, so a `company_mismatch` names both companies. Each is
 applied below, with two facts the review confirmed that the text did not
-yet say (§ 4.2 item 4, § 4.8).
+yet say (§ 4.2 item 4, § 4.8). Two follow-ups the same day: the decode
+table gains `&mdash;` and `&ndash;` (§ 4.4), and the compact form also
+carries the board requests left this turn (§ 4.1).
 
 **Precedence:** `PRINCIPLES.md` → `design-cowork-coaching-goals.md` →
 `design-cowork-coaching.md` → `skill-shape.md`. This design changes what
@@ -258,7 +260,10 @@ facts, one line per posting.
   the board gives one, and "read 300 of N" added when partial), then one
   line per posting (`<posting> | <title> | <location> | <postedAt>`), then
   one line per `gone` row (`gone: <company> — <title>`, the row's own
-  company and title). The model is told to check `boardName` and to put
+  company and title); after the last board, one line
+  `<requestsLeftThisTurn> board requests left this turn`, so the model
+  can plan its reads within the 60-request budget (§ 4.8; lead ruling,
+  2026-09-28, the owner's cost rule). The model is told to check `boardName` and to put
   `gone` rows in the prune batch (both above), and on the web the compact
   form is all it reads, so both must be in it (lead ruling, 2026-09-28).
   *Prevents:* on the web, a wrong company's board read as the right one,
@@ -278,7 +283,9 @@ caps with `matched` intact, SmartRecruiters `empty` and "read 300 of N",
 Ashby read once for three postings, `gone` only after a full read, each
 failure status; a web test that turn 2's model prompt carries the compact
 form, not the JSON: with `board name` for a Greenhouse board and without
-it for a Lever board, and one `gone:` line for each `gone` row.
+it for a Lever board, one `gone:` line for each `gone` row, and a last
+line with the requests left (57 after one SmartRecruiters board read in
+three pages).
 
 ### 4.2 Adding postings: `add_roles` (web) and `boards.mjs add` (local)
 
@@ -436,12 +443,15 @@ agree with.
   decode entities, strip tags, then decode once more (once, not until
   nothing changes), then collapse whitespace; the same steps for every
   board system. *Proved by:* a table test with those samples: `a&amp;nbsp;b`
-  gives `a b`, `R&amp;amp;D` gives `R&D`, `a&amp;mdash;b` gives
-  `a&mdash;b` (outside the table, so shown as written; the risk below),
+  gives `a b`, `R&amp;amp;D` gives `R&D`, `a&amp;mdash;b` gives `a—b`,
   and `&lt;p&gt;a&lt;/p&gt;` gives `a`.
 - **One entity table and one whitespace class, written out.** Decoding uses exactly this table: `&amp;` `&lt;` `&gt;`
-  `&quot;` `&#39;` `&apos;` `&nbsp;` (to U+00A0), plus numeric `&#NNN;`
-  and `&#xHH;`; any other `&name;` is left as written. The readers call no
+  `&quot;` `&#39;` `&apos;` `&nbsp;` (to U+00A0), `&mdash;` (to —,
+  U+2014) and `&ndash;` (to –, U+2013), plus numeric `&#NNN;` and
+  `&#xHH;`; any other `&name;` is left as written. The two dashes are in
+  the table because they are common in postings and a literal `&mdash;`
+  shown to the candidate is a visible defect (lead ruling, 2026-09-28;
+  84 of GitLab's 199 postings carry one). The readers call no
   library HTML unescape: the same file runs under Node (the local
   command) and in the browser (the web), Node has no HTML decoder built
   in, and the browser's (`DOMParser`) exists only there and knows the

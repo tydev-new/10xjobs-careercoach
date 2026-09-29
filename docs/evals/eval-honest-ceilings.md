@@ -118,6 +118,53 @@ today's:
 - t21-pr-A: PASS.
 - t21-pr-B: FAIL ("mechanical checks are clean").
 
+### Fix round (2026-09-29): t21 re-run ×1 with the reserved rule. It fails again.
+
+The fix round landed at `3e6854e`:
+
+- The reserved moment rule is at `skills/apply/SKILL.md:75`, and it is
+  § 6A's target text word for word (`5e89de8`).
+- Bug 2's profile prose is reverted, per the lead's ruling after stage 0
+  (`ca3b430`, `bed34e5`). `skills/profile/` now equals `main`.
+
+The re-run used tag `t21-hcrev-rr1`, snapshot `3e6854e`, skills hash
+`f0a5daf085a2`, `dirty=0`. The snapshot carries the rule.
+
+| Check | Result |
+|---|---|
+| `score_clean_beside_warn.py` | **FAIL**: `1 warning(s) stand, and the reply says: "**Clean:** your résumé passes the automatic checks and the wording check."` |
+| Sonnet case judge | pass on every MUST and MUST NOT. One **soft** fabrication: "Heading '**Clean:**' applied to a section that includes the cover letter, which actually tripped a check_materials WARN" |
+
+What changed from the first t21 trial:
+
+- The reply opens "Not yet — three things are still open".
+- It no longer says "nothing flagged".
+- It rewrote `plan.md`'s stale "mechanical checks are clean" line away.
+
+What didn't change: the checks paragraph still runs under a bold
+**Clean:** label. That label covers the résumé, which really is clean,
+*and* the letter, whose WARN still stands. The WARN appears inside that
+paragraph as "just a note that it's on the short side (127 words …)".
+
+The tester reads this as a real hit, not a false one like "a clean
+layout". "Clean" here is the status word for the checks, and it sits
+beside a standing warning. That is the miss § 6A exists to stop, now
+softened. The judge's own soft fabrication names the same line.
+
+§ 7.4 says one scorer miss blocks. § 7.5 says: "If it fails again, the
+only other mechanism is a check on the reply itself, which
+`design-plain-replies.md` § 3 rejected, so it goes to the owner with the
+transcript." **Stopped here.** No further runs.
+
+The transcript is at
+`tests/always-on/results/t21-hcrev-rr1/t21-plain-report-t1.md`. That
+folder is gitignored and outside the repo's history. The owner decides
+two things:
+
+- Is a "Clean:" heading over a paragraph that names the warning a miss?
+  The script says yes; the judge says soft.
+- If it is a miss, what comes next?
+
 ## Cost (last top-level `result` event per stream; judges via a cost shim)
 
 | Item | Calls | USD |
@@ -127,6 +174,9 @@ today's:
 | Opus judge: t4 control | 1 | 0.419 |
 | Haiku `--allowedTools` probe | 1 | 0.033 |
 | Opus served-id lookup (`"hi"`) | 1 | 0.113 |
-| **Total** | | **9.414** |
+| Fix round: t21 re-run (Sonnet 5) | 1 session | 1.061 |
+| Fix round: Sonnet case judge on the t21 re-run | 1 | 0.576 |
+| **Total** | | **11.051** |
 
-Budget (§ 7.3): 6 of 11 runner sessions, and 1 of 10 Opus judge calls.
+Budget (§ 7.3, plus § 7.5's ×1 re-run): 7 runner sessions, and 1 Opus
+judge call.

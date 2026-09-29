@@ -19,7 +19,6 @@ Everything the candidate *brings* and their core public positioning live here; e
 | A goal with a date, and a committed time floor | heads `plan.md` (intake seeds once, coach owns after) |
 | Watchlist — companies they already care about. Empty is fine | `criteria.md § Target companies` |
 | Base résumé at full altitude, **§ Claim rules seeded** from hazard walk | `base-resume.md` (rules: § State, below; walk: `references/patterns.md`) |
-| Résumé analyzed, not filed — the four findings | `profile.md § Intake findings` (the findings: `references/patterns.md`) |
 | Core positioning statement surviving the substitution test | `pitch.md § Core statement` |
 | All 5 pitch variants present (TMAY, Networking, Recruiter, Fair, LinkedIn) | `pitch.md § Variants` |
 | Messages rubric pinned or marked PROPOSED | `pitch.md § Messages rubric` |
@@ -52,9 +51,6 @@ Anything not yet true is written into its file as `TODO:` and resurfaces when it
 
 - **Process:** Check `documents/` first. Ask ONE question at a time. Decline raw LinkedIn URLs as seeding sources (request PDF export instead).
 - **Extraction gate:** Facts told directly in conversation are written to disk; facts extracted from documents pass through § Nothing extracted is written.
-- **When they give their interview history:** write the diagnosis into `profile.md § Interview history` in that reply — what the pattern points at, with the sample size beside it. A read of the pattern they gave you is not a guess; if it is too thin to point anywhere, write that as the read ("one interview — no pattern yet"), not `TODO:`.
-- **When the résumé shows a founder or co-founder going back to employment:** write its own question — "will you leave to go back to it?" — into `§ Career-narrative gaps` now. It needs a factual answer, not a reassurance — with what happened to the company if they've told you, otherwise `TODO:` for it.
-- **Whenever you write a line that restates a flagged claim** — in `profile.md`, `criteria.md`, `plan.md`, or anywhere outside `base-resume.md` — and they haven't answered the flag, write it in the résumé's own words or as the open question. Never settle it ("built/led a 60-person org" where the résumé says "led").
 - **Close:** Deliver a concise summary (target, band, timeline, top asset, top risk, first step). Offer the practice cold-start (*"say 'drill me' for your first 15-minute score"*).
 
 ### Base résumé — improvement rounds (the loop)

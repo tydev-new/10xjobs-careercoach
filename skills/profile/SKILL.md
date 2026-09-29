@@ -5,7 +5,7 @@ description: Use this skill when the candidate is starting out, needs a job, or 
 
 # Profile — raw material & positioning
 
-Everything the candidate *brings* and their core public positioning live here; every other skill consumes them. Backward looks — progress reviews — belong to the coach.
+Everything the candidate *brings* and their core public positioning live here; every other skill consumes them. Backward looks — progress reviews, the retrospective — belong to the coach.
 
 ## The goal, and what must be true when it is met
 
@@ -50,7 +50,7 @@ Anything not yet true is written into its file as `TODO:` and resurfaces when it
 
 **Runs when** a new candidate arrives, a résumé is dropped, or they ask to get set up. **Exits** when destination table items are written or `TODO:`'d, and the close summary is delivered.
 
-- **Process:** Check `documents/` first. Ask ONE question at a time. Decline raw LinkedIn URLs (request PDF export instead).
+- **Process:** Check `documents/` first. Ask ONE question at a time. Decline raw LinkedIn URLs as seeding sources (request PDF export instead).
 - **Extraction gate:** Facts told directly in conversation are written to disk; facts extracted from documents pass through § Nothing extracted is written.
 - **When they give their interview history:** write the diagnosis into `profile.md § Interview history` in that reply — what the pattern points at, with the sample size beside it. A read of the pattern they gave you is not a guess; if it is too thin to point anywhere, write that as the read ("one interview — no pattern yet"), not `TODO:`.
 - **When the résumé shows a founder or co-founder going back to employment:** write its own question — "will you leave to go back to it?" — into `§ Career-narrative gaps` now. It needs a factual answer, not a reassurance — with what happened to the company if they've told you, otherwise `TODO:` for it.
@@ -85,13 +85,13 @@ Anything not yet true is written into its file as `TODO:` and resurfaces when it
 2. **Audit top-down:** Review Headline, About, Experience against search impact and positioning thesis. Produce concrete rewrites.
 3. **Write `linkedin-audit.md`:** Sync headline to `profile.md § Snapshot` and note consistency updates.
 
-**Exits** when `linkedin-audit.md` is written and syncing completed.
+**Exits** when `linkedin-audit.md` is written and downstream syncing obligations completed.
 
 ### Consistency sweep (a sequence)
 
 **Runs when** asked "do my materials tell one story?" or after modifying any positioning surface.
 
-- Cross-read base résumé summary, LinkedIn About/Headline, and pitch. Propose adjustments to it in chat before writing.
+- Cross-read base résumé summary, LinkedIn About/Headline, and pitch. Propose base résumé summary adjustments in chat before writing.
 
 **Exits** when all surface mismatches have concrete rewrites.
 
@@ -99,8 +99,8 @@ Anything not yet true is written into its file as `TODO:` and resurfaces when it
 
 **Runs when** they ask what they are looking for, change targets, or retarget. **Exits** when `criteria.md` is current and downstream staleness is flagged.
 
-- Update targets in `criteria.md` (archiving targets as history lines).
-- Flag staleness in `pitch.md`, evaluate verdicts, and `criteria.md` constraints. Never restart from scratch.
+- Update targets in `criteria.md` (archiving old targets as history lines).
+- Flag downstream staleness in `pitch.md`, evaluate verdicts, and `criteria.md` constraints. Never restart from scratch.
 
 ## State
 
@@ -111,7 +111,7 @@ File shapes in `references/schema.md`. Enforced by `scripts/check_files.mjs`.
   - *Trace rule:* Every number, title, date, scope claim on any surface traces here. A surface may be vaguer, never stronger.
   - *Ruling gate:* Concessions ("I can't defend that"), declined proposals, and approved wordings are written here immediately.
   - *Direction rule:* When a correction is agreed, update the base first in the same turn, then re-render dependent surfaces.
-- **The write moment:** Every `pitch.md` rewrite triggers, in the same turn: (1) update `pitch.md`, (2) sync `profile.md § Snapshot` headline, (3) propose any novel fact for `base-resume.md`, (4) append row to `## Rounds` in `pitch.md` (or `pitch-history.md`).
+- **The write moment:** Every `pitch.md` rewrite triggers four actions in the same turn: (1) update `pitch.md`, (2) sync `profile.md § Snapshot` headline, (3) propose any novel fact for `base-resume.md`, (4) append row to `## Rounds` in `pitch.md` (or `pitch-history.md`).
 - **Hands back:** When the ask is answered and records are written to disk.
 - **Session close:** Run `node scripts/check_files.mjs --workspace .`. The wording check runs inside the base-résumé loop; no other profile surface is candidate-voiced, so the close spawns no checker-subagent. Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
@@ -122,8 +122,8 @@ Material extracted from documents or past sessions passes through the proposal t
 | field / claim | proposed value | source | tier | conflicts with |
 |---|---|---|---|---|
 
-- **Batch confirm:** Document-sourced rows are confirmed together, with opt-out.
-- **Explicit yes:** Conversation-sourced claims and novel inferences require their own confirmation.
+- **Batch confirm:** Document-sourced rows are confirmed in one batch with opt-out.
+- **Explicit yes:** Conversation-sourced claims and novel inferences require their own explicit confirmation.
 - **Declined proposals:** Record as a ruling in `base-resume.md § Claim rules` (*"declined at intake: `<value>` from `<source>`, `<date>`"*) so it is never re-proposed.
 
 ## Guardrails

@@ -4,15 +4,21 @@
 // conversation itself (Transcript + Composer + the viewer) is owned by
 // the caller and passed in as `talkToTen`; Frame only decides WHICH page
 // shows, never reads or sends anything of its own (§ 5.2 rules 1 and 2 —
-// Frame's own page components receive only `messages` and `status`).
+// Frame's own page components receive only `messages` and `status` from
+// `useChat`; never the `useChat` object itself). Stage 3a adds Documents
+// (§ 5.3): `listDocuments`/`onOpenFile` are the caller's own `store.list()`
+// and `handleOpen`, not `useChat`, so this still holds — Documents never
+// gets `sendMessage` or any other `useChat` function.
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Header, type HeaderProps } from "./Header";
 import { Rail } from "./Rail";
 import { TabBar } from "./TabBar";
 import { EmptyPage } from "./EmptyPage";
+import { DocumentsPage } from "./DocumentsPage";
 import { VersionNotice, type VersionNoticeMode } from "../real/VersionNotice";
 import { landingPage } from "../workspace/landing.ts";
-import type { AppMessage, Page, Status } from "../types.ts";
+import { buildAskTenDraft } from "../workspace/ask-ten.ts";
+import type { AppMessage, FileInfo, Page, Status } from "../types.ts";
 
 export interface FrameVersionNotice {
   mode: VersionNoticeMode;
@@ -51,6 +57,23 @@ export interface FrameProps extends Omit<HeaderProps, "pageTitle"> {
    *  "Continue with Ten... composer focused"). Optional: a caller with no
    *  composer ref (none today) simply navigates without focusing. */
   onFocusComposer?: () => void;
+  /** Stage 3a, Documents (§ 5.3): `store.list()` — the SAME WorkspaceStore
+   *  instance the agent uses (§ 5.2 rule 1), threaded down from the
+   *  caller (ChatShell / RealChatShell already hold it for the composer's
+   *  upload and the side panel's reads). */
+  listDocuments: () => Promise<FileInfo[]>;
+  /** Opens a path in the pinned viewer (§ 5.2 rule 8) — the caller's own
+   *  `handleOpen`, the exact function Talk to Ten's chips and cards call.
+   *  `opener` (R2 fix, § 5.5) is the clicked/tapped element itself, for
+   *  the viewer's focus-return on close — never guessed from
+   *  `document.activeElement`, which WebKit leaves at BODY after a tap. */
+  onOpenFile: (path: string, opener?: HTMLElement) => void;
+  /** The composer's current text and its setter (§ 5.4, "Ask Ten about
+   *  this... only when the composer is empty; unsent text is never
+   *  overwritten"). Frame decides whether to write the draft; it never
+   *  reads or clears this on its own otherwise. */
+  composerValue: string;
+  onComposerDraft: (text: string) => void;
 }
 
 const PAGE_TITLE: Record<Page, string> = {
@@ -62,7 +85,20 @@ const PAGE_TITLE: Record<Page, string> = {
 };
 
 export function Frame(props: FrameProps): ReactElement {
-  const { messages, status, talkToTen, sidePanel, viewerOpen, versionNotice, onFocusComposer, ...headerProps } = props;
+  const {
+    messages,
+    status,
+    talkToTen,
+    sidePanel,
+    viewerOpen,
+    versionNotice,
+    onFocusComposer,
+    listDocuments,
+    onOpenFile,
+    composerValue,
+    onComposerDraft,
+    ...headerProps
+  } = props;
   // The landing rule runs ONCE, at mount, off the messages Frame is
   // mounted with (design-web-ui.md § 5.1, "Where the app opens") — never
   // re-run as messages change during the session: a gate opening while
@@ -88,6 +124,21 @@ export function Frame(props: FrameProps): ReactElement {
   };
   const openTalkToTen = (): void => navigate("talk", false);
   const continueWithTen = (): void => navigate("talk", true);
+
+  // "Ask Ten about this" (§ 5.4): puts `About <path>: ` in the composer
+  // ONLY when it's empty ("unsent text is never overwritten"), then opens
+  // Talk to Ten — same as the plain rail/tab-bar navigation above, this
+  // never focuses the composer (§ 5.4 names composer-focus for Continue
+  // with Ten alone). Never sends (§ 5.2 rule 2).
+  // N6 (Stage 3a review): "empty" means the empty STRING, never
+  // `.trim() === ""` — a composer holding only spaces is still unsent
+  // text a candidate typed and would lose (§ 1.8's own rule: "unsent
+  // text is something a candidate can lose"), so it must never be
+  // silently replaced by a draft either.
+  const askTenAbout = (path: string): void => {
+    if (composerValue === "") onComposerDraft(buildAskTenDraft(path));
+    openTalkToTen();
+  };
 
   // The focus call itself must run AFTER Talk to Ten's own
   // `frame-page--hidden` class is removed and the browser has painted it,
@@ -135,36 +186,47 @@ export function Frame(props: FrameProps): ReactElement {
             <VersionNotice mode={versionNotice.mode} saveFailed={versionNotice.saveFailed} />
           ) : null}
           {page === "home" ? (
+            // § 5.3.1 H17/H18 (lead ruling, 2026-09-28: word for word from
+            // main's docs/design-web-ui.md — Stage 3c replaces this page).
             <EmptyPage
               icon="house"
               first="Nothing here yet."
-              rest="Ten writes your plan and your pipeline as you work together."
+              rest="Talk to Ten to start your plan and your job list; they show here."
               cta="continue"
               onOpenTalkToTen={continueWithTen}
             />
           ) : page === "jobs" ? (
+            // § 5.3.1 J17/J18, NOT J19 (lead ruling, 2026-09-28): C1's own
+            // gate — J19's "Ask Ten to look for roles" ships only once
+            // design-web-search.md § 9 S5 lands; until then (and until
+            // Stage 3b replaces this page) it's J18's words only.
             <EmptyPage
               icon="briefcase"
               first="No roles yet."
-              rest="Ask Ten to look for roles, or paste a job link or a posting's text into the conversation."
+              rest="Paste a job link or a posting's text into the conversation."
               cta="talk"
               onOpenTalkToTen={openTalkToTen}
             />
           ) : page === "applications" ? (
+            // § 5.3.1 AP16/AP17 (lead ruling, 2026-09-28 — Stage 3d
+            // replaces this page).
             <EmptyPage
               icon="layers"
               first="No applications yet."
-              rest="When you decide to apply for a role, Ten drafts the materials and they show here."
+              rest="Ask Ten to draft a résumé and letter for a role, and they show here."
               cta="talk"
               onOpenTalkToTen={openTalkToTen}
             />
           ) : page === "documents" ? (
-            <EmptyPage
-              icon="files"
-              first="No files yet."
-              rest="Drop your résumé into the conversation to start."
-              cta="talk"
+            <DocumentsPage
+              list={listDocuments}
+              onOpenFile={onOpenFile}
+              onAskTen={askTenAbout}
               onOpenTalkToTen={openTalkToTen}
+              // § 5.2 rule 4: "While a turn is running, the page shows
+              // one neutral line" — the same signal the header's own
+              // avatar shows (thinking/working), not a second source.
+              turnRunning={status.state === "thinking" || status.state === "working"}
             />
           ) : null}
         </div>

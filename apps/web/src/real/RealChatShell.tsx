@@ -12,6 +12,7 @@
 //     (plan step 5b item 3)
 import { useChat } from "@ai-sdk/react";
 import type { Coach, WorkspaceStore } from "../../../../packages/agent/src/types.ts";
+import { WorkspaceError } from "../../../../packages/agent/src/types.ts";
 import type { AuthClientLike } from "../backend/auth.ts";
 import type { CoachModel } from "../backend/coach-model.ts";
 import { prepareConversationForSave, CONVERSATION_BYTE_CAP } from "../../../../packages/agent/src/index.ts";
@@ -227,6 +228,11 @@ export function RealChatShell({
   const [storeEmpty, setStoreEmpty] = useState(false);
   const [openRef, setOpenRef] = useState<string | undefined>(undefined);
   const [openFile, setOpenFile] = useState<FileRead | undefined>(undefined);
+  // § 5.2 rule 6, "the file being viewed": a non-missing read() failure —
+  // B1 (Stage 3a review). Bumped `openAttempt` re-runs the read effect
+  // below (Retry), without a second copy of its logic.
+  const [openError, setOpenError] = useState<{ path: string } | undefined>(undefined);
+  const [openAttempt, setOpenAttempt] = useState(0);
   const [panelOpenOnPhone, setPanelOpenOnPhone] = useState(false);
   const [balanceUsd, setBalanceUsd] = useState<number | undefined>(undefined);
   const [attaching, setAttaching] = useState(false);
@@ -300,29 +306,55 @@ export function RealChatShell({
     };
   }, [workspace, messages.length]);
 
+  // B1 (Stage 3a review, § 5.2 rule 6): a `resource_missing` read shows
+  // the viewer's ordinary empty state (openFile/openError both clear —
+  // "missing is empty"); any OTHER failure is loud (openError set,
+  // openFile stays clear — never silently falls back to "Nothing open
+  // yet.", which used to happen here for every failure alike).
   useEffect(() => {
     let cancelled = false;
     if (!openRef) {
       setOpenFile(undefined);
+      setOpenError(undefined);
       return;
     }
     workspace
       .read(openRef)
       .then((f) => {
-        if (!cancelled) setOpenFile(f as FileRead);
+        if (cancelled) return;
+        setOpenFile(f as FileRead);
+        setOpenError(undefined);
       })
-      .catch(() => {
-        if (!cancelled) setOpenFile(undefined);
+      .catch((err) => {
+        if (cancelled) return;
+        setOpenFile(undefined);
+        setOpenError(err instanceof WorkspaceError && err.code === "resource_missing" ? undefined : { path: openRef });
       });
     return () => {
       cancelled = true;
     };
-  }, [openRef, workspace]);
+  }, [openRef, workspace, openAttempt]);
 
-  const handleOpen = (ref: string) => {
+  const retryOpenFile = () => setOpenAttempt((n) => n + 1);
+
+  // R2 fix, § 5.5: the opener element itself (a row/chip's own
+  // `event.currentTarget`), never `document.activeElement` (WebKit
+  // leaves that at BODY after a tap). A ref, not state: it must never
+  // itself trigger a re-render, and SidePanel only ever reads it at
+  // close time.
+  const openerElRef = useRef<HTMLElement | null>(null);
+  const handleOpen = (ref: string, opener?: HTMLElement) => {
+    openerElRef.current = opener ?? null;
     setOpenRef(ref);
     setPanelOpenOnPhone(true);
   };
+
+  // Stage 3a: a STABLE function identity per `workspace` — Documents' own
+  // effect is keyed on this prop (§ 5.2 rule 4, "reads when it's shown"),
+  // so a new closure every render would re-list on every keystroke
+  // elsewhere in this component, not just when Documents is actually
+  // shown.
+  const listDocuments = useCallback(() => workspace.list(), [workspace]);
 
   const handlePrint = (htmlPath: string) => {
     handleOpen(htmlPath);
@@ -499,7 +531,11 @@ export function RealChatShell({
         onSetPassword={() => setShowSetPassword(true)}
         onSignOut={onSignOut}
         coachModel={coachModel}
-        viewerOpen={openFile !== undefined}
+        viewerOpen={openFile !== undefined || openError !== undefined}
+        listDocuments={listDocuments}
+        onOpenFile={handleOpen}
+        composerValue={composerValue}
+        onComposerDraft={setComposerValue}
         talkToTen={
           <>
             <input ref={importInputRef} type="file" accept=".zip" hidden onChange={(e) => void handleImportFile(e)} />
@@ -558,7 +594,10 @@ export function RealChatShell({
           <SidePanel
             ref={iframeRef}
             file={openFile}
+            error={openError}
+            onRetry={retryOpenFile}
             open={panelOpenOnPhone}
+            opener={openerElRef.current}
             onClose={() => setPanelOpenOnPhone(false)}
           />
         }

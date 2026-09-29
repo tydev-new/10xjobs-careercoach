@@ -19,7 +19,7 @@
  },
  "expect": [
   {
-   "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: pass (0 fail, 1 warn)\n  [WARN] non-standard section name \"Reworded\" — ATS parsers rank on standard names ('Professional Experience', not 'Where I've Made Impact'); put the ambition in a subtitle line instead\n\n✔ automatic checks clean\n",
+   "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: pass (0 fail, 1 warn)\n  [WARN] non-standard section name \"Reworded\" — ATS parsers rank on standard names ('Professional Experience', not 'Where I've Made Impact'); put the ambition in a subtitle line instead\n\nno failures, 1 warning above — fix each one or tell the candidate\n",
    "stderr": "",
    "stderrMatch": "exact",
    "exit": 0

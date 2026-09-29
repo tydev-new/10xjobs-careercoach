@@ -1579,6 +1579,11 @@ select:focus-visible {
   justify-content: center;
 }
 
+.side-panel-print {
+  flex: none;
+  margin-left: auto;
+}
+
 .side-panel-path {
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -1586,6 +1591,11 @@ select:focus-visible {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Shares the header row with the print button (F43) now — must be
+     able to shrink below its own text's intrinsic width, or a long path
+     pushes the button out past --panel-w instead of ellipsizing. */
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .side-panel-body {
@@ -1885,6 +1895,196 @@ select:focus-visible {
   color: var(--fg-muted);
 }
 
+/* ---- The workspace list pane (design-web-ui.md § 5.6, "Jobs"/
+   "Applications"/"Documents": "The same list pane" — --bg-canvas, an
+   inner column max 760px wide, padding 24px 28px). Documents (§ 5.9 Stage
+   3a) is the first page to use it; Jobs and Applications reuse these two
+   classes unchanged in their own stages. ---- */
+
+.workspace-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-canvas);
+}
+
+.workspace-page-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  /* § 5.6 "Jobs": "the list pane is --bg-canvas, with its inner column
+     max 760px and padding 24px 28px" — 28px has no token (--space-6 is
+     24, --space-8 is 32), so the horizontal figure is the spec's own
+     literal, same posture as every other bare px in this file's layout
+     rules (only color/font/radius literals are barred outside the token
+     block, § 5.6 "Chain rules this spec keeps"). */
+  padding: var(--space-6) 28px;
+}
+
+/* ---- Loading skeletons (§ 5.6, "Skeleton": "A page list loading shows
+   three 64px row skeletons.") ---- */
+
+.page-list-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.page-list-skeleton-row {
+  height: 64px;
+}
+
+/* ---- The loud, unreadable-list error (§ 5.2 rule 6: "any other read
+   failure shows... with a Retry button, never the empty state"; § 5.6
+   "Empty state": "Unreadable file uses the error card's shape in neutral
+   colors... and a Retry sec sm button.") A page list's own list() read
+   reuses the same neutral shape — there is no single <path> to name, so
+   the copy says "your files" instead of one path. ---- */
+
+.page-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 380px;
+  padding: var(--space-5);
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  color: var(--red);
+}
+
+.page-error-message {
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--fg);
+}
+
+/* ---- Documents (design-web-ui.md § 5.3 "Documents: every file"; § 5.6
+   "Documents"): one card per group, group headings with a plain count,
+   rows at least 44px with the file icon, the path (folder prefix dimmed)
+   and the date, divided by a 1px border inside the group's card. ---- */
+
+.documents-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+/* ---- The working line (design-web-ui.md § 5.2 rule 4; § 5.6 "The
+   working line"): "a pill with --bg-sunken, --type-small, --fg-muted,
+   and a spinning loader-circle, above the page content." Shared shape —
+   Jobs/Applications/Home reuse it, unstyled, once their own stages wire
+   it in. ---- */
+
+.page-working-line {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  color: var(--fg-muted);
+  font: var(--type-small);
+}
+
+.doc-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font: var(--type-card-title);
+  color: var(--fg);
+}
+
+.doc-group-count {
+  font: var(--type-meta);
+  color: var(--fg-subtle);
+}
+
+.doc-group-card {
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.doc-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+}
+
+.doc-row + .doc-row {
+  border-top: 1px solid var(--border);
+}
+
+.doc-row-open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1 1 240px;
+  min-width: 0;
+  background: none;
+  border: none;
+  min-height: 44px;
+  color: var(--fg);
+  text-align: left;
+}
+
+.doc-row-open:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.doc-row-open svg {
+  flex: none;
+  color: var(--fg-subtle);
+}
+
+.doc-row-path {
+  font: var(--type-ui);
+  overflow-wrap: anywhere;
+}
+
+.doc-row-prefix {
+  color: var(--fg-subtle);
+}
+
+.doc-row-date {
+  flex: none;
+  font: var(--type-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+
+.doc-row-ask {
+  flex: none;
+  margin-left: auto;
+}
+
+@container frame (max-width: 760px) {
+  .workspace-page-inner {
+    padding: var(--space-4);
+  }
+
+  .doc-row {
+    align-items: flex-start;
+  }
+
+  .doc-row-date {
+    order: 2;
+  }
+
+  .doc-row-ask {
+    order: 3;
+    margin-left: 0;
+  }
+}
+
 /* ---- Phone tab bar (design-web-ui.md § 5.5). Hidden at desktop widths;
    the container query below turns it on. Hidden again whenever the
    composer has focus, at any width (§ 5.5: "nothing then sits between
@@ -1982,7 +2182,10 @@ select:focus-visible {
 @container frame (max-width: 1100px) {
   .side-panel {
     position: absolute;
-    top: 0;
+    /* R2 fix: never the app's own header — the ⋯ menu (and everything
+       else in it) must stay reachable whether the drawer is covering or
+       not, so the drawer only ever occupies the page area below it. */
+    top: var(--header-h);
     right: 0;
     bottom: 0;
     width: min(var(--panel-w), 100%);
@@ -1992,6 +2195,32 @@ select:focus-visible {
 
   .side-panel-back {
     display: inline-flex;
+  }
+
+  /* R2 fix (§ 5.6 "Breakpoint"): "the drawer must not cover the page
+     when nothing is open." Unlike phone (≤760px, below), this
+     breakpoint's drawer keeps its close ✕ reachable even with nothing
+     open (the stage2-review fixture check for this breakpoint finds one
+     with no turn ever run) — so only the COVERING part (the body, and
+     the space it would otherwise occupy) collapses; the header row
+     (holding the close ✕) never does. `pointer-events: none` is a second
+     line of defence: a hit-test at any point still inside the now-
+     shrunk box (its own border/shadow) must still pass through to
+     whatever real control sits behind it. */
+  .side-panel:not(.side-panel--open) {
+    bottom: auto;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
+  }
+
+  .side-panel:not(.side-panel--open) .side-panel-header {
+    pointer-events: auto;
+  }
+
+  .side-panel:not(.side-panel--open) .side-panel-path,
+  .side-panel:not(.side-panel--open) .side-panel-body {
+    display: none;
   }
 }
 
@@ -2025,6 +2254,25 @@ select:focus-visible {
 
   .side-panel-back {
     display: inline-flex;
+  }
+
+  /* N5 (Stage 3a review), § 5.5: "A long path or URL wraps with
+     overflow-wrap: anywhere" — the sheet header was ellipsizing a long
+     path with "…" instead. At this width the header itself may grow to
+     more than one line; the print button (when present) simply sits
+     below the wrapped path, never off-screen (`flex-wrap: wrap` on the
+     header, .side-panel-print's own `margin-left: auto` stops applying
+     once it wraps to its own line). */
+  .side-panel-header {
+    flex-wrap: wrap;
+  }
+
+  .side-panel-path {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow: visible;
+    text-overflow: clip;
+    flex-basis: 100%;
   }
 
   .app-header {

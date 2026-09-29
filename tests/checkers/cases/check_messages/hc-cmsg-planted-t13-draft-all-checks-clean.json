@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers/freeze.mjs (honest-ceilings): covers: tests/test_check_messages.py::test_planted_t13_draft_all_check_marks_stays_clean",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "contacts/acme.md": "# Contacts — Nimbus Robotics\n\n## Priya Sharma — Data Lead (the hiring manager)\n- Role-relationship: HM — the JD's \"reporting to the data lead\" (first-party, 2026-08-14). Confidence: high.\n- Enrichment: 2026-08-01 company blog post \"Every fleet incident gets a postmortem — including data incidents\" (she is the listed author).\n- Send channel: LinkedIn connect request w/ note (≤300 chars). Fallback: none evidenced.\n- Outreach status: draft below, PROPOSED.\n\n## Drafts\n\n**To Priya Sharma — LinkedIn connect request (≤300 chars):**\n> Your postmortems-for-data-incidents post matched how I work — my no-show dashboard took three tries because the first two answered questions nobody asked. Just applied for the Analytics Engineer role. Would love to connect.\n(rubric: specificity ✓ · brevity ✓ · ask ✓ · value ✓ · voice ✓)\n",
+  "pitch.md": "# Pitch — Alex Chen\n\n## Core statement\n\nI build analytics pipelines that stay correct under stakeholder pressure — the no-show dashboard my clinic managers actually use every morning took three tries, and the third one stuck.\n\n## Variants\n\n**TMAY (60-90s)** — the dashboard story arc, ending on reliability.\n\n## Messages rubric\n\n*PINNED 2026-08-15 — confirmed by the candidate.*\n\n| # | Claim | Supporting number / evidence | Tier |\n|---|---|---|---|\n| 1 | Built the no-show dashboard clinic managers use daily | adopted by 3 managers, third iteration | PRIMARY |\n| 2 | Owns SQL pipelines feeding the monthly financial close | Postgres, business-critical cycle | PRIMARY |\n| 3 | Led the migration of ad-hoc reports into a tested dbt project | shared project, tested models | PRIMARY |\n| 4 | Prototyped an LLM ticket-triage assistant | LangChain, four queues | PRIMARY |\n\nTier behavior: PRIMARY may open a message; all four PRIMARY claims are the candidate's strongest material.\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: pass (0 fail, 0 warn, 1 drafts)\n  [INFO] draft 1: 223 chars / 33 words\n✔ message floor clean\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

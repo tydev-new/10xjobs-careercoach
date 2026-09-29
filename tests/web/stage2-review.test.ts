@@ -278,7 +278,10 @@ test("§ 5.6 'Ten's avatar': the header avatar is the 28px brand mark with its s
 
 test("§ 5.3 empty states: each page shows § 5.3's own words (first sentence then the rest), and one button that only opens Talk to Ten — Home's 'Continue with Ten' focuses the composer, no draft (§ 5.4)", async () => {
   const ctx = await ctxFor(DESK);
-  const page = await openMock(ctx);
+  // Stage 3a: Documents lists real files once the fixture has any, so the
+  // empty states are read on § 5.7's empty fixture (a workspace with no turn
+  // yet, § 5.3 Documents), not the picker's default (checker-failure).
+  const page = await openMock(ctx, "empty-first-run");
   const bad: string[] = [];
   await page.locator(".composer-input").fill("my unsent words");
   for (const [name, key, cta] of [["Home", "home", "Continue with Ten"], ["Jobs", "jobs", "Talk to Ten"], ["Applications", "applications", "Talk to Ten"], ["Documents", "documents", "Talk to Ten"]] as const) {
@@ -550,6 +553,17 @@ test("§ 5.1 'One frame for both builds' (real shell, spy store): a turn left ru
   assert.deepEqual(bad, []);
 });
 
+/** Closes the phone's viewer sheet (§ 5.5) when it is up — its Back arrow
+ *  shows only then: Escape first, then the arrow. A no-op on desktop. */
+async function closeSheet(page: Page) {
+  const back = page.locator(".side-panel-back");
+  if (!(await back.isVisible())) return;
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(60);
+  if (await back.isVisible()) await back.click();
+  await page.waitForTimeout(60);
+}
+
 test("§ 5.2 rules 1-2 on the frame (real shell, spies): every rail item, tab and page control, on every page, at 1440 and 375 — zero write/upload calls, zero model calls, zero saves", async () => {
   const bad: string[] = [];
   for (const vp of [DESK, PHONE]) {
@@ -568,6 +582,10 @@ test("§ 5.2 rules 1-2 on the frame (real shell, spies): every rail item, tab an
           await b.click().catch(() => {});
           clicks++;
           await r.page.waitForTimeout(60);
+          // Stage 3a: a Documents row opens the viewer, which on the phone is
+          // the full-screen sheet over the tab bar (§ 5.5); close it (Escape,
+          // then its Back arrow) before the next nav click, as a candidate would.
+          await closeSheet(r.page);
           await r.page.locator(nav).getByRole("button", { name: new RegExp(`^${n}`) }).click();
         }
       }
@@ -705,7 +723,9 @@ test("§ 5.4 (amended): only Continue with Ten focuses the composer — the firs
   for (const vp of [DESK, PHONE]) {
     // first load: the mock and the real shell's two Talk to Ten landings
     const c0 = await ctxFor(vp);
-    const m = await openMock(c0);
+    // Stage 3a: the empty fixture, so Documents still shows its empty
+    // state's "Talk to Ten" button (the control this test is about).
+    const m = await openMock(c0, "empty-first-run");
     await m.waitForTimeout(400);
     if (await composerFocused(m)) bad.push(`${vp.width}: mock first load focused the composer`);
     for (const seed of ["none", "gate"] as const) {

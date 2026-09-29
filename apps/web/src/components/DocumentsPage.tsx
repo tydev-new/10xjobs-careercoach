@@ -6,7 +6,7 @@
 // opens through the SAME viewer every other page and the conversation use
 // (§ 5.2 rule 8) via `onOpenFile`, owned by the caller (ChatShell /
 // RealChatShell). No window/document/localStorage/Node-only API.
-import { useEffect, useState, type ReactElement } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Icon } from "../icons.tsx";
 import { EmptyPage } from "./EmptyPage";
 import { datePart, groupDocuments, splitPathForDisplay } from "../workspace/documents.ts";
@@ -25,6 +25,12 @@ export interface DocumentsPageProps {
    *  (§ 5.2 rule 2). */
   onAskTen: (path: string) => void;
   onOpenTalkToTen: () => void;
+  /** § 5.2 rule 4: "While a turn is running, the page shows one neutral
+   *  line... A page reads its files when it's shown and again when a
+   *  turn ends while it's showing." True while Frame's own avatar state
+   *  is thinking/working — the same signal the header already shows,
+   *  never a second source (rule 12). */
+  turnRunning: boolean;
 }
 
 type LoadState =
@@ -32,10 +38,14 @@ type LoadState =
   | { kind: "error" }
   | { kind: "ready"; files: FileInfo[] };
 
-export function DocumentsPage({ list, onOpenFile, onAskTen, onOpenTalkToTen }: DocumentsPageProps): ReactElement {
+// § 5.2 rule 4's own words, F34 (§ 5.3.1).
+const WORKING_LINE = "Ten is working. This page updates when it finishes.";
+
+export function DocumentsPage({ list, onOpenFile, onAskTen, onOpenTalkToTen, turnRunning }: DocumentsPageProps): ReactElement {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
-  // Bumped by Retry (below) to force a fresh `list()` call without a
-  // second copy of the effect's own logic.
+  // Bumped by Retry (below) AND by a turn ending while this page shows,
+  // to force a fresh `list()` call without a second copy of the effect's
+  // own logic.
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -56,10 +66,28 @@ export function DocumentsPage({ list, onOpenFile, onAskTen, onOpenTalkToTen }: D
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list, attempt]);
 
+  // § 5.2 rule 4, second half: "again when a turn ends while it's
+  // showing." Fires once per FALLING edge of `turnRunning` (true -> false)
+  // — never on the rising edge, and never merely because this component
+  // re-rendered for some other reason.
+  const wasRunningRef = useRef(turnRunning);
+  useEffect(() => {
+    if (wasRunningRef.current && !turnRunning) setAttempt((n) => n + 1);
+    wasRunningRef.current = turnRunning;
+  }, [turnRunning]);
+
+  const workingLine: ReactNode = turnRunning ? (
+    <div className="page-working-line" role="status">
+      <Icon name="loaderCircle" size={14} className="spin" />
+      {WORKING_LINE}
+    </div>
+  ) : null;
+
   if (state.kind === "loading") {
     return (
       <div className="workspace-page">
         <div className="workspace-page-inner">
+          {workingLine}
           <div className="page-list-skeletons" aria-hidden="true">
             <div className="skeleton page-list-skeleton-row" />
             <div className="skeleton page-list-skeleton-row" />
@@ -74,6 +102,7 @@ export function DocumentsPage({ list, onOpenFile, onAskTen, onOpenTalkToTen }: D
     return (
       <div className="workspace-page">
         <div className="workspace-page-inner">
+          {workingLine}
           <div className="page-error-card">
             <Icon name="circleAlert" size={18} />
             <p className="page-error-message">Couldn't read your files. Try again in a moment.</p>
@@ -91,6 +120,11 @@ export function DocumentsPage({ list, onOpenFile, onAskTen, onOpenTalkToTen }: D
   // § 5.3 Documents, "Empty": "the list is empty" — after `leads.md` is
   // dropped, `groupDocuments` returns no groups at all exactly when there
   // is nothing left to show (rule 6: missing is empty, never loud).
+  // (The working line is not shown here: a workspace with literally no
+  // files while a turn is running is not part of 3a's own exit list, and
+  // EmptyPage's own centered layout has no room for a second element
+  // above it without its own CSS rework — scope note, not a silent
+  // drop.)
   if (groups.length === 0) {
     return (
       <EmptyPage
@@ -106,6 +140,7 @@ export function DocumentsPage({ list, onOpenFile, onAskTen, onOpenTalkToTen }: D
   return (
     <div className="workspace-page">
       <div className="workspace-page-inner documents-page">
+        {workingLine}
         {groups.map((group) => (
           <section className="doc-group" key={group.key || "top-level"} aria-label={group.label}>
             <h2 className="doc-group-head">

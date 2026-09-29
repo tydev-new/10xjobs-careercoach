@@ -1,13 +1,14 @@
 // The pinned side panel (design-web-ui.md § 1.1/§ 1.2). .md as plain
 // formatted text, .html in a sandboxed iframe. On phone (375px) this
-// becomes a full-screen sheet, closed by a back arrow. Strings F41-F45
+// becomes a full-screen sheet, closed by a back arrow or Escape (§ 5.5),
+// returning focus to whatever opened it. Strings F41-F45
 // (§ 5.3.1, Stage 4's label table, origin/docs/workspace-labels, PR #22 —
 // not yet merged to main): "Nothing open yet.", "This file can't be
 // previewed here." (F42, changed from "Binary file — no preview.": C5,
 // "Binary" needs no definition, § 5.3.1), "Print / Save as PDF" (F43, now
 // also the viewer's own control, not only the document card's), "Close",
 // "File preview".
-import { forwardRef, type ReactElement } from "react";
+import { forwardRef, useEffect, useRef, type ReactElement } from "react";
 import { kindOf } from "../store.ts";
 import type { FileRead } from "../types.ts";
 import { Icon } from "../icons.tsx";
@@ -17,6 +18,16 @@ export interface SidePanelProps {
   file: FileRead | undefined;
   open: boolean;
   onClose: () => void;
+  /** § 5.2 rule 6, "the file being viewed": a non-missing `read()`
+   *  failure — never surfaced by clearing `file` back to `undefined`
+   *  (that reads as the ordinary empty "Nothing open yet.", which would
+   *  hide a real failure, rule 8). `path` is the file that failed, for
+   *  the loud line's own `<path>`. Mutually exclusive with `file` — the
+   *  caller clears one when it sets the other. */
+  error?: { path: string };
+  /** Re-attempts the same read (the loud error's Retry button). Required
+   *  whenever `error` can be set. */
+  onRetry?: () => void;
 }
 
 // No allow-scripts, ever: a candidate's own rendered HTML must never be
@@ -54,7 +65,7 @@ function bodyModifier(path: string | undefined): string {
 }
 
 export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function SidePanel(
-  { file, open, onClose },
+  { file, open, onClose, error, onRetry },
   iframeRef
 ): ReactElement {
   const kind = file ? kindOf(file.path) : undefined;
@@ -70,13 +81,40 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
   const printFile = (): void => {
     if (iframeRef && typeof iframeRef !== "function") iframeRef.current?.contentWindow?.print();
   };
+
+  // § 5.5: "Back, or the Escape key, closes it and returns focus to the
+  // row or chip that opened it." `open` flips true the instant a
+  // row/chip/card calls the caller's `onOpenFile` — at that exact moment
+  // the browser has already focused the element that was clicked (a
+  // native button click), so capturing `document.activeElement` on the
+  // rising edge of `open` is "the opener", with no extra wiring needed
+  // from any caller. Read through a ref (never state): this must never
+  // itself trigger a re-render.
+  const openerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (open) openerRef.current = document.activeElement as HTMLElement | null;
+  }, [open]);
+  const closeAndRestoreFocus = (): void => {
+    onClose();
+    openerRef.current?.focus();
+  };
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") closeAndRestoreFocus();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   return (
     <aside className={`side-panel${open ? " side-panel--open" : ""}`} aria-label="File preview">
       <div className="side-panel-header">
-        <button type="button" className="side-panel-back" onClick={onClose} aria-label="Close">
+        <button type="button" className="side-panel-back" onClick={closeAndRestoreFocus} aria-label="Close">
           <Icon name="arrowLeft" size={18} />
         </button>
-        <span className="side-panel-path">{file ? file.path : "Nothing open yet."}</span>
+        <span className="side-panel-path">{file ? file.path : error ? error.path : "Nothing open yet."}</span>
         {file && !file.binary && kind === "html" ? (
           <button type="button" className="btn btn--ghost side-panel-print" onClick={printFile}>
             Print / Save as PDF
@@ -88,8 +126,16 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
           (observed as stray leftover nodes when React reused DOM across
           two unrelated .md structures with coincidentally-matching
           positional keys). */}
-      <div className={`side-panel-body${bodyModifier(file?.path)}`} key={file?.path ?? "empty"}>
-        {!file ? (
+      <div className={`side-panel-body${bodyModifier(file?.path)}`} key={file?.path ?? error?.path ?? "empty"}>
+        {error ? (
+          <div className="page-error-card">
+            <Icon name="circleAlert" size={18} />
+            <p className="page-error-message">Couldn't read {error.path}. Try again in a moment.</p>
+            <button type="button" className="btn btn--sec" onClick={onRetry}>
+              Retry
+            </button>
+          </div>
+        ) : !file ? (
           <p className="side-panel-empty">Nothing open yet.</p>
         ) : file.binary ? (
           <p className="side-panel-empty">This file can't be previewed here.</p>

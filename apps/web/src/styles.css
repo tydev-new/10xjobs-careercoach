@@ -1970,6 +1970,24 @@ select:focus-visible {
   gap: var(--space-6);
 }
 
+/* ---- The working line (design-web-ui.md § 5.2 rule 4; § 5.6 "The
+   working line"): "a pill with --bg-sunken, --type-small, --fg-muted,
+   and a spinning loader-circle, above the page content." Shared shape —
+   Jobs/Applications/Home reuse it, unstyled, once their own stages wire
+   it in. ---- */
+
+.page-working-line {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  color: var(--fg-muted);
+  font: var(--type-small);
+}
+
 .doc-group-head {
   display: flex;
   align-items: baseline;
@@ -2207,6 +2225,25 @@ select:focus-visible {
 
   .side-panel-back {
     display: inline-flex;
+  }
+
+  /* N5 (Stage 3a review), § 5.5: "A long path or URL wraps with
+     overflow-wrap: anywhere" — the sheet header was ellipsizing a long
+     path with "…" instead. At this width the header itself may grow to
+     more than one line; the print button (when present) simply sits
+     below the wrapped path, never off-screen (`flex-wrap: wrap` on the
+     header, .side-panel-print's own `margin-left: auto` stops applying
+     once it wraps to its own line). */
+  .side-panel-header {
+    flex-wrap: wrap;
+  }
+
+  .side-panel-path {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow: visible;
+    text-overflow: clip;
+    flex-basis: 100%;
   }
 
   .app-header {

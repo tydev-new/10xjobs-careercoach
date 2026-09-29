@@ -127,8 +127,13 @@ export function Frame(props: FrameProps): ReactElement {
   // Talk to Ten — same as the plain rail/tab-bar navigation above, this
   // never focuses the composer (§ 5.4 names composer-focus for Continue
   // with Ten alone). Never sends (§ 5.2 rule 2).
+  // N6 (Stage 3a review): "empty" means the empty STRING, never
+  // `.trim() === ""` — a composer holding only spaces is still unsent
+  // text a candidate typed and would lose (§ 1.8's own rule: "unsent
+  // text is something a candidate can lose"), so it must never be
+  // silently replaced by a draft either.
   const askTenAbout = (path: string): void => {
-    if (composerValue.trim() === "") onComposerDraft(buildAskTenDraft(path));
+    if (composerValue === "") onComposerDraft(buildAskTenDraft(path));
     openTalkToTen();
   };
 
@@ -207,6 +212,10 @@ export function Frame(props: FrameProps): ReactElement {
               onOpenFile={onOpenFile}
               onAskTen={askTenAbout}
               onOpenTalkToTen={openTalkToTen}
+              // § 5.2 rule 4: "While a turn is running, the page shows
+              // one neutral line" — the same signal the header's own
+              // avatar shows (thinking/working), not a second source.
+              turnRunning={status.state === "thinking" || status.state === "working"}
             />
           ) : null}
         </div>

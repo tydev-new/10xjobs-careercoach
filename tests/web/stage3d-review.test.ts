@@ -356,7 +356,8 @@ test("§ 5.3 detail on the fixture (real shell, 1440): NovaGrid — header (labe
   if (!d.h3.includes(COVERAGE_LABEL)) bad.push(`no "${COVERAGE_LABEL}" (h3s ${JSON.stringify(d.h3)})`);
   const wantHead = [COL.req, COL.ev, COL.status, COL.decision];
   if (JSON.stringify(d.coverageHead) !== JSON.stringify(wantHead)) bad.push(`coverage columns ${JSON.stringify(d.coverageHead)}, want ${JSON.stringify(wantHead)}`);
-  const wantCov = pr.coverage.map((c: string[]) => [c[0], c[2], STATUS[c[1]] ?? c[1], DECISION[c[3]] ?? c[3]]);
+  // C § 19 (lead ruling 2026-09-29): the status label keys on `statuses[i]`; outside the table, the cell as written
+  const wantCov = pr.coverage.map((c: string[], i: number) => [c[0], c[2], Object.hasOwn(STATUS, pr.statuses[i]) ? STATUS[pr.statuses[i]] : c[1], Object.hasOwn(DECISION, c[3]) ? DECISION[c[3]] : c[3]]);
   if (JSON.stringify(d.coverage) !== JSON.stringify(wantCov)) bad.push(`coverage ${JSON.stringify(d.coverage)}\n  want ${JSON.stringify(wantCov)}`);
   // cuts
   if (!d.h3.includes(CUT_LABEL)) bad.push(`no "${CUT_LABEL}"`);
@@ -522,14 +523,35 @@ test("§ 5.3 part 5 'any other value as written': a status or decision that happ
   const d = await readDetail(r.page).catch(() => null);
   await ctx.close();
   assert.ok(d, `the detail did not render; page errors ${JSON.stringify(errors)}; the page shows "${body.slice(0, 200)}"`);
-  // docs/workspace-review-drift, C § 19, lead ruling 2026-09-29: "A
-  // coverage status is matched once, here" — the page now shows
-  // `statuses[i]` (run()'s own `stripChars(cell.toLowerCase(), "`*_ ")`
-  // normalisation), never the raw cell, so the reply and the page can't
-  // disagree. `__proto__`'s two underscores are stripped exactly the way
-  // `_gap_` (markdown emphasis) would be, the same as `constructor`
-  // (no strip-chars in it) stays unchanged.
-  assert.deepEqual(d.coverage, [["proto", "z2", "constructor", "toString"], ["p2", "z3", "proto", "hasOwnProperty"]]);
+  // Round 2: the builder changed this to expect `proto` (the normalised
+  // status). Rewritten by the tester: C § 19 (origin/docs/workspace-review-
+  // drift, lead ruling 2026-09-29) keys the label table on `statuses`, but
+  // "A value outside the table shows as its cell is written" — `__proto__`
+  // normalises to `proto`, which is outside the table, so the cell shows
+  // `__proto__`, as written.
+  assert.deepEqual(d.coverage, [["proto", "z2", "constructor", "toString"], ["p2", "z3", "__proto__", "hasOwnProperty"]]);
+});
+
+test("C § 19 ruling on the page: the status label keys on `statuses` (`**gap**`, `` `gap` ``, `Gap` → Gap; `Have` → Covered; `Shown-But-Unnamed` → AP10); a value outside the table shows as its cell is written (`partly`, `**Partly**`)", async () => {
+  const rows = [
+    "| r1 | **gap** | e1 | open |",
+    "| r2 | `gap` | e2 | open |",
+    "| r3 | Gap | e3 | open |",
+    "| r4 | Have | e4 | answered |",
+    "| r5 | Shown-But-Unnamed | e5 | answered |",
+    "| r6 | partly | e6 | skipped |",
+    "| r7 | **Partly** | e7 | skipped |",
+  ];
+  const files = { "jobs.md": EDGE_JOBS, "applications/oddrow-lead-application.md": notes(rows, []) };
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, files);
+  await go(r.page, "Applications");
+  const d = await readDetail(r.page);
+  await ctx.close();
+  assert.deepEqual(
+    d.coverage.map((c) => c[2]),
+    [STATUS.gap, STATUS.gap, STATUS.gap, STATUS.have, STATUS["shown-but-unnamed"], "partly", "**Partly**"],
+  );
 });
 
 test("§ 5.2 rule 6 on Applications: a notes file whose read fails shows F40 with its path and Retry in parts 5-6 only (header, steps and files still show); Retry recovers", async () => {

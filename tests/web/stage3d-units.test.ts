@@ -238,6 +238,29 @@ test("C § 19 table: CRLF — proposalRows alone, and the page's reader (univers
   assert.deepEqual({ coverage: page.coverage, statuses: page.statuses, cuts: page.cuts, kept: page.kept, unreadable: page.unreadable }, lf);
 });
 
+test("C § 19 table (lead ruling 2026-09-29, origin/docs/workspace-review-drift): `statuses[i]` is coverage[i]'s status as run() matches it — `**gap**`, `` `gap` ``, `Gap`, `Have`, `Shown-But-Unnamed`, `partly`; null exactly when coverage is; a wrong-count row has no status", () => {
+  const text = [
+    "## Coverage",
+    COV_H,
+    "|---|---|---|---|",
+    "| r1 | **gap** | e | open |",
+    "| r2 | `gap` | e | open |",
+    "| short | gap | e |",
+    "| r3 | Gap | e | open |",
+    "| r4 | Have | e | answered |",
+    "| r5 | Shown-But-Unnamed | e | answered |",
+    "| r6 | partly | e | skipped |",
+    "",
+  ].join("\n");
+  const r = proposalRows(text);
+  assert.deepEqual(r.statuses, ["gap", "gap", "gap", "have", "shown-but-unnamed", "partly"]);
+  assert.equal(r.statuses.length, r.coverage.length);
+  assert.deepEqual(r.coverage.map((c: string[]) => c[1]), ["**gap**", "`gap`", "Gap", "Have", "Shown-But-Unnamed", "partly"], "the raw cells stay as written");
+  assert.equal(proposalRows(APP.replace(COV_H, "| requirement | status |")).statuses, null);
+  const page = readApplicationTables(text);
+  assert.deepEqual(page.statuses, r.statuses);
+});
+
 test("C § 19: a U+2028 inside a cell — the page reads what the script reads (universalNewlines in, so splitlines breaks the row there, as Python's does): the row is unreadable, not dropped, and no sentinel leaks out", () => {
   const text = APP.replace("owned the roadmap", "owned the roadmap");
   const page = readApplicationTables(text);

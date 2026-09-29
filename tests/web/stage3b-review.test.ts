@@ -206,6 +206,11 @@ test("§ 5.3 Jobs detail table: a field naming a missing file, a failing read, a
   const store = createInMemoryWorkspaceStore({ "company/plain.md": "# Plain\n\nNo sections here.\n" });
   const missing = await loadFieldFile(store as any, "jd-analysis/gone.md");
   assert.deepEqual(missing, { kind: "missing", path: "jd-analysis/gone.md" }, "a missing file must be the J13 'isn't in your workspace' case, not an error");
+  // the Supabase store throws packages/agent's class; any error whose code is resource_missing is "missing"
+  const agentClass = await loadFieldFile({ read: async (p: string) => { throw new AgentWorkspaceError("resource_missing", `${p} does not exist.`); } } as any, "company/x.md");
+  assert.deepEqual(agentClass, { kind: "missing", path: "company/x.md" }, "packages/agent's WorkspaceError(resource_missing) must be the J13 case");
+  const ducked = await loadFieldFile({ read: async () => { throw Object.assign(new Error("gone"), { code: "resource_missing" }); } } as any, "company/y.md");
+  assert.deepEqual(ducked, { kind: "missing", path: "company/y.md" }, "an error whose code is resource_missing must be the J13 case");
   const failing = await loadFieldFile({ read: async () => { throw new Error("HTTP 500"); } } as any, "company/x.md");
   assert.equal(failing.kind, "error");
   const none = await loadFieldFile(store as any, "company/plain.md");
@@ -658,7 +663,7 @@ test("§ 5.3 detail on the fixture (real shell, 1440): the first row in page ord
   assert.deepEqual(bad, []);
 });
 
-test("§ 5.3 detail table in the page (real shell): a failing read of the company file shows F40 + Retry in that file's place only (analysis parts still show), and Retry recovers; a company file with none of the headings shows none, and 'Open company notes' stays", async () => {
+test("§ 5.3 detail table in the page (real shell): a failing read of the company file shows F40 + Retry in that file's place only (analysis parts still show), and Retry recovers; a MISSING company file (packages/agent's resource_missing, via the spy store) shows J13; a company file with none of the headings shows none, and 'Open company notes' stays", async () => {
   const bad: string[] = [];
   const nova = JOBS.find((j) => j.fields.get("Analysis")! in FILES && j.fields.get("Company file")! in FILES)!;
   const cf = nova.fields.get("Company file")!;
@@ -680,6 +685,20 @@ test("§ 5.3 detail table in the page (real shell): a failing read of the compan
   t = squash(await detail(page).innerText());
   if (!t.includes(S("J11").replace("<Company>", nova.company))) bad.push("Retry did not bring the company sections back");
   await ctx.close();
+
+  // a Company file that isn't there (the store's own resource_missing,
+  // packages/agent's class — what the Supabase store throws in production)
+  const noCompany = Object.fromEntries(Object.entries(FILES).filter(([p]) => p !== cf));
+  const ctx3 = await ctxFor(DESK);
+  const r3 = await openReal(ctx3, noCompany);
+  await go(r3.page, "Jobs");
+  await chooseRow(r3.page, nova.heading);
+  const t3 = squash(await detail(r3.page).innerText());
+  if (!t3.includes(MISSING_LINE(cf))) bad.push(`missing ${cf}: no "${MISSING_LINE(cf)}" (J13) — detail: ${t3.slice(0, 400)}`);
+  if (t3.includes(COULDNT(cf))) bad.push(`missing ${cf}: shows the rule 6 error line instead of J13`);
+  if (!t3.includes(S("J9"))) bad.push(`missing ${cf}: the analysis parts are gone too`);
+  await shot(r3.page, "jobs-detail-missing-company-1440x900");
+  await ctx3.close();
 
   const files2 = { ...FILES, [cf]: "# NovaGrid Energy — notes\n\nNo evaluate headings in this file.\n\n## Something else\ntext\n" };
   const ctx2 = await ctxFor(DESK);

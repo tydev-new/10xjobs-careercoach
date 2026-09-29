@@ -218,11 +218,16 @@ function CoverageTable({ rows, statuses }: { rows: string[][]; statuses: string[
             <td>{r[0]}</td>
             <td>{r[2]}</td>
             {/* docs/workspace-review-drift, C § 19 (lead ruling
-                2026-09-29): the status column keys on `statuses[i]` —
-                run()'s own once-normalised status — never the raw cell
-                (r[1]), so `**gap**`/`` `gap` ``/`Gap` all read the same
-                status the reply used. */}
-            <td>{labelFor(COVERAGE_STATUS_LABEL, statuses[i])}</td>
+                2026-09-29): the status column KEYS on `statuses[i]` —
+                run()'s own once-normalised status — never the raw cell,
+                so `**gap**`/`` `gap` ``/`Gap` all match the same table
+                row the reply used. But "a value outside the table shows
+                as its cell is written" (C § 19; § 5.3 "any other value
+                as written") — `**Partly**` normalises to `partly`, which
+                is outside the table too, but the SHOWN text is the raw
+                cell `**Partly**`, not the normalised `partly`: the
+                fallback is `r[1]`, not `statuses[i]`. */}
+            <td>{Object.hasOwn(COVERAGE_STATUS_LABEL, statuses[i]) ? COVERAGE_STATUS_LABEL[statuses[i]] : r[1]}</td>
             <td>{labelFor(COVERAGE_DECISION_LABEL, r[3])}</td>
           </tr>
         ))}

@@ -3554,7 +3554,12 @@ select:focus-visible {
      only those. This cell holds ordinary prose (a requirement, evidence,
      a status/decision label), never a path or URL, so it wraps at normal
      word boundaries only (found live, the review's own build: "ecosystem"
-     broken mid-word at a narrow column width). */
+     broken mid-word at a narrow column width).
+     Tried `overflow-wrap: break-word` for the optional long-hyphenated-
+     token overlap (coordinator's 3d fix-3 message): under this table's
+     `table-layout: fixed`, Chromium applies it to ORDINARY words too
+     (not just a genuine last resort), reopening the mid-word test's own
+     regression — reverted; not shipped. */
 }
 
 .app-coverage-table tr:last-child td {

@@ -911,6 +911,40 @@ test("§ 5.5 / § 5.3 restore ruling at 375: Jobs opens as the list alone; choos
   assert.deepEqual(bad, []);
 });
 
+test("§ 5.3 detail + § 5.2 rule 4 (restore ruling: read when the row is chosen) under latency (real shell, 1440): a slow read of row A's analysis that resolves AFTER row B was chosen never shows A's sections under B's header", async () => {
+  const withBoth = JOBS.filter((j) => j.group !== "Dismissed" && j.fields.get("Analysis")! in FILES && j.fields.get("Company file")! in FILES);
+  const [a, b] = withBoth;
+  assert.ok(a && b, "the fixture needs two rows with both files");
+  const aFile = a.fields.get("Analysis")!;
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, FILES);
+  const page = r.page;
+  await go(page, "Jobs");
+  // A's analysis read now takes 1.5 s (a slow network read, as on the Supabase store)
+  await page.evaluate((slow) => {
+    const inner = (window as any).__inner;
+    const orig = inner.read.bind(inner);
+    inner.read = async (p: string) => {
+      if (p === slow) await new Promise((res) => setTimeout(res, 1500));
+      return orig(p);
+    };
+  }, aFile);
+  await pane(page).locator(".jobs-list-pane").getByText(a.heading, { exact: true }).first().click();
+  await page.waitForTimeout(50);
+  await pane(page).locator(".jobs-list-pane").getByText(b.heading, { exact: true }).first().click();
+  await page.waitForTimeout(2500);
+  const head = squash(await detail(page).innerText());
+  const shown = await detailSection(page, S("J9"));
+  const bWant = specPick(FILES[b.fields.get("Analysis")!], "Competency extraction")!;
+  const aWant = specPick(FILES[aFile], "Competency extraction")!;
+  const firstLine = (s: string) => s.split("\n").find((l) => l.trim())!.replace(/^[-*] /, "").replace(/\*\*/g, "");
+  await ctx.close();
+  assert.ok(head.includes(b.heading), `the detail is not ${b.heading}`);
+  assert.ok(shown, "no J9 section");
+  assert.ok(!shown!.text.includes(firstLine(aWant.body)), `${b.heading}'s detail shows ${a.heading}'s "${S("J9")}" (a read that resolved late overwrote it)`);
+  assert.ok(shown!.text.includes(firstLine(bWant.body)), `${b.heading}'s "${S("J9")}" is not its own file's section`);
+});
+
 test("§ 5.3.1 J19 is not in the bundle before web search S5 (C1): neither J19 nor 'Ask Ten to look for roles' appears in the built JS", () => {
   const js = readdirSync(path.join(mockDir, "assets")).filter((f) => f.endsWith(".js")).map((f) => readFileSync(path.join(mockDir, "assets", f), "utf8")).join("\n");
   assert.ok(js.includes(S("J18")) || js.includes(S("J18").replace("'", "\\'")), "J18 is not in the bundle");

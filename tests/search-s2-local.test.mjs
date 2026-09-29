@@ -199,7 +199,7 @@ test("Workday add (known item 3): a posting without the locale prefix is matched
   assert.ok(r.stdout.includes("added: Acme — WD Role 2"), r.stdout);
 });
 
-test("Workday add (known item 3): a real posting past the first 80 on a big board is reported not_found — a false answer", async () => {
+test("Workday add (known item 3): a real posting past the first 80 on a big board is found, never a false not_found", async () => {
   const f = stubFetch([[WD, workdayBoard(300)]]);
   const r = await add(memIo(), f.fn, [["https://acme.wd5.myworkdayjobs.com/en-US/External/job/Berlin/WD-Role-150_R1150", "Acme"]]);
   assert.ok(r.stdout.includes("added: Acme — WD Role 150"), `the posting exists on the board; got:\n${r.stdout}`);
@@ -214,15 +214,27 @@ test("Workday add (known item 3): the saved posting has the posting's text (§ 4
   assert.ok(!jd.includes("(JD body not fetched for this posting)"), jd);
 });
 
-test("Workday add (known item 3): three postings from one board cost one board read, not three (§ 4.1's Ashby rule applied to a list-only reader)", { todo: "no spec rule names this for Workday; cost finding: each Workday add re-reads up to 4 list pages" }, async () => {
+test("Workday add (known item 3): three postings from one board share one read of the list (per-run cache), and a missing posting ends as not_found", async () => {
   const f = stubFetch([[WD, workdayBoard(60)]]);
-  await add(memIo(), f.fn, [0, 1, 2].map((i) => [`https://acme.wd5.myworkdayjobs.com/en-US/External/job/Berlin/WD-Role-${i}_R${1000 + i}`, "Acme"]));
-  assert.ok(f.calls.length <= 3, `${f.calls.length} requests for three postings on one 60-posting board`);
+  const r = await add(memIo(), f.fn, [0, 1, 2].map((i) => [`https://acme.wd5.myworkdayjobs.com/en-US/External/job/Berlin/WD-Role-${i}_R${1000 + i}`, "Acme"]));
+  assert.equal(r.stdout.match(/^added:/gm)?.length, 3, r.stdout);
+  assert.equal(f.calls.length, 1, `${f.calls.length} requests for three postings on the first page of one board`);
+  const f2 = stubFetch([[WD, workdayBoard(45)]]);
+  const r2 = await add(memIo(), f2.fn, [["https://acme.wd5.myworkdayjobs.com/en-US/External/job/Berlin/No-Such_R9", "Acme"]]);
+  assert.ok(r2.stdout.includes("— not_found"), r2.stdout);
+  assert.equal(r2.exitCode, 1, "add exits 1 when a role failed (round-2 also-fix)");
+  assert.equal(f2.calls.length, 3, "read to the end of a 45-posting board (3 pages), then stopped");
+});
+
+test("Workday add: on a very large board a posting not found stops at the 60-request budget and says request_limit, not not_found", async () => {
+  const f = stubFetch([[WD, workdayBoard(5000)]]);
+  const r = await add(memIo(), f.fn, [["https://acme.wd5.myworkdayjobs.com/en-US/External/job/Berlin/No-Such_R9", "Acme"]]);
+  assert.equal(f.calls.length, 60);
+  assert.ok(r.stdout.includes("— request_limit"), r.stdout);
 });
 
 test(
-  "Workday list: a partial read (80 of 200) yields no gone, even when later pages carry total 0",
-  { todo: "premise UNVERIFIED (no POST sent to Workday under the GET-only rule): Workday's cxs list is widely reported to return `total` only on the offset-0 page; boards.mjs:121 overwrites total with each page's value, so total collapses to read and `gone` fires on a partial read" },
+  "Workday list: a partial read (80 of 200) yields no gone, even when later pages carry total 0 (total taken from offset 0 only; the Workday premise stays UNVERIFIED live)",
   async () => {
     const f = stubFetch([[WD, workdayBoard(200, { totalOnLaterPages: 0 })]]);
     const io = memIo({ "jobs.md": jobsMd({ "To Review": [["Acme — WD Role 150", "- URL: https://acme.wd5.myworkdayjobs.com/en-US/External/job/Berlin/WD-Role-150_R1150"]] }) });

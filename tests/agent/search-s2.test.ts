@@ -750,31 +750,95 @@ test("§ 4.4: fetch_job decodes Greenhouse entities before stripping; a Lever po
   assert.ok(!("boardName" in lv));
 });
 
-// ================================================================== SPEC GAP (reported to the lead; a todo, so it runs but doesn't fail the suite)
 
-test(
-  "§ 4.4 spec gap: real Greenhouse `content` is DOUBLE-encoded inside text (&amp;nbsp; &amp;amp; &amp;mdash;), so one decode then strip still saves `&nbsp;`",
-  { todo: "design-web-search.md § 4.4 says 'decode, then strip' (one pass); live GitLab board 2026-09-28: 2771 &amp;nbsp;, 375 &amp;amp;, 84 &amp;mdash; across 199 postings. Spec needs a second decode after the strip." },
-  async () => {
-    const f = stubFetch([[GH_API + "acme/jobs/1", () => json(ghJob(1, "Engineer", { content: "&lt;p&gt;Build&amp;nbsp;fast &amp;amp; ship &amp;mdash; well&lt;/p&gt;" }))]]);
+// ================================================================== round 2: the lead's rulings (PR #23, origin/docs/search-s2-rulings)
+
+test("§ 4.4 ruling: decode, strip, decode once more — the ruling's table (a&amp;nbsp;b, R&amp;amp;D, a&amp;mdash;b, &lt;p&gt;a&lt;/p&gt;) and &ndash;", async () => {
+  const cases: Array<[string, string]> = [
+    ["a&amp;nbsp;b", "a b"],
+    ["R&amp;amp;D", "R&D"],
+    ["a&amp;mdash;b", "a—b"],
+    ["&lt;p&gt;a&lt;/p&gt;", "a"],
+    ["2&amp;ndash;4 years", "2–4 years"],
+    ["&lt;p&gt;Build&amp;nbsp;fast &amp;amp; ship &amp;mdash; well&lt;/p&gt;", "Build fast & ship — well"],
+    // once, not until nothing changes: a triple-encoded entity keeps one level
+    ["x&amp;amp;amp;y", "x&amp;y"],
+    // outside the table, still left as written
+    ["caf&amp;eacute;", "caf&eacute;"],
+  ];
+  for (const [content, want] of cases) {
+    const f = stubFetch([[GH_API + "acme/jobs/1", () => json(ghJob(1, "Engineer", { content }))]]);
     const { call } = toolsFor(createInMemoryWorkspaceStore(), f.fn, { estimated: false });
     const gh = await call("fetch_job", { url: "https://boards.greenhouse.io/acme/jobs/1" });
-    assert.ok(!/&(nbsp|amp);/.test(gh.text), gh.text);
-  },
-);
+    assert.equal(gh.text, want, `content ${JSON.stringify(content)}`);
+  }
+});
 
-test(
-  "§ 4.1 spec conflict: the model is to check boardName and put `gone` rows in the prune batch, but the compact form (M3) the model reads carries neither",
-  { todo: "design-web-search.md § 4.1: 'boardName is shown so the model can check it reached the right company's board' and gone '…the model puts them in the prune batch', yet M3's compact line format lists neither. The code follows M3 literally. Chain fix needed (lead)." },
-  async () => {
-    const md = jobsMd({ "To Review": [["Acme — Vanished Role", "- URL: https://job-boards.greenhouse.io/acme/jobs/99"]] });
-    const f = stubFetch([[GH_API + "acme/jobs?", () => json({ jobs: [ghJob(1, "Engineer", { company_name: "Someone Else Ltd" })] })]]);
-    const { tools, call } = toolsFor(createInMemoryWorkspaceStore({ "jobs.md": md }), f.fn);
-    const out = await call("list_board", LB_OK);
-    assert.equal(out.boards[0].boardName, "Someone Else Ltd");
-    assert.deepEqual(out.boards[0].gone, [{ company: "Acme", title: "Vanished Role" }]);
-    const text = tools.list_board.toModelOutput({ output: out, toolCallId: "x", input: {} }).value;
-    assert.ok(text.includes("Someone Else Ltd"), `boardName not in the model's text:\n${text}`);
-    assert.ok(text.includes("Vanished Role"), `gone not in the model's text:\n${text}`);
-  },
-);
+test("§ 4.1 M3 ruling: the compact form carries `board name` (Greenhouse, not Lever), one `gone:` line per gone row, and a last line with the requests left (57 after one 3-page SmartRecruiters read)", async () => {
+  const md = jobsMd({
+    "To Review": [
+      ["Acme — Vanished Role", "- URL: https://job-boards.greenhouse.io/acme/jobs/99"],
+      ["Acme — Also Vanished", "- URL: https://job-boards.greenhouse.io/acme/jobs/98"],
+    ],
+  });
+  const lid = "11111111-1111-4111-8111-111111111111";
+  const f = stubFetch([
+    [GH_API + "acme/jobs?", () => json({ jobs: [ghJob(1, "Engineer", { company_name: "Someone Else Ltd" })] })],
+    ["https://api.lever.co/v0/postings/leverco", () => json([{ id: lid, text: "Designer", categories: { location: "NYC" }, hostedUrl: `https://jobs.lever.co/leverco/${lid}`, descriptionPlain: "x" }])],
+  ]);
+  const { tools, call } = toolsFor(createInMemoryWorkspaceStore({ "jobs.md": md }), f.fn);
+  const out = await call("list_board", { boards: [{ url: "https://boards.greenhouse.io/acme", company: "Acme" }, { url: "https://jobs.lever.co/leverco", company: "Leverco" }] });
+  const text: string = tools.list_board.toModelOutput({ output: out, toolCallId: "x", input: {} }).value;
+  const lines = text.split("\n");
+  assert.ok(lines.includes("Acme · board name Someone Else Ltd · ok · 1 postings · 1 match · 0 already on the list · showing 1"), text);
+  assert.ok(lines.includes("Leverco · ok · 1 postings · 1 match · 0 already on the list · showing 1"), `Lever line has no board name:\n${text}`);
+  assert.ok(lines.includes("gone: Acme — Vanished Role") && lines.includes("gone: Acme — Also Vanished"), text);
+  assert.equal(lines.filter((l) => l.startsWith("gone: ")).length, 2);
+  assert.equal(lines[lines.length - 1], "58 board requests left this turn");
+
+  const SR = "https://api.smartrecruiters.com/v1/companies/bigco/postings";
+  const f2 = stubFetch([[SR, (url) => { const off = Number(new URL(url).searchParams.get("offset")); return json({ totalFound: 1200, content: Array.from({ length: 100 }, (_, i) => ({ id: String(700000 + off + i), name: `Role ${off + i}`, company: { name: "BigCo", identifier: "bigco" }, location: { city: "Austin" } })) }); }]]);
+  const t2 = toolsFor(createInMemoryWorkspaceStore(), f2.fn);
+  const out2 = await t2.call("list_board", { boards: [{ url: "https://jobs.smartrecruiters.com/bigco", company: "BigCo" }] });
+  const text2: string = t2.tools.list_board.toModelOutput({ output: out2, toolCallId: "x", input: {} }).value;
+  assert.equal(text2.split("\n").at(-1), "57 board requests left this turn", text2);
+  assert.ok(text2.split("\n")[0].includes("BigCo · board name BigCo · ok · 1200 postings") && text2.includes("read 300 of 1200"), text2);
+});
+
+test("§ 4.2 ruling: `message` is optional plain words, present on company_mismatch with both names, and `failed` entries carry no other extra keys", async () => {
+  const f = stubFetch([[GH_API + "acme/jobs/1", () => json(ghJob(1, "Engineer"))], [GH_API + "acme/jobs/2", () => json({}, 404)]]);
+  const { call } = toolsFor(createInMemoryWorkspaceStore(), f.fn);
+  const out = await call("add_roles", { roles: [{ posting: "https://boards.greenhouse.io/acme/jobs/1", company: "Beta Corp" }, { posting: "https://boards.greenhouse.io/acme/jobs/2", company: "Acme" }, { posting: "https://example.com/x", company: "Acme" }] });
+  for (const x of out.failed) for (const k of Object.keys(x)) assert.ok(["posting", "reason", "message"].includes(k), k);
+  assert.equal(out.failed[0].reason, "company_mismatch");
+  assert.ok(/Beta Corp/.test(out.failed[0].message) && /Acme, Inc\./.test(out.failed[0].message), out.failed[0].message);
+  assert.deepEqual(out.failed.slice(1).map((x: any) => x.reason), ["not_found", "unsupported_url"]);
+});
+
+test("§ 4.8 ruling: the body timer also covers add_roles' single-posting read (a stalled body is `error` at 15 s, nothing written)", async () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    let called!: () => void;
+    const wasCalled = new Promise<void>((r) => (called = r));
+    const stall = async (_u: string, init: any) => {
+      called();
+      return { ok: true, status: 200, headers: { get: () => "application/json" }, json: () => new Promise((_res, rej) => init.signal.addEventListener("abort", () => rej(new DOMException("aborted", "AbortError")))) };
+    };
+    const store = createInMemoryWorkspaceStore();
+    const { call } = toolsFor(store, stall);
+    let settled: any = null;
+    call("add_roles", AR_OK).then((o: any) => (settled = o));
+    await wasCalled;
+    await flush();
+    mock.timers.tick(14_999);
+    await flush();
+    assert.equal(settled, null, "not before 15 s");
+    mock.timers.tick(1);
+    await flush();
+    assert.ok(settled, "add_roles returned at 15 s");
+    assert.deepEqual(settled.failed.map((x: any) => x.reason), ["error"]);
+    assert.deepEqual(await store.list(), []);
+  } finally {
+    mock.timers.reset();
+  }
+});

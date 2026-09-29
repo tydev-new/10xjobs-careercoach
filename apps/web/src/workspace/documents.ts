@@ -54,6 +54,14 @@ export const TOP_LEVEL_GROUP_LABEL = "Your records";
 // one." The export still includes it (rule 9) — only this page hides it.
 const HIDDEN_PATH = "leads.md";
 
+// Lead ruling, 2026-09-28: "skills/ is Ten's own read-only instructions
+// bundle, not the candidate's files. Documents must never list anything
+// under skills/, even if a store's list() returns such paths." (PR #24
+// added "skills" to check-files.mjs's MANIFEST_DIRS — a real, write-
+// refused path for the checker/path-rules, packages/agent/src/workspace/
+// path-rules.ts — but never a folder Documents shows; it holds no D-row.)
+const HIDDEN_FOLDER = "skills";
+
 export interface DocumentGroup {
   /** "" for the top-level group ("Your records"); the folder name
    *  otherwise. Stable across renders — safe as a React list key. */
@@ -74,14 +82,16 @@ function topFolder(path: string): string | undefined {
 }
 
 /** Groups `store.list()`'s files exactly as § 5.3 describes: `leads.md`
- *  dropped, top-level files first under "Your records" (omitted entirely
- *  when there are none), then one group per top-level folder that's
- *  actually present — MANIFEST_DIRS' own folders first in § 5.3's order,
- *  any other (unknown) folder after, sorted by name for a stable order
- *  the spec doesn't otherwise name. Every file appears in exactly one
- *  group, each group sorted by path. */
+ *  and everything under `skills/` dropped (lead ruling, 2026-09-28: Ten's
+ *  own bundle, never the candidate's), top-level files first under "Your
+ *  records" (omitted entirely when there are none), then one group per
+ *  top-level folder that's actually present — MANIFEST_DIRS' own folders
+ *  first in § 5.3's order, any other (unknown) folder after, sorted by
+ *  name for a stable order the spec doesn't otherwise name. Every
+ *  remaining file appears in exactly one group, each group sorted by
+ *  path. */
 export function groupDocuments(files: FileInfo[]): DocumentGroup[] {
-  const visible = files.filter((f) => f.path !== HIDDEN_PATH);
+  const visible = files.filter((f) => f.path !== HIDDEN_PATH && topFolder(f.path) !== HIDDEN_FOLDER);
 
   const topLevel: FileInfo[] = [];
   const byFolder = new Map<string, FileInfo[]>();

@@ -54,6 +54,29 @@ test("leads.md is dropped from every group, but nothing else at top level is", (
   assert.deepEqual(paths, ["jobs.md", "plan.md"]); // sorted by path too
 });
 
+// Lead ruling, 2026-09-28: "skills/ is Ten's own read-only instructions
+// bundle, not the candidate's files. Documents must never list anything
+// under skills/, even if a store's list() returns such paths."
+test("everything under skills/ is dropped, even if the store's own list() returns it", () => {
+  const files = [
+    file("plan.md"),
+    file("skills/apply/SKILL.md"),
+    file("skills/profile/references/schema.md"),
+    file("applications/acme.md"),
+  ];
+  const groups = groupDocuments(files);
+  const paths = groups.flatMap((g) => g.files.map((f) => f.path));
+  assert.ok(!paths.some((p) => p === "skills" || p.startsWith("skills/")));
+  assert.deepEqual(paths.sort(), ["applications/acme.md", "plan.md"]);
+  assert.ok(!groups.some((g) => g.key === "skills"), "no 'skills' group at all");
+});
+
+test("a bare top-level file literally named 'skills' (no slash) is NOT dropped — only the skills/ folder is", () => {
+  const groups = groupDocuments([file("skills"), file("plan.md")]);
+  const paths = groups.flatMap((g) => g.files.map((f) => f.path));
+  assert.deepEqual(paths.sort(), ["plan.md", "skills"]);
+});
+
 test("leads.md alone leaves no groups at all (the page's empty state)", () => {
   assert.deepEqual(groupDocuments([file("leads.md")]), []);
 });

@@ -103,7 +103,8 @@ const RULE6 = squash(DOC.match(/Any other read\s+failure\s+shows\s+"([^"]+)"/)![
 // ---------------------------------------------------------------- static
 
 test("§ 5.3.1 D2-D12 cover exactly the folders check_files.py's MANIFEST_DIRS lists (§ 5.3: 'keyed by the folder names check_files.py lists')", () => {
-  assert.deepEqual([...FOLDER_LABEL.keys()].sort(), MANIFEST_DIRS);
+  // Lead ruling, 2026-09-28: skills/ is not a candidate folder.
+  assert.deepEqual([...FOLDER_LABEL.keys()].sort(), MANIFEST_DIRS.filter((d) => d !== "skills"));
   assert.equal(TOP_LABEL, "Your records");
   assert.equal(FOLDER_LABEL.get("documents"), "Your uploads");
 });

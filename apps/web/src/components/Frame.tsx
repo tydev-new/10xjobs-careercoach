@@ -186,26 +186,34 @@ export function Frame(props: FrameProps): ReactElement {
             <VersionNotice mode={versionNotice.mode} saveFailed={versionNotice.saveFailed} />
           ) : null}
           {page === "home" ? (
+            // § 5.3.1 H17/H18 (lead ruling, 2026-09-28: word for word from
+            // main's docs/design-web-ui.md — Stage 3c replaces this page).
             <EmptyPage
               icon="house"
               first="Nothing here yet."
-              rest="Ten writes your plan and your pipeline as you work together."
+              rest="Talk to Ten to start your plan and your job list; they show here."
               cta="continue"
               onOpenTalkToTen={continueWithTen}
             />
           ) : page === "jobs" ? (
+            // § 5.3.1 J17/J18, NOT J19 (lead ruling, 2026-09-28): C1's own
+            // gate — J19's "Ask Ten to look for roles" ships only once
+            // design-web-search.md § 9 S5 lands; until then (and until
+            // Stage 3b replaces this page) it's J18's words only.
             <EmptyPage
               icon="briefcase"
               first="No roles yet."
-              rest="Ask Ten to look for roles, or paste a job link or a posting's text into the conversation."
+              rest="Paste a job link or a posting's text into the conversation."
               cta="talk"
               onOpenTalkToTen={openTalkToTen}
             />
           ) : page === "applications" ? (
+            // § 5.3.1 AP16/AP17 (lead ruling, 2026-09-28 — Stage 3d
+            // replaces this page).
             <EmptyPage
               icon="layers"
               first="No applications yet."
-              rest="When you decide to apply for a role, Ten drafts the materials and they show here."
+              rest="Ask Ten to draft a résumé and letter for a role, and they show here."
               cta="talk"
               onOpenTalkToTen={openTalkToTen}
             />

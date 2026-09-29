@@ -466,6 +466,14 @@ this table. A card is a
 - **Verdict `ref`:** `record_verdict` gets `--analysis-file` whenever an
   analysis was written (host note, § 7). With no `analysis_file`, the card
   has no `ref` and shows "no analysis file linked"; it never guesses.
+  **The card always carries the row's `analysis_file` as its `ref`, as
+  written, even when that file isn't in the workspace** (lead ruling,
+  2026-09-29). The card is a receipt of the row; checking the file first
+  would make the card say less than the row it came from. Opening a
+  `ref` whose file is missing shows "<path> isn't in your workspace." in
+  the viewer, never the viewer's empty state (`design-web-ui.md` § 5.2
+  rule 6, a Stage 4 build item). A fixture may hold such a card only
+  under `design-web-ui.md` § 4's one exception.
 - **`parsePlanTodo(md) → { text, ref? }[]`** is pure and exported from
   `packages/agent`. The card builder uses it. (Corrected 2026-09-26: this
   line used to say `apps/workspace-ui`'s `parsePlan` maps from it. It
@@ -2435,7 +2443,7 @@ The workspace's Home page (`design-web-ui.md` § 5, owner ruling
 2026-09-26) shows `plan.md`'s head lines and its Waiting on you and To do
 sections. Two plan readers exist in the web runtime today: `parsePlanTodo`
 (§ 6.2, To do only) and `waitingRows` in the check_closeout port
-(`packages/checkers/src/check-closeout.mjs:51-72`, Waiting on you only,
+(`skills/coach/scripts/lib/check-closeout.mjs:51-72`, Waiting on you only,
 parity-tested against `check_closeout.mjs`). A third, `apps/workspace-ui`'s
 own `parsePlan` (`apps/workspace-ui/server/workspace-core.mjs:71-95`), is
 **not used**: it invents priorities and due dates (rule 8). A new
@@ -2462,7 +2470,7 @@ export interface PlanBoard {
 
 - **Line endings.** The text goes through the port's `universalNewlines`
   first, as check_closeout's own reads do, and every returned string goes
-  back through `restoreLineSeparators` (`packages/checkers/src/py-text.mjs`).
+  back through `restoreLineSeparators` (`skills/profile/scripts/lib/py-text.mjs`).
 - **Head lines.** `goalLine` and `budgetLine` are looked for only before
   the first `## ` heading. An optional `# ` title may sit above them
   (coach's `schema.md`: "An optional H1 title, then two head lines";
@@ -2491,20 +2499,23 @@ export interface PlanBoard {
   (The pages' minutes pill and sum come from § 18.1's two functions, run
   on its output; `readPlanBoard` itself is unchanged.)
 - **One new import direction.** `packages/agent` imports
-  `waitingRows` (`packages/checkers/src/check-closeout.mjs`) and
+  `waitingRows` (`skills/coach/scripts/lib/check-closeout.mjs`) and
   `universalNewlines` and `restoreLineSeparators`
-  (`packages/checkers/src/py-text.mjs`). The modules this pulls in are
-  `check-closeout.mjs`, `argx.mjs`, `py-text.mjs` and `help-text.mjs`;
+  (`skills/profile/scripts/lib/py-text.mjs`). The modules this pulls in
+  are `check-closeout.mjs`, and `argx.mjs`, `py-text.mjs`,
+  `py-digits.mjs` and `help-text.mjs` in `skills/profile/scripts/lib/`;
   none imports `window`, `document`, `localStorage` or `node:*`, so § 1's
-  lint rule still holds for them. (No claim is made here about the rest
-  of `packages/checkers`.) Each `.mjs` import from `packages/checkers`
-  carries `// @ts-expect-error - plain .mjs, no type declarations` (the
-  posture of `apps/web/src/backend/script-runner.ts:17-19`). The tester
-  updates `mutantCopy` (`tests/agent/browser-safety.test.ts:128-135`) so
-  the copy sits at `<tmp>/packages/agent` beside a copy of
-  `<tmp>/packages/checkers/src`. This is a named, allowed change to a
-  tester-owned test; no assertion changes. (Lead ruling, 2026-09-26, fix
-  round 3.)
+  lint rule still holds for them, and the skills lib lint
+  (`tests/agent/browser-safety.test.ts:256`) scans every
+  `skills/*/scripts/lib/` file. Each `.mjs` import from
+  `skills/*/scripts/lib/` carries `// @ts-expect-error - plain .mjs, no
+  type declarations` (the posture of
+  `apps/web/src/backend/script-runner.ts:19-21`). The tester updates
+  `mutantCopy` (`tests/agent/browser-safety.test.ts:126-134`) so the copy
+  sits at `<tmp>/packages/agent` beside a copy of `<tmp>/skills`. This is
+  a named, allowed change to a tester-owned test; no assertion changes.
+  (Lead ruling, 2026-09-26, fix round 3; paths moved with the JavaScript
+  switch, PR #24.)
 - **The script fix it needed: landed, PR #10 (`6470cb6`).**
   check_closeout's Waiting on you block used to run on into
   `## Standing floor` / `## Queue`, because `##\b` never matched a `## `
@@ -2542,12 +2553,12 @@ here right now" over lines it couldn't read (rule 8).
   `apps/web/src/agent-helpers.test.ts:47-80`, `tests/agent/cards.test.ts`,
   `packages/agent/test/cards.test.ts:156`. A failing old case goes back
   to the architect; it is never edited to pass.
-- A parity test: for every `check_closeout` corpus case that has a
-  `plan.md` (`tests/checkers-parity/extra.mjs`, including
-  `r2-cc-lone-cr-plan` at :383 and `r2-cc-bom-waiting`),
+- A parity test: for every `check_closeout` case that has a `plan.md`
+  (`tests/checkers/cases/check_closeout/`, including
+  `extra-r2-cc-lone-cr-plan.json` and `extra-r2-cc-bom-waiting.json`),
   `readPlanBoard`'s Waiting on you texts equal
   `waitingRows(universalNewlines(text))`, the way check_closeout's own io
-  reads the file (`packages/checkers/src/io-node.mjs:33`). The corpus
+  reads the file (`skills/profile/scripts/lib/io-node.mjs:34`). The cases
   includes the section-end fix's new case: Waiting on you last on the
   board, then `## Standing floor` and `## Queue`.
 - A new table test: a `# Plan — <name>` title above the head lines;
@@ -2632,15 +2643,18 @@ unchanged.
 The Applications detail (`design-web-ui.md` § 5.3) shows the
 application file's coverage rows and its cut list. `proposal_block`'s
 port already reads both tables (`table()`,
-`packages/checkers/src/proposal-block.mjs:18-29`, used at :80-89) and is
-parity-tested against the Python. A second table reader in the web app
+`skills/apply/scripts/lib/proposal-block.mjs:18-29`, used at :82-83) and
+is held to the expected-output cases in
+`tests/checkers/cases/proposal_block/`, frozen from the Python it
+replaced (`tests/checkers/FROZEN_AT`). A second table reader in the web app
 would be a second grammar of one file (rule 12). So the port gains one
 export, and its own `run()` is re-expressed through it.
 
 ```js
-// packages/checkers/src/proposal-block.mjs
+// skills/apply/scripts/lib/proposal-block.mjs
 export function proposalRows(text) /* → {
   coverage: string[][] | null, // ## Coverage rows with exactly 4 cells, in file order; null when the header line is absent
+  statuses: string[] | null,   // statuses[i] is coverage[i]'s status cell as run() matches it: stripChars(cell.toLowerCase(), "`*_ "); null when coverage is
   cuts: string[][] | null,     // ## Selection rows with 7 cells whose in/out cell is `out`, in file order; null when the header line is absent
   kept: string[][] | null,     // the same, for `in`
   unreadable: string[][],      // rows under either header with the wrong cell count (4 for Coverage, 7 for Selection), as split
@@ -2656,38 +2670,55 @@ export function proposalRows(text) /* → {
   Every place `run()` reads coverage rows already skips rows that don't
   have 4 cells, so its output can't change. `run()` ignores
   `unreadable`; the page shows those rows under `design-web-ui.md` § 5.2
-  rule 6's "Ten couldn't read these lines of <path>:" with the cells
-  joined back by ` | `, so a malformed row is said, not dropped.
+  rule 6's line, "This page couldn't read these lines of <path>:"
+  (`design-web-ui.md` § 5.3.1, F42), with the cells joined back by
+  ` | `, so a malformed row is said, not dropped.
+- **A coverage status is matched once, here** (lead ruling, 2026-09-29).
+  `run()` matches a status cell only after
+  `stripChars(r[1].toLowerCase(), "`*_ ")` (`proposal-block.mjs:122-123`
+  and `:143`), so the reply lists `**gap**`, `` `gap` `` and `Gap` as
+  gaps and checks `Have` as `have`. `proposalRows` returns that same
+  value in `statuses`, and `run()` uses `statuses` in those three places
+  instead of normalising again. The page keys its status label table on
+  `statuses`, never on the raw cell (`design-web-ui.md` § 5.3,
+  Applications), so the page and the reply never disagree about a row.
+  A value outside the table shows as its cell is written.
 - **An escaped `\|` is removed, not kept.** `run()` deletes every `\|`
   from the text before splitting (`proposal-block.mjs:75`), so a cell
   written `a \| b` reads `a  b`. `proposalRows` does the same, and the
   page shows what it returns.
 - The page passes the text through `universalNewlines` first, as the
-  port's own io does (`packages/checkers/src/io-node.mjs:33`), and puts
+  port's own io does (`skills/profile/scripts/lib/io-node.mjs:34`), and puts
   each returned cell through `restoreLineSeparators` before showing it
   (as § 18).
 - `packages/agent` doesn't import it. The page imports it from
-  `packages/checkers` with the `// @ts-expect-error - plain .mjs, no
-  type declarations` line (§ 18's posture). `proposal-block.mjs`'s own
-  imports are `path-util.mjs`, `py-text.mjs`, `argx.mjs`,
-  `help-text.mjs` and `traceback.mjs`. **UNVERIFIED:** that none of
-  them touches `window`, `node:*` or the file system at import time; the
-  port's header says it "runs in Node AND in the browser", and 3d's
-  build proves it.
+  `skills/apply/scripts/lib/proposal-block.mjs` with the `//
+  @ts-expect-error - plain .mjs, no type declarations` line (§ 18's
+  posture). `proposal-block.mjs`'s own imports are `path-util.mjs`,
+  `py-text.mjs` (which imports `py-digits.mjs`), `argx.mjs`,
+  `help-text.mjs` and `traceback.mjs`, all in
+  `skills/profile/scripts/lib/`. **UNVERIFIED:** that none of them
+  touches `window`, `node:*` or the file system at import time; the
+  port's header says it "runs in Node AND in the browser", all of them
+  are in the skills lib lint's scope
+  (`tests/agent/browser-safety.test.ts:256`), and 3d's build proves it.
 
-**Prevents:** a coverage list or cut list on the page that differs from
-what `proposal_block` printed in the reply (rules 11, 12).
-**Proved by:** the `proposal_block` parity corpus
-(`packages/checkers/test/parity.mjs:444` onward and
-`tests/checkers-parity/extra.mjs:211` onward) passes **unchanged by this
-change** (a failing case goes back to the architect, never edited to
-pass). `design-plain-replies.md` changes two `proposal_block` output
+**Prevents:** a coverage list, a coverage status or a cut list on the
+page that differs from what `proposal_block` printed in the reply (rules
+11, 12).
+**Proved by:** the `proposal_block` cases
+(`tests/checkers/cases/proposal_block/`, run by
+`tests/checkers/run-cases.mjs`) pass **unchanged by this change** (a
+failing case goes back to the architect, never edited to pass). `design-plain-replies.md` changes two `proposal_block` output
 strings; whichever of the two changes lands second rebases onto the
 other's corpus. A table test for `proposalRows`: both tables present; a
 missing `## Coverage` header (`coverage === null`); a Selection table
 with no `out` row (`cuts` is `[]`); a row with the wrong cell count (in
 `unreadable`, not in `coverage` or `cuts`); a cell written `a \| b`
-(expected `a  b`); CRLF.
+(expected `a  b`); CRLF; status cells `**gap**`, `` `gap` ``, `Gap`,
+`Have` and `Shown-But-Unnamed` (expected `statuses` `gap`, `gap`, `gap`,
+`have`, `shown-but-unnamed`), and a status outside the table, such as
+`partly` (returned as `partly`, shown as written).
 
 ---
 

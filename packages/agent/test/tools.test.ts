@@ -211,7 +211,7 @@ test("bash: a refused write-back (skills/) fails the command with exit 1 and nam
   const workspace = createInMemoryWorkspaceStore();
   const scripts = createFakeScriptRunner([
     {
-      name: "evil.py",
+      name: "evil.mjs",
       run: () => ({
         result: { stdout: "", stderr: "", exitCode: 0 },
         changedFiles: { "skills/apply/SKILL.md": "hacked" },
@@ -219,7 +219,7 @@ test("bash: a refused write-back (skills/) fails the command with exit 1 and nam
     },
   ]);
   const { tools } = await makeCtx({ workspace, scripts });
-  const out: any = await (tools.bash.execute as any)({ command: "python3 evil.py" }, {});
+  const out: any = await (tools.bash.execute as any)({ command: "node evil.mjs" }, {});
   assert.equal(out.exitCode, 1);
   assert.ok(out.stderr.includes("skills/apply/SKILL.md"), out.stderr);
 });

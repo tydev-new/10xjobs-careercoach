@@ -1,7 +1,8 @@
 // Node adapter for the checkers' `io` interface (see README.md "The io
-// interface"). Only this file, `bin/*.mjs` (Node-only by nature — they are
-// CLIs), and the just-bash command adapter touch a real filesystem API. The
-// ports under src/*.mjs stay platform-neutral: no node:fs, no node:path.
+// interface"). Only this file, `skills/*/scripts/*.mjs` (the Node-only CLI
+// wrappers — they are CLIs by nature), and the just-bash command adapter
+// touch a real filesystem API. The ports under `skills/*/scripts/lib/*.mjs`
+// stay platform-neutral: no node:fs, no node:path.
 import { promises as fs } from "node:fs";
 import { dirname } from "node:path";
 import { universalNewlines } from "./py-text.mjs";

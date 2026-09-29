@@ -23,15 +23,15 @@
 // `resolveInvokedScriptPath(workspace)` — a function, not a bare string,
 // because the answer can depend on where the caller resolves things from:
 //
-//   - `bin/check_files.mjs` (a Node-only file, like io-node.mjs) ignores
-//     the workspace argument and always returns its own real position on
-//     disk (there is deliberately no `import.meta.url`/host-disk-path
-//     fallback IN THIS SHARED PORT FILE: that was fix round 1's
-//     mistake — it silently pointed at wherever THIS PACKAGE happens to
-//     live on the machine running the code, meaningless inside
-//     just-bash's in-memory filesystem). A raw `new URL(...).pathname`
-//     also percent-encodes a space in the path (`%20`); bin/check_files.mjs
-//     decodes with `fileURLToPath` instead.
+//   - `skills/profile/scripts/check_files.mjs` (a Node-only CLI file,
+//     like io-node.mjs) ignores the workspace argument and always
+//     returns its own real position on disk (there is deliberately no
+//     `import.meta.url`/host-disk-path fallback IN THIS SHARED PORT
+//     FILE: that was fix round 1's mistake — it silently pointed at
+//     wherever THIS PACKAGE happens to live on the machine running the
+//     code, meaningless inside just-bash's in-memory filesystem). A raw
+//     `new URL(...).pathname` also percent-encodes a space in the path
+//     (`%20`); check_files.mjs decodes with `fileURLToPath` instead.
 //   - `dispatch.mjs`'s `dispatchPython3` reconstructs it from where
 //     docs/design-web-agent.md § 4 guarantees the skills bundle is
 //     mounted: `<workspace>/skills/...` — joined against THIS SCRIPT'S
@@ -71,8 +71,18 @@ export const HISTORY_HEADERS = {
   "pitch-history.md": "| date | round | driver | scored vs FIXED | what changed |",
   "storybank-history.md": "| date | story | round | what changed | scored |",
 };
+// Only the loop-owned history files are bound to the header — derived from
+// the manifest annotation, not a third list. A CANDIDATE's own *-history.md
+// is theirs: the stray WARN mentions it, nothing FAILs it (reviewer-measured
+// 2026-08-18: the bare glob hard-failed a candidate-authored
+// interview-history.md while the same run called it a stray — the manifest
+// docstring's own rule, contradicted one function down).
 const LOOP_HISTORY = new Set(Object.keys(HISTORY_HEADERS));
 
+// Stray = WARN, never FAIL — the workspace is the candidate's; code
+// surfaces, the human decides. Receipt: a full parallel master-resume sat
+// unnoticed beside base-resume.md in the live workspace (found 2026-08-17)
+// — exactly the second-source-of-truth start goal 3 predicts.
 export const MANIFEST_FILES = new Map([
   ["CLAUDE.md", "profile (written at setup from the template)"],
   ["jobs.md", "search scripts"],
@@ -120,6 +130,11 @@ export const SELECTION_ENUMS = new Map([
   [3, new Set(["in", "out"])],
   [4, new Set(["base", "story", "new"])],
 ]);
+// The tailoring loop's round record and the panel's findings (2026-08-21,
+// the loop-alignment design): the same five columns as the history files,
+// inside the application file; the panel table's outcome cell is
+// "fixed" or "discarded — <why>". Header + cell counts checked; the
+// scored cell's form (N/M held; unmet: …) is the agent's discipline.
 export const ROUNDS_HEADER = "| date | round | driver | scored | what changed |";
 export const ROUNDS_ENUMS = new Map();
 export const PANEL_HEADER = "| lens | finding | outcome |";
@@ -151,6 +166,11 @@ async function checkTableHere(io, path, header, enums) {
   return checkTable(io, path, header, enums, {
     titleForHeader: TITLE_FOR_HEADER,
     columnValidators: header === PANEL_HEADER ? PANEL_COLUMN_VALIDATORS : undefined,
+    // Every table this file checks via checkTable (COVERAGE_HEADER,
+    // SELECTION_HEADER, ROUNDS_HEADER, PANEL_HEADER) is declared by
+    // apply/references/schema.md — the domain-neutral core in
+    // shapecheck.mjs never hardcodes that file name itself (J2 review, L4).
+    enumSourceHint: "apply/references/schema.md",
   });
 }
 

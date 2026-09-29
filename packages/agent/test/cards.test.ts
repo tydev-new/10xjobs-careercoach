@@ -34,13 +34,15 @@ test("bash record_verdict.py, exit 0 -> verdict card from the jobs.md row it wro
       "- Score: 82",
       "- Reason: 8 years of B2B SaaS platform PM experience matches the core ask",
       "- Track: A",
-      "- JD: jd-analysis/acme-staff-pm.md",
+      // design-web-search.md § 7.1 (S1): `Analysis` is the field the
+      // verdict card's `ref` reads now, never `JD` (the raw posting).
+      "- Analysis: jd-analysis/acme-staff-pm.md",
       "",
     ].join("\n"),
   });
   const cards = await cb.forToolResult(
     "bash",
-    { command: 'node evaluate/scripts/record_verdict.mjs --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --track A --reasons "x" --jd-file jd-analysis/acme-staff-pm.md' },
+    { command: 'node evaluate/scripts/record_verdict.mjs --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --track A --reasons "x" --analysis-file jd-analysis/acme-staff-pm.md' },
     { stdout: "recorded (created NEW role): Acme — Staff PM → strong (82)", stderr: "", exitCode: 0, changed: ["jobs.md"] },
     ws,
   );
@@ -61,7 +63,7 @@ test("bash record_verdict.py, exit 0 -> verdict card from the jobs.md row it wro
   ]);
 });
 
-test("bash record_verdict.py: no jd_file row -> card has no ref (never guesses a path)", async () => {
+test("bash record_verdict.py: no analysis_file row -> card has no ref (never guesses a path)", async () => {
   const cb = new CardBuilder();
   const ws = createInMemoryWorkspaceStore({
     "jobs.md": ["### Beta — PM", "- Verdict: weak", "- Score: 40", "- Reason: no fit", ""].join("\n"),

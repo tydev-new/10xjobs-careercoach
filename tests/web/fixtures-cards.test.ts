@@ -101,8 +101,24 @@ for (const name of NAMES) {
         const cmd = [...assistantParts(fx)].map((x) => x.p).find((x) => x.type === "tool-bash" && /record_verdict\.mjs/.test(x.input.command) && x.input.command.includes(`--company ${props.company}`) || (x.type === "tool-bash" && x.input.command?.includes(`--company "${props.company}"`)));
         if (!cmd) problems.push(`verdict card ${props.company} with no record_verdict call`);
         else {
-          const jd = cmd.input.command.match(/--jd-file (\S+)/)?.[1];
-          if (jd !== ref) problems.push(`verdict ref ${ref} != --jd-file ${jd}`);
+          // design-web-search.md § 7.1 (S1, the `Analysis` field);
+          // design-web-agent.md § 6.2: the card's ref is the row's
+          // `analysis_file` now, never `jd_file` (design-web-ui.md § 5.9
+          // Stage 3b moved cards.ts's own mapping to match).
+          const analysisFile = cmd.input.command.match(/--analysis-file (\S+)/)?.[1];
+          // A fixture is allowed to omit the ref when `--analysis-file`
+          // names a file this fixture's own `files` never wrote (the
+          // deliberate "missing analysis file" case, § 5.3 Jobs: a field
+          // that names a file which doesn't exist is a normal, designed
+          // state, not a fixture bug) — the OTHER check above ("every
+          // card ref ... exists in files", ui § 4) already refuses a ref
+          // to a phantom file, so a card built to satisfy BOTH checks
+          // correctly has no ref here even though real cards.ts would
+          // set one from the row.
+          const analysisFileIsPhantom = analysisFile !== undefined && !(analysisFile in fx.files);
+          if (analysisFile !== ref && !(analysisFileIsPhantom && ref === undefined)) {
+            problems.push(`verdict ref ${ref} != --analysis-file ${analysisFile}`);
+          }
           const v = cmd.input.command.match(/--verdict (\S+)/)?.[1];
           if (v !== props.verdict) problems.push(`verdict ${props.verdict} != --verdict ${v}`);
           const r = cmd.input.command.match(/--reasons "([^"]*)"/)?.[1];

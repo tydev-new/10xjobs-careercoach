@@ -121,7 +121,12 @@ export class CardBuilder {
       dealbreakers: row.dealbreakers,
     };
     const card: DataCardData = { card: "verdict", props };
-    if (row.jdFile) card.ref = row.jdFile;
+    // design-web-search.md § 7.1 (S1, the `Analysis` field): the card's
+    // `ref` moves to the row's `analysis_file` — `record_verdict` gets
+    // `--analysis-file` whenever an analysis was written; with none, the
+    // card has no `ref` and shows "no analysis file linked", never a
+    // guess (design-web-agent.md § 6.2's own table).
+    if (row.analysisFile) card.ref = row.analysisFile;
     return [card];
   }
 

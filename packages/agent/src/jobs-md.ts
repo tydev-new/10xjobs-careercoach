@@ -3,11 +3,20 @@
 // full jobs_md.py port (search/scripts/jobs_md.py, field list, stage
 // rewriting, dedupe) — that lands with packages/checkers. This file reads
 // just the fields the verdict card needs (company, title, verdict, score,
-// track, reason, dealbreakers, jd_file), matching jobs_md.py's own
-// "### {company} — {title}" heading and "- {Label}: {value}" field-line
-// shape (skills/search/scripts/jobs_md.py's FIELDS table). Once the real
-// port lands, this should be replaced with an import from it — flagged in
-// the coder hand-back as a stub pending that port.
+// track, reason, dealbreakers, jd_file, analysis_file), matching
+// jobs_md.py's own "### {company} — {title}" heading and
+// "- {Label}: {value}" field-line shape
+// (skills/search/scripts/jobs_md.py's FIELDS table). Once the real port
+// lands, this should be replaced with an import from it — flagged in the
+// coder hand-back as a stub pending that port.
+//
+// design-web-ui.md § 5.9 Stage 3b / design-web-search.md § 7.1 (S1, the
+// `Analysis` field): the verdict card's `ref` is the row's `analysis_file`
+// now, never `jd_file` (`JD` stays the raw posting, `jd-inbox/`;
+// `Analysis` is evaluate's decode, `jd-analysis/`) — cards.ts reads
+// `analysisFile` below. `jdFile` is kept on this stub (still a real
+// jobs.md field, § 4.3) even though the card no longer reads it, so a
+// future caller isn't silently missing it.
 export interface JobsMdRow {
   company: string;
   title: string;
@@ -17,6 +26,7 @@ export interface JobsMdRow {
   reason?: string;
   dealbreakers?: string;
   jdFile?: string;
+  analysisFile?: string;
 }
 
 const ROLE_HEADING_RE = /^###\s+(.+?)\s+—\s+(.+?)\s*$/;
@@ -36,6 +46,7 @@ export function parseJobsMdRows(markdown: string): JobsMdRow[] {
       reason: current["reason"],
       dealbreakers: current["dealbreakers"],
       jdFile: current["jd"],
+      analysisFile: current["analysis"],
     });
   };
   for (const rawLine of markdown.replace(/\r\n/g, "\n").split("\n")) {

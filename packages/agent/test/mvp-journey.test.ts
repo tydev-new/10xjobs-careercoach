@@ -74,7 +74,9 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
         command:
           'node evaluate/scripts/record_verdict.mjs --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --track A --reasons "8 years of B2B SaaS platform PM experience matches the core ask" --url ' +
           JD_URL +
-          " --jd-file jd-analysis/acme-staff-pm.md",
+          // design-web-search.md § 7.1 (S1): the card's ref reads the
+          // row's `analysis_file` now (design-web-ui.md § 5.9 Stage 3b).
+          " --analysis-file jd-analysis/acme-staff-pm.md",
       },
       "c3",
     ),
@@ -117,7 +119,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
           `- Score: ${f.score}`,
           `- Reason: ${f.reasons}`,
           `- Track: ${f.track}`,
-          `- JD: ${f["jd-file"]}`,
+          `- Analysis: ${f["analysis-file"]}`,
           "",
         ].join("\n");
         return {

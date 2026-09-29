@@ -264,6 +264,7 @@ export async function run(argv, io) {
     stdout = HEADER.replace("{maybe}", baseText ? ", base résumé loaded for the verbatim check" : "");
 
     let failed = false;
+    let totalWarn = 0;
     const jobs = [
       ["RESUME", a.resume, "resume"],
       ["LETTER", a.letter, "letter"],
@@ -286,11 +287,23 @@ export async function run(argv, io) {
         results = checkLetter(text);
       }
       const fails = results.filter((r) => r[0] === "FAIL");
-      stdout += `\n${label} ${basename(path)}: ${fails.length ? "FAIL" : "pass"} (${fails.length} fail, ${results.length - fails.length} warn)\n`;
+      const warns = results.length - fails.length;
+      stdout += `\n${label} ${basename(path)}: ${fails.length ? "FAIL" : "pass"} (${fails.length} fail, ${warns} warn)\n`;
       for (const [level, msg] of results) stdout += `  [${level}] ${msg}\n`;
       failed = failed || fails.length > 0;
+      totalWarn += warns;
     }
-    stdout += "\n" + (failed ? "✘ fix the FAILs before delivering" : "✔ automatic checks clean") + "\n";
+    // design-honest-ceilings.md § 6A: never say "clean" beside a standing
+    // WARN. Exit codes don't change — a WARN-only run still exits 0.
+    let closing;
+    if (failed) {
+      closing = "✘ fix the FAILs before delivering";
+    } else if (totalWarn > 0) {
+      closing = `no failures, ${totalWarn === 1 ? "1 warning" : `${totalWarn} warnings`} above — fix each one or tell the candidate`;
+    } else {
+      closing = "✔ automatic checks clean";
+    }
+    stdout += "\n" + closing + "\n";
     return { stdout: restoreLineSeparators(stdout), stderr: "", exitCode: failed ? 1 : 0 };
   } catch (e) {
     // Python's os.path.exists() is true for a directory too, so a

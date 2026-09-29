@@ -84,7 +84,9 @@ for (const name of NAMES) {
         if (!want) { problems.push(`checker card ${props.name} with no check_materials stdout block`); continue; }
         try { assert.deepEqual(props, want); } catch { problems.push(`checker props ${JSON.stringify(props)}\n   != parsed stdout ${JSON.stringify(want)}`); }
         if (!ref || !ref.endsWith(props.name)) problems.push(`checker ref ${ref} is not the checked file ${props.name}`);
-        latestChecker.set(ref, props.status === "pass" ? "clean" : "fail");
+        // design-honest-ceilings.md § 6A: a pass with N >= 1 warnings is
+        // "warn" (carrying warnCount), never "clean".
+        latestChecker.set(ref, props.status !== "pass" ? "fail" : props.warnCount > 0 ? `warn:${props.warnCount}` : "clean");
       }
       if (card === "document") {
         const rr = [...assistantParts(fx)].map((x) => x.p).filter((x) => x.type === "tool-bash" && /render_resume\.mjs/.test(x.input.command) && x.output.exitCode === 0);
@@ -94,7 +96,8 @@ for (const name of NAMES) {
         if (!w || +w[1] !== props.words) problems.push(`document words ${props.words} != stdout ${w?.[1]}`);
         if (w && props.htmlPath !== w[2]) problems.push(`document htmlPath ${props.htmlPath} != ${w[2]}`);
         const badge = latestChecker.get(ref) ?? "not-run";
-        if (props.checker !== badge) problems.push(`document badge ${props.checker} != latest checker ${badge}`);
+        const shown = props.checker === "warn" ? `warn:${props.warnCount}` : props.checker;
+        if (shown !== badge) problems.push(`document badge ${shown} != latest checker ${badge}`);
       }
       if (card === "verdict") {
         verdictCards++;

@@ -28,8 +28,9 @@ One entry per lead, then the warm paths, then the send log.
 - **Drafts** — a blockquote group per draft, each followed by its
   **written rubric line**:
   `rubric: specificity ✓ · brevity ✓ · ask ✓ · value ✓ · voice ✓` — an
-  unmet item shows ✗ with the tradeoff. A draft written while
-  enrichment was blocked is marked `PROVISIONAL: missing <input>`.
+  unmet item shows ✗ with the tradeoff. Marks are ✓ or ✗, nothing else;
+  any ✗ puts UNMET on the line, with what didn't fit. A draft written
+  while enrichment was blocked is marked `PROVISIONAL: missing <input>`.
 - **Send log** — every send and outcome, DATED; status enum
   `drafted` / `sent <date> <channel>` / `replied <date>` /
   `no-response` / `closed`. The enum IS the response-rate denominator.

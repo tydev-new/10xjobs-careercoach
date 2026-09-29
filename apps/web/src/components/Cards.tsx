@@ -143,8 +143,19 @@ function DocumentCard({
         {fileRef ? <span className="card-title-file">{fileRef}</span> : "Document"}
       </div>
       <p className="card-meta">
-        {props.words} words · checker{" "}
-        <span className={`badge badge--${props.checker}`}>{props.checker}</span>
+        {/* design-web-ui.md § 5.3.1 T2: "automatic checks:", not "checker". */}
+        {props.words} words · automatic checks:{" "}
+        <span className={`badge badge--${props.checker}`}>
+          {/* design-honest-ceilings.md § 6A: a pass with warnings never
+              renders as "clean" — clean and fail read as today; not-run
+              reads as "not run" (design-web-ui.md § 5.3.1 T6), the
+              underlying value ("not-run") stays the CSS class suffix. */}
+          {props.checker === "warn"
+            ? `no failures, ${props.warnCount === 1 ? "1 warning" : `${props.warnCount ?? 0} warnings`}`
+            : props.checker === "not-run"
+              ? "not run"
+              : props.checker}
+        </span>
       </p>
       <div className="card-actions">
         {fileRef ? <OpenInPanel onOpen={() => onOpen(fileRef)} /> : null}

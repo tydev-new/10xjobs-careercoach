@@ -253,6 +253,30 @@ test("readApplicationTables: an escaped `\\|` is removed, not kept (matches prop
   assert.deepEqual(tables.coverage, [["Req a  b", "have", "Evidence a  b", "answered"]]);
 });
 
+// docs/workspace-review-drift, design-web-agent.md C § 19, lead ruling
+// 2026-09-29: "A coverage status is matched once, here" — statuses[i] is
+// run()'s own once-normalised status, so **gap**/`gap`/Gap all read the
+// same value the reply used, and a value outside the table (e.g.
+// "partly") is returned normalised but never dropped.
+test("readApplicationTables: statuses normalises `**gap**`, `` `gap` ``, `Gap`, `Have` the same way run() always has, and passes through a status outside the table", () => {
+  const text =
+    COVERAGE_HEADER +
+    "| r1 | **gap** | e1 | open |\n" +
+    "| r2 | `gap` | e2 | open |\n" +
+    "| r3 | Gap | e3 | open |\n" +
+    "| r4 | Have | e4 | answered |\n" +
+    "| r5 | partly | e5 | open |\n";
+  const tables = readApplicationTables(text);
+  assert.deepEqual(tables.statuses, ["gap", "gap", "gap", "have", "partly"]);
+});
+
+test("readApplicationTables: statuses is null exactly when coverage is null", () => {
+  const text = "no tables here\n";
+  const tables = readApplicationTables(text);
+  assert.equal(tables.coverage, null);
+  assert.equal(tables.statuses, null);
+});
+
 // ---------------------------------------------------------------------
 // nextFromYou — design-web-ui.md § 5.3 Applications, part 4: "Waiting on
 // you and then To do, in file order, whose ref ... is one of this

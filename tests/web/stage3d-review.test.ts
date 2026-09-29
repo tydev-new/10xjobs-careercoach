@@ -522,7 +522,14 @@ test("§ 5.3 part 5 'any other value as written': a status or decision that happ
   const d = await readDetail(r.page).catch(() => null);
   await ctx.close();
   assert.ok(d, `the detail did not render; page errors ${JSON.stringify(errors)}; the page shows "${body.slice(0, 200)}"`);
-  assert.deepEqual(d.coverage, [["proto", "z2", "constructor", "toString"], ["p2", "z3", "__proto__", "hasOwnProperty"]]);
+  // docs/workspace-review-drift, C § 19, lead ruling 2026-09-29: "A
+  // coverage status is matched once, here" — the page now shows
+  // `statuses[i]` (run()'s own `stripChars(cell.toLowerCase(), "`*_ ")`
+  // normalisation), never the raw cell, so the reply and the page can't
+  // disagree. `__proto__`'s two underscores are stripped exactly the way
+  // `_gap_` (markdown emphasis) would be, the same as `constructor`
+  // (no strip-chars in it) stays unchanged.
+  assert.deepEqual(d.coverage, [["proto", "z2", "constructor", "toString"], ["p2", "z3", "proto", "hasOwnProperty"]]);
 });
 
 test("§ 5.2 rule 6 on Applications: a notes file whose read fails shows F40 with its path and Retry in parts 5-6 only (header, steps and files still show); Retry recovers", async () => {

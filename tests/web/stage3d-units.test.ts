@@ -231,7 +231,11 @@ test("C § 19 table: CRLF — proposalRows alone, and the page's reader (univers
   const lf = proposalRows(APP);
   assert.deepEqual(proposalRows(APP.replace(/\n/g, "\r\n")), lf);
   const page = readApplicationTables(APP.replace(/\n/g, "\r\n"));
-  assert.deepEqual({ coverage: page.coverage, cuts: page.cuts, kept: page.kept, unreadable: page.unreadable }, lf);
+  // `statuses` (docs/workspace-review-drift, C § 19, lead ruling
+  // 2026-09-29, "A coverage status is matched once, here") is picked
+  // alongside the other four fields, not left out — `page` and `lf` must
+  // still agree on it under CRLF, the same as everything else here.
+  assert.deepEqual({ coverage: page.coverage, statuses: page.statuses, cuts: page.cuts, kept: page.kept, unreadable: page.unreadable }, lf);
 });
 
 test("C § 19: a U+2028 inside a cell — the page reads what the script reads (universalNewlines in, so splitlines breaks the row there, as Python's does): the row is unreadable, not dropped, and no sentinel leaks out", () => {

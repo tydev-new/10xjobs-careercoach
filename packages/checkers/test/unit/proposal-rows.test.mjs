@@ -27,15 +27,17 @@ test("both tables present: coverage, cuts and kept all populate, in file order",
     ["Req one", "have", "Evidence one", "answered"],
     ["Req two", "gap", "Evidence two", "open"],
   ]);
+  assert.deepEqual(rows.statuses, ["have", "gap"]);
   assert.deepEqual(rows.cuts, [["2", "A", "bullet two", "out", "base", "6", "weakest"]]);
   assert.deepEqual(rows.kept, [["1", "A", "bullet one", "in", "base", "5", "lead"]]);
   assert.deepEqual(rows.unreadable, []);
 });
 
-test("a missing ## Coverage header: coverage is null", () => {
+test("a missing ## Coverage header: coverage AND statuses are both null", () => {
   const text = SELECTION_HEADER + "| 1 | A | bullet one | in | base | 5 | lead |\n";
   const rows = proposalRows(text);
   assert.equal(rows.coverage, null);
+  assert.equal(rows.statuses, null);
   assert.deepEqual(rows.kept, [["1", "A", "bullet one", "in", "base", "5", "lead"]]);
   assert.deepEqual(rows.cuts, []);
 });
@@ -44,8 +46,51 @@ test("a missing ## Selection header: cuts and kept are both null", () => {
   const text = COVERAGE_HEADER + "| Req one | have | Evidence one | answered |\n";
   const rows = proposalRows(text);
   assert.deepEqual(rows.coverage, [["Req one", "have", "Evidence one", "answered"]]);
+  assert.deepEqual(rows.statuses, ["have"]);
   assert.equal(rows.cuts, null);
   assert.equal(rows.kept, null);
+});
+
+// ---------------------------------------------------------------------
+// statuses — docs/workspace-review-drift, design-web-agent.md C § 19,
+// lead ruling 2026-09-29: "A coverage status is matched once, here."
+// `run()`'s own normalisation (stripChars(cell.toLowerCase(), "`*_ "))
+// so `**gap**`, `` `gap` `` and `Gap` all read `gap`, and a value outside
+// the table (e.g. `partly`) is returned lowercased/stripped but otherwise
+// as written — never blank, never thrown.
+// ---------------------------------------------------------------------
+
+test("statuses: `**gap**`, `` `gap` ``, `Gap`, `Have` and `Shown-But-Unnamed` normalise the same way run() always has", () => {
+  const text =
+    COVERAGE_HEADER +
+    "| r1 | **gap** | e1 | open |\n" +
+    "| r2 | `gap` | e2 | open |\n" +
+    "| r3 | Gap | e3 | open |\n" +
+    "| r4 | Have | e4 | answered |\n" +
+    "| r5 | Shown-But-Unnamed | e5 | answered |\n";
+  const rows = proposalRows(text);
+  assert.deepEqual(rows.statuses, ["gap", "gap", "gap", "have", "shown-but-unnamed"]);
+});
+
+test("statuses: a status outside the table (e.g. `partly`) is returned normalised, not dropped — the page shows it as written", () => {
+  const text = COVERAGE_HEADER + "| r1 | partly | e1 | open |\n";
+  const rows = proposalRows(text);
+  assert.deepEqual(rows.statuses, ["partly"]);
+});
+
+test("statuses: index i always lines up with coverage[i] — a malformed row in between is routed to unreadable, never shifting the alignment", () => {
+  const text =
+    COVERAGE_HEADER +
+    "| r1 | have | e1 | answered |\n" +
+    "| r2 | gap | e2 |\n" + // 3 cells: unreadable, not coverage/statuses
+    "| r3 | Gap | e3 | open |\n";
+  const rows = proposalRows(text);
+  assert.deepEqual(rows.coverage, [
+    ["r1", "have", "e1", "answered"],
+    ["r3", "Gap", "e3", "open"],
+  ]);
+  assert.deepEqual(rows.statuses, ["have", "gap"]);
+  assert.deepEqual(rows.unreadable, [["r2", "gap", "e2"]]);
 });
 
 test("a Selection table with no `out` row: cuts is []", () => {

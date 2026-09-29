@@ -3364,12 +3364,19 @@ select:focus-visible {
   box-shadow: 0 0 0 1px var(--border);
   font: var(--type-small);
   color: var(--fg-muted);
+  /* the pill is § 5.3.1's own short word ("Dismissed") only — a long
+     note never sits inside it (a review finding: the note used to be
+     glued into this fixed-height pill and overflowed it). */
+  white-space: nowrap;
 }
 
-.app-entry-tier {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+/* The dismissed note (§ 5.3: "'Dismissed' plus the note", the note word
+   for word) — plain text below the pill above, never inside it, so it
+   wraps normally at any length. */
+.app-entry-note {
+  display: block;
+  font: var(--type-meta);
+  color: var(--fg-muted);
 }
 
 .app-entry-score {
@@ -3380,6 +3387,20 @@ select:focus-visible {
 
 .app-entry-ask {
   flex: none;
+}
+
+/* § 5.3 "Its files, each opening the viewer"; § 5.6 "Then its files as
+   document rows" — the list entry's OWN files, reusing Documents' own
+   `.doc-row`/`.doc-row-open`/`.doc-row-path` shape unstyled here (rule
+   12: one file-row look). A light inset card so the files read as part
+   of THIS entry, not a new list. */
+.app-entry-files {
+  width: 100%;
+  margin-left: 48px; /* aligns under the label, past the 36px tile + gap */
+  background: var(--bg-canvas);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
 }
 
 .app-detail {
@@ -3414,6 +3435,16 @@ select:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* "Where it stands" for a dismissed row — the same pill+note split as
+   the list entry's own (`.app-entry-stage-pill`/`.app-entry-note`),
+   stacked. */
+.app-detail-dismissed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
 }
 
 .app-detail-files {
@@ -3494,6 +3525,15 @@ select:focus-visible {
 
 .app-coverage-table {
   width: 100%;
+  /* table-layout: fixed — without it, an `auto`-layout table sizes each
+     column to its OWN content's unwrapped preferred width first, and can
+     demand more than the viewport to avoid wrapping prose at all (a
+     review finding: removing the coverage cells' `overflow-wrap:
+     anywhere`, above, otherwise re-opened a horizontal-scroll regression
+     at 375px this page's own review already covered). `fixed` sizes
+     columns from the table's own 100% width instead, so a cell always
+     wraps within its column at normal word boundaries. */
+  table-layout: fixed;
   border-collapse: collapse;
   font: var(--type-body-sm);
 }
@@ -3510,7 +3550,11 @@ select:focus-visible {
   padding: var(--space-2) var(--space-3);
   border-bottom: 1px solid var(--border);
   vertical-align: top;
-  overflow-wrap: anywhere;
+  /* § 5.5: "A long path or URL wraps with overflow-wrap: anywhere" — and
+     only those. This cell holds ordinary prose (a requirement, evidence,
+     a status/decision label), never a path or URL, so it wraps at normal
+     word boundaries only (found live, the review's own build: "ecosystem"
+     broken mid-word at a narrow column width). */
 }
 
 .app-coverage-table tr:last-child td {
@@ -3577,6 +3621,17 @@ select:focus-visible {
 
   .app-detail-back {
     display: inline-flex;
+  }
+
+  /* table-layout: fixed (above) already keeps the coverage table within
+     its own container; at 375px four columns' worth of padding alone
+     (var(--space-3) each side, 96px total) left one column's longest
+     ordinary word a few px short of fitting on its own line — never
+     enough to need word-breaking (§ 5.5's own exception stays exactly
+     "a long path or URL"), just tighter cell padding. */
+  .app-coverage-table th,
+  .app-coverage-table td {
+    padding: var(--space-2) var(--space-1);
   }
 }
 /* ---- END Applications ---- */

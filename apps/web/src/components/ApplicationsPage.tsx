@@ -16,7 +16,6 @@ import { readPlanBoard } from "../../../../packages/agent/src/plan-board.ts";
 import { load as loadJobsRows } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import { Icon } from "../icons.tsx";
 import type { FileInfo, WorkspaceStore } from "../types.ts";
-import { WorkspaceError } from "../types.ts";
 import {
   groupApplications,
   linkedApplicationRow,
@@ -26,8 +25,8 @@ import {
   type ApplicationEntry,
   type ApplicationTables,
 } from "../workspace/applications.ts";
-import { stageSteps } from "../workspace/stage-steps.ts";
-import { storeIo } from "../workspace/store-io.ts";
+import { StageSteps } from "./StageSteps";
+import { isMissingError, storeIo } from "../workspace/store-io.ts";
 import { PlanItem } from "./PlanItem";
 import { EmptyPage } from "./EmptyPage";
 import { TierPill } from "./Cards.tsx";
@@ -70,17 +69,36 @@ const COVERAGE_DECISION_LABEL: Record<string, string> = {
   skipped: "Skipped",
 };
 
+// Object.hasOwn, never a plain index + `?? key` fallback: a status or
+// decision word that happens to spell an inherited Object.prototype
+// property (`constructor`, `toString`, `hasOwnProperty`, `__proto__`)
+// would read back that PROPERTY (a function, or the prototype itself),
+// which `?? key` never catches (the lookup isn't `undefined`) — React
+// then crashes trying to render a function as a child (found live, this
+// review's own build). "Any other value as written" must hold for every
+// string the file can carry, JS-object accidents included.
+function labelFor(table: Record<string, string>, key: string): string {
+  return Object.hasOwn(table, key) ? table[key] : key;
+}
+
 const WORKING_LINE = "Ten is working. This page updates when it finishes.";
 
 // § 5.3 Applications: "Its stage from that row, or 'Dismissed' plus the
-// note." No exact wording is given (unlike Jobs' own "Dismissed from
-// <stage>", J5, which is a different field — jobs.md's `Was`, not
-// shown on Applications). This coder's reading: "Dismissed" then the
-// row's own `Dismissed` note, word for word, joined by ": " — reported
-// to the lead as an ambiguity. Shared by the list row and the detail so
-// the two never drift (rule 12).
-function dismissedLabel(row: JobsRow): string {
-  return row.dismiss_note ? `Dismissed: ${row.dismiss_note}` : "Dismissed";
+// note." "Dismissed" (P16, § 5.3.1) is the one word the pill everywhere
+// else (Home's count cell, a Jobs group) already uses — the pill here
+// stays that short word, never the note glued into it (a review finding:
+// a long note inside the fixed-height pill overflowed it). The note is
+// its own plain line, word for word, below the pill — the same split
+// Jobs' own dismissed row already uses for its `Was`/`Dismissed` fields
+// (§ 5.3 Jobs: "adds its Dismissed note word for word"). Shared by the
+// list row and the detail so the two never drift (rule 12).
+function DismissedStatus({ row }: { row: JobsRow }): ReactElement {
+  return (
+    <>
+      <span className="app-entry-stage-pill">Dismissed</span>
+      {row.dismiss_note ? <span className="app-entry-note">{row.dismiss_note}</span> : null}
+    </>
+  );
 }
 
 function roleLabel(entry: ApplicationEntry, row: JobsRow | undefined): string {
@@ -110,48 +128,58 @@ function EntryRow({
   row,
   selected,
   onSelect,
+  onOpenFile,
   onAskTen,
 }: {
   entry: ApplicationEntry;
   row: JobsRow | undefined;
   selected: boolean;
   onSelect: () => void;
+  onOpenFile: (path: string, opener?: HTMLElement) => void;
   onAskTen: () => void;
 }): ReactElement {
   const label = roleLabel(entry, row);
   return (
     <div className={`app-entry-row${selected ? " app-entry-row--selected" : ""}`}>
+      {/* The header: the initial tile, the role label, the stage pill
+          (or "Not linked..."). § 5.3/§ 5.6 name no tier pill or score on
+          the LIST entry (only Jobs' own row and this page's DETAIL show
+          them, § 5.3 Applications detail part 1) — a review finding.
+          `choose()`-style tests click this row's FIRST button, so it
+          stays first in the markup, before the file rows below. */}
       <button type="button" className="app-entry-open" onClick={onSelect} aria-current={selected ? "true" : undefined}>
         <span className="app-entry-tile" aria-hidden="true">
           {(row ? row.company : label).charAt(0).toUpperCase()}
         </span>
-        {/* Everything else stacks in ONE column (never a second column
-            competing with the tile for width): at a narrow list-pane
-            width (the list-plus-detail split, or the phone), a tier
-            pill sitting BESIDE the label used to starve the label's own
-            flex item down toward its min-width: 0 floor, wrapping it
-            character by character (found live, this stage's own build:
-            "Fernway Robotics" as a vertical column of single letters).
-            Stacking removes the competing sibling entirely. */}
         <span className="app-entry-main">
           <span className="app-entry-label">{label}</span>
           {row ? (
             row.dismissed ? (
-              <span className="app-entry-stage-pill">{dismissedLabel(row)}</span>
+              <DismissedStatus row={row} />
             ) : (
               <span className="app-entry-stage-pill">{row.stage}</span>
             )
           ) : (
             <span className="app-entry-unlinked">Not linked to a role on your job list.</span>
           )}
-          {row?.fit_verdict ? (
-            <span className="app-entry-tier">
-              <TierPill verdict={row.fit_verdict} />
-              {typeof row.fit_score === "number" ? <span className="app-entry-score">{row.fit_score}/100</span> : null}
-            </span>
-          ) : null}
         </span>
       </button>
+      {/* § 5.3 "Its files, each opening the viewer"; § 5.6 "Then its
+          files as document rows, then Ask Ten about this" — on the LIST
+          entry itself, not only the chosen entry's detail (a review
+          finding: this page previously only showed files once a row was
+          selected). Reuses Documents' own doc-row shape (rule 12: one
+          file-row look everywhere a page lists files). */}
+      <div className="app-entry-files">
+        {entry.files.map((f) => (
+          <div className="doc-row" key={f.path}>
+            <button type="button" className="doc-row-open" onClick={(e) => onOpenFile(f.path, e.currentTarget)}>
+              <Icon name="fileText" size={14} />
+              <span className="doc-row-path">{f.path}</span>
+            </button>
+          </div>
+        ))}
+      </div>
       <button type="button" className="btn btn--ghost app-entry-ask" onClick={onAskTen}>
         Ask Ten about this
       </button>
@@ -172,7 +200,7 @@ interface DetailState {
   planError?: boolean;
 }
 
-function CoverageTable({ rows }: { rows: string[][] }): ReactElement | null {
+function CoverageTable({ rows, statuses }: { rows: string[][]; statuses: string[] }): ReactElement | null {
   if (rows.length === 0) return null;
   return (
     <table className="app-coverage-table">
@@ -189,8 +217,13 @@ function CoverageTable({ rows }: { rows: string[][] }): ReactElement | null {
           <tr key={i}>
             <td>{r[0]}</td>
             <td>{r[2]}</td>
-            <td>{COVERAGE_STATUS_LABEL[r[1]] ?? r[1]}</td>
-            <td>{COVERAGE_DECISION_LABEL[r[3]] ?? r[3]}</td>
+            {/* docs/workspace-review-drift, C § 19 (lead ruling
+                2026-09-29): the status column keys on `statuses[i]` —
+                run()'s own once-normalised status — never the raw cell
+                (r[1]), so `**gap**`/`` `gap` ``/`Gap` all read the same
+                status the reply used. */}
+            <td>{labelFor(COVERAGE_STATUS_LABEL, statuses[i])}</td>
+            <td>{labelFor(COVERAGE_DECISION_LABEL, r[3])}</td>
           </tr>
         ))}
       </tbody>
@@ -269,9 +302,11 @@ function ApplicationDetail({
       {/* 2. Where it stands */}
       {row ? (
         row.dismissed ? (
-          <p className="app-entry-stage-pill">{dismissedLabel(row)}</p>
+          <div className="app-detail-dismissed">
+            <DismissedStatus row={row} />
+          </div>
         ) : row.stage ? (
-          <StageStepsInline stage={row.stage} />
+          <StageSteps stage={row.stage} />
         ) : null
       ) : null}
 
@@ -314,7 +349,7 @@ function ApplicationDetail({
           {detail.tables.coverage && detail.tables.coverage.length > 0 ? (
             <div className="app-detail-section">
               <h3>What the posting asks for, and your evidence</h3>
-              <CoverageTable rows={detail.tables.coverage} />
+              <CoverageTable rows={detail.tables.coverage} statuses={detail.tables.statuses ?? []} />
             </div>
           ) : null}
           {detail.tables.cuts && detail.tables.cuts.length > 0 ? (
@@ -337,26 +372,6 @@ function ApplicationDetail({
         Ask Ten about this
       </button>
     </div>
-  );
-}
-
-// A thin wrapper so the detail imports the stage steps' logic the same
-// way the list-pane pill and Jobs (later) will — kept local to avoid a
-// second entry point into ../components/StageSteps.tsx's own props.
-function StageStepsInline({ stage }: { stage: string }): ReactElement {
-  return (
-    <ol className="stage-steps" aria-label="Stage">
-      {stageSteps(stage).map((step) => (
-        <li
-          key={step.label}
-          className={`stage-step${step.current ? " stage-step--current" : ""}`}
-          aria-current={step.current ? "step" : undefined}
-        >
-          <span className="stage-step-dot" aria-hidden="true" />
-          <span className="stage-step-label">{step.label}</span>
-        </li>
-      ))}
-    </ol>
   );
 }
 
@@ -385,7 +400,10 @@ export interface ApplicationsPageProps {
 
 type ListState =
   | { kind: "loading" }
-  | { kind: "error" }
+  // `path`: set when `jobs.md` specifically failed to read (F40 names it);
+  // absent when `store.list("applications")` itself failed (no single
+  // path to name, the generic "your files" line, unchanged).
+  | { kind: "error"; path?: string }
   | { kind: "ready"; entries: ApplicationEntry[]; rows: JobsRow[] };
 
 export function ApplicationsPage({
@@ -406,15 +424,28 @@ export function ApplicationsPage({
 
   const loadList = useCallback(async () => {
     setList((prev) => (prev.kind === "ready" ? prev : { kind: "loading" }));
+    let files: FileInfo[];
     try {
-      const [files, rows] = await Promise.all([
-        store.list("applications"),
-        loadJobsRows(storeIo(store), "") as Promise<JobsRow[]>,
-      ]);
-      setList({ kind: "ready", entries: groupApplications(files), rows });
+      files = await store.list("applications");
     } catch {
+      // No single path names a directory listing — the same generic
+      // line Documents' own list() failure uses.
       setList({ kind: "error" });
+      return;
     }
+    let rows: JobsRow[];
+    try {
+      // The port's own `load()` calls `io.exists("jobs.md")` first
+      // (store-io.ts's `isMissingError`, now shared with Home) — a
+      // genuinely MISSING jobs.md returns [] here without throwing
+      // (§ 5.2 rule 6, "missing is empty"); anything this catch DOES
+      // see is jobs.md unreadable for a real reason, named below (F40).
+      rows = (await loadJobsRows(storeIo(store), "")) as JobsRow[];
+    } catch {
+      setList({ kind: "error", path: "jobs.md" });
+      return;
+    }
+    setList({ kind: "ready", entries: groupApplications(files), rows });
   }, [store]);
 
   useEffect(() => {
@@ -468,7 +499,7 @@ export function ApplicationsPage({
         const file = await store.read(notes[0].path);
         tables = readApplicationTables(file.binary ? "" : file.content);
       } catch (err) {
-        if (!(err instanceof WorkspaceError && err.code === "resource_missing")) tablesError = true;
+        if (!isMissingError(err)) tablesError = true;
       }
     }
 
@@ -478,7 +509,7 @@ export function ApplicationsPage({
       const file = await store.read("plan.md");
       plan = readPlanBoard(file.binary ? "" : file.content);
     } catch (err) {
-      if (err instanceof WorkspaceError && err.code === "resource_missing") {
+      if (isMissingError(err)) {
         plan = { sections: [] };
       } else {
         planError = true;
@@ -531,13 +562,19 @@ export function ApplicationsPage({
   }
 
   if (list.kind === "error") {
+    // § 5.3.1 F40: "jobs.md" names the one path that actually failed
+    // (jobs.md unreadable for a real reason, never missing — § 5.2 rule
+    // 6, isMissingError already turned "missing" into an empty rows
+    // list before this state is ever reached). `store.list()` itself
+    // failing names no single path — Documents' own generic line.
+    const message = list.path ? `Couldn't read ${list.path}. Try again in a moment.` : "Couldn't read your files. Try again in a moment.";
     return (
       <div className="workspace-page">
         <div className="workspace-page-inner">
           {workingLine}
           <div className="page-error-card">
             <Icon name="circleAlert" size={18} />
-            <p className="page-error-message">Couldn't read your files. Try again in a moment.</p>
+            <p className="page-error-message">{message}</p>
             <button type="button" className="btn btn--sec" onClick={() => setListAttempt((n) => n + 1)}>
               Retry
             </button>
@@ -570,6 +607,7 @@ export function ApplicationsPage({
             row={linkedApplicationRow(entry, list.rows)}
             selected={entry.key === chosenKey}
             onSelect={() => select(entry.key)}
+            onOpenFile={onOpenFile}
             onAskTen={() => onAskTen(roleLabel(entry, linkedApplicationRow(entry, list.rows)))}
           />
         ))}

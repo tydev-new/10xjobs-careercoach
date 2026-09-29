@@ -36,7 +36,15 @@ function OpenInPanel({ onOpen }: { onOpen: () => void }): ReactElement {
 // the same reason as VERDICT_LABEL above (§ 5.3: Home, Jobs and
 // Applications all show this pill from the same row/card data).
 export function TierPill({ verdict }: { verdict: string }): ReactElement {
-  const label = VERDICT_LABEL[verdict] ?? verdict;
+  // Object.hasOwn, not a plain index + `?? verdict`: a verdict string that
+  // happens to spell an inherited Object.prototype property name
+  // (`constructor`, `toString`, `hasOwnProperty`, `__proto__`) would read
+  // back that PROPERTY (a function, or the prototype itself), not
+  // `undefined` — `?? verdict` never catches that, and React crashes
+  // trying to render a function as a child (found live, this review's own
+  // build). A row-written word must always show as written when it isn't
+  // one of § 2.1's own four keys, never a JS-object accident.
+  const label = Object.hasOwn(VERDICT_LABEL, verdict) ? VERDICT_LABEL[verdict] : verdict;
   return (
     <span className={`tier-pill tier-pill--${verdict}`}>
       {verdict === "strong" ? <Icon name="check" size={13} /> : null}

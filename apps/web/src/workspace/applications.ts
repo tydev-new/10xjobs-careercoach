@@ -184,6 +184,15 @@ export function nextFromYou(
 
 export interface ApplicationTables {
   coverage: string[][] | null;
+  /** coverage[i]'s own status cell, normalised once by the port
+   *  (`stripChars(cell.toLowerCase(), "`*_ ")`) — the same value
+   *  `proposal_block`'s `run()` matches in the reply (docs/
+   *  workspace-review-drift, design-web-agent.md C § 19, lead ruling
+   *  2026-09-29: "A coverage status is matched once, here"). The page
+   *  keys its status label table on THIS, never on the raw cell, so
+   *  `**gap**`/`` `gap` ``/`Gap` all read the same status the reply
+   *  used. `null` exactly when `coverage` is `null`. */
+  statuses: string[] | null;
   cuts: string[][] | null;
   kept: string[][] | null;
   unreadable: string[][];
@@ -191,6 +200,10 @@ export interface ApplicationTables {
 
 function restoreRows(rows: string[][] | null): string[][] | null {
   return rows === null ? null : rows.map((r) => r.map((cell) => restoreLineSeparators(cell)));
+}
+
+function restoreList(values: string[] | null): string[] | null {
+  return values === null ? null : values.map((v) => restoreLineSeparators(v));
 }
 
 /** The notes file's Coverage and Selection tables (C § 19), read the same
@@ -202,12 +215,14 @@ function restoreRows(rows: string[][] | null): string[][] | null {
 export function readApplicationTables(text: string): ApplicationTables {
   const rows = proposalRows(universalNewlines(text)) as {
     coverage: string[][] | null;
+    statuses: string[] | null;
     cuts: string[][] | null;
     kept: string[][] | null;
     unreadable: string[][];
   };
   return {
     coverage: restoreRows(rows.coverage),
+    statuses: restoreList(rows.statuses),
     cuts: restoreRows(rows.cuts),
     kept: restoreRows(rows.kept),
     unreadable: restoreRows(rows.unreadable) ?? [],

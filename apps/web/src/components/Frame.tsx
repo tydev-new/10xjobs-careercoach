@@ -15,6 +15,7 @@ import { Rail } from "./Rail";
 import { TabBar } from "./TabBar";
 import { EmptyPage } from "./EmptyPage";
 import { DocumentsPage } from "./DocumentsPage";
+import { ApplicationsPage } from "./ApplicationsPage";
 import { Home } from "./Home";
 import { VersionNotice, type VersionNoticeMode } from "../real/VersionNotice";
 import { landingPage } from "../workspace/landing.ts";
@@ -161,6 +162,18 @@ export function Frame(props: FrameProps): ReactElement {
     openTalkToTen();
   };
 
+  // § 5.4 "Pages to pages": "an application's 'Role details' opens Jobs
+  // with the linked row chosen." Stage 3b (Jobs, in parallel) hasn't
+  // landed in this build yet — Jobs still renders as EmptyPage below, so
+  // nothing consumes `chosenJobsAnalysisPath` today. This is the minimal
+  // forward wiring 3b needs: the state that remembers which row to
+  // select once Jobs has a detail to select it in. Reported to the lead.
+  const [chosenJobsAnalysisPath, setChosenJobsAnalysisPath] = useState<string | undefined>(undefined);
+  const openJobsRow = (analysisPath: string): void => {
+    setChosenJobsAnalysisPath(analysisPath);
+    navigate("jobs");
+  };
+
   // The focus call itself must run AFTER Talk to Ten's own
   // `frame-page--hidden` class is removed and the browser has painted it,
   // or `.focus()` targets an element that is still `display: none` and
@@ -232,14 +245,14 @@ export function Frame(props: FrameProps): ReactElement {
               onOpenTalkToTen={openTalkToTen}
             />
           ) : page === "applications" ? (
-            // § 5.3.1 AP16/AP17 (lead ruling, 2026-09-28 — Stage 3d
-            // replaces this page).
-            <EmptyPage
-              icon="layers"
-              first="No applications yet."
-              rest="Ask Ten to draft a résumé and letter for a role, and they show here."
-              cta="talk"
+            // § 5.9 Stage 3d.
+            <ApplicationsPage
+              store={store}
+              onOpenFile={onOpenFile}
+              onAskTen={askTenAbout}
               onOpenTalkToTen={openTalkToTen}
+              onOpenJobsRow={openJobsRow}
+              turnRunning={status.state === "thinking" || status.state === "working"}
             />
           ) : page === "documents" ? (
             <DocumentsPage

@@ -13,7 +13,10 @@ import type {
 import { formatUsd } from "../format.ts";
 import { Icon } from "../icons.tsx";
 
-const VERDICT_LABEL: Record<string, string> = {
+// § 2.1's own tier-label table — exported so Home, Jobs and Applications
+// (design-web-ui.md § 5.3: "tier label (§ 2.1's table)", P5-P8) reuse this
+// ONE table instead of each page keeping its own copy (rule 12).
+export const VERDICT_LABEL: Record<string, string> = {
   strong: "Strong Fit",
   investable_stretch: "Investable Stretch",
   long_shot: "Long-Shot Stretch",
@@ -29,8 +32,10 @@ function OpenInPanel({ onOpen }: { onOpen: () => void }): ReactElement {
 }
 
 // § 5.6, "Cards — Tier pills": the words carry the meaning, color only
-// marks the category. Strong Fit alone gets the check icon.
-function TierPill({ verdict }: { verdict: string }): ReactElement {
+// marks the category. Strong Fit alone gets the check icon. Exported for
+// the same reason as VERDICT_LABEL above (§ 5.3: Home, Jobs and
+// Applications all show this pill from the same row/card data).
+export function TierPill({ verdict }: { verdict: string }): ReactElement {
   const label = VERDICT_LABEL[verdict] ?? verdict;
   return (
     <span className={`tier-pill tier-pill--${verdict}`}>

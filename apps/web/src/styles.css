@@ -3252,3 +3252,331 @@ select:focus-visible {
   letter-spacing: var(--track-wordmark);
   color: var(--fg);
 }
+
+/* =====================================================================
+   Applications (design-web-ui.md § 5.3 "Applications: the materials per
+   role", § 5.6 "Applications"; § 5.9 Stage 3d). Kept together, under this
+   one marker, so a merge with the other Stage 3 pages' own CSS stays
+   easy — nothing here reaches outside the `.applications-*`/
+   `.app-*`/`.stage-step*` prefixes. Reuses `.workspace-page`,
+   `.workspace-page-inner`, `.doc-row*`, `.plan-item-list`, `.tier-pill`,
+   `.page-empty*`, `.page-error-card` and `.page-working-line` unchanged
+   (§ 5.6: "Jobs and Applications... The same list pane").
+   ===================================================================== */
+
+.applications-page {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+.applications-list {
+  flex: 1 1 360px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6) 0 var(--space-6) var(--space-6);
+}
+
+.applications-detail-pane {
+  flex: 1 1 480px;
+  min-width: 0;
+  padding: var(--space-6) var(--space-6) var(--space-6) 0;
+}
+
+.app-entry-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.app-entry-row--selected {
+  box-shadow: 0 0 0 2px var(--focus), var(--shadow-1);
+}
+
+.app-entry-open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  /* flex-basis 200px, not "auto": in the list-plus-detail-plus-viewer
+     split (the list pane can be ~280px wide, § 5.6 "Jobs and
+     Applications... the mockup's list-plus-detail layout"), "auto"
+     would size this against its own (very wide) unwrapped content,
+     losing almost the whole row to `.app-entry-ask`'s flex: none width
+     — found live, this stage's own build: the role label wrapped one
+     character per line. `flex-wrap: wrap` on the row (above) lets the
+     ask button drop to its own line instead when both can't fit. */
+  flex: 1 1 200px;
+  min-width: 0;
+  background: none;
+  border: none;
+  text-align: left;
+  padding: var(--space-2);
+  min-height: 44px;
+}
+
+.app-entry-tile {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--hero);
+  color: var(--on-hero);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 15px var(--font-display);
+}
+
+.app-entry-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-entry-label {
+  font: var(--type-card-title);
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.app-entry-unlinked {
+  font: var(--type-meta);
+  color: var(--fg-muted);
+}
+
+.app-entry-stage-pill {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  box-shadow: 0 0 0 1px var(--border);
+  font: var(--type-small);
+  color: var(--fg-muted);
+}
+
+.app-entry-tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.app-entry-score {
+  font: var(--type-number);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+.app-entry-ask {
+  flex: none;
+}
+
+.app-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  padding: var(--space-5) var(--space-6);
+}
+
+.app-detail-back {
+  display: none;
+  align-self: flex-start;
+}
+
+.app-detail-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.app-detail-title {
+  margin: 0;
+  font: var(--type-card-title);
+  color: var(--fg);
+}
+
+.app-detail-tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-detail-files {
+  background: var(--bg-canvas);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.app-detail-section h3 {
+  margin: 0 0 var(--space-3);
+  font: var(--type-card-title);
+  color: var(--fg);
+}
+
+.app-two-notes-files {
+  font: var(--type-body-sm);
+  color: var(--fg-muted);
+}
+
+.app-inline-error {
+  max-width: none;
+}
+
+/* ---- The stage steps (design-web-ui.md § 5.3, "Pieces the pages
+   share"; the mockup's `.stepper` shape). No check marks, no dates — a
+   dot and a label per step, the current one marked with weight and ink,
+   every other step drawn alike whether before or after it. Shared by
+   Applications' own detail today; Jobs and Home reuse the same classes
+   once their own stages wire the StageSteps component in. ---- */
+
+.stage-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: var(--type-small);
+  color: var(--fg-subtle);
+}
+
+.stage-step:not(:last-child)::after {
+  content: "";
+  width: 16px;
+  height: 1px;
+  background: var(--border-strong);
+  margin-left: var(--space-2);
+}
+
+.stage-step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+}
+
+.stage-step--current {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.stage-step--current .stage-step-dot {
+  background: var(--fg);
+}
+
+/* ---- The coverage table (§ 5.3 Applications detail, part 5; § 5.6 "To
+   restore": "the mockup's table.cover"). Plain, left-aligned; the status
+   and decision columns carry a static label, never the raw file
+   word. ---- */
+
+.app-coverage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--type-body-sm);
+}
+
+.app-coverage-table th {
+  text-align: left;
+  font: var(--type-small);
+  color: var(--fg-muted);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-coverage-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.app-coverage-table tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---- The cut list (§ 5.3 Applications detail, part 6; § 5.6 "To
+   restore": "the mockup's ol.cuts"). "From <role>" (AP13), the whole
+   bullet, then its why — the same rows `proposal_block` printed in the
+   reply. ---- */
+
+.app-cut-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.app-cut-list li {
+  font: var(--type-body-sm);
+}
+
+.app-cut-from {
+  margin: 0;
+  font: var(--type-small);
+  color: var(--fg-muted);
+}
+
+.app-cut-bullet {
+  margin: 2px 0;
+  color: var(--fg);
+}
+
+.app-cut-why {
+  margin: 0;
+  color: var(--fg-subtle);
+  font-style: italic;
+}
+
+@container frame (max-width: 760px) {
+  /* "Jobs, Applications and Documents are the list alone. A file opens
+     the sheet above" (§ 5.5) — the list/detail split becomes one column
+     at a time, switched by whether an entry is chosen; "Back to
+     Applications" (AP15) returns to the list. */
+  .applications-page {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .applications-list,
+  .applications-detail-pane {
+    width: 100%;
+    padding: var(--space-4);
+  }
+
+  .applications-page:not(.applications-page--detail-open) .applications-detail-pane {
+    display: none;
+  }
+
+  .applications-page.applications-page--detail-open .applications-list {
+    display: none;
+  }
+
+  .app-detail-back {
+    display: inline-flex;
+  }
+}
+/* ---- END Applications ---- */

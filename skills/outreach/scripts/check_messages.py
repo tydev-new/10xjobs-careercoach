@@ -41,7 +41,10 @@ THANKYOU_WORD_LIMIT = 120     # eval.md § Channel limits: thank-you note
 # filled-glyph variants read the same as the plain marks.
 MARK_NORMALIZE = str.maketrans({"✔": "✓", "✅": "✓", "✘": "✗", "❌": "✗"})
 RUBRIC_CRITERIA = ("specificity", "brevity", "ask", "value", "voice")
-RUBRIC_MARK_RE = {name: re.compile(re.escape(name) + r"\s*(\S)", re.I) for name in RUBRIC_CRITERIA}
+# honest-ceilings review ruling: the criterion name matches as a WHOLE
+# WORD only ("task"/"asked"/"values" never trigger "ask"/"value"), and a
+# colon between the name and the mark is allowed ("brevity: ✓").
+RUBRIC_MARK_RE = {name: re.compile(r"\b" + re.escape(name) + r"\b\s*:?\s*(\S)", re.I) for name in RUBRIC_CRITERIA}
 
 
 def read(path):
@@ -112,12 +115,19 @@ def draft_rubric_line(lines, end_index):
 def rubric_marks(line):
     """[(criterion, mark)] for the five rubric criteria found on a rubric
     line, after normalizing filled-glyph variants. A mark is the first
-    non-space character after the criterion name; anything elsewhere on the
-    line ("~280/300 chars", a "?" in a note) is not a mark."""
+    non-space character after the criterion name (a colon between the
+    name and the mark is allowed: "brevity: ✓"); anything elsewhere on
+    the line ("~280/300 chars", a "?" in a note) is not a mark. Matching
+    is whole-word ("task"/"asked"/"values" never trigger "ask"/"value"),
+    and only the rubric segment — everything from the line's own
+    "rubric:" label onward — is searched, so a criterion-shaped word in
+    a note before that label is never a mark (honest-ceilings review)."""
     norm = line.translate(MARK_NORMALIZE)
+    idx = norm.lower().find("rubric:")
+    segment = norm[idx + len("rubric:"):] if idx != -1 else norm
     found = []
     for name in RUBRIC_CRITERIA:
-        m = RUBRIC_MARK_RE[name].search(norm)
+        m = RUBRIC_MARK_RE[name].search(segment)
         if m:
             found.append((name, m.group(1)))
     return found

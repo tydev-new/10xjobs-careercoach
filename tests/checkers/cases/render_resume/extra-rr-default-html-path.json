@@ -1,0 +1,27 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: rr-default-html-path — html path masked (mkdtemp); pre-existing applications/resume.html must be untouched",
+ "steps": [
+  {
+   "script": "apply/scripts/render_resume.py",
+   "argv": [
+    "--md",
+    "applications/acme-resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/acme-resume.md": "# A\n\nhi\n",
+  "applications/resume.html": "PRE-EXISTING\n"
+ },
+ "expect": [
+  {
+   "stdout": "words: 2  ->  <tmp>/resume.html\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

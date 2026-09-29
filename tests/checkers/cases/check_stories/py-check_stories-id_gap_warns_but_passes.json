@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_check_stories.py::test_id_gap_warns_but_passes",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "<ws>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "stories/S001-a.md": "# story\n",
+  "stories/S003-c.md": "# story\n",
+  "storybank.md": "# Storybank\n\n## Coverage\n\n| Competency | Source | Covered by |\n|---|---|---|\n| X | [inferred] | S001 |\n\n## Stories\n\n| ID | Title | Strength | Status | Notes |\n|---|---|---|---|---|\n| S001 | A | 4 | confirmed | |\n| S003 | C | 3 | confirmed | |\n"
+ },
+ "expect": [
+  {
+   "stdout": "WARN  ID sequence gap at S002 — legal, but usually a hand-deleted row\n\n2 index row(s), 2 story file(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

@@ -1,0 +1,32 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cf-unicode-stray-order",
+ "steps": [
+  {
+   "script": "profile/scripts/check_files.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--skills",
+    "<skills>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "Zebra.txt": "x",
+  "z.txt": "x",
+  "é.txt": "x",
+  "😀.txt": "x",
+  "ｆ-notes.txt": "x"
+ },
+ "expect": [
+  {
+   "stdout": "WARN  stray file \"Zebra.txt\" — no skill reads or writes it. A second source of truth starts exactly here: if the candidate dropped it, move it to documents/ and capture it; if it holds real facts, it needs an owner; if it is scratch, move it out\nWARN  stray file \"z.txt\" — no skill reads or writes it. A second source of truth starts exactly here: if the candidate dropped it, move it to documents/ and capture it; if it holds real facts, it needs an owner; if it is scratch, move it out\nWARN  stray file \"é.txt\" — no skill reads or writes it. A second source of truth starts exactly here: if the candidate dropped it, move it to documents/ and capture it; if it holds real facts, it needs an owner; if it is scratch, move it out\nWARN  stray file \"ｆ-notes.txt\" — no skill reads or writes it. A second source of truth starts exactly here: if the candidate dropped it, move it to documents/ and capture it; if it holds real facts, it needs an owner; if it is scratch, move it out\nWARN  stray file \"😀.txt\" — no skill reads or writes it. A second source of truth starts exactly here: if the candidate dropped it, move it to documents/ and capture it; if it holds real facts, it needs an owner; if it is scratch, move it out\n\n0 file(s) checked against 11 schema(s); 0 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

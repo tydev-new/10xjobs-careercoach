@@ -1,0 +1,28 @@
+{
+ "note": "packages/checkers/test/parity.mjs: letter-informal-many-blocks (covers: test_mechanical_cases (4, 5, 6))",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--letter",
+    "<ws>/letter.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "letter.md": "# Cover letter\n\nHello —\n\nfiller filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler\n\nfiller filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler\n\nfiller filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler\n\nfiller filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler\n\nfiller filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler\n\nfiller filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler filler\n\nAlex Chen\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nLETTER letter.md: FAIL (1 fail, 1 warn)\n  [WARN] 8 blocks — max 6 (salutation + hook + 2-3 body + why-us + close)\n  [FAIL] salutation \"Hello —\" is DM register — patterns.md: \"an application letter, not a relationship DM\"; never invent a name, use \"Dear Hiring Manager\"\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

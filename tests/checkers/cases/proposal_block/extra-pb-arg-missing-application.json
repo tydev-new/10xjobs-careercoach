@@ -1,0 +1,24 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: pb-arg-missing-application",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: proposal_block.mjs [-h] --workspace WORKSPACE --application APPLICATION\n                         [--base BASE]\nproposal_block.mjs: error: the following arguments are required: --application\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

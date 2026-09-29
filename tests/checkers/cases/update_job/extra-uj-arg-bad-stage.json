@@ -1,0 +1,30 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: uj-arg-bad-stage",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Café",
+    "--title",
+    "Staff",
+    "--stage",
+    "applied"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: update_job.mjs [-h] --workspace WORKSPACE --company COMPANY\n                     --title TITLE\n                     (--stage {To Review,Interested,Applied,Interviewing,Offer} |\n                     --dismiss | --restore) [--reason REASON]\nupdate_job.mjs: error: argument --stage: invalid choice: 'applied' (choose from To Review, Interested, Applied, Interviewing, Offer)\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

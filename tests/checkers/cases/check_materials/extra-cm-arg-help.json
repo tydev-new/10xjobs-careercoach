@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-arg-help",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "-h"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "usage: check_materials.mjs [-h] --workspace WORKSPACE [--resume RESUME]\n                          [--letter LETTER] [--base BASE]\n\nMechanical pre-delivery check for tailored résumés and cover letters.\n\nThe apply skill's constraints were prose in references/patterns.md, which meant\nthey bound only if the model remembered to read them. This script makes the\ncheckable subset checkable. Run it BEFORE showing materials to the candidate.\n\n    node check_materials.mjs --workspace .         --resume applications/foo-resume.md         --letter applications/foo-cover-letter.md\n\nExit 0 = clean, 1 = at least one FAIL. WARNs never fail the run — they are\njudgment calls the agent must actively defend in its reply, not silently pass.\n\nSTRUCTURE TIER ONLY since #29 (the READ-split principle, measured by t15 —\ndocs/eval-t15-checker.md: the subagent 10/10 vs this parser's 5/10). The\nlanguage rungs (never-say, struck forms, confirm-tier) and their parsers\n(load_hazards, load_never_say, quoted_phrases) are DELETED — the rungs'\nincidents now enforced by profile/references/language-check.md, which also\ncatches the paraphrases exact-match never could. Receipts carried over:\nnever-say/struck forms earned 2026-08-17 (\"three technology eras\"); the\nhazard parser's own failure (silently loading ZERO forms, 2026-08-17) is\nthe incident that earned the deletion.\n\nEarned 2026-08-01: a tailored résumé shipped with a Summary AND a parallel\nhighlights band (the exact structure tailoring.md forbids), a 133-word case\nagainst a 7-11s scan budget, and bullets that did not open with the JD's\nphrasing. Every one of those rules was already written down.\n\nEarned 2026-08-16 (the deletion valve, issue #25): rules that had become\ncheckable were still full prose in tailoring.md — moved here, prose deleted.\nNew rungs from the first live packet: --base verifies Experience bullets are\nthe base résumé's own sentences (the verbatim-bullets law as a guarantee,\ncandidate-caught 08-16: story-blended rewrites \"feel taken out of context\");\narrow glyphs (candidate-caught 08-16); repeated Summary numbers; banned\nfiller; grad-year/stale-date age tags; duplicated Summary/Experience\nsentences.\n\nPruned 2026-08-18 (#11 guardrail sweep, the earned-FAIL bar): the\nno-opening-section WARN (never fired; its incident class is the\ntwo-opening-sections FAIL) and both checklist-shape WARNs (style\nopinion hardened into code) deleted; the two spec-born letter FAILs\n(word band, block count — never fired on a real document) demoted to\nWARN until an incident promotes them.\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n                        dir holding voice.md + base-resume.md\n  --resume RESUME\n  --letter LETTER\n  --base BASE           base résumé path; defaults to <workspace>/base-\n                        resume.md when present — verifies Experience bullets\n                        verbatim\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

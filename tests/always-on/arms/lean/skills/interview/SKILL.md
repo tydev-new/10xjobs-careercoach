@@ -65,7 +65,7 @@ A fabricated drill answer is named directly, not polished.
 
 ## Session close
 
-Run `../profile/scripts/check_files.py --workspace .`; fix a FAIL
+Run `../profile/scripts/check_files.mjs --workspace .`; fix a FAIL
 before the reply ends. Report outcomes, never narration.
 
 *Every reply ends with ONE contextual next step — a sentence with its why, not a menu.*

@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_every_class_character_collapses_and_trims_everywhere_both_runtimes (jobs_md.save, as _both_save calls it)",
+ "steps": [
+  {
+   "script": "search/scripts/jobs_md.py",
+   "argv": [
+    "save",
+    "<ws>",
+    "[{\"company\": \" Acme  Co \", \"title\": \"  Staff  Engineer \", \"stage\": \"To Review\", \"dismissed\": false, \"url\": \" a  b \", \"location\": \" a  b \", \"posted_at\": \" a  b \", \"seen_at\": \" a  b \", \"updated_at\": \" a  b \", \"fit_verdict\": \" a  b \", \"fit_reason\": \" a  b \", \"dealbreakers\": \" a  b \", \"track\": \" a  b \", \"flags\": \" a  b \", \"jd_sim\": \" a  b \", \"jd_file\": \" a  b \", \"analysis_file\": \" a  b \", \"company_file\": \" a  b \", \"evaluated_at\": \" a  b \"}]",
+    "null"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme Co — Staff Engineer\n- URL: a b\n- Location: a b\n- Posted: a b\n- Seen: a b\n- Updated: a b\n- Verdict: a b\n- Reason: a b\n- Dealbreakers: a b\n- Track: a b\n- Flags: a b\n- Sim: a b\n- JD: a b\n- Analysis: a b\n- Company file: a b\n- Evaluated: a b\n"
+ }
+}

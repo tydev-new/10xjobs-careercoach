@@ -42,6 +42,7 @@ skill.
 | Blanket assent is not a yes on a specific new bullet | 2026-08-16 — the Medtronic-negotiation bullet; candidate rejected it after "use it wherever it helps"; baited in t10 |
 | Panel reviewers get SOURCE documents, never the author's summary | 2026-08-16 — candidate-requested; the judge-inputs rule applied to personas |
 | The renderer owns the markup | 2026-08-18 — a hand-rolled renderer shipped literal `**` and split wrapped prose into one-line paragraphs |
+| Never-say/struck forms and their parsers (`load_hazards`, `load_never_say`, `quoted_phrases`) were deleted from the structure-tier checker (#29, the READ-split principle, measured by t15: the subagent scored 10/10 vs this parser's 5/10) — the rungs' incidents are now enforced by `profile/references/language-check.md`, which also catches the paraphrases exact-match never could | never-say/struck forms earned 2026-08-17 ("three technology eras"); the hazard parser's own failure (silently loading ZERO forms, 2026-08-17) is the incident that earned the deletion |
 
 ## profile
 
@@ -76,6 +77,12 @@ skill.
 | A checker reply that is not the JSON table is VOID, not a pass | t15b — one malformed reply in 30 |
 | `source-check.md` deleted 2026-08-19 | its rules 1-3 restated the always-on guardrail, rule 4 was already fully in `intake.md`, its independence claim borrowed t4/t15 receipts that measured different things, it had no harness case, and it made `t4-intake`'s expectation unsatisfiable |
 | Every reply, and every `plan.md` line, is in everyday words — script names, table labels and skill-coined terms stay out of the candidate's ear | owner ruling 2026-09-26 (`docs/design-plain-replies.md`, shown two versions of the same `mvp-journey` conversation side by side): today's fixture voice leaked `render_resume`, `check_materials`'s "mechanical checks", "the language check", a bare `Track A` letter, and "jobs.md"/"plan.md" doing double duty as both file name and the thing's own name. It binds in § How you talk (Tier 0), not coach, because coach isn't loaded on those turns — the leaks come from apply and evaluate turns, and only one skill loads at a time, by description match — goals doc § 2: a guardrail that must fire before its own skill loads is always-on. Measured: profile turn 2,971 → 3,066 words (`tests/agent/loading.test.ts`), inside the ~3,300 cap. **UNMEASURED** at commit time: the harness arms (A/B, § 4) that prove the skills actually produce the plain form and that it costs no fact — the lead runs one trial first (owner, 2026-09-26) before the full run |
+
+## search
+
+| Rule | Incident |
+|---|---|
+| `migrate_jobs_db.py` retired, not ported (J2): its job was a one-shot — "One-shot: convert a legacy jobs.db into the jobs.md record (2026-08-14)." Backed the database up to `jobs.db.bak` and deleted the original once SQLite stopped being a persistent store; safe to re-run (a no-op once `jobs.db` is gone). No live workspace still needs it, so there is no JS equivalent to hold this line | 2026-08-14 — storage moved from `jobs.db` to `jobs.md`; the shared record library (`jobs_md`/`jobs-md.mjs`) lives with the search skill, the pipeline's writer of first entry |
 
 ## Cross-cutting laws
 

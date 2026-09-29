@@ -1,0 +1,31 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-uj-sort-dismissed-astral",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Café",
+    "--title",
+    "Staff",
+    "--dismiss"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## Dismissed\n\n### 😀co — PM\n- Was: To Review\n\n### ￠co — PM\n- Was: Applied\n\n## To Review\n\n### Café — Staff Engineer\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "jobs.md: duplicate role ￠co — PM (canonical collision with 😀co — PM)\n",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

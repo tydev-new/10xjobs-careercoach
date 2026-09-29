@@ -6,8 +6,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import * as cf from "../../src/check-files.mjs";
-import { nodeIo } from "../../src/io-node.mjs";
+import * as cf from "../../../../skills/profile/scripts/lib/check-files.mjs";
+import { nodeIo } from "../../../../skills/profile/scripts/lib/io-node.mjs";
 import { makeFakeIo } from "./fake-io.mjs";
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -216,7 +216,7 @@ test("history headers stay in sync with the owning skill's own prose (loud-fail 
 });
 
 async function allMdUnder(dir) {
-  const { walkFilesRecursive } = await import("../../src/fs-walk.mjs");
+  const { walkFilesRecursive } = await import("../../../../skills/profile/scripts/lib/fs-walk.mjs");
   return walkFilesRecursive(nodeIo, dir, ".md");
 }
 

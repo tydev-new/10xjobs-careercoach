@@ -1,0 +1,32 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_empty_company_or_title_after_cleaning_refused_exit_2_nothing_written_both_runtimes",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--company",
+    "Beta",
+    "--title",
+    " \t\n   ",
+    "--verdict",
+    "weak",
+    "--score",
+    "5"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: empty company or title after cleaning; nothing written\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

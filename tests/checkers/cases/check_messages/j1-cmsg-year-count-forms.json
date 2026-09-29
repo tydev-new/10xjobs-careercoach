@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): YEAR_COUNT forms: +, spaces, case, three digits, curly quotes, one digit",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "contacts/acme.md": "> 15+ years here.\n\nx\n\n> 20 + years there.\n\nx\n\n> 30 YEARS of work.\n\nx\n\n> 100 years is not two digits.\n\nx\n\n> “12+ years” in curly quotes is exempt.\n\nx\n\n> 5 years is one digit.\n",
+  "pitch.md": "# P\n\n## Messages rubric\n\nPINNED 2026-08-17\n| tier | claim |\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: FAIL (3 fail, 0 warn, 6 drafts)\n  [FAIL] draft 1: aggregate year count \"15+ years\" — the age tag; answer with outcomes, not tenure (a double-quoted JD bar is exempt)\n  [INFO] draft 1: 15 chars / 3 words\n  [FAIL] draft 2: aggregate year count \"20 + years\" — the age tag; answer with outcomes, not tenure (a double-quoted JD bar is exempt)\n  [INFO] draft 2: 17 chars / 4 words\n  [FAIL] draft 3: aggregate year count \"30 YEARS\" — the age tag; answer with outcomes, not tenure (a double-quoted JD bar is exempt)\n  [INFO] draft 3: 17 chars / 4 words\n  [INFO] draft 4: 28 chars / 6 words\n  [INFO] draft 5: 38 chars / 7 words\n  [INFO] draft 6: 21 chars / 5 words\n✘ fix the FAILs before finalizing\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

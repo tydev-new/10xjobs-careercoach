@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): lone CR line endings (universal newlines)",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\r\r## Map\r\r| Topic | Scope | Source | Status |\r|---|---|---|---|\r| X | track-A | s | gap |\r| Y | bad | s | gap |\r"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  Y: bad scope 'bad' — `track-<lane>` or `role: <key>` (plain hyphens)\n\n2 map row(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

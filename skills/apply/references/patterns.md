@@ -36,19 +36,19 @@ reaches it fastest, earned over the 2026-08 rounds.
    claim; "no" is a recorded answer; cap at ~5 by the JD's weighting.
    Selection rows: every bullet in or out; the `out` rows are the cut
    list, **weakest-first for THIS posting**, each `why` saying what the
-   cut buys. `proposal_block.py` WARNs a `have` whose JD word is absent
+   cut buys. `proposal_block.mjs` WARNs a `have` whose JD word is absent
    from the base, and `out` rows left in base order.
 4. **Assemble with your defaults** — cuts as selected; each
    `shown-but-unnamed` word placed where it does most (Summary, Skills
    line, or a bolded opener; bullets stay verbatim). The letter is
    always drafted — it doubles as outreach material; the form decides
    where it goes, never whether it exists.
-5. **Render and measure** (`render_resume.py`), then the checks and
+5. **Render and measure** (`render_resume.mjs`), then the checks and
    the panel per `eval.md § The panel — three lenses`. Each lens
    returns `lens · finding` rows, you add the outcome, every finding
    ends fixed or discarded-with-why.
 6. **Deliver with the decisions beside it**: the `.md` path and the
-   PDF, the rubric line, then the `proposal_block.py` list, then the
+   PDF, the rubric line, then the `proposal_block.mjs` list, then the
    sentence that makes reversal cheap — *"say 'keep the onboarding
    guide' or 'ship it at two pages' and I'll restore and re-render;
    otherwise this is the version."*
@@ -110,7 +110,7 @@ base.
   never carries Ten's own labels (a verdict tier, a track name, a round
   count); the wording check's `search_jargon` rule holds the list.
 - **No arrows**: write it in words ("from six months to one month");
-  `check_materials.py` and `check_messages.py` FAIL arrow glyphs and
+  `check_materials.mjs` and `check_messages.py` FAIL arrow glyphs and
   ASCII arrow chains.
 
 ### The Summary — why it exists, and the least that does the job
@@ -164,7 +164,7 @@ the tailored document.
 
 A Letter page fits roughly 520–560 words at the shipped type size, so 2
 pages ≈ 1,050 words of visible text including headings; state the
-budget in the audit block and draft against it. `render_resume.py`
+budget in the audit block and draft against it. `render_resume.mjs`
 measures. The page target is soft: over it, the `out` rows are the cut list, weakest-first for THIS posting, each saying what it buys, delivered beside the document with the page choice — and if the candidate would rather ship three pages, that is their call, not a defect. An over-long render is fixed
 upstream in the `.md`, never by shrinking the font.
 
@@ -234,7 +234,7 @@ and respect its never-say list.
 
 ## The PDF — ATS-safe rendering
 
-`scripts/render_resume.py` owns the markup, the escaping, and the
+`scripts/render_resume.mjs` owns the markup, the escaping, and the
 measurement; never hand-roll the HTML at delivery (both formatting bugs
 that reached a candidate on 2026-08-18 came from a renderer improvised
 per run). The template contract it implements: single column; no

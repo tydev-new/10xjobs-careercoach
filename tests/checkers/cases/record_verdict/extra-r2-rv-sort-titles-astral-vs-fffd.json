@@ -1,0 +1,32 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-rv-sort-titles-astral-vs-fffd",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Zed",
+    "--title",
+    "PM",
+    "--verdict",
+    "weak"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Acme — � lead\n\n### Acme — 😀 lead\n\n### Acme — ａ lead\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "jobs.md: duplicate role Acme — 😀 lead (canonical collision with Acme — � lead)\n",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

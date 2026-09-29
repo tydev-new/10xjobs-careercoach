@@ -4,7 +4,7 @@
 // Python script.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { checkResume, checkLetter } from "../../src/check-materials.mjs";
+import { checkResume, checkLetter } from "../../../../skills/apply/scripts/lib/check-materials.mjs";
 
 const RESUME_TWO_SECTIONS = `# Alex Chen
 

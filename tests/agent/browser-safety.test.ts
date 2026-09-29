@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { builtinModules } from "node:module";
-import { cpSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -165,4 +165,158 @@ test("mutants: the package's own lint (test/no-forbidden-imports.test.ts) fails 
     if (!theirLintCatches(mutantCopy(code))) missed.push(name);
   }
   assert.deepEqual(missed, [], "the package's lint passed these mutants");
+});
+
+// ------------------------------------------------------------------ skills/*/scripts/lib (JS-only J2)
+// docs/design-js-only.md § 2: "A file under `scripts/lib/` imports no `node:`
+// module, except `profile/scripts/lib/io-node.mjs`, which only the command
+// files import. `tests/agent/browser-safety.test.ts` is widened to scan
+// `skills/*/scripts/lib/` with that one named exception." § 6 J2 *Exit*: "the
+// browser-safety lint covers `skills/*/scripts/lib/`". The web dispatch
+// (packages/checkers/src/dispatch.mjs) imports these files into the browser.
+
+const LIB_EXCEPTION = "profile/scripts/lib/io-node.mjs"; // relative to skills/
+const NODE_ONLY_GLOBALS = ["Buffer", "process", "require", "__dirname", "__filename"];
+
+function libFiles(skillsRoot: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const abs = path.join(dir, name);
+      if (statSync(abs).isDirectory()) walk(abs);
+      else if (/\.(mjs|js|ts)$/.test(name)) out.push(abs);
+    }
+  };
+  for (const skill of readdirSync(skillsRoot)) {
+    const lib = path.join(skillsRoot, skill, "scripts", "lib");
+    if (existsSync(lib)) walk(lib);
+  }
+  return out.sort();
+}
+
+/** Bundle every lib file (the exception left out) for the browser and report
+ *  (a) every node:/builtin/Supabase import in the graph, (b) every module
+ *  reached that is the exception or not a lib file at all (a lib importing a
+ *  command file would pull its node:child_process in), and (c) any Node-only
+ *  global used in a lib file. */
+async function scanSkillLibs(skillsRootIn: string) {
+  const skillsRoot = realpathSync(skillsRootIn);
+  const exception = path.join(skillsRoot, LIB_EXCEPTION);
+  const inputs = libFiles(skillsRoot).filter((f) => f !== exception);
+  const { rolldown } = await import(path.join(REPO, "apps/web/node_modules/rolldown/dist/index.mjs"));
+  const edges: Array<{ importer: string; source: string }> = [];
+  const modules = new Set<string>();
+  const bundle = await rolldown({
+    input: inputs,
+    platform: "browser",
+    logLevel: "silent",
+    plugins: [{
+      name: "record",
+      resolveId(source: string, importer: string | undefined) {
+        if (importer) edges.push({ importer, source });
+        if (BUILTINS.has(source) || source.startsWith("node:")) return { id: source, external: true };
+        return null;
+      },
+      load(id: string) { modules.add(id); return null; },
+    }],
+  });
+  const out = await bundle.generate({ format: "esm" });
+  for (const o of out.output) for (const id of (o as any).moduleIds ?? []) modules.add(id);
+  await bundle.close?.();
+  const rel = (f: string) => path.relative(skillsRoot, f);
+  const badImports = edges
+    .filter((e) => BUILTINS.has(e.source) || e.source.startsWith("node:") || e.source.includes("@supabase/"))
+    .map((e) => `${rel(e.importer)} -> ${e.source}`);
+  const notLib = [...modules]
+    .filter((m) => !m.startsWith("node:") && !BUILTINS.has(m) && !m.startsWith("\0"))
+    .filter((m) => m === exception || !m.startsWith(skillsRoot) || !/\/scripts\/lib\//.test(m))
+    .map(rel);
+  const globals: string[] = [];
+  for (const f of inputs) {
+    const src = ts.createSourceFile(f, readFileSync(f, "utf8"), ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS);
+    const visit = (n: any) => {
+      if (ts.isIdentifier(n) && NODE_ONLY_GLOBALS.includes(n.text)) {
+        const p = n.parent;
+        const isPropName = (ts.isPropertyAccessExpression(p) && p.name === n) || (ts.isPropertyAssignment(p) && p.name === n) || (ts.isMethodDeclaration?.(p) && p.name === n);
+        const isDecl = (ts.isVariableDeclaration(p) || ts.isParameter(p) || ts.isFunctionDeclaration(p) || ts.isImportSpecifier(p)) && p.name === n;
+        if (!isPropName && !isDecl) globals.push(`${rel(f)}:${src.getLineAndCharacterOfPosition(n.getStart()).line + 1} ${n.text}`);
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(src);
+  }
+  // Browser globals too (S2 review: a `window` planted in a lib passed this
+  // scan and the package lint). A lib runs in Node as well as the browser
+  // (the command files import it), where `window`/`document`/`localStorage`
+  // do not exist: the same globalUses() the agent package is held to.
+  const browserGlobals = inputs.flatMap((f) => globalUses(f).map((h) => `${path.relative(skillsRoot, path.dirname(f))}/${h}`));
+  return { inputs: inputs.map(rel), badImports, notLib, globals, browserGlobals };
+}
+
+test("skills/*/scripts/lib: a browser bundle of every lib file reaches no node:/builtin/Supabase import, no command file, and not io-node.mjs; no Node-only or browser global", async () => {
+  const r = await scanSkillLibs(path.join(REPO, "skills"));
+  assert.ok(r.inputs.length >= 15, `scanned ${r.inputs.length} lib files`);
+  for (const must of ["apply/scripts/lib/check-materials.mjs", "profile/scripts/lib/shapecheck.mjs", "search/scripts/lib/jobs-md.mjs", "coach/scripts/lib/check-closeout.mjs"]) {
+    assert.ok(r.inputs.includes(must), `${must} is scanned`);
+  }
+  assert.deepEqual(r.badImports, []);
+  assert.deepEqual(r.notLib, []);
+  assert.deepEqual(r.globals, []);
+  assert.deepEqual(r.browserGlobals, []);
+  console.log(`[tester] skills lib scan: ${r.inputs.length} files`);
+});
+
+test("skills/*/scripts/lib: the one exception is named, exists, is Node-only, and no lib file imports it", () => {
+  const skills = path.join(REPO, "skills");
+  const exc = path.join(skills, LIB_EXCEPTION);
+  assert.ok(existsSync(exc), `${LIB_EXCEPTION} exists (a stale exception would be silent)`);
+  assert.match(readFileSync(exc, "utf8"), /from "node:fs"/, "the exception really is Node-only");
+  // real import/export-from statements only (a JSDoc `import("…")` type is a comment)
+  const importers = libFiles(skills).filter((f) => {
+    if (f === exc) return false;
+    const src = ts.createSourceFile(f, readFileSync(f, "utf8"), ts.ScriptTarget.ES2022, true, ts.ScriptKind.JS);
+    return src.statements.some((s: any) => (ts.isImportDeclaration(s) || ts.isExportDeclaration(s)) && s.moduleSpecifier && /io-node\.mjs$/.test(s.moduleSpecifier.text));
+  });
+  assert.deepEqual(importers.map((f) => path.relative(skills, f)), []);
+});
+
+const LIB_MUTANTS: Record<string, string> = {
+  "node:fs import": 'import { readFileSync as __r } from "node:fs";\nexport const __m = __r;\n',
+  "multi-line node:fs import": 'import {\n  readFileSync as __r,\n} from "node:fs";\nexport const __m = __r;\n',
+  "side-effect node import": 'import "node:path";\n',
+  "bare builtin import": 'import { spawn as __s } from "child_process";\nexport const __m = __s;\n',
+  "dynamic node import": 'export const __m = () => import("node:fs");\n',
+  "lib imports io-node.mjs": 'import { nodeIo as __io } from "../../../profile/scripts/lib/io-node.mjs";\nexport const __m = __io;\n',
+  "lib imports a command file": 'import "../render_resume.mjs";\n',
+  "process.env in a lib": "export const __m = () => process.env.HOME;\n",
+  "Buffer in a lib": 'export const __m = () => Buffer.from("x");\n',
+  "window in a lib": "export const __m = () => window.location.href;\n",
+  "typeof window in a lib": 'export const __m = typeof window !== "undefined";\n',
+  "document in a lib": 'export const __m = () => document.createElement("a");\n',
+  "localStorage in a lib": 'export const __m = () => localStorage.getItem("k");\n',
+  "globalThis.localStorage in a lib": "export const __m = () => globalThis.localStorage;\n",
+  "destructured document in a lib": "const { document: __d } = globalThis;\nexport const __m = __d;\n",
+  "navigator in a lib": "export const __m = () => navigator.userAgent;\n",
+};
+
+function skillsCopy(target: string, code: string): string {
+  const root = tmp("skills-lib-mutant-");
+  cpSync(path.join(REPO, "skills"), path.join(root, "skills"), { recursive: true });
+  const f = path.join(root, "skills", target);
+  writeFileSync(f, code + readFileSync(f, "utf8"));
+  return path.join(root, "skills");
+}
+
+test("skills lib mutants: a planted node:fs import (and each sibling form) in a lib file fails the scan", async () => {
+  const missed: string[] = [];
+  for (const [name, code] of Object.entries(LIB_MUTANTS)) {
+    const r = await scanSkillLibs(skillsCopy("apply/scripts/lib/check-materials.mjs", code));
+    if (!(r.badImports.length || r.notLib.length || r.globals.length || r.browserGlobals.length)) missed.push(name);
+  }
+  assert.deepEqual(missed, []);
+  // controls: a harmless mutant passes, and so does a node: import in the named exception
+  const ok = await scanSkillLibs(skillsCopy("apply/scripts/lib/check-materials.mjs", "export const __m = 1;\n"));
+  assert.deepEqual([ok.badImports, ok.notLib, ok.globals, ok.browserGlobals], [[], [], [], []]);
+  const exc = await scanSkillLibs(skillsCopy(LIB_EXCEPTION, 'import { stat as __s } from "node:fs/promises";\nexport const __m = __s;\n'));
+  assert.deepEqual([exc.badImports, exc.notLib, exc.globals, exc.browserGlobals], [[], [], [], []]);
 });

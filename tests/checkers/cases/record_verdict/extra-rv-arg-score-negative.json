@@ -1,0 +1,32 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: rv-arg-score-negative",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Acme",
+    "--title",
+    "Staff Engineer",
+    "--verdict",
+    "strong",
+    "--score",
+    "-5"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: --score must be 0-100\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

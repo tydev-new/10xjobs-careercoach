@@ -1,9 +1,9 @@
 {
   "meta": {
     "persona": "Sam Okafor (invented) — sam.okafor.demo@example.com, 555-0119",
-    "description": "A batch evaluation run stops mid-way when the model proxy refuses the NEXT call because the balance is not above 0 (design-web-agent.md § 8) — a pre-call refusal, not OpenRouter rejecting a call mid-run. So there is no model reply after it: the turn ends right after the second role's verdict card, with no trailing tool call and no trailing text (design-web-ui.md § 2.5/§ 4 — never a reply composed after the refusal). Each exit-0 record_verdict call gets its own verdict card, props built from that call's real output and the jobs.md row it wrote (company, title, verdict, score, reason; no track/dealbreakers/ref since neither call passed --track/--dealbreakers/--jd-file). files holds the real jobs.md produced by actually running record_verdict.py for the two roles that finished before the run stopped."
+    "description": "A batch evaluation run stops mid-way when the model proxy refuses the NEXT call because the balance is not above 0 (design-web-agent.md § 8) — a pre-call refusal, not OpenRouter rejecting a call mid-run. So there is no model reply after it: the turn ends right after the second role's verdict card, with no trailing tool call and no trailing text (design-web-ui.md § 2.5/§ 4 — never a reply composed after the refusal). Each exit-0 record_verdict call gets its own verdict card, props built from that call's real output and the jobs.md row it wrote (company, title, verdict, score, reason; no track/dealbreakers/ref since neither call passed --track/--dealbreakers/--jd-file). files holds the real jobs.md produced by actually running record_verdict.mjs for the two roles that finished before the run stopped."
   },
-  "files": {"jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.py moves,\nrecord_verdict.py judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 2** · dismissed: 0 · updated 2026-09-22\n\n## To Review\n\n### Meridian Labs — Product Lead\n- Seen: 2026-09-22T22:22:26+00:00\n- Updated: 2026-09-22T22:22:26+00:00\n- Verdict: investable_stretch\n- Score: 64\n- Reason: Series B stage matches target; one leveling gap\n- Evaluated: 2026-09-22T22:22:26+00:00\n\n### Solterra Robotics — Group PM\n- Seen: 2026-09-22T22:22:26+00:00\n- Updated: 2026-09-22T22:22:26+00:00\n- Verdict: weak\n- Score: 31\n- Reason: Hardware-heavy roadmap, little overlap with candidate's SaaS background\n- Evaluated: 2026-09-22T22:22:26+00:00\n"},
+  "files": {"jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 2** · dismissed: 0 · updated 2026-09-22\n\n## To Review\n\n### Meridian Labs — Product Lead\n- Seen: 2026-09-22T22:22:26+00:00\n- Updated: 2026-09-22T22:22:26+00:00\n- Verdict: investable_stretch\n- Score: 64\n- Reason: Series B stage matches target; one leveling gap\n- Evaluated: 2026-09-22T22:22:26+00:00\n\n### Solterra Robotics — Group PM\n- Seen: 2026-09-22T22:22:26+00:00\n- Updated: 2026-09-22T22:22:26+00:00\n- Verdict: weak\n- Score: 31\n- Reason: Hardware-heavy roadmap, little overlap with candidate's SaaS background\n- Evaluated: 2026-09-22T22:22:26+00:00\n"},
   "messages": [
     {
       "id": "m1",
@@ -33,7 +33,7 @@
             { "url": "https://news.example.com/meridian-labs", "title": "Meridian Labs raises Series B", "excerpt": "Meridian Labs closed a Series B in early 2026." }
           ] } },
         { "type": "tool-bash", "toolCallId": "call-3", "state": "output-available",
-          "input": { "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Meridian Labs\" --title \"Product Lead\" --verdict investable_stretch --score 64 --reasons \"Series B stage matches target; one leveling gap\"" },
+          "input": { "command": "node evaluate/scripts/record_verdict.mjs --workspace . --company \"Meridian Labs\" --title \"Product Lead\" --verdict investable_stretch --score 64 --reasons \"Series B stage matches target; one leveling gap\"" },
           "output": { "stdout": "recorded (created NEW role): Meridian Labs — Product Lead → investable_stretch (64)", "stderr": "", "exitCode": 0, "changed": ["jobs.md"] } },
         { "type": "data-card", "data": { "card": "verdict", "props": {
           "company": "Meridian Labs",
@@ -49,7 +49,7 @@
             { "url": "https://reviews.example.com/solterra-robotics", "title": "Solterra Robotics employee reviews", "excerpt": "Hardware-heavy roadmap, long build cycles." }
           ] } },
         { "type": "tool-bash", "toolCallId": "call-5", "state": "output-available",
-          "input": { "command": "python3 evaluate/scripts/record_verdict.py --workspace . --company \"Solterra Robotics\" --title \"Group PM\" --verdict weak --score 31 --reasons \"Hardware-heavy roadmap, little overlap with candidate's SaaS background\"" },
+          "input": { "command": "node evaluate/scripts/record_verdict.mjs --workspace . --company \"Solterra Robotics\" --title \"Group PM\" --verdict weak --score 31 --reasons \"Hardware-heavy roadmap, little overlap with candidate's SaaS background\"" },
           "output": { "stdout": "recorded (created NEW role): Solterra Robotics — Group PM → weak (31)", "stderr": "", "exitCode": 0, "changed": ["jobs.md"] } },
         { "type": "data-card", "data": { "card": "verdict", "props": {
           "company": "Solterra Robotics",

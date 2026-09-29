@@ -1,0 +1,30 @@
+{
+ "note": "tests/test_check_closeout.py::test_stage_auto_inferred",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--asked",
+    "which mutual to Flo",
+    "--asked",
+    "your comp floor"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "Goal: x by 2026-10-01\nBudget: 60 min/day\n\n## Board\nWaiting on you\n- the comp floor — criteria.md § Compensation\n- warm-path pick: which of the three mutuals to Flo\nTo do\n- review the Corvid letter (10 min)\n"
+ },
+ "expect": [
+  {
+   "stdout": "close-out clean: stage groundwork; plan.md written; 2 question(s) each have a row\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

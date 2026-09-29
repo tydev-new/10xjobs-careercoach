@@ -27,5 +27,5 @@ Read `voice.md` alongside — it holds how this candidate actually writes.
 Rules for one kind of artifact (letter structure, channel limits, ATS
 openers) live with that artifact.
 
-Checkers: `../../apply/scripts/check_materials.py` and
+Checkers: `../../apply/scripts/check_materials.mjs` and
 `../../outreach/scripts/check_messages.py`.

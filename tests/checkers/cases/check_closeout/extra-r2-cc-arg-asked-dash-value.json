@@ -1,0 +1,30 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-cc-arg-asked-dash-value",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--stage",
+    "applying",
+    "--asked",
+    "-x"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "## Board\nWaiting on you\n- the comp floor\nTo do\n- x\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.mjs: error: argument --asked: expected one argument\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

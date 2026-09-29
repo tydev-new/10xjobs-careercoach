@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_search_s1_tester.py::test_s1_crlf_file_round_trips_the_same_both_runtimes (jobs_md.load then save, as _both_roundtrip calls it)",
+ "steps": [
+  {
+   "script": "search/scripts/jobs_md.py",
+   "argv": [
+    "roundtrip",
+    "<ws>"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\r\n\r\n*The record. Script-written (search sweeps, update_job.mjs moves,\r\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\r\nthe duplicate-key check can protect it. Dismissed roles keep their\r\nhistory at the bottom; nothing is ever deleted.*\r\n\r\n**Active: 2** · dismissed: 0 · updated 2026-09-23\r\n\r\n## To Review\r\n\r\n### Acme — Staff Engineer\r\n- URL: https://x/1\r\n- Location: Remote\r\n\r\n## Applied\r\n\r\n### Beta — PM\r\n\r\n## Search notes\r\n\r\nline one\r\nline two\r\n"
+ },
+ "expect": [
+  {
+   "stdout": "[{\"_raw\":\"### Acme — Staff Engineer\\n- URL: https://x/1\\n- Location: Remote\",\"company\":\"Acme\",\"dismissed\":false,\"fit_score\":null,\"location\":\"Remote\",\"stage\":\"To Review\",\"title\":\"Staff Engineer\",\"url\":\"https://x/1\"},{\"_raw\":\"### Beta — PM\",\"company\":\"Beta\",\"dismissed\":false,\"fit_score\":null,\"stage\":\"Applied\",\"title\":\"PM\"}]\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 2** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### Acme — Staff Engineer\n- URL: https://x/1\n- Location: Remote\n\n## Applied\n\n### Beta — PM\n\n## Search notes\n\nline one\nline two\n"
+ }
+}

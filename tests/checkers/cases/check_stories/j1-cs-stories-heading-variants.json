@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): ## Stories... opens the table; other ## headings close it",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "stories/S001-a.md": "# s\n",
+  "stories/S002-a.md": "# s\n",
+  "storybank.md": "# Storybank\n\n## Stories (12)\n\n| ID | Status |\n|---|---|\n| S001 | confirmed |\n\n## Story bank\n\n| ID | Status |\n|---|---|\n| bad | x |\n\n## STORIES\n\n| ID | Status |\n|---|---|\n| S002 | nope |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  S002: invalid Status 'nope' — `confirmed` or `draft [source: <file>]`\n\n2 index row(s), 2 story file(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

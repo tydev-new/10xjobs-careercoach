@@ -104,9 +104,10 @@ flowchart TD
   browser-only or Node-only imports, so the same loop can later run on a
   server. A test fails if that rule breaks.
 - **The skills are bundled into the site at build time,** read-only. The
-  checker scripts they call run as JavaScript ports (`packages/checkers`)
-  behind a fake `python3` command. A parity test keeps the ports matching
-  the Python (C § 5).
+  checker scripts they call run through the `node` dispatch
+  (`packages/checkers`) — the same module the local host runs. Expected-
+  output cases (`tests/checkers/`) keep the web and local paths matching
+  (C § 5).
 - **Vercel only serves static files,** including `version.json`, which
   open tabs read to spot a newer build (C § 10). Supabase holds
   everything with state (C § 8).
@@ -339,7 +340,7 @@ settings: [`apps/web/README.md`](../apps/web/README.md).
 | To change… | Edit | Contract |
 |---|---|---|
 | What the coach says or does | `skills/<name>/SKILL.md`, `references/patterns.md` | [`skill-shape.md`](skill-shape.md), [`PROCESS.md`](PROCESS.md) |
-| A checker's rules | `skills/<name>/scripts/*.py` **and** its port in `packages/checkers` (parity test) | C § 5 |
+| A checker's rules | one file, `skills/<name>/scripts/*.mjs`, with expected-output cases | C § 5 |
 | The agent loop, tools, gate, cost estimate | `packages/agent/src/` (`coach.ts`, `tools/index.ts`, `estimate-cost.ts`) | C § 1, § 3, § 4, § 9, § 12 |
 | The proxy's rules, models, ceilings | `supabase/functions/ten-model-proxy/core.ts`, `handler.ts` | C § 8, § 13, § 14 |
 | Tables and access rules | a **new** file in `supabase/migrations/`, plus the teardown and `tests/sql/` | C § 2, § 8 |

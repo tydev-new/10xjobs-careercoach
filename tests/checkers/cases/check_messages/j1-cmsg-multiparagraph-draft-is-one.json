@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): covers: tests/test_check_messages.py::test_multiparagraph_draft_is_one_draft",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "contacts/acme.md": "**To the HM:**\n\n> First paragraph of the message, quite long indeed.\n\n> Second paragraph continues the same single message.\n\nSome prose after.\n\n> A second, separate draft.\n",
+  "pitch.md": "# P\n\n## Messages rubric\n\nPINNED 2026-08-17\n| tier | claim |\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: pass (0 fail, 0 warn, 2 drafts)\n  [INFO] draft 1: 102 chars / 15 words\n  [INFO] draft 2: 25 chars / 4 words\n✔ message floor clean\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

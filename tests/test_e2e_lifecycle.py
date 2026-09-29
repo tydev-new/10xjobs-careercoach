@@ -26,12 +26,20 @@ LEARN_SCRIPTS = os.path.join(SKILLS, "learn", "scripts")
 EVALUATE_SCRIPTS = os.path.join(SKILLS, "evaluate", "scripts")
 SEARCH_SCRIPTS = os.path.join(SKILLS, "search", "scripts")
 
-sys.path.insert(0, PROFILE_SCRIPTS)
-import check_files as cf
+import shutil
+
+# docs/design-js-only.md § 6 (J2): the seven ported scripts run under
+# `node` now, on their new skills/<skill>/scripts/<name>.mjs home;
+# check_knowledge.py, check_messages.py, check_stories.py have no port
+# yet (J3) and still run under `sys.executable`. run_py() picks the
+# runtime from the script path's own extension, so each call site below
+# only needs to name the right file.
+NODE = shutil.which("node")
 
 
 def run_py(script_path, *args):
-    cmd = [sys.executable, script_path] + list(args)
+    interpreter = NODE if script_path.endswith(".mjs") else sys.executable
+    cmd = [interpreter, script_path] + list(args)
     proc = subprocess.run(cmd, capture_output=True, text=True)
     return proc.returncode, proc.stdout, proc.stderr
 
@@ -210,7 +218,7 @@ Scaling distributed data pipelines past 50M daily events without breaking the bu
         open(os.path.join(ws, "linkedin-audit.md"), "w", encoding="utf-8").write(linkedin_audit_content)
 
         # Verify Stage 1 files
-        code, out, err = run_py(os.path.join(PROFILE_SCRIPTS, "check_files.py"), "--workspace", ws, "--skills", SKILLS)
+        code, out, err = run_py(os.path.join(PROFILE_SCRIPTS, "check_files.mjs"), "--workspace", ws, "--skills", SKILLS)
         assert code == 0, f"Stage 1 check_files failed: {out}\n{err}"
 
         # =====================================================================
@@ -331,7 +339,7 @@ Strong alignment with distributed streaming and latency optimization background.
 
         # Record verdict via script
         code, out, err = run_py(
-            os.path.join(EVALUATE_SCRIPTS, "record_verdict.py"),
+            os.path.join(EVALUATE_SCRIPTS, "record_verdict.mjs"),
             "--workspace", ws,
             "--company", "Writer",
             "--title", "Staff Infrastructure Engineer",
@@ -386,7 +394,7 @@ I am writing to express my strong interest in the Staff Infrastructure Engineer 
         open(os.path.join(ws, "applications", "writer-staff-infra-cover-letter.md"), "w", encoding="utf-8").write(app_letter_content)
 
         code, out, err = run_py(
-            os.path.join(APPLY_SCRIPTS, "check_materials.py"),
+            os.path.join(APPLY_SCRIPTS, "check_materials.mjs"),
             "--workspace", ws,
             "--resume", os.path.join(ws, "applications", "writer-staff-infra-resume.md"),
             "--letter", os.path.join(ws, "applications", "writer-staff-infra-cover-letter.md")
@@ -553,7 +561,7 @@ Secure Staff Infrastructure Engineer role by 2026-10-31.
 
         # Run Closeout Checker
         code, out, err = run_py(
-            os.path.join(COACH_SCRIPTS, "check_closeout.py"),
+            os.path.join(COACH_SCRIPTS, "check_closeout.mjs"),
             "--workspace", ws,
             "--stage", "interviewing"
         )
@@ -561,7 +569,7 @@ Secure Staff Infrastructure Engineer role by 2026-10-31.
 
         # Run Master Workspace File Checker
         code, out, err = run_py(
-            os.path.join(PROFILE_SCRIPTS, "check_files.py"),
+            os.path.join(PROFILE_SCRIPTS, "check_files.mjs"),
             "--workspace", ws,
             "--skills", SKILLS
         )
@@ -658,7 +666,7 @@ Senior Infrastructure Engineer who automates high-availability multi-region clou
 ## Consistency notes
 - Aligned with pitch.md
 """)
-        code, out, err = run_py(os.path.join(PROFILE_SCRIPTS, "check_files.py"), "--workspace", ws, "--skills", SKILLS)
+        code, out, err = run_py(os.path.join(PROFILE_SCRIPTS, "check_files.mjs"), "--workspace", ws, "--skills", SKILLS)
         assert code == 0, f"Positioning in profile check failed: {out}\n{err}"
 
 
@@ -798,7 +806,7 @@ High on infra; moderate on internal eval tooling.
 - Recruiter stated comp band: $320k–$360k base + equity on 2026-08-24.
 """)
 
-        code, out, err = run_py(os.path.join(PROFILE_SCRIPTS, "check_files.py"), "--workspace", ws, "--skills", SKILLS)
+        code, out, err = run_py(os.path.join(PROFILE_SCRIPTS, "check_files.mjs"), "--workspace", ws, "--skills", SKILLS)
         assert code == 0, f"Interview lifecycle check failed: {out}\n{err}"
         code, out, err = run_py(os.path.join(STORYBANK_SCRIPTS, "check_stories.py"), "--workspace", ws)
         assert code == 0, f"Storybank check failed: {out}\n{err}"

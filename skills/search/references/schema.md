@@ -9,12 +9,12 @@ touching any of these files by hand (which should be nearly never).
 ## `jobs.md` — the pipeline record, readable as the board
 
 One labeled block per role, organized by stage sections, dismissed roles
-last with their reasons. Script-written: sweeps append · `update_job.py`
+last with their reasons. Script-written: sweeps append · `update_job.mjs`
 moves stages, dismisses, restores (loud-fail on ambiguous matches) ·
-evaluate's `record_verdict.py` judges. Read it anywhere.
+evaluate's `record_verdict.mjs` judges. Read it anywhere.
 
 - `JD` is the raw posting in `jd-inbox/`; `Analysis` is evaluate's
-  decode in `jd-analysis/`, written by `record_verdict.py
+  decode in `jd-analysis/`, written by `record_verdict.mjs
   --analysis-file` (the latest wins).
 - **A role's URL is the employer's own posting — it is the application
   link.** Aggregator URLs never sit on a pipeline role. The one other

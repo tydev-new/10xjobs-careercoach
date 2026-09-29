@@ -175,7 +175,7 @@ once, then rely on conversational updates and pasted screenshots.
 | **Offer** | The word tends to be unambiguous | Say congratulations, then route to `../SKILL.md § Outcome intake` — it carries the four rules that still hold (the authoritative copy; do not restate them here). Never draft a reply to a comp question as a staged draft |
 | **Ghost-followup material** | Thread gone quiet N days after an interview | Feed the follow-up suggestion (outreach owns the draft + its stop rules) |
 
-3. Map each event to its pipeline row by company (+ role when a company has several). **0 or 2+ matches → show the candidates and ask** — same loud-fail rule as `update_job.py`.
+3. Map each event to its pipeline row by company (+ role when a company has several). **0 or 2+ matches → show the candidates and ask** — same loud-fail rule as `update_job.mjs`.
 4. Report the sweep as a digest: what was applied, what needs their call, what needs no action. Never narrate 40 auto-acks one by one.
 
 ### Calendar (when a connector exists)

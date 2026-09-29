@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: pb-crlf",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--application",
+    "applications/a.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/a.md": "## Coverage\r\n\r\n| requirement | status | evidence | decision |\r\n|---|---|---|---|\r\n| Python | have | x | answered |\r\n| Rust | gap | none | open |\r\n\r\n## Selection\r\n\r\n| # | role | bullet | in/out | source | words | why |\r\n|---|---|---|---|---|---|---|\r\n| 3 | Acme | a | out | base | 12 | weak |\r\n| 5 | Acme | b | out | base | 9 | weaker |\r\n| 7 | Acme | c | out | base | — | |\r\n",
+  "base-resume.md": "# B\r\n- Python work\r\n"
+ },
+ "expect": [
+  {
+   "stdout": "**Cut — 3 of 3 bullets, weakest first.** Say \"keep\" and the bullet's name or number to bring one back.\n1. Acme — a — *weak*\n2. Acme — b — *weaker*\n3. Acme — c — **\n\n**Gaps — evidence you might have?** (\"no\" is a fine answer)\n- Rust — none\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nFAIL  out row #7 (Acme) has no `why` or no `words` — a cut nobody can weigh\nWARN  the `out` rows are in base order (# strictly rising) — rank them weakest-first for THIS posting, in the file, then re-run\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

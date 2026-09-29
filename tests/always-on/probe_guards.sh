@@ -124,7 +124,7 @@ none_created() { [ -z "$(printf '%s' "$created" | tr -d ' ')" ]; }
 check "a locked vault refuses new files and directories" \
       "a locked vault still accepts new entries by absolute path:${created} (vault_lock marks only -type f uchg)" none_created
 
-echo "== render_resume.py never launches a real browser in this harness, and never discloses that it's a stand-in (fix round, 2026-09-27) =="
+echo "== render_resume.mjs never launches a real browser in this harness, and never discloses that it's a stand-in (fix round, 2026-09-27) =="
 # sandbox_home_setup (not a bare `source`) is the real per-trial path every
 # run_*.sh now takes — RENDER_RESUME_CHROME is no longer set at source
 # time, only once a sandbox HOME exists to stage the neutral copy into
@@ -165,15 +165,20 @@ check "the staged copy carries no 'harness'/'stand-in'/'fake'/'test' word an age
       "the staged copy still discloses what it is: $(printf '%s' "$harness_copy" | grep -inE '\b(harness|stand-in|fake|test)\b' | head -3)" no_giveaway
 [ -n "$harness_fakehome" ] && rm -rf "$harness_fakehome" 2>/dev/null
 
-harness_pdf="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; sandbox_home_setup; python3 - '$REPO' '$T' <<'EOF'
-import sys, os
-sys.path.insert(0, os.path.join(sys.argv[1], 'skills', 'apply', 'scripts'))
-import render_resume as rr
-t = sys.argv[2]
-open(os.path.join(t, 'harness.html'), 'w').write('<html></html>')
-ok, err = rr.to_pdf(os.path.join(t, 'harness.html'), os.path.join(t, 'harness.pdf'))
-print('OK' if ok else 'FAIL:' + str(err))
+# A tiny .mjs helper, not inlined `node -e`: render_resume.mjs's toPdf()/
+# findChrome() are ESM named exports, and this keeps every quoting layer
+# (the outer bash -c, the sandboxed subshell) free of nested JS string
+# literals.
+cat > "$T/probe_agent_call.mjs" <<EOF
+import { toPdf } from "$REPO/skills/apply/scripts/render_resume.mjs";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+const t = "$T";
+writeFileSync(join(t, "harness.html"), "<html></html>");
+const { ok, err } = await toPdf(join(t, "harness.html"), join(t, "harness.pdf"));
+console.log(ok ? "OK" : "FAIL:" + String(err));
 EOF
+harness_pdf="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; sandbox_home_setup; node '$T/probe_agent_call.mjs'
 sandbox_home_cleanup")"
 pdf_ok() { [ "$harness_pdf" = OK ]; }
 check "an agent-style call (no explicit chrome=) renders via the staged copy" \
@@ -188,9 +193,9 @@ check "an agent-style call (no explicit chrome=) renders via the staged copy" \
 # sandboxed copy — see tests/test_always_on_fake_chrome.py for the full,
 # documented arithmetic this re-checks only the OUTCOME of.
 page_probe="$(REALJS=/nonexistent-probe-vault bash -c "ROOT='$ROOT'; REPO='$REPO'; source '$ROOT/lib_env.sh'; sandbox_home_setup
-python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/cases/t10-over-budget/base-resume.md' --pdf '$T/ob.pdf' --pages 1 2>&1 | grep '^pages:'
-python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/fixtures/resume-330w.md' --pdf '$T/w330.pdf' --pages 1 2>&1 | grep '^pages:'
-python3 '$REPO/skills/apply/scripts/render_resume.py' --md '$ROOT/fixtures/resume-600w.md' --pdf '$T/w600.pdf' --pages 1 2>&1 | grep '^pages:'
+node '$REPO/skills/apply/scripts/render_resume.mjs' --md '$ROOT/cases/t10-over-budget/base-resume.md' --pdf '$T/ob.pdf' --pages 1 2>&1 | grep '^pages:'
+node '$REPO/skills/apply/scripts/render_resume.mjs' --md '$ROOT/fixtures/resume-330w.md' --pdf '$T/w330.pdf' --pages 1 2>&1 | grep '^pages:'
+node '$REPO/skills/apply/scripts/render_resume.mjs' --md '$ROOT/fixtures/resume-600w.md' --pdf '$T/w600.pdf' --pages 1 2>&1 | grep '^pages:'
 sandbox_home_cleanup")"
 ob_pages="$(printf '%s\n' "$page_probe" | sed -n '1s/^pages: \([0-9]*\).*/\1/p')"
 w330_pages="$(printf '%s\n' "$page_probe" | sed -n '2s/^pages: \([0-9]*\).*/\1/p')"
@@ -210,7 +215,7 @@ if command -v pdftotext >/dev/null; then
         "the fake's PDF has no extractable text (pdftotext) — apply's verify-by-extraction step fails" has_text
 fi
 
-echo "== render_resume.py to_pdf() timeout (a real candidate run, RENDER_RESUME_CHROME unset) =="
+echo "== render_resume.mjs toPdf() timeout (a real candidate run, RENDER_RESUME_CHROME unset) =="
 cat > "$T/fakechrome" <<EOF
 #!/bin/bash
 # stands in for Chrome: a browser process with a helper child of its own
@@ -218,24 +223,29 @@ cat > "$T/fakechrome" <<EOF
 wait
 EOF
 chmod +x "$T/fakechrome"; ln -sf /bin/sleep "$T/zzHelper"
-python3 - "$REPO" "$T" <<'EOF'
-import sys, os
-sys.path.insert(0, os.path.join(sys.argv[1], "skills", "apply", "scripts"))
-import render_resume as rr
-t = sys.argv[2]
-open(os.path.join(t, "r.html"), "w").write("<html></html>")
-rr.to_pdf(os.path.join(t, "r.html"), os.path.join(t, "r.pdf"), chrome=os.path.join(t, "fakechrome"), timeout=1)
+cat > "$T/probe_timeout.mjs" <<EOF
+import { toPdf } from "$REPO/skills/apply/scripts/render_resume.mjs";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+const t = "$T";
+writeFileSync(join(t, "r.html"), "<html></html>");
+await toPdf(join(t, "r.html"), join(t, "r.pdf"), join(t, "fakechrome"), 1000);
 EOF
+node "$T/probe_timeout.mjs"
 sleep 0.3
 helper_gone() { ! alive zzHelper; }
 check "timeout stops Chrome's own helper children too" \
       "timeout kills the Chrome PID only; its helper children keep running" helper_gone
-dflt="$(python3 -c "import inspect,sys; sys.path.insert(0,'$REPO/skills/apply/scripts'); import render_resume as rr; print(inspect.signature(rr.to_pdf).parameters['timeout'].default)")"
+# the source's own default (seconds) — no runtime introspection needed for
+# a `timeoutMs = 90_000` default parameter the way Python's inspect.signature
+# read to_pdf's `timeout=90`.
+dflt_ms="$(grep -oE 'timeoutMs = [0-9_]+' "$REPO/skills/apply/scripts/render_resume.mjs" | grep -oE '[0-9_]+$' | tr -d '_')"
+dflt="$((dflt_ms / 1000))"
 # the 10 s reap after the kill counts too: timeout + 10 must land under 120
 under_tool() { [ $((dflt + 10)) -lt 120 ]; }
-check "to_pdf timeout (${dflt}s + 10s reap) is under the agent Bash tool's 120s default" \
-      "to_pdf timeout ${dflt}s (+10s reap) is not under the agent Bash tool's 120s default" under_tool
-no_hint() { ! grep -q -F 'another Chrome window' "$REPO/skills/apply/scripts/render_resume.py"; }
+check "toPdf timeout (${dflt}s + 10s reap) is under the agent Bash tool's 120s default" \
+      "toPdf timeout ${dflt}s (+10s reap) is not under the agent Bash tool's 120s default" under_tool
+no_hint() { ! grep -q -F 'another Chrome window' "$REPO/skills/apply/scripts/render_resume.mjs"; }
 check "timeout message does not point at other Chrome windows" \
       "timeout message points the agent at 'another Chrome window' (the owner's browser)" no_hint
 

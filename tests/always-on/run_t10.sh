@@ -98,7 +98,7 @@ for case_name in $CASES; do
     R="$(ls "$WS"/applications/*-resume.md 2>/dev/null | head -1)"
     L="$(ls "$WS"/applications/*cover-letter*.md 2>/dev/null | head -1)"
     if [ -n "$R" ]; then
-      python3 "$RUNNER_SKILLS_DIR/apply/scripts/check_materials.py" --workspace "$WS" \
+      node "$RUNNER_SKILLS_DIR/apply/scripts/check_materials.mjs" --workspace "$WS" \
         --resume "$R" ${L:+--letter "$L"} --base "$WS/base-resume.md" \
         > "$out-ws/_materials_check.txt" 2>&1
     else

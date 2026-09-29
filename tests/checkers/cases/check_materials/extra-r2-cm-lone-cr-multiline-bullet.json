@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r2-cm-lone-cr-multiline-bullet",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "base-resume.md": "# Base\n\n## Experience\n- Wrote SQL pipelines in Postgres for the finance team.\n",
+  "resume.md": "# A\r\r## Summary\r\rok.\r\r## Experience\r\r- Wrote SQL pipelines in Postgres for the finance team.\r  and invented a database.\r"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: FAIL (1 fail, 0 warn)\n  [FAIL] Experience bullet not verbatim from base: \"Wrote SQL pipelines in Postgres for the finance team. and invented a d…\" — patterns.md: selection is the tailoring. A JD-vocabulary rewording is allowed only when the candidate approved it and it is declared in § Reworded (base: / tailored: pair)\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

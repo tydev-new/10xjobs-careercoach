@@ -48,14 +48,16 @@ function argv(command: string): string[] {
 }
 
 const SCRIPT_DIRS: Record<string, string> = {
-  "check_materials.py": "skills/apply/scripts",
-  "render_resume.py": "skills/apply/scripts",
-  "record_verdict.py": "skills/evaluate/scripts",
-  "check_closeout.py": "skills/coach/scripts",
+  "check_materials.mjs": "skills/apply/scripts",
+  "render_resume.mjs": "skills/apply/scripts",
+  "record_verdict.mjs": "skills/evaluate/scripts",
+  "check_closeout.mjs": "skills/coach/scripts",
 };
 
-/** A ScriptRunner that runs the REAL Python script on a temp copy of the
- *  snapshot and reports every changed/new workspace file. */
+/** A ScriptRunner that runs the REAL script (docs/design-js-only.md § 6,
+ *  J2: node on the .mjs port, not python3 on the retired .py original) on
+ *  a temp copy of the snapshot and reports every changed/new workspace
+ *  file. */
 function realPythonRunner() {
   return {
     async run(command: string, files: Readonly<Record<string, string>>) {
@@ -67,12 +69,12 @@ function realPythonRunner() {
       }
       const [bin, script, ...rest] = argv(command);
       const name = path.basename(script ?? "");
-      if (bin !== "python3" || !SCRIPT_DIRS[name]) {
+      if (bin !== "node" || !SCRIPT_DIRS[name]) {
         return { result: { stdout: "", stderr: `not available in the web app: ${name}\n`, exitCode: 127, changed: [] }, changedFiles: {} };
       }
       let stdout = "", stderr = "", exitCode = 0;
       try {
-        stdout = execFileSync("python3", [path.join(REPO, SCRIPT_DIRS[name], name), ...rest], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+        stdout = execFileSync("node", [path.join(REPO, SCRIPT_DIRS[name], name), ...rest], { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
       } catch (e: any) {
         stdout = e.stdout ?? ""; stderr = e.stderr ?? ""; exitCode = e.status ?? 1;
       }
@@ -102,7 +104,7 @@ async function runBash(commands: string[], opts: { files?: Record<string, string
 }
 
 const VERDICT_CMD =
-  'python3 evaluate/scripts/record_verdict.py --workspace . --company "Nimbus Robotics" --title "Analytics Engineer" --verdict strong --score 82 --reasons "SQL depth matches; dbt ownership" --dealbreakers "on-site 5 days" --jd-file jd-analysis/nimbus-analytics-engineer.md --track A';
+  'node evaluate/scripts/record_verdict.mjs --workspace . --company "Nimbus Robotics" --title "Analytics Engineer" --verdict strong --score 82 --reasons "SQL depth matches; dbt ownership" --dealbreakers "on-site 5 days" --jd-file jd-analysis/nimbus-analytics-engineer.md --track A';
 
 // ------------------------------------------------------------------ verdict
 
@@ -126,21 +128,21 @@ test("verdict card: props from the jobs.md row record_verdict wrote, word for wo
 });
 
 test("verdict card: no --jd-file -> no ref (never guessed)", async () => {
-  const { cards } = await runBash(['python3 skills/evaluate/scripts/record_verdict.py --workspace . --company "Acme Labs" --title "Data Analyst" --verdict long_shot --score 40 --reasons "stretch on python"']);
+  const { cards } = await runBash(['node skills/evaluate/scripts/record_verdict.mjs --workspace . --company "Acme Labs" --title "Data Analyst" --verdict long_shot --score 40 --reasons "stretch on python"']);
   const v = cards.filter((c) => c.card === "verdict");
   assert.equal(v.length, 1);
   assert.equal(v[0].ref, undefined);
 });
 
 test("verdict card: a record_verdict that fails (exit 2) makes no card", async () => {
-  const { cards, outputs } = await runBash(['python3 record_verdict.py --workspace . --company X --title Y --verdict great']);
+  const { cards, outputs } = await runBash(['node record_verdict.mjs --workspace . --company X --title Y --verdict great']);
   assert.equal(outputs[0].exitCode, 2);
   assert.equal(cards.length, 0);
 });
 
 // ------------------------------------------------------------------ checker
 
-const CM = "python3 apply/scripts/check_materials.py --workspace . --resume applications/nimbus/resume.md --letter applications/nimbus/letter.md";
+const CM = "node apply/scripts/check_materials.mjs --workspace . --resume applications/nimbus/resume.md --letter applications/nimbus/letter.md";
 
 test("checker cards on a FAILING check_materials (exit 1): one card per file, findings word for word (§ 6.2 has no exit-0 condition for this row)", async () => {
   const { cards, outputs } = await runBash([CM]);
@@ -157,7 +159,7 @@ test("checker cards on a FAILING check_materials (exit 1): one card per file, fi
 test("checker cards on a passing check_materials (exit 0) + document badge from the latest checker for that .md", async () => {
   const files = fixtureFiles();
   files["applications/nimbus/letter.md"] = "Dear team,\nI am writing to apply.\n";
-  const { cards, outputs } = await runBash([CM, "python3 apply/scripts/render_resume.py --md applications/nimbus/resume.md --html applications/nimbus/resume.html"], { files });
+  const { cards, outputs } = await runBash([CM, "node apply/scripts/render_resume.mjs --md applications/nimbus/resume.md --html applications/nimbus/resume.html"], { files });
   assert.equal(outputs[0].exitCode, 0);
   const stdout: string = outputs[0].stdout;
   const checkers = cards.filter((c) => c.card === "checker");
@@ -179,8 +181,8 @@ test("document card after a FAILING check of the same .md shows fail, not not-ru
   const files = fixtureFiles();
   files["applications/nimbus/resume.md"] = files["base-resume.md"].replace("## Summary\n", "## Summary\n\nI am passionate about data.\n");
   const { cards, outputs } = await runBash([
-    "python3 apply/scripts/check_materials.py --workspace . --resume applications/nimbus/resume.md",
-    "python3 apply/scripts/render_resume.py --md applications/nimbus/resume.md --html applications/nimbus/resume.html",
+    "node apply/scripts/check_materials.mjs --workspace . --resume applications/nimbus/resume.md",
+    "node apply/scripts/render_resume.mjs --md applications/nimbus/resume.md --html applications/nimbus/resume.html",
   ], { files });
   assert.equal(outputs[0].exitCode, 1, outputs[0].stdout);
   const doc = cards.find((c) => c.card === "document");
@@ -189,7 +191,7 @@ test("document card after a FAILING check of the same .md shows fail, not not-ru
 });
 
 test("document card: htmlPath only if inside the workspace (render_resume without --html prints a temp path)", async () => {
-  const { cards, outputs } = await runBash(["python3 apply/scripts/render_resume.py --md applications/nimbus/resume.md"]);
+  const { cards, outputs } = await runBash(["node apply/scripts/render_resume.mjs --md applications/nimbus/resume.md"]);
   assert.equal(outputs[0].exitCode, 0);
   const doc = cards.find((c) => c.card === "document");
   assert.ok(doc);
@@ -199,7 +201,7 @@ test("document card: htmlPath only if inside the workspace (render_resume withou
 // ------------------------------------------------------------------ plan
 
 test("plan card: check_closeout exit 0 -> parsePlanTodo(plan.md) + --stage; ref plan.md", async () => {
-  const { cards, outputs } = await runBash(["python3 coach/scripts/check_closeout.py --workspace . --stage applying"]);
+  const { cards, outputs } = await runBash(["node coach/scripts/check_closeout.mjs --workspace . --stage applying"]);
   assert.equal(outputs[0].exitCode, 0, outputs[0].stdout + outputs[0].stderr);
   const plan = cards.find((c) => c.card === "plan");
   assert.ok(plan);
@@ -212,7 +214,7 @@ test("plan card: check_closeout exit 0 -> parsePlanTodo(plan.md) + --stage; ref 
 });
 
 test("plan card: check_closeout exit 1 -> no card", async () => {
-  const { cards, outputs } = await runBash(["python3 coach/scripts/check_closeout.py --workspace . --stage apply"]);
+  const { cards, outputs } = await runBash(["node coach/scripts/check_closeout.mjs --workspace . --stage apply"]);
   assert.equal(outputs[0].exitCode, 1);
   assert.equal(cards.filter((c) => c.card === "plan").length, 0);
 });

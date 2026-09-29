@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: uj-missing-jobs-file",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Café",
+    "--title",
+    "Staff",
+    "--dismiss"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: --company/--title matched no roles — be more specific\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

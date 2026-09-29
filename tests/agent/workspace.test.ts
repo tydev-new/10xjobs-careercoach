@@ -172,9 +172,9 @@ const script = (name: string, fn: (files: any) => Record<string, string>, stdout
 
 test("a bash write-back, then write_file on the same path, succeeds (version tracked from the write-back)", async () => {
   const store = createInMemoryWorkspaceStore({ "jobs.md": "# Pipeline\n" });
-  const runner = createFakeScriptRunner([script("record_verdict.py", (f) => ({ "jobs.md": f["jobs.md"] + "### A — B\n" }))]);
+  const runner = createFakeScriptRunner([script("record_verdict.mjs", (f) => ({ "jobs.md": f["jobs.md"] + "### A — B\n" }))]);
   const { call } = toolsFor(store, runner);
-  const b = await call("bash", { command: "python3 evaluate/scripts/record_verdict.py --workspace . --company A --title B --verdict strong" });
+  const b = await call("bash", { command: "node evaluate/scripts/record_verdict.mjs --workspace . --company A --title B --verdict strong" });
   assert.equal(b.exitCode, 0);
   assert.deepEqual(b.changed, ["jobs.md"]);
   assert.equal((await call("write_file", { path: "jobs.md", content: "edited" })).written, true);
@@ -183,9 +183,9 @@ test("a bash write-back, then write_file on the same path, succeeds (version tra
 test("bash write-backs to CLAUDE.md or skills/ fail the command (exit 1, names the file); nothing changes", async () => {
   for (const target of ["CLAUDE.md", "skills/coach/SKILL.md"]) {
     const store = createInMemoryWorkspaceStore({ "CLAUDE.md": "orig" });
-    const runner = createFakeScriptRunner([script("check_files.py", () => ({ [target]: "EVIL" }))]);
+    const runner = createFakeScriptRunner([script("check_files.mjs", () => ({ [target]: "EVIL" }))]);
     const { call } = toolsFor(store, runner);
-    const b = await call("bash", { command: "python3 check_files.py --workspace ." });
+    const b = await call("bash", { command: "node check_files.mjs --workspace ." });
     assert.equal(b.exitCode, 1, target);
     assert.ok((b.stderr + b.stdout).includes(target), `names ${target}: ${b.stderr}`);
     assert.equal((await store.read("CLAUDE.md") as any).content, "orig");
@@ -202,7 +202,7 @@ test("bash write-back racing an outside edit -> exit 1 naming the file; the outs
     },
   };
   const { call } = toolsFor(store, runner);
-  const b = await call("bash", { command: "python3 update_job.py" });
+  const b = await call("bash", { command: "node update_job.mjs" });
   assert.equal(b.exitCode, 1);
   assert.ok(b.stderr.includes("jobs.md"));
   assert.equal((await store.read("jobs.md") as any).content, "UI edit");
@@ -222,6 +222,6 @@ test("bash sees files 4 levels deep (in-memory list() must not hide them from th
   let seen: string[] = [];
   const runner = { async run(_c: string, files: any) { seen = Object.keys(files).filter((p) => !p.startsWith("skills/")); return { result: { stdout: "", stderr: "", exitCode: 0, changed: [] }, changedFiles: {} }; } };
   const { call } = toolsFor(store, runner);
-  await call("bash", { command: "python3 check_materials.py --workspace . --resume applications/acme/drafts/resume.md" });
+  await call("bash", { command: "node check_materials.mjs --workspace . --resume applications/acme/drafts/resume.md" });
   assert.ok(seen.includes("applications/acme/drafts/resume.md"), `snapshot: ${seen.join(",")}`);
 });

@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_three_lens_review.py::test_messages_new_spans_exempt_inside_a_draft",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--contacts",
+    "<ws>/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "acme.md": "# Acme\n\n> ~~~\n> a->b\n> ~~~\n> Thanks for the time.\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: pass (0 fail, 1 warn, 1 drafts)\n  [WARN] pitch.md Messages rubric is PROPOSED/absent — drafts need the candidate's pin before finalizing (WATCH forms enforced anyway)\n  [INFO] draft 1: 33 chars / 7 words\n✔ message floor clean\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

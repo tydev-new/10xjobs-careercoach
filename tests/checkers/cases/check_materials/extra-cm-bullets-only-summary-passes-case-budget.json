@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-bullets-only-summary-passes-case-budget",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "resume.md": "# Alex Chen\n\n## Summary\n\n- Platform engineering leader delivering reliability at scale.\n- Cut incident response time from 4 hours to 40 minutes.\n- Built the on-call rotation from zero to a 6-person bench.\n\n## Experience\n\nPlatform Lead — Northwind Labs.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: pass (0 fail, 0 warn)\n\n✔ automatic checks clean\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

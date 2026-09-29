@@ -1,0 +1,27 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): no Status column: status is empty, so invalid",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "stories/S001-a.md": "# s\n",
+  "storybank.md": "# Storybank\n\n## Stories\n\n| ID | Title |\n|---|---|\n| S001 | A |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  S001: invalid Status '' — `confirmed` or `draft [source: <file>]`\n\n1 index row(s), 1 story file(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

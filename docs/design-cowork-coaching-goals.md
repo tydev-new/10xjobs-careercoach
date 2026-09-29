@@ -152,9 +152,10 @@ could understand or change them; this goal prevents that.
   failure.
 - **The deletion valve.** Prose earns its place by an observed failure — and
   when an earned rule becomes checkable, it moves to code and the prose is
-  deleted. The receipt lives in the commit or the script docstring, not the
-  skill. Without this valve, earn-your-place is a one-way ratchet — which is
-  exactly how skills become unreadable.
+  deleted. The receipt lives in the commit, in the JavaScript that now holds
+  that rule, or in `docs/receipts.md`, not the skill. Without this valve,
+  earn-your-place is a one-way ratchet — which is exactly how skills become
+  unreadable.
 - **Three editing tiers.** Everyone customizes through their own files
   (`voice.md`, `companies.txt`, criteria) — the skill reads their file; they
   never open ours. Power users edit skill prose, and can, because it's short.

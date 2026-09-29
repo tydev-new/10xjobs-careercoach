@@ -1,6 +1,6 @@
 # Profile — the file shapes
 
-What `scripts/check_files.py` verifies, plus the shapes it cannot see but
+What `scripts/check_files.mjs` verifies, plus the shapes it cannot see but
 the files must still hold. **The section list is the schema** — these
 sections, these names, this order; the checker parses this file and
 enforces it. Read it before writing or editing any of these records.

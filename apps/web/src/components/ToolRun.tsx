@@ -4,36 +4,11 @@
 // restated description.
 import { useState, type ReactElement } from "react";
 import { Icon } from "../icons.tsx";
-
-export interface ToolPartLike {
-  type: string; // "tool-<name>"
-  toolCallId?: string;
-  input?: unknown;
-  output?: unknown;
-  errorText?: string;
-  state?: string;
-}
-
-function toolName(type: string): string {
-  return type.startsWith("tool-") ? type.slice(5) : type;
-}
-
-function displayName(name: string): string {
-  return name.replace(/_/g, " ");
-}
-
-function summarize(parts: ToolPartLike[]): string {
-  const labels: string[] = [];
-  let i = 0;
-  while (i < parts.length) {
-    const name = toolName(parts[i].type);
-    let count = 1;
-    while (i + count < parts.length && toolName(parts[i + count].type) === name) count++;
-    labels.push(count > 1 ? `${displayName(name)} ×${count}` : displayName(name));
-    i += count;
-  }
-  return labels.join(" · ");
-}
+// Moved to tool-run-summary.ts (plain .ts, no JSX; see its own header) —
+// re-exported here so this file stays the one design-web-ui.md § 3/§ 5.3
+// points at, and used below for this component's own rendering.
+import { displayName, summarize, toolName, type ToolPartLike } from "./tool-run-summary.ts";
+export { summarize, type ToolPartLike };
 
 function pretty(value: unknown): string {
   if (typeof value === "string") return value;

@@ -6,11 +6,14 @@ import { Card } from "./Cards";
 import { ErrorPart } from "./ErrorPart";
 import { GateCard } from "./GateCard";
 import { Icon } from "../icons.tsx";
-import { ToolRun, type ToolPartLike } from "./ToolRun";
-
-type Group =
-  | { kind: "tool"; parts: ToolPartLike[] }
-  | { kind: "other"; part: Record<string, unknown> };
+import { ToolRun } from "./ToolRun";
+// Exported here (design-web-ui.md § 5.9, 3c: "groupParts' groups
+// (Transcript.tsx:35, exported)") — the implementation moved to
+// group-parts.ts (plain .ts, no JSX) so Home's activity line and its own
+// unit test can import it without a .tsx file in the graph; this file
+// both uses it below AND keeps the one export Home's contract names.
+import { groupParts, type Group } from "./group-parts.ts";
+export { groupParts, type Group };
 
 // A plain stroke icon, not an emoji (banned defaults: no emoji standing
 // in for an icon) — a single small attach mark, same weight as the rest
@@ -32,24 +35,6 @@ function AttachmentIcon(): ReactElement {
       <path d="M21.44 11.05l-9.19 9.19a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
     </svg>
   );
-}
-
-function groupParts(parts: Array<Record<string, unknown>>): Group[] {
-  const groups: Group[] = [];
-  for (const part of parts) {
-    const type = part.type as string;
-    if (type.startsWith("tool-")) {
-      const last = groups[groups.length - 1];
-      if (last && last.kind === "tool") {
-        last.parts.push(part as unknown as ToolPartLike);
-        continue;
-      }
-      groups.push({ kind: "tool", parts: [part as unknown as ToolPartLike] });
-    } else {
-      groups.push({ kind: "other", part });
-    }
-  }
-  return groups;
 }
 
 export function Transcript({

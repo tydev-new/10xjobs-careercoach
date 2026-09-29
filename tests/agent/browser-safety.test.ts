@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { builtinModules } from "node:module";
-import { cpSync, existsSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
@@ -123,14 +123,33 @@ const MUTANTS: Record<string, string> = {
   "multi-line supabase import": 'import {\n  createClient,\n} from "@supabase/supabase-js";\nexport const __m = createClient;\n',
 };
 
+// design-web-agent.md § 18 (lead ruling, 2026-09-26, fix round 3; updated
+// for the js-only J2 switch, PR #24): packages/agent imports
+// waitingRows/universalNewlines/restoreLineSeparators from
+// skills/coach/scripts/lib/check-closeout.mjs and
+// skills/profile/scripts/lib/py-text.mjs (readPlanBoard, plan-board.ts;
+// jobs-md.mjs's own load()/STAGES moved the same way, to
+// skills/search/scripts/lib/jobs-md.mjs, for apps/web's store-io.ts —
+// packages/checkers/src no longer carries any of these three files). A
+// flat `<tmp>/src` copy of packages/agent alone breaks those relative
+// "../../../skills/..." imports — so the copy sits at `<tmp>/packages/agent`,
+// beside a full copy of `<tmp>/skills` (mirroring the real repo layout, and
+// this file's own skillsCopy() pattern below for the lib-mutant tests).
+// Named, allowed change to this tester-owned test; no assertion below
+// changes.
 function mutantCopy(code: string): string {
   const root = tmp("agent-mutant-");
-  for (const d of ["src", "test"]) cpSync(path.join(AGENT, d), path.join(root, d), { recursive: true });
-  for (const f of ["package.json", "tsconfig.json"]) cpSync(path.join(AGENT, f), path.join(root, f));
-  symlinkSync(path.join(AGENT, "node_modules"), path.join(root, "node_modules"));
-  const target = path.join(root, "src/helpers.ts"); // reachable from index.ts
+  const agentRoot = path.join(root, "packages/agent");
+  for (const d of ["src", "test"]) cpSync(path.join(AGENT, d), path.join(agentRoot, d), { recursive: true });
+  for (const f of ["package.json", "tsconfig.json"]) {
+    mkdirSync(path.dirname(path.join(agentRoot, f)), { recursive: true });
+    cpSync(path.join(AGENT, f), path.join(agentRoot, f));
+  }
+  symlinkSync(path.join(AGENT, "node_modules"), path.join(agentRoot, "node_modules"));
+  cpSync(path.join(REPO, "skills"), path.join(root, "skills"), { recursive: true });
+  const target = path.join(agentRoot, "src/helpers.ts"); // reachable from index.ts
   writeFileSync(target, code + readFileSync(target, "utf8"));
-  return root;
+  return agentRoot;
 }
 
 function theirLintCatches(root: string): boolean {

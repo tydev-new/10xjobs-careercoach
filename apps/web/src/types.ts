@@ -188,8 +188,17 @@ export type WorkspaceErrorCode =
   | "unsupported_type";
 
 export class WorkspaceError extends Error {
-  constructor(public code: WorkspaceErrorCode, message?: string) {
+  // A plain field, not a constructor parameter property (`public code:
+  // ...`): Node's native `--test` type-stripping (no bundler in front of
+  // it, unlike Vite/esbuild/tsc) can't parse that TS shorthand and throws
+  // ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX the moment this class is imported as
+  // a runtime value, not just a type — found running store-io.ts's own
+  // unit tests (stage 3c). packages/agent/src/types.ts's own
+  // `WorkspaceError` already uses this safer form; this matches it.
+  code: WorkspaceErrorCode;
+  constructor(code: WorkspaceErrorCode, message?: string) {
     super(message ?? code);
+    this.code = code;
     this.name = "WorkspaceError";
   }
 }

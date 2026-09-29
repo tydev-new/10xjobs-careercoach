@@ -15,9 +15,20 @@
   Grok pack in this work, before the beta, not after it.
 
 **Lead rulings (2026-09-26, fix round 1):** M7, the web adds rows
-through the parity-tested `jobs_md` port, with no new script; § 7.1,
+through the job list library (`skills/search/scripts/lib/jobs-md.mjs`
+after J2, the one implementation both hosts use), with no new script; § 7.1,
 `JD` keeps meaning the raw posting and a new `Analysis` field holds the
 analysis; § 7.2, the leads wording. Each is applied below.
+
+**Lead rulings (2026-09-28, S2 independent review):** § 4.4, Greenhouse's
+`content` is encoded twice, so the readers decode entities, strip tags,
+then decode once more; § 4.1 (M3), the compact form the model reads
+carries `boardName` and the `gone` rows; § 4.2, a failed role gains an
+optional `message`, so a `company_mismatch` names both companies. Each is
+applied below, with two facts the review confirmed that the text did not
+yet say (§ 4.2 item 4, § 4.8). Two follow-ups the same day: the decode
+table gains `&mdash;` and `&ndash;` (§ 4.4), and the compact form also
+carries the board requests left this turn (§ 4.1).
 
 **Precedence:** `PRINCIPLES.md` → `design-cowork-coaching-goals.md` →
 `design-cowork-coaching.md` → `skill-shape.md`. This design changes what
@@ -148,7 +159,7 @@ PRINCIPLES Part 1 is the test.
    in the plan.
 5. Pick the postings that fit `criteria.md` (the model's judgment).
 6. Add them. Code reads each posting from its board and writes the row.
-7. Give each new role evaluate's quick pass (`record_verdict.py
+7. Give each new role evaluate's quick pass (`record_verdict.mjs
    --existing` with a `quick-scan:` reason, on the company and title
    exactly as the add reported them), up to the run's stated number.
 8. Prune proposals (stale, outranked, gone from its board) as one batch
@@ -158,11 +169,11 @@ PRINCIPLES Part 1 is the test.
 
 | Instrument | Claude Code (local) | Web app |
 |---|---|---|
-| Read company boards | `python3 scripts/boards.py list …` | `list_board` tool |
-| Add postings | `python3 scripts/boards.py add …` | `add_roles` tool |
+| Read company boards | `node scripts/boards.mjs list …` | `list_board` tool |
+| Add postings | `node scripts/boards.mjs add …` | `add_roles` tool |
 | Web search limited to job boards | the host's web search with its domain filter | `web_search` with `jobBoardsOnly` |
-| Quick pass | `../evaluate/scripts/record_verdict.py` | the same script, through `bash` (ported) |
-| Prune | `update_job.py` | the same script, ported |
+| Quick pass | `node ../evaluate/scripts/record_verdict.mjs …` | the same script, through `bash` |
+| Prune | `node scripts/update_job.mjs …` | the same script |
 | Board systems | Greenhouse, Lever, Ashby, SmartRecruiters, **Workday** | the first four (Workday refuses browser calls, § 12) |
 | Company discovery beyond job boards | attended web search and page reading: companies for the plan, never rows | not in the first ship |
 
@@ -175,9 +186,9 @@ commands (§ 5.3), and the web host note points the web at the tools
 
 ## 4. The contracts
 
-### 4.1 Reading a board: `list_board` (web) and `boards.py list` (local)
+### 4.1 Reading a board: `list_board` (web) and `boards.mjs list` (local)
 
-One behaviour, two implementations, one parity test (§ 4.4).
+One behaviour, one implementation for both hosts (§ 4.4).
 
 ```ts
 input:  { boards: { url: string; company: string }[];   // 1-10
@@ -196,7 +207,7 @@ output: { boards: { url: string; company: string;
           requestsLeftThisTurn: number }
 ```
 
-Local: `boards.py list --workspace DIR --board URL --company NAME
+Local: `boards.mjs list --workspace DIR --board URL --company NAME
 [--board … --company …] [--title-words "a,b"] [--days N]` prints the same
 facts, one line per posting.
 
@@ -243,11 +254,21 @@ facts, one line per posting.
   partial read ("300 of N") yields no `gone` at all.
 - **What the model reads (web, M3).** The tool sets `toModelOutput`
   (`ai` 7.0.111, from `@ai-sdk/provider-utils`) so the model gets a
-  compact text: one line per board (`<company> · <status> · <total>
-  postings · <matched> match · <alreadyInJobList> already on the list ·
-  showing <shown>`, plus "read 300 of N" when partial) and one line per
-  posting (`<posting> | <title> | <location> | <postedAt>`). The full
-  output stays in the UI message for the card and the "ran" line.
+  compact text: one line per board (`<company> · board name <boardName>
+  · <status> · <total> postings · <matched> match · <alreadyInJobList>
+  already on the list · showing <shown>`; the `board name` part only when
+  the board gives one, and "read 300 of N" added when partial), then one
+  line per posting (`<posting> | <title> | <location> | <postedAt>`), then
+  one line per `gone` row (`gone: <company> — <title>`, the row's own
+  company and title); after the last board, one line
+  `<requestsLeftThisTurn> board requests left this turn`, so the model
+  can plan its reads within the 60-request budget (§ 4.8; lead ruling,
+  2026-09-28, the owner's cost rule). The model is told to check `boardName` and to put
+  `gone` rows in the prune batch (both above), and on the web the compact
+  form is all it reads, so both must be in it (lead ruling, 2026-09-28).
+  *Prevents:* on the web, a wrong company's board read as the right one,
+  and a delisted row that never reaches the prune batch. The full output
+  stays in the UI message for the card and the "ran" line.
   UNVERIFIED: that the package converts saved messages with the same
   tools, so a replayed turn also sends the compact form (an S2 test).
 
@@ -261,9 +282,12 @@ date, dedupe by link and by key including a dismissed row, the 40 and 120
 caps with `matched` intact, SmartRecruiters `empty` and "read 300 of N",
 Ashby read once for three postings, `gone` only after a full read, each
 failure status; a web test that turn 2's model prompt carries the compact
-form, not the JSON.
+form, not the JSON: with `board name` for a Greenhouse board and without
+it for a Lever board, one `gone:` line for each `gone` row, and a last
+line with the requests left (57 after one SmartRecruiters board read in
+three pages).
 
-### 4.2 Adding postings: `add_roles` (web) and `boards.py add` (local)
+### 4.2 Adding postings: `add_roles` (web) and `boards.mjs add` (local)
 
 ```ts
 input:  { roles: { posting: string; company: string }[] }   // 1-20
@@ -271,8 +295,13 @@ output: { added: { company: string; title: string; url: string }[];
           alreadyInJobList: { company: string; title: string; stage: string }[];
           failed: { posting: string;
                     reason: "unsupported_url" | "not_found" | "company_mismatch" | "empty_field"
-                          | "company_limit" | "active_cap" | "error" | "request_limit" }[] }
+                          | "company_limit" | "active_cap" | "error" | "request_limit";
+                    message?: string }[] }   // plain words; on company_mismatch, both names
 ```
+
+A failed role's `message` (`AddRolesFailure` in the package's types) is
+optional and in plain words. It exists because `reason` alone can't name
+the two companies item 3 requires (lead ruling, 2026-09-28).
 
 For each role, code, not the model:
 
@@ -283,20 +312,28 @@ For each role, code, not the model:
    sweep). **Where this differs from the sweep:** when the board gives
    its own name (Greenhouse `company_name`, SmartRecruiters
    `company.name`) and it doesn't match `company` under `jobs_md`
-   `canon()`, the role fails `company_mismatch`, naming both. The sweep
-   never checked. *Proved by:* "Acme" against "Acme, Inc." adds; "Acme"
-   against "Beta Corp" fails with both names; a Lever posting (no board
-   name) adds under `company`.
+   `canon()`, the role fails `company_mismatch`, naming both in its
+   `message`. The sweep never checked. *Proved by:* "Acme" against "Acme,
+   Inc." adds; "Acme" against "Beta Corp" fails with both names in
+   `message`; a Lever posting (no board name) adds under `company`.
 4. Takes title, location, posting date and application link from the
    board, the same fields the sweep reads (`search_ats.py` `extract`,
-   `posted_iso`; parity, § 4.4).
+   `posted_iso`; § 4.4). A SmartRecruiters link is built from the
+   posting's own `company.identifier` and id
+   (`jobs.smartrecruiters.com/<identifier>/<id>`), as the sweep builds it
+   (`search_ats.py:516`), never from the address as the model typed it:
+   the API answers `SmartRecruiters` and `smartrecruiters` alike (S2
+   review, checked live 2026-09-28). *Prevents:* one posting saved under
+   two links, so the link check misses it. *Proved by:* a posting added
+   as `jobs.smartrecruiters.com/SmartRecruiters/<id>-…` is saved as
+   `jobs.smartrecruiters.com/smartrecruiters/<id>`.
 5. Saves the posting text to `jd-inbox/<slug>.md` in the sweep's shape
    (`# Company — Title`, `# Source: <link>`, blank line, text; the slug is
    the sweep's rule), create-only; an existing file is kept.
-6. Writes the row through the job list library: on the web the
-   parity-tested port's `load`, `key` and `save`
-   (`packages/checkers/src/jobs-md.mjs`), imported directly, never the
-   stub `packages/agent/src/jobs-md.ts`; locally `jobs_md.py`. If any
+6. Writes the row through the job list library's `load`, `key` and
+   `save` (`skills/search/scripts/lib/jobs-md.mjs`, the one
+   implementation after J2), imported directly on the web and locally,
+   never the stub `packages/agent/src/jobs-md.ts`. If any
    row, dismissed rows included, has the same key or the same link
    (trimmed, exact), nothing is written and the role is reported under
    `alreadyInJobList` with its stage (or "dismissed"). Otherwise the row
@@ -334,7 +371,7 @@ company name.
 dismissed role coming back (promise 6); a role filed under another
 company.
 **Proved by:** stubbed-`fetch` tests on the web and the local test file
-(`tests/test_boards.py`): the row's title and link equal the stubbed
+(`tests/boards.test.mjs`): the row's title and link equal the stubbed
 board's byte for byte; the input schema has no title field and the tool
 refuses unknown keys (§ 4.8); known by key; known by link under a
 different title; known when dismissed, with the stage untouched and
@@ -345,7 +382,9 @@ untouched; the injection test in § 4.3 run through this path.
 
 **B2: sanitising, in `jobs_md.save` and its port.** Every row value `save()` writes (each field's value, and the company and title in the row's heading; never the `## Search notes` block, which `save()` copies as it is),
 first has each run of whitespace turned into one space and is trimmed.
-Whitespace here is one explicit class, the same in both languages (§ 4.4):
+Whitespace here is one explicit class, written out in the one job list
+library (`skills/search/scripts/lib/jobs-md.mjs` after J2; § 4.4 uses
+the same class):
 space, tab, `\n`, `\r`, form feed, vertical tab, U+0085, U+00A0,
 U+2028, U+2029. A company containing ` — ` (space, em dash, space),
 or ending in ` —`, has that em dash written as `-`, because a row's
@@ -354,13 +393,14 @@ theirs; the split takes the first one. A company or title that is
 empty after cleaning, in the row this call writes, is refused: the
 writer exits 2 and jobs.md is unchanged; rows already in the file are
 written back as read. It lives in `save()`, so every writer (the adds,
-`record_verdict.py`, `update_job.py`) is protected in both languages.
+`record_verdict.mjs`, `update_job.mjs`) is protected; after J2 there is
+one `save()`, in `lib/jobs-md.mjs`.
 **Prevents:** a posting title that carries a newline and `## Offer` or
 `- URL:` becoming a stage heading or a field of another row (a job post
 is the plan's named prompt-injection risk). **Proved by:** (B1, kept, run
 against the new path) a board posting titled
 `Engineer\n## Offer\n### Evil Co — Row\n- URL: https://evil.example` is
-added through `add_roles` and through `boards.py add`; `jobs.md` then
+added through `add_roles` and through `boards.mjs add`; `jobs.md` then
 holds exactly one new row, under To Review, with the title on one line,
 and `load()` returns the expected rows and no Offer section; a company
 `A — B` round-trips as `A - B`; a `jobs.md` with a multi-line Search notes block round-trips byte-identical through a save; the parity
@@ -374,37 +414,54 @@ meaning the raw posting, as search's schema says. Parity cases: a new
 row with both; a re-verdict replacing `Analysis`; `JD` untouched by a
 later `--jd-file`. Target texts for every file that reads it: § 7.1.
 
-**`--existing` (the quick pass's write).** `record_verdict.py` gains `--existing`: the role must already be a row with the same key; otherwise it prints `error: no role <company> — <title> in jobs.md; nothing written` and exits 2. With `--existing`, `--url`, `--location` and `--jd-file` are refused (exit 2). The quick pass in a search run always passes `--existing`, with the company and title exactly as `add_roles` / `boards.py add` reported them (search's "How to run each instrument" table, § 5.3). **Prevents:** a quick pass creating a second, model-typed row, or replacing the link or location the board supplied. **Proved by:** parity cases — `--existing` on a missing key exits 2 with `jobs.md` byte-identical; `--existing --url x` exits 2; `--existing` on a present key changes only the verdict fields and `Evaluated`/`Updated`.
+**`--existing` (the quick pass's write).** `record_verdict.py` gains `--existing`: the role must already be a row with the same key; otherwise it prints `error: no role <company> — <title> in jobs.md; nothing written` and exits 2. With `--existing`, `--url`, `--location` and `--jd-file` are refused (exit 2). The quick pass in a search run always passes `--existing`, with the company and title exactly as `add_roles` / `boards.mjs add` reported them (search's "How to run each instrument" table, § 5.3). **Prevents:** a quick pass creating a second, model-typed row, or replacing the link or location the board supplied. **Proved by:** parity cases — `--existing` on a missing key exits 2 with `jobs.md` byte-identical; `--existing --url x` exits 2; `--existing` on a present key changes only the verdict fields and `Evaluated`/`Updated`.
 
-### 4.4 Parity
+### 4.4 One implementation
 
-- **Board reading.** The pure parts of `skills/search/scripts/boards.py`
-  (address parsing, API address building, reading each system's list and
-  posting, the word and date filters, the dedupe decision, the row built,
-  the slug and the JD header) and of `packages/agent/src/tools/boards.ts`
-  run over the same synthetic board answers; outputs must match exactly.
-  The Workday reader is local-only and has its own tests. Wired into
-  `tests/run.py` beside the checkers' parity; a difference fails loudly.
-- **The library.** § 4.3's changes go into the existing `jobs_md` and
-  `record_verdict` parity corpus (`packages/checkers/test/parity.mjs`,
-  the coverage gate): every new `def test_` gets a case.
-- **Two known bugs fixed on the way, in both languages:** Greenhouse
+The board readers are written once, in JavaScript
+(`docs/design-js-only.md`). The pure parts (address parsing, API address
+building, reading each system's list and posting, the word and date
+filters, the dedupe decision, the row built, the slug and the JD header)
+live in `skills/search/scripts/lib/board-readers.mjs`. The local command
+`skills/search/scripts/boards.mjs` and `packages/agent`'s `list_board`
+and `add_roles` both import them. The Workday reader runs only in the
+command, under Node. The entity table and the whitespace class below are
+written once, in that file. Tests are expected-output cases over
+synthetic board answers and table tests; there is no second language to
+agree with.
+
+- **Two known bugs fixed on the way:** Greenhouse
   sends `content` HTML-entity-encoded, and both the sweep
   (`search_ats.py:481`) and `fetch_job` (`packages/agent/src/tools/index.ts:80`)
   strip tags without decoding first, so saved postings keep
-  `&lt;div…&gt;` (checked, § 12). The new readers decode, then strip.
-- **One entity table and one whitespace class, written out, in both
-  languages.** Decoding uses exactly this table: `&amp;` `&lt;` `&gt;`
-  `&quot;` `&#39;` `&apos;` `&nbsp;` (to U+00A0), plus numeric `&#NNN;`
-  and `&#xHH;`; any other `&name;` is left as written. Neither language
-  calls its library's HTML unescape (Python's `html.unescape` knows
-  about 2,000 names, a browser's decoder differs again). Collapsing
-  whitespace uses § 4.3's written-out class, never `\s`: Python's `\s`
-  on text includes U+001C–U+001F and JavaScript's includes U+FEFF and
-  other Unicode spaces, so `\s` would make the two languages disagree on
-  the same posting. **Risk:** a posting using an entity outside the
+  `&lt;div…&gt;` (checked, § 12). **And it is encoded twice** (lead
+  ruling, 2026-09-28): the S2 review's live read of the GitLab board,
+  2026-09-28, 199 postings, found `&amp;nbsp;`, `&amp;amp;` and
+  `&amp;mdash;` inside the text (my re-read the same day: the first two in
+  all 199, `&amp;mdash;` in 84, no other doubled name), so one decode
+  leaves `&nbsp;` and `&amp;` in the saved posting. The new readers
+  decode entities, strip tags, then decode once more (once, not until
+  nothing changes), then collapse whitespace; the same steps for every
+  board system. *Proved by:* a table test with those samples: `a&amp;nbsp;b`
+  gives `a b`, `R&amp;amp;D` gives `R&D`, `a&amp;mdash;b` gives `a—b`,
+  and `&lt;p&gt;a&lt;/p&gt;` gives `a`.
+- **One entity table and one whitespace class, written out.** Decoding uses exactly this table: `&amp;` `&lt;` `&gt;`
+  `&quot;` `&#39;` `&apos;` `&nbsp;` (to U+00A0), `&mdash;` (to —,
+  U+2014) and `&ndash;` (to –, U+2013), plus numeric `&#NNN;` and
+  `&#xHH;`; any other `&name;` is left as written. The two dashes are in
+  the table because they are common in postings and a literal `&mdash;`
+  shown to the candidate is a visible defect (lead ruling, 2026-09-28;
+  84 of GitLab's 199 postings carry one). The readers call no
+  library HTML unescape: the same file runs under Node (the local
+  command) and in the browser (the web), Node has no HTML decoder built
+  in, and the browser's (`DOMParser`) exists only there and knows the
+  full list of about 2,000 names, so a library call would decode the same
+  posting differently by host, or not load at all. Collapsing whitespace
+  uses § 4.3's written-out class, never `\s`: JavaScript's `\s` leaves
+  out U+0085 and includes U+FEFF and other Unicode spaces, so the readers
+  would clean a posting differently from `save()`. **Risk:** a posting using an entity outside the
   table shows it as written (for example `&eacute;`); that is a visible
-  blemish, never a parity failure. Parity cases include every table
+  blemish, never a test failure. Expected-output cases include every table
   entry, one unknown name, and each whitespace character.
   `fetch_job` names a Lever posting's company after its team
   (`index.ts:90`); it moves onto `boards.ts`, which has no company field
@@ -482,7 +539,7 @@ model extracting a title or link is how invented data gets in).
 
 - After the adds, the model gives each added role evaluate's quick pass:
   the dealbreaker check, then fit against `criteria.md` and `profile.md`
-  only, from the saved posting, recorded with `record_verdict.py
+  only, from the saved posting, recorded with `record_verdict.mjs
   --existing` and a `quick-scan:` reason, on the company and title exactly
   as the add reported them (§ 4.3; evaluate `SKILL.md` § Quick-scan tier,
   unchanged).
@@ -501,7 +558,7 @@ model extracting a title or link is how invented data gets in).
   evaluate `SKILL.md` (585) ≈ 2,750, under 3,300 (UNVERIFIED until S5's
   measurement).
 - **Local:** the same, in the same run. The quick pass writes through
-  `record_verdict.py` in both hosts.
+  `record_verdict.mjs` in both hosts.
 
 ### 4.7 Cost and the gate (web), size first (both)
 
@@ -559,14 +616,17 @@ model extracting a title or link is how invented data gets in).
 - **A per-turn budget of 60 board requests,** shared by `list_board`,
   `add_roles` and `fetch_job`, counted in the turn state. Past it, the
   rest returns `request_limit` and the reply names what wasn't read. Four
-  requests at a time, 15 seconds each, no retries in the same turn.
+  requests at a time, 15 seconds each, counted until the body is read,
+  not only the headers; no retries in the same turn.
   *Prevents:* the browser acting as a crawler (the boards publish no
   limits, UNVERIFIED); a turn that never ends; a silent partial result.
   *Proved by:* 70 requested reads give 60 answers and 10
-  `request_limit`; a hanging stub times out at 15 s; a redirecting stub
+  `request_limit`; a hanging stub times out at 15 s, and so does one that
+  sends headers and then never finishes the body; a redirecting stub
   gives `error`; a board answering HTML gives `error`, with no throw.
-- `boards.ts` imports nothing from the browser or Node (the package's
-  lint rule).
+- `boards.ts` (the package's lint rule) and `board-readers.mjs` (the
+  browser-safety lint, which covers `skills/*/scripts/lib/` from J2)
+  import nothing from the browser or Node.
 
 ### 4.9 Where results land
 
@@ -647,7 +707,7 @@ model extracting a title or link is how invented data gets in).
   Amendments (§ 7.1, § 7.4): the analysis parts read `Analysis`; the row
   shows the date part of `Posted`; the empty state names search.
 - **Ten verdict cards in one turn** (a question for the designer, S5):
-  every `record_verdict.py` call builds a verdict card
+  every `record_verdict.mjs` call builds a verdict card
   (`design-web-agent.md` § 6.2), so a run with ten quick passes puts ten
   cards in the transcript. Whether they show as ten cards, or collapse
   under the search card, is the designer's call; the cards themselves
@@ -684,44 +744,50 @@ model extracting a title or link is how invented data gets in).
 
 | Deleted | Its receipt, adjudicated |
 |---|---|
-| `scripts/search_ats.py` | The regex filters' patches (2026-07-18 to 2026-08-14) become model judgment, with the lessons kept as hints (§ 5.3). Board reading moves to `boards.py` (same fields, parity). Slug guessing and the identity check go: board addresses are chosen at plan time, and `boardName` shows the board's own name. The lead-validation ladder goes with the lead tier. SimHash and trust flags only served aggregator and agency rows, which no longer land. Liveness checks: replaced by `gone` for the plan's boards (§ 4.12 names the gap). The cloud map (`market-api.json`) and discovery submit go. |
+| `scripts/search_ats.py` | The regex filters' patches (2026-07-18 to 2026-08-14) become model judgment, with the lessons kept as hints (§ 5.3). Board reading moves to `boards.mjs` (same fields, in `board-readers.mjs`). Slug guessing and the identity check go: board addresses are chosen at plan time, and `boardName` shows the board's own name. The lead-validation ladder goes with the lead tier. SimHash and trust flags only served aggregator and agency rows, which no longer land. Liveness checks: replaced by `gone` for the plan's boards (§ 4.12 names the gap). The cloud map (`market-api.json`) and discovery submit go. |
 | YC, BambooHR, Teamtailor, Breezy readers | YC's receipt (2026-08-04): a real role reachable only on YC's own board. That class is now reached by attended page reading, and the role enters through evaluate on the candidate's say-so. Persona P3 in § 8 contains exactly this case, so the loss is measured, not assumed. The other three carry no incident receipt. |
 | hiring.cafe (role-first scan, bespoke giants) | Receipt 2026-08-03/04: 21 of 23 companies it surfaced were missing from the company list. Those were mostly on job systems no sweep could read, so they reached the candidate as companies, not rows. Replaced by job-board-limited web search (rows) and attended general web search (companies for the plan). Measured in § 8 by measure 1b (good-fit employers surfaced, OLD's `leads.md` and `companies.md` additions counted) and by P3's third target, a traditional employer only hiring.cafe indexes; the bar and falsifier for P2 and P3 decide. |
 | `scripts/discover_hn.py`, `scripts/discover_trackb.py` | Company discovery only (their own docstrings). Replaced by attended web search and page reading, feeding plan revisions. Measured in § 8 by measure 1b for P2 and P3 (companies OLD appended to `companies.md` against companies NEW proposed for the plan). |
-| `scripts/autopilot_sweep.py`, `autopilot-log.md` | They existed so a scheduled run needed one permitted command. A scheduled run is now the agent running the plan (the skill's existing "Scheduled run" sequence) with `boards.py` permitted; its summary is its report. `t5-plan-scheduled` measures it. |
-| `criteria.json` and the rest of the settings parser | The model reads `criteria.md` in full (it already must). Two settings stay read by code, in `boards.py` and `boards.ts` with parity: `max new roles per company` and `active pipeline cap` (§ 4.2, item 8). |
+| `scripts/autopilot_sweep.py`, `autopilot-log.md` | They existed so a scheduled run needed one permitted command. A scheduled run is now the agent running the plan (the skill's existing "Scheduled run" sequence) with `boards.mjs` permitted; its summary is its report. `t5-plan-scheduled` measures it. |
+| `criteria.json` and the rest of the settings parser | The model reads `criteria.md` in full (it already must). Two settings stay read by code, in `board-readers.mjs`: `max new roles per company` and `active pipeline cap` (§ 4.2, item 8). |
 | `companies.md` | Board addresses live in the plan. An existing workspace's Board column is read once, at the next plan revision, and offered as the plan's addresses. |
 | `leads.md` | No lead tier (§ 7.2). |
-| `tests/test_search_targets.py` (12 tests), `tests/test_search_filters.py` (34) | Test deleted code; the behaviour they protected either moves into `tests/test_boards.py` (dedupe, dismissed-stays, fields) or is gone on purpose (regex filters). |
+| `tests/test_search_targets.py` (12 tests), `tests/test_search_filters.py` (34) | Test deleted code; the behaviour they protected either moves into `tests/boards.test.mjs` (dedupe, dismissed-stays, fields) or is gone on purpose (regex filters). |
+| `scripts/jobs_md.py` (and `tests/test_jobs_md.py`, which guards it) | Kept after J2 only as `search_ats.py`'s library (`docs/design-js-only.md`, J2); it goes with `search_ats.py`. The job list library is `scripts/lib/jobs-md.mjs`. |
 
-`check_files.py` and its port drop the four manifest rows
-(`check_files.py:53-58`, `check-files.mjs:74-79`) with parity; an old
+`check_files.mjs` drops six manifest rows, `companies.md`, `leads.md`,
+`criteria.json`, `jobs.db`, `jobs.db.bak` and `autopilot-log.md` (today
+`check_files.py:53-58`; `design-js-only.md` § 4.5 keeps the two `jobs.db`
+rows until S4), with its expected-output cases; an old
 workspace's leftover files then show as stray-file WARNs, which is the
 honest signal to delete them. **The first run of the new skill** in a
 workspace that still has any of `leads.md`, `companies.md`,
-`criteria.json` or `autopilot-log.md` names them once and offers, as one
+`criteria.json`, `autopilot-log.md`, `jobs.db` or `jobs.db.bak` names them once and offers, as one
 question, to move them into `archive/search-<date>/` (the Board column of
 `companies.md` is offered as plan addresses first). Only on the
 candidate's yes are they moved; a no is recorded in the plan and never
-asked again (promise 6). `archive` joins `check_files.py`'s manifest
-folders ("search files the simplified skill no longer uses"), with
-parity. On the web, where the store can't move files, an imported
+asked again (promise 6). `archive` joins `check_files.mjs`' manifest
+folders ("search files the simplified skill no longer uses"), with its
+expected-output cases. On the web, where the store can't move files, an imported
 workspace's leftovers are named once and left in place.
 `tests/test_e2e_lifecycle.py:275-276` stop
-creating `companies.md` and `leads.md`. `migrate_jobs_db.py` is
-unrelated and stays.
+creating `companies.md` and `leads.md`. `migrate_jobs_db.py` was
+retired by the JavaScript switch (J2). S4's leftovers list gains `jobs.db`
+and `jobs.db.bak`.
 
 ### 5.2 What is kept or added
 
-- **Kept:** `jobs_md.py` (hardened, § 4.3), `update_job.py`, the plan
+- **Kept:** the job list library (hardened, § 4.3; `scripts/lib/jobs-md.mjs`
+  after J2), `update_job.mjs`, the plan
   gate, the sweep loop's budget and exits, the prune report with one
   batch yes, the scheduled-run sequence (plan verbatim, no widening),
-  session close with `check_files.py`.
-- **Added:** `scripts/boards.py` (`list` and `add`; Greenhouse, Lever,
-  Ashby, SmartRecruiters, Workday), about 300 lines, stdlib only, parity
-  with `boards.ts` for the four shared systems.
+  session close with `check_files.mjs`.
+- **Added:** `scripts/boards.mjs` (`list` and `add`; Greenhouse, Lever,
+  Ashby, SmartRecruiters, Workday), about 300 lines, stdlib only, its
+  readers in `board-readers.mjs`, shared with `boards.ts` for the four
+  shared systems.
 - **What the local host keeps that the web can't:** Workday boards
-  (Python can make the call the browser can't); attended general web
+  (Node can make the call the browser can't); attended general web
   search and page reading for company discovery and market size; the
   attended LinkedIn radar for contacts and drafts. None of these writes
   a row unless the posting is read from one of the five board systems.
@@ -740,7 +806,7 @@ unrelated and stays.
 - **`references/patterns.md`**: the catalog becomes three instruments
   (company boards, job-board-limited web search, attended discovery),
   with a "How to run each instrument" table naming both hosts'
-  commands, including the quick pass as `record_verdict.py --existing`
+  commands, including the quick pass as `record_verdict.mjs --existing`
   on the company and title exactly as the add reported them; composing a plan (with board addresses); reading a thin
   result (unchanged craft); the title-judgment hints carried from the
   deleted filters ("Founding X" is usually a hands-on role; a title can
@@ -1016,7 +1082,7 @@ same.
    output (claims of boards read, counts).
 6. **Cost:** `claude -p`'s reported cost. NEW includes the quick passes;
    its search part and quick-pass part are reported separately (split at
-   its first `record_verdict.py` call).
+   its first `record_verdict.mjs` call).
 
 **What counts as found.** The labelling judge sees, per persona and trial, the union of: rows either arm added; OLD's `leads.md` entries from that run; companies OLD appended to `companies.md`; companies NEW proposed for the plan. Rows and leads are labelled fits / borderline / off; each company is labelled "hiring for this persona's roles now: yes / no" with one posting link as evidence. Measure 1b: good-fit employers surfaced (employers of good-fit leads, plus "yes" companies). **Bar adds:** for P2 and P3, NEW's good-fit employers summed over trials ≥ OLD's − 1. **Falsifier adds:** NEW surfaces two or more fewer in P2 or P3 → the discovery instrument that found them comes back as code under test.
 **Run protocol.** Each arm composes its plan in a first `claude -p` call; a second call carries the scripted reply `yes` and runs it; only the second is scored. Each persona's `criteria.md` carries `§ Target companies` and `§ Search settings` in the shape OLD's projection reads, and before any OLD run a code check confirms the generated `criteria.json` contains none of `DEFAULT_TARGETS` or `DEFAULT_CRITERIA`'s themes.
@@ -1090,16 +1156,18 @@ green. Unblocks W3b and W3d.
 latest `--analysis-file` wins; `--jd-file` still keeps the first; the
 `--existing` parity cases — `--existing` on a missing key exits 2 with `jobs.md` byte-identical; `--existing --url x` exits 2; `--existing` on a present key changes only the verdict fields and `Evaluated`/`Updated`.
 
-**S2. The board readers.** `skills/search/scripts/boards.py` (local,
-five systems) and `tests/test_boards.py`; `packages/agent/src/tools/boards.ts`,
-`list_board`, `add_roles`, the input checks, the estimate-first rule, the
-60-request budget, `toModelOutput`, `fetch_job` moved onto `boards.ts`
-with both fixes; board parity cases; a one-page note in `docs/spikes/`
-calling all four list endpoints and three single-posting endpoints from a
-page on a Vercel preview. If S2 lands before W3b, it deletes the stub
-`packages/agent/src/jobs-md.ts` exactly as W3b describes (`design-web-ui.md`
-§ 5.9, 3b), and W3b drops that part.
-*Exit:* § 4.1, § 4.2, § 4.8 proofs; parity 100%; the browser-safety lint.
+**S2. The board readers** (after J2). `skills/search/scripts/boards.mjs`
+(local, five systems) and `skills/search/scripts/lib/board-readers.mjs`;
+`packages/agent/src/tools/boards.ts`, `list_board`, `add_roles`, the input
+checks, the estimate-first rule, the 60-request budget, `toModelOutput`,
+`fetch_job` moved onto the shared readers with both fixes; expected-output
+cases and table tests; a one-page note in `docs/spikes/` calling all four
+list endpoints and three single-posting endpoints from a page on a Vercel
+preview. If S2 lands before W3b, it deletes the stub
+`packages/agent/src/jobs-md.ts` exactly as W3b describes, and W3b drops
+that part.
+*Exit:* § 4.1, § 4.2, § 4.8 proofs; the browser-safety lint covers
+`board-readers.mjs`.
 *Tester checks:* nothing the model types except company and posting
 address reaches a row; the budget; a hanging board; an HTML answer; a
 redirect; SmartRecruiters `empty` and "300 of N".
@@ -1120,7 +1188,7 @@ reply's coverage line still holds.
 **S4. The local skill rewrite and the comparison (stage L).** § 5's
 deletions and new prose (the full skill-shape conversion procedure,
 `docs/skill-shape.md`, including the token-preservation check and the
-word report), the `check_files` manifest change with parity, test
+word report), the `check_files` manifest change with its expected-output cases, test
 deletions; then § 8: one trial, its price to the owner, then the full
 comparison and the conduct cases, recorded in
 `docs/evals/eval-search-simplified.md`.
@@ -1241,7 +1309,8 @@ by the lead's rulings (§ 7).
 - Fields: a Greenhouse list item has `company_name`, `requisition_id`,
   `first_published`, `absolute_url`; `absolute_url` can be the company's
   own careers site (the hosted `job-boards` address redirected there,
-  302). Greenhouse `content` is entity-encoded HTML. A Lever posting has
+  302). Greenhouse `content` is entity-encoded HTML, encoded twice
+  (checked 2026-09-28, § 4.4). A Lever posting has
   no company field (`categories`: team, location, commitment,
   allLocations). An Ashby board has `apiVersion` and `jobs`, no company
   name. A SmartRecruiters posting has `company` with `identifier` and
@@ -1292,8 +1361,8 @@ the cost of a quick pass (S6); that replayed turns use `toModelOutput`
 >       lines (§ 7)
 > - [ ] S1 `jobs_md` sanitising + `Analysis` + `record_verdict
 >       --analysis-file`, both languages, parity (unblocks W3b, W3d)
-> - [ ] S2 `boards.py` (local) and `boards.ts` + `list_board` +
->       `add_roles` (web), parity, browser note
+> - [ ] S2 `boards.mjs` (local) and `boards.ts` + `list_board` +
+>       `add_roles` (web) on shared `board-readers.mjs`, browser note
 > - [ ] S3 job-board-limited web search, reservation, seam errors, proxy
 >       rule; live check (approved, ~$0.25); owner deploys
 > - [ ] S4 local skill rewrite and deletions; measured comparison (one

@@ -1,0 +1,26 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): no Status column: the row's status is empty",
+ "steps": [
+  {
+   "script": "learn/scripts/check_knowledge.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "knowledge.md": "# K\n\n## Map\n\n| Topic | Scope |\n|---|---|\n| X | track-A |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  X: bad status '' — gap/studying/credible/retired, bare (notes go in source)\n\n1 map row(s); 1 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

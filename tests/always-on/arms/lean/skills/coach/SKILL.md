@@ -36,7 +36,7 @@ in the same reply.
 ## Outcome intake
 
 When they report reject / screen / offer / ghost: update the pipeline
-row via `../search/scripts/update_job.py` (never hand-edit `jobs.md`);
+row via `../search/scripts/update_job.mjs` (never hand-edit `jobs.md`);
 refresh `plan.md`; prescribe the next move. Never invent a conversion
 rate when n < 5 — a raw count, not a rate.
 
@@ -51,8 +51,8 @@ time-separated points.
 
 ## Session close
 
-Run `scripts/check_closeout.py --workspace . --stage <stage> --asked
-"<each question>"` and `../profile/scripts/check_files.py --workspace
+Run `scripts/check_closeout.mjs --workspace . --stage <stage> --asked
+"<each question>"` and `../profile/scripts/check_files.mjs --workspace
 .`; fix a FAIL before the reply ends. Report outcomes, never narration.
 
 ## Handoffs

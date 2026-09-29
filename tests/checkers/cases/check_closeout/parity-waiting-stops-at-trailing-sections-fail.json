@@ -1,0 +1,30 @@
+{
+ "note": "packages/checkers/test/parity.mjs: waiting-stops-at-trailing-sections-fail (covers: test_waiting_on_you_stops_at_trailing_optional_sections)",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--stage",
+    "applying",
+    "--asked",
+    "follow up on the timer"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "Goal: x by 2026-10-01\nBudget: 60 min/day\n\n## Board\nWaiting on you\n- the comp floor — criteria.md\n\n## Standing floor\n- 1 practice rep a day\n\n## Queue\n- timer: follow up Acme 10-02\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  asked \"follow up on the timer\" — no Waiting-on-you row shares a word with it; write the row this turn\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

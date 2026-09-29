@@ -1,0 +1,32 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: rv-u2028-in-company",
+ "steps": [
+  {
+   "script": "evaluate/scripts/record_verdict.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "A B",
+    "--title",
+    "PM",
+    "--verdict",
+    "weak"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "recorded (created NEW role): A B — PM → weak (None)\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 1** · dismissed: 0 · updated 2026-09-23\n\n## To Review\n\n### A B — PM\n- Seen: 2026-09-23T12:34:56+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Verdict: weak\n- Evaluated: 2026-09-23T12:34:56+00:00\n"
+ }
+}

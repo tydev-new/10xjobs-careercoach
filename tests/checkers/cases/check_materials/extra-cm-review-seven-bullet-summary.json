@@ -1,0 +1,28 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cm-review-seven-bullet-summary",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--resume",
+    "resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "resume.md": "# Alex Chen\n\n*Platform engineering leader — reliability at scale*\n\n## Summary\n\n- Platform engineering leader who keeps a payments platform available through 10x growth.\n- **8+ years in SRE:** yes — Northwind Labs on-call lead since 2021.\n- Cut incident response time from 4 hours to 40 minutes across 12 services.\n- Built the on-call rotation from zero to a 6-person bench.\n- Moved deploys from weekly to daily with zero customer-facing rollbacks.\n- Reduced cloud spend 30% by retiring two legacy clusters.\n- Ran the incident review program for 40 engineers.\n\n## Experience\n\n### Northwind Labs — Platform Lead\n\n- Led the reliability program.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: pass (0 fail, 0 warn)\n\n✔ automatic checks clean\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

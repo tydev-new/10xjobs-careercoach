@@ -1,6 +1,6 @@
 // A tiny in-memory `io` for fast unit tests — no real filesystem, no
 // tempdir cleanup. Mirrors the io interface documented in README.md.
-import { join, dirname } from "../../src/path-util.mjs";
+import { join, dirname } from "../../../../skills/profile/scripts/lib/path-util.mjs";
 
 // `dirs`: paths that exist as EMPTY directories even though no file lives
 // under them yet (mirrors a real filesystem's mkdir(ws) happening before

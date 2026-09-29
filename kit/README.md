@@ -12,7 +12,7 @@ copying them by hand — and so a fix lands once.
 | The build rules (Part 2 of the principles: believe the file, one of everything, every rule derivable or earned, match the checker, context is scarce, bounded loops, evidence decides, plain language) | `../PRINCIPLES.md § Part 2` | `PRINCIPLES-core.md` — a verbatim extract, guarded by `tests/test_kit.py` |
 | The shape — five files, the loop skeleton, the alignment rules, how to convert a skill | `../docs/skill-shape.md` | not copied; read it there |
 | The process — design gate → review → dogfood → harness → closing review | `../docs/PROCESS.md` | not copied; read it there |
-| The checker core — schema parser, section check, declared tables, round-record check, the link rung | `../skills/profile/scripts/check_files.py` | `shapecheck.py` — the domain-neutral functions, guarded byte-identical by `tests/test_kit.py` |
+| The checker core: schema parser, section check, declared tables, round-record check, the link rung | `../skills/profile/scripts/lib/shapecheck.mjs` | not copied; vendor `skills/profile/scripts/lib/` (the file and the helpers it imports) |
 | The invariants — what must be true of every skill in a `skills/` directory | — | `tests/test_invariants.py`, parameterized by `SKILLS_ROOT` |
 | The conduct harness — runner, judge, the two helpers, how to write a case | `../tests/always-on/` (the live suites) | `harness/` — templates with four host blocks to fill |
 
@@ -25,8 +25,8 @@ copying them by hand — and so a fix lands once.
   skill, because every skill's `eval.md` answers to it.
 - **The checker's host constants** — the workspace manifest (which
   files may exist, who owns each), the history-table headers, any
-  declared tables — in its own `check_files.py` that imports or copies
-  `shapecheck.py`.
+  declared tables — in its own `check_files.mjs` that imports
+  `shapecheck.mjs`.
 - **One conduct case per skill**, with the bait that skill's law
   forbids, and the host blocks of the runner/judge.
 - **The close-out contract at Tier 0** — whatever must hold on every

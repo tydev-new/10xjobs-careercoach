@@ -63,7 +63,7 @@ Instrument catalog and discovery tactics in `references/patterns.md`.
 Owned: `jobs.md`, `companies.md`, `leads.md`, `criteria.json`, `jd-inbox/`, `autopilot-log.md` (shapes in `references/schema.md`).
 
 - **Hands back:** New To-Review rows → `evaluate`; radar hits → `outreach`.
-- **Session close:** Run `../profile/scripts/check_files.py --workspace .`. No checker-subagent is spawned (search writes no candidate-voiced text). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `../profile/scripts/check_files.mjs --workspace .`. No checker-subagent is spawned (search writes no candidate-voiced text). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

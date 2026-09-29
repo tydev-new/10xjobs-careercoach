@@ -1,0 +1,34 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: uj-arg-dismiss-twice",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Café",
+    "--title",
+    "Staff",
+    "--dismiss",
+    "--dismiss"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n*x*\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Café Labs — Staff Engineer\n- URL: https://c\n- Seen: 2026-01-01T00:00:00+00:00\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "updated: Café Labs — Staff Engineer — dismissed\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {
+  "jobs.md": "# Pipeline\n\n*The record. Script-written (search sweeps, update_job.mjs moves,\nrecord_verdict.mjs judges) — read it anywhere; change it via chat so\nthe duplicate-key check can protect it. Dismissed roles keep their\nhistory at the bottom; nothing is ever deleted.*\n\n**Active: 0** · dismissed: 1 · updated 2026-09-23\n\n## Dismissed\n\n### Café Labs — Staff Engineer\n- URL: https://c\n- Seen: 2026-01-01T00:00:00+00:00\n- Updated: 2026-09-23T12:34:56+00:00\n- Was: To Review\n"
+ }
+}

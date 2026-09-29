@@ -38,7 +38,7 @@ takes one), and an outreach plan (`contacts/<company>.md`, via
    title; paragraph 2 is proof; paragraph 3 is logistics + the ask.
    Never put internal pipeline notes in a candidate-facing letter.
 4. **Disclose:** cuts, placed words, and gaps beside the delivered
-   document (`scripts/proposal_block.py` prints the list) — never
+   document (`scripts/proposal_block.mjs` prints the list) — never
    silent.
 5. Two rounds max without score movement → present the tradeoff as a
    **DECISION**.
@@ -48,7 +48,7 @@ takes one), and an outreach plan (`contacts/<company>.md`, via
 Every delivered document runs, in this order, before the candidate sees
 it:
 
-1. `scripts/check_materials.py --workspace . --resume <path> --letter
+1. `scripts/check_materials.mjs --workspace . --resume <path> --letter
    <path>` — the structure tier (verbatim bullets, one opening section,
    banned filler, length bounds).
 2. The independent language checker-subagent
@@ -64,7 +64,7 @@ Filling a live form, and firing submit, each follow the human gate in
 your workspace `CLAUDE.md` (wording in
 `../coach/references/gate-grammar.md`) — **one role at a time, never a
 batch**. The confirmation is captured and logged (`jobs.md` → Applied
-via `../search/scripts/update_job.py`). See § Guardrails for what
+via `../search/scripts/update_job.mjs`). See § Guardrails for what
 never happens at this gate.
 
 - EEO defaults come from `profile.md § Application defaults` unless the
@@ -91,8 +91,8 @@ auto-submit — the submit gate still fires one role at a time.
 
 ## Session close
 
-Run `scripts/proposal_block.py --workspace . --application <path>` and
-`../profile/scripts/check_files.py --workspace .`; fix a FAIL before
+Run `scripts/proposal_block.mjs --workspace . --application <path>` and
+`../profile/scripts/check_files.mjs --workspace .`; fix a FAIL before
 the reply ends. Report outcomes, never narration.
 
 ## Guardrails

@@ -1,0 +1,32 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: uj-ambiguous-emoji-titles",
+ "steps": [
+  {
+   "script": "search/scripts/update_job.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--company",
+    "Café",
+    "--title",
+    "Staff",
+    "--stage",
+    "Offer"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "jobs.md": "# Pipeline\n\n*x*\n\n**Active: 1** · dismissed: 0 · updated 2026-01-01\n\n## To Review\n\n### Café — Staff Engineer 🚀\n\n### Café — Staff Engineer II 🛰\n\n"
+ },
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "error: --company/--title matched 2 roles: Staff Engineer 🚀; Staff Engineer II 🛰 — be more specific\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

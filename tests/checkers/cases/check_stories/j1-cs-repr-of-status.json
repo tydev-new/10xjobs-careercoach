@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): Python repr() of the bad status",
+ "steps": [
+  {
+   "script": "storybank/scripts/check_stories.py",
+   "argv": [
+    "--workspace",
+    "."
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "stories/S001-a.md": "# story\n",
+  "stories/S002-a.md": "# story\n",
+  "stories/S003-a.md": "# story\n",
+  "storybank.md": "# Storybank\n\n## Coverage\n\n| Competency | Source | Covered by |\n|---|---|---|\n| X | [inferred] | S001 |\n\n## Stories\n\n| ID | Title | Strength | Status | Notes |\n|---|---|---|---|---|\n| S001 | A | 4 | it's | |\n| S002 | B | 4 | \"q\" it's | |\n| S003 | C | 4 | café x | |\n"
+ },
+ "expect": [
+  {
+   "stdout": "FAIL  S001: invalid Status \"it's\" — `confirmed` or `draft [source: <file>]`\nFAIL  S002: invalid Status '\"q\" it\\'s' — `confirmed` or `draft [source: <file>]`\nFAIL  S003: invalid Status 'café\\u2028x' — `confirmed` or `draft [source: <file>]`\n\n3 index row(s), 3 story file(s); 3 failure(s).\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

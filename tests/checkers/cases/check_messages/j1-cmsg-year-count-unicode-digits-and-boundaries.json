@@ -1,0 +1,29 @@
+{
+ "note": "tests/checkers/freeze.mjs (J1): Python's \\d and \\b are Unicode-aware",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    ".",
+    "--contacts",
+    "contacts/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "contacts/acme.md": "> ٢٠ years in Arabic-Indic digits.\n\nx\n\n> café20 years glued to a letter.\n\nx\n\n> x_20 years after an underscore.\n",
+  "pitch.md": "# P\n\n## Messages rubric\n\nPINNED 2026-08-17\n| tier | claim |\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: FAIL (1 fail, 0 warn, 3 drafts)\n  [FAIL] draft 1: aggregate year count \"٢٠ years\" — the age tag; answer with outcomes, not tenure (a double-quoted JD bar is exempt)\n  [INFO] draft 1: 32 chars / 5 words\n  [INFO] draft 2: 31 chars / 6 words\n  [INFO] draft 3: 31 chars / 5 words\n✘ fix the FAILs before finalizing\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

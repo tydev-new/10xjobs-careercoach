@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: r3-cc-arg-help-empty-equals",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--help="
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "",
+   "stderr": "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\ncheck_closeout.mjs: error: argument -h/--help: ignored explicit argument ''\n",
+   "stderrMatch": "exact",
+   "exit": 2
+  }
+ ],
+ "after": {}
+}

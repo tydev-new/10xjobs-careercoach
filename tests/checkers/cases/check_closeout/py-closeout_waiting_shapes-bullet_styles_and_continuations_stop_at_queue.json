@@ -1,0 +1,34 @@
+{
+ "note": "tests/test_closeout_waiting_shapes.py::test_bullet_styles_and_continuations_stop_at_queue",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--stage",
+    "applying",
+    "--asked",
+    "compensation pointer",
+    "--asked",
+    "mutual",
+    "--asked",
+    "relocation"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "plan.md": "# Plan — Test Candidate\nGoal: an offer by 2026-12-01\nBudget: 60 min/day\n\n## Board\nWaiting on you\n- the comp floor\n  pointer: criteria.md § Compensation\n* which mutual to ask — contacts/flo.md\n• relocation answer — profile.md\n\n## Queue\n- timer: follow up Acme recruiter 10-02\n"
+ },
+ "expect": [
+  {
+   "stdout": "close-out clean: stage applying; plan.md written; 3 question(s) each have a row\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

@@ -1,0 +1,29 @@
+{
+ "note": "packages/checkers/test/parity.mjs: prints-cut-list (covers: test_prints_the_cut_list_short_with_why, test_have_row_missing_their_word_warns_and_near_vocab_does_not, test_out_rows_in_base_order_warns)",
+ "steps": [
+  {
+   "script": "apply/scripts/proposal_block.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--application",
+    "applications/x.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "applications/x.md": "## Coverage\n| requirement | status | evidence | decision |\n|---|---|---|---|\n| Orchestrate scheduled data workflows | have | monitoring bullet | answered |\n| Tested dbt models | have | dbt bullet | answered |\n| A/B testing | gap | none | open |\n## Selection\n| # | role | bullet | in/out | source | words | why |\n|---|---|---|---|---|---|---|\n| 1 | A | one | in | base | 5 | lead |\n| 2 | A | two | out | base | 6 | weakest |\n| 3 | A | three | out | base | 7 | next |\n| 4 | A | four | out | base | 8 | furthest |\n",
+  "base-resume.md": "# Base\n## Experience\n- Set up scheduled job monitoring with alerting on failed overnight loads.\n- Built tested dbt models with peer review.\n"
+ },
+ "expect": [
+  {
+   "stdout": "**Cut — 3 of 4 bullets, weakest first.** Say \"keep\" and the bullet's name or number to bring one back.\n1. A — two — *weakest*\n2. A — three — *next*\n3. A — four — *furthest*\n\n**Gaps — evidence you might have?** (\"no\" is a fine answer)\n- A/B testing — none\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nWARN  the `out` rows are in base order (# strictly rising) — rank them weakest-first for THIS posting, in the file, then re-run\nWARN  `have` row \"Orchestrate scheduled data workflows\": their word(s) ['Orchestrate', 'workflows'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

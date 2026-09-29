@@ -1,0 +1,23 @@
+{
+ "note": "tests/checkers-parity/extra.mjs: cc-arg-help",
+ "steps": [
+  {
+   "script": "coach/scripts/check_closeout.py",
+   "argv": [
+    "-h"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {},
+ "expect": [
+  {
+   "stdout": "usage: check_closeout.mjs [-h] --workspace WORKSPACE [--stage STAGE]\n                         [--asked ASKED] [--minutes MINUTES]\n\nThe coach's close-out, in code — the three duties every version of the\nskill dropped about half the time (t8, every round 2026-08-15 → 08-21):\nthe stage named, every question asked turned into a Waiting-on-you row,\nthe plan written this turn. Prose could not hold them; apply's proposal\nproblem had the same shape and a script fixed it.\n\nThe agent DECLARES what its reply does, and the script checks the disk:\n\n    node check_closeout.mjs --workspace . --stage applying \\\n        --asked \"which of the three mutuals\" --asked \"the comp floor\"\n\nFAIL: the stage is not one of the five · plan.md was not modified in the\nlast --minutes (default 30) · an --asked question has no Waiting-on-you\nrow that shares a keyword with it · the Board is empty. Exit 1 on any\nFAIL. The declaration is the forcing function: a question you did not\ndeclare is a question you forgot to write down.\n\noptions:\n  -h, --help            show this help message and exit\n  --workspace WORKSPACE\n  --stage STAGE         one of: groundwork / searching / applying /\n                        interviewing / deciding (auto-inferred from workspace\n                        if omitted)\n  --asked ASKED         a question this reply asks the candidate (repeatable)\n  --minutes MINUTES     plan.md must have been written within this many\n                        minutes\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 0
+  }
+ ],
+ "after": {}
+}

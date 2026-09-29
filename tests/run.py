@@ -18,12 +18,21 @@ paths = sorted(glob.glob(os.path.join(HERE, "test_*.py")))
 paths += [os.path.join(KIT, "test_kit.py")]          # the kit's guarded copies
 for path in paths:
     name = os.path.basename(path)[:-3]
-    if path.startswith(KIT):
-        name = "kit_" + name
-        spec = importlib.util.spec_from_file_location(name, path)
-        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-    else:
-        mod = importlib.import_module(name)
+    try:
+        if path.startswith(KIT):
+            name = "kit_" + name
+            spec = importlib.util.spec_from_file_location(name, path)
+            mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        else:
+            mod = importlib.import_module(name)
+    except Exception:
+        # A single test file's own import failing (e.g. a module it
+        # imports was deleted this stage) must not crash every OTHER
+        # test file's run — reported as one FAIL, not a hard stop.
+        failed += 1
+        print(f"FAIL {name} (import)")
+        traceback.print_exc()
+        continue
     for name in sorted(dir(mod)):
         if name.startswith("test_"):
             try:
@@ -88,13 +97,14 @@ else:
     else:
         passed += 1
 
-# packages/checkers: the JS ports' own unit tests, plus the parity test
-# against the real Python scripts (docs/design-web-agent.md § 5, step 3).
-# Skips loudly (not silently) when node isn't on PATH, same pattern as
-# tests/web above.
+# packages/checkers: the JS ports' own unit tests (docs/design-web-agent.md
+# § 5). The parity machinery (parity.mjs, coverage-gate.mjs) is gone at J2
+# (docs/design-js-only.md § 6): tests/checkers/run-cases.mjs's
+# expected-output cases are the specification now. Skips loudly (not
+# silently) when node isn't on PATH, same pattern as tests/web above.
 CHECKERS = os.path.join(HERE, "..", "packages", "checkers")
 if not node:
-    print("\nSKIPPED packages/checkers (unit + parity): no `node` on PATH")
+    print("\nSKIPPED packages/checkers (unit): no `node` on PATH")
 else:
     print("\n--- node --test packages/checkers/test/unit/*.test.mjs ---")
     unit_tests = sorted(glob.glob(os.path.join(CHECKERS, "test", "unit", "*.test.mjs")))
@@ -105,26 +115,11 @@ else:
     else:
         passed += 1
 
-    print("\n--- node packages/checkers/test/parity.mjs ---")
-    result = subprocess.run([node, os.path.join(CHECKERS, "test", "parity.mjs")], cwd=CHECKERS)
-    if result.returncode != 0:
-        failed += 1
-        print("FAIL packages/checkers/test/parity.mjs — see output above")
-    else:
-        passed += 1
-
-    print("\n--- node packages/checkers/test/coverage-gate.mjs ---")
-    result = subprocess.run([node, os.path.join(CHECKERS, "test", "coverage-gate.mjs")], cwd=CHECKERS)
-    if result.returncode != 0:
-        failed += 1
-        print("FAIL packages/checkers/test/coverage-gate.mjs — see output above")
-    else:
-        passed += 1
-
-# tests/checkers-parity/: the INDEPENDENT tester's own suite for
-# packages/checkers (plan step 3, fix round 2 item 4; fix round 3 brought
-# it to 156/156 both engines) — separate from packages/checkers/test/
-# (the coder's own tests, above).
+# tests/checkers-parity/dispatch.test.mjs: the INDEPENDENT tester's own
+# dispatch-contract suite (plan step 3), separate from
+# packages/checkers/test/ (the coder's own tests, above). extra.mjs and
+# e2e_both.py (the tester's parity harness against Python) are gone at J2,
+# same reason as packages/checkers/test/parity.mjs above.
 CHECKERS_PARITY = os.path.join(HERE, "checkers-parity")
 if not node:
     print("\nSKIPPED tests/checkers-parity: no `node` on PATH")
@@ -137,30 +132,39 @@ else:
     else:
         passed += 1
 
-    print("\n--- node tests/checkers-parity/extra.mjs ---")
-    result = subprocess.run([node, os.path.join(CHECKERS_PARITY, "extra.mjs")], cwd=CHECKERS_PARITY)
-    if result.returncode != 0:
-        failed += 1
-        print("FAIL tests/checkers-parity/extra.mjs — see output above")
+# tests/checkers/: the expected-output cases (docs/design-js-only.md § 5) —
+# Python 3.14's recorded output for all eleven shipped scripts, replayed
+# through the `node` path (the ports; python3 for the three unported
+# scripts until J3) and the web's just-bash dispatch; then the § 5.4 tester
+# checks (a planted wrong output, an edited input, the masked temp path and
+# the stub Chrome page line must each FAIL). Node 18 (the floor, § 5.4)
+# runs the `node` path too when NODE18_BIN names a Node 18 binary.
+CASES = os.path.join(HERE, "checkers")
+if not node:
+    print("\nSKIPPED tests/checkers/run-cases.mjs: no `node` on PATH")
+else:
+    for label, args in (
+        ("run-cases.mjs", []),
+        ("run-cases.mjs --self-test", ["--self-test"]),
+    ):
+        print(f"\n--- node tests/checkers/{label} ---")
+        result = subprocess.run([node, os.path.join(CASES, "run-cases.mjs"), *args], cwd=os.path.join(HERE, ".."))
+        if result.returncode != 0:
+            failed += 1
+            print(f"FAIL tests/checkers/{label} — see output above")
+        else:
+            passed += 1
+    node18 = os.environ.get("NODE18_BIN")
+    if not node18:
+        print("\nSKIPPED tests/checkers/run-cases.mjs on Node 18: set NODE18_BIN to a Node 18.19.1 binary")
     else:
-        passed += 1
-
-    # tests/checkers-parity/e2e_both.py: the independent tester's own
-    # replay of test_e2e_lifecycle.py's fixtures through BOTH engines (fix
-    # round 3, item "wire e2e_both.py into tests/run.py"). It's a
-    # standalone script, not a test_*.py module of test_*() functions
-    # (importing it runs the whole thing immediately, including its own
-    # sys.exit) — so it's run as a subprocess here, the same pattern as
-    # the other node-based suites above, not imported like tests/test_*.py.
-    # It also shells out to `node` itself (to run packages/checkers/bin/),
-    # so it's gated on `node` being on PATH, same as its siblings here.
-    print("\n--- python3 tests/checkers-parity/e2e_both.py ---")
-    result = subprocess.run([sys.executable, os.path.join(CHECKERS_PARITY, "e2e_both.py")])
-    if result.returncode != 0:
-        failed += 1
-        print("FAIL tests/checkers-parity/e2e_both.py — see output above")
-    else:
-        passed += 1
+        print(f"\n--- {node18} tests/checkers/run-cases.mjs --paths=node ---")
+        result = subprocess.run([node18, os.path.join(CASES, "run-cases.mjs"), "--paths=node"], cwd=os.path.join(HERE, ".."))
+        if result.returncode != 0:
+            failed += 1
+            print("FAIL tests/checkers/run-cases.mjs on Node 18 — see output above")
+        else:
+            passed += 1
 
 # packages/agent's own suite (node --test) — plan step 4. Run with cwd
 # set to packages/agent so its own node_modules (ai,

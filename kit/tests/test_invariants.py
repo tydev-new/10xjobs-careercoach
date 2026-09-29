@@ -6,19 +6,51 @@ they fail on every `tests/run.py`, instead of needing a reviewer.
 Structure only — what code can see. Conduct stays with the harness.
 """
 import glob
+import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 
-# Domain-neutral: point SKILLS_ROOT at any skills/ directory. The host's
-# checker constants (manifest, history headers) are read from the module
-# named by HOST_CHECKER (default: the kit's shapecheck, which has none —
-# the manifest test then only checks schema owners are skills).
+# Domain-neutral: point SKILLS_ROOT at any skills/ directory. docs/
+# design-js-only.md § 2.1: the kit no longer keeps a guarded Python copy
+# of the checker core — it vendors skills/profile/scripts/lib/shapecheck.mjs
+# (kit/README.md "Adopting it"), which has no MANIFEST_FILES (that constant
+# is host-specific, defined only in check-files.mjs) — the manifest test
+# below only checks schema owners are skills, same as before.
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
 SKILLS = os.environ.get("SKILLS_ROOT", os.path.join(ROOT, "skills"))
-sys.path.insert(0, os.path.join(ROOT, "kit"))
-import shapecheck as cf  # noqa: E402
-MANIFEST = getattr(cf, "MANIFEST_FILES", {})
+SHAPECHECK_MJS = os.path.join(ROOT, "skills", "profile", "scripts", "lib", "shapecheck.mjs")
+IO_NODE_MJS = os.path.join(ROOT, "skills", "profile", "scripts", "lib", "io-node.mjs")
+NODE = shutil.which("node")
+MANIFEST = {}
+
+
+def _node_json(js_body):
+    assert NODE, "no `node` on PATH — required for kit/tests/test_invariants.py's schema/link checks"
+    wrapped = f"(async () => {{\n{js_body}\n}})();"
+    r = subprocess.run([NODE, "--input-type=module", "-e", wrapped], capture_output=True, text=True)
+    assert r.returncode == 0, f"node -e failed:\n{r.stderr}"
+    return json.loads(r.stdout)
+
+
+def cf_load_schemas():
+    return _node_json(f"""
+      const {{ loadSchemas }} = await import({json.dumps("file://" + SHAPECHECK_MJS)});
+      const {{ nodeIo }} = await import({json.dumps("file://" + IO_NODE_MJS)});
+      const schemas = await loadSchemas(nodeIo, {json.dumps(SKILLS)});
+      console.log(JSON.stringify(schemas));
+    """)
+
+
+def cf_check_skill_prose():
+    return _node_json(f"""
+      const {{ checkSkillProse }} = await import({json.dumps("file://" + SHAPECHECK_MJS)});
+      const {{ nodeIo }} = await import({json.dumps("file://" + IO_NODE_MJS)});
+      const res = await checkSkillProse(nodeIo, {json.dumps(os.path.abspath(SKILLS))});
+      console.log(JSON.stringify(res));
+    """)
 
 ALL = sorted(os.path.basename(d) for d in glob.glob(os.path.join(SKILLS, "*")) if os.path.isdir(d))
 STAGES_OF_A_SECTION = ("Runs when", "Exits")
@@ -79,7 +111,7 @@ def test_loop_sections_stay_short():
 
 
 def test_one_owner_per_schema_file_and_manifest_agrees():
-    schemas = cf.load_schemas(SKILLS)
+    schemas = cf_load_schemas()
     for name, s in schemas.items():
         assert s.get("owner") in ALL, f"{name}: owner {s.get('owner')!r} is not a skill"
     for fname, owner in MANIFEST.items():
@@ -88,7 +120,7 @@ def test_one_owner_per_schema_file_and_manifest_agrees():
 
 
 def test_cross_skill_links_resolve():
-    problems = [f"{l}: {m}" for l, m in cf.check_skill_prose(os.path.abspath(SKILLS)) if l == "FAIL"]
+    problems = [f"{l}: {m}" for l, m in cf_check_skill_prose() if l == "FAIL"]
     assert not problems, "\n".join(problems)
 
 
@@ -98,7 +130,7 @@ def test_session_close_names_its_scripts_and_the_subagent_fact():
         m = re.search(r"\*\*Session close[^*]*\*\*(.*?)(?=^## |\Z)", t, re.S | re.M)
         assert m, f"{skill}: no Session close"
         close = m.group(1)
-        assert ".py" in close, f"{skill}: Session close names no script"
+        assert re.search(r"scripts/\w+\.(mjs|py)\b", close), f"{skill}: Session close names no script"
         assert "subagent" in close or "checker" in close.lower(), f"{skill}: Session close does not state the subagent fact"
 
 

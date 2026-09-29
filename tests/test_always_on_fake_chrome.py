@@ -2,13 +2,20 @@
 replacing an earlier plan to isolate the whole harness under a separate
 macOS user `tentest`): a runner's PDF step must never launch a real Chrome
 — that is what hung during the 2026-09-26 incident (see
-skills/apply/scripts/render_resume.py's to_pdf() docstring and
+skills/apply/scripts/render_resume.mjs's toPdf() docstring and
 tests/always-on/guard-bin/pkill for the incident it caused). Every
 run_*.sh sources lib_env.sh, which — since the fix round below — stages a
 comment-free copy of tests/always-on/fixtures/fake-chrome inside the
 trial's own sandbox HOME (sandbox_home_setup, never at source time) and
-points RENDER_RESUME_CHROME at THAT; render_resume.py's to_pdf() reads
+points RENDER_RESUME_CHROME at THAT; render_resume.mjs's toPdf() reads
 that var only when its own caller passes no explicit `chrome=`.
+
+docs/design-js-only.md § 6 (J2), lead ruling 1: render_resume.py is gone —
+this file stays Python (tooling moves last, stage T) but every `rr.*` call
+below now goes through tests/always-on/render-resume-driver.mjs (a `node`
+subprocess, the same seam tests/checkers/jobs-md-driver.mjs uses for
+jobs_md), via the small `_RR` wrapper right after the imports. The
+assertions, the fixtures and every dated receipt below are unchanged.
 
 Fix round (arm-A t10 measured misses, 2026-09-27), two independent bugs:
   (a) an agent under test read RENDER_RESUME_CHROME, then `cat` the file
@@ -26,7 +33,7 @@ Fix round (arm-A t10 measured misses, 2026-09-27), two independent bugs:
       under test, told wrongly its résumé was 2 pages, cut it further
       to 278 words chasing a page count nothing real would report. Fixed:
       the fixture's WRAP_WIDTH/LINES_PER_PAGE/HEADING_EXTRA_LINES
-      constants are now DERIVED from render_resume.py's own CSS, every
+      constants are now DERIVED from render_resume.mjs's own CSS, every
       step shown in the fixture's own docstring —
       test_derived_constants_match_render_resume_css below recomputes
       that same arithmetic fresh from the live CSS so a future CSS edit
@@ -35,9 +42,11 @@ Fix round (arm-A t10 measured misses, 2026-09-27), two independent bugs:
     python3 tests/test_always_on_fake_chrome.py
 """
 import atexit
+import json
 import os
 import py_compile
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -52,9 +61,46 @@ FAKE_CHROME = os.path.join(AO, "fixtures", "fake-chrome")
 STAGE_SCRIPT = os.path.join(AO, "stage_fake_chrome.py")
 RESUME_330W = os.path.join(AO, "fixtures", "resume-330w.md")
 RESUME_600W = os.path.join(AO, "fixtures", "resume-600w.md")
+RENDER_RESUME_DRIVER = os.path.join(AO, "render-resume-driver.mjs")
+NODE = shutil.which("node")
 
-sys.path.insert(0, os.path.join(REPO, "skills", "apply", "scripts"))
-import render_resume as rr  # noqa: E402
+
+class _RR:
+    """rr.to_pdf/pdf_pages/to_html/find_chrome/CSS, each a `node` subprocess
+    call to render-resume-driver.mjs — see the module docstring."""
+
+    def _run(self, *args, env=None):
+        assert NODE, "no `node` on PATH — required for the render_resume.mjs driver"
+        r = subprocess.run([NODE, RENDER_RESUME_DRIVER, *[str(a) for a in args]],
+                            capture_output=True, text=True, env=env or os.environ.copy())
+        assert r.returncode == 0, f"render-resume-driver.mjs {args}: {r.stderr}"
+        return json.loads(r.stdout)
+
+    def to_pdf(self, html, pdf, chrome=None, timeout=None):
+        timeout_ms = "" if timeout is None else str(int(timeout * 1000))
+        out = self._run("to-pdf", html, pdf, chrome or "", timeout_ms)
+        return out["ok"], out["err"]
+
+    def pdf_pages(self, pdf_path):
+        return self._run("pdf-pages", pdf_path)["pages"]
+
+    def to_html(self, md_text):
+        tmp_md = tempfile.mktemp(suffix=".md")
+        open(tmp_md, "w", encoding="utf-8").write(md_text)
+        try:
+            return self._run("to-html", tmp_md)["html"]
+        finally:
+            os.remove(tmp_md)
+
+    def find_chrome(self, env=None):
+        return self._run("find-chrome", env=env)["path"]
+
+    @property
+    def CSS(self):
+        return self._run("css")["css"]
+
+
+rr = _RR()
 
 
 def _tmp(suffix=""):
@@ -110,7 +156,7 @@ def test_lib_env_points_every_runner_at_a_staged_copy_inside_the_sandbox():
 def test_to_pdf_uses_the_fake_when_only_the_env_var_is_set():
     """The path a real harness runner takes: RENDER_RESUME_CHROME is set in
     the environment (never passed as an explicit argument), and to_pdf()
-    is called exactly the way render_resume.py's own main() calls it."""
+    is called exactly the way render_resume.mjs's own main() calls it."""
     html = _tmp(".html")
     open(html, "w", encoding="utf-8").write("<html><body>hi</body></html>")
     pdf = _tmp(".pdf")
@@ -131,7 +177,7 @@ def test_fake_chrome_writes_a_realistic_size_by_default():
     """BLOCKING fix (independent review, 2026-09-27): size is now DERIVED
     FROM CONTENT, not a fixed 45KB stub — an empty page is a few hundred
     bytes, and a realistic one-page résumé lands comfortably under the
-    ~100KB upload limit render_resume.py warns about."""
+    ~100KB upload limit render_resume.mjs warns about."""
     html = _tmp(".html")
     open(html, "w", encoding="utf-8").write(
         "<html><body><h1>Alex Chen</h1><p>Senior data analyst building "
@@ -169,7 +215,7 @@ def test_fake_chrome_size_is_overridable_for_the_over_limit_case():
 
 def test_fake_chrome_never_hangs():
     """The whole point: no real browser, so nothing to wait on — this
-    returns near-instantly, well under render_resume.py's own 120s
+    returns near-instantly, well under render_resume.mjs's own 120s
     default timeout (a generous 5s bound here so the test itself never
     hangs a CI run either)."""
     html = _tmp(".html")
@@ -214,18 +260,30 @@ def test_explicit_chrome_argument_overrides_the_env_var():
 
 def test_production_behaviour_is_unchanged_when_the_env_var_is_unset():
     """Outside this harness RENDER_RESUME_CHROME is never set — to_pdf()
-    must fall back to find_chrome() exactly as before this change."""
-    had, old = _pop_env("RENDER_RESUME_CHROME")
-    real_find_chrome = rr.find_chrome
-    rr.find_chrome = lambda: None
+    must fall back to find_chrome() exactly as before this change. This is
+    a subprocess call now (see the module docstring), so "find_chrome()
+    finds nothing" is forced the same way tests/checkers/run-cases.mjs
+    forces it for a case's own "no chrome" mode — PATH pointed at an empty
+    directory plus RENDER_RESUME_CHROME_PATH_ONLY=1 (render_resume.mjs's
+    own comment: this is the one gap PATH manipulation alone can't close,
+    since a real Chrome.app on the machine running this test would
+    otherwise always be found via its hardcoded absolute path, regardless
+    of PATH) — never a Python monkeypatch, which a subprocess boundary
+    can't reach anyway."""
+    d = tempfile.mkdtemp(prefix="no-chrome-path-")
+    env = dict(os.environ, PATH=d, RENDER_RESUME_CHROME_PATH_ONLY="1")
+    env.pop("RENDER_RESUME_CHROME", None)
+    html, pdf = _tmp(".html"), _tmp(".pdf")
+    open(html, "w", encoding="utf-8").write("<html></html>")
     try:
-        ok, err = rr.to_pdf(_tmp(".html"),
-                             _tmp(".pdf"), chrome=None)
+        r = subprocess.run([NODE, RENDER_RESUME_DRIVER, "to-pdf", html, pdf, "", ""],
+                            capture_output=True, text=True, env=env)
     finally:
-        rr.find_chrome = real_find_chrome
-        _restore_env("RENDER_RESUME_CHROME", had, old)
-    assert ok is False
-    assert "no Chrome/Chromium found" in err
+        shutil.rmtree(d, ignore_errors=True)
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["ok"] is False
+    assert "no Chrome/Chromium found" in out["err"]
 
 
 def test_check_env_verifies_the_fake_chrome_is_wired_in():
@@ -277,7 +335,7 @@ def _pdftotext(pdf_path):
 
 def test_fake_chrome_pdf_parses_with_pdftotext_and_pypdf():
     """The BLOCKING finding itself: both real extractors must open the
-    file without error — a fixture that only render_resume.py's own
+    file without error — a fixture that only render_resume.mjs's own
     (lenient) pdf_pages() can read is not a fix."""
     pdf = _render(RESUME_HTML.format(bullets=""))
     if _HAS_PDFTOTEXT:
@@ -343,10 +401,10 @@ def test_fake_chrome_two_pages_for_long_content():
 
 
 def _render_md_through_real_renderer(md_path):
-    """The exact path an agent takes: render_resume.py's own to_html() on
+    """The exact path an agent takes: render_resume.mjs's own to_html() on
     a REAL .md fixture, then to_pdf() through the harness fake — never a
     hand-built HTML string, so this exercises the actual block shapes
-    (h1/h2/h3/p/li) render_resume.py emits, not an approximation of them."""
+    (h1/h2/h3/p/li) render_resume.mjs emits, not an approximation of them."""
     md_text = open(md_path, encoding="utf-8").read()
     html = _tmp(".html")
     open(html, "w", encoding="utf-8").write(rr.to_html(md_text))
@@ -425,7 +483,7 @@ def test_fake_chrome_over_limit_pdf_still_parses_with_correct_page_count():
 # (a) hide it: RENDER_RESUME_CHROME must point at a comment-free, per-trial
 #     copy (tests/always-on/stage_fake_chrome.py), not the documented repo
 #     fixture. (b) calibrate it: WRAP_WIDTH/LINES_PER_PAGE/
-#     HEADING_EXTRA_LINES are now derived from render_resume.py's own CSS,
+#     HEADING_EXTRA_LINES are now derived from render_resume.mjs's own CSS,
 #     not guessed.
 
 import importlib.machinery  # noqa: E402
@@ -524,7 +582,7 @@ def test_calibration_600_word_resume_renders_two_pages():
 
 def test_derived_constants_match_render_resume_css():
     """Canary against future drift: recomputes WRAP_WIDTH/LINES_PER_PAGE/
-    HEADING_EXTRA_LINES fresh from render_resume.py's LIVE CSS string (page
+    HEADING_EXTRA_LINES fresh from render_resume.mjs's LIVE CSS string (page
     size/margins, body font-size/line-height, each heading's font-size and
     margins, h2's border/padding, and ul's own padding-left for the bullet
     indent) using the exact same arithmetic the fixture's own docstring
@@ -538,7 +596,7 @@ def test_derived_constants_match_render_resume_css():
         for m in re.finditer(r"([^{}]+)\{([^}]*)\}", css):
             if m.group(1).strip() == selector:
                 return m.group(2)
-        raise AssertionError(f"selector {selector!r} not found in render_resume.py's CSS")
+        raise AssertionError(f"selector {selector!r} not found in render_resume.mjs's CSS")
 
     def num(decl, prop, unit):
         m = re.search(rf"\b{re.escape(prop)}\s*:\s*([0-9.]+){re.escape(unit)}", decl)
@@ -547,7 +605,7 @@ def test_derived_constants_match_render_resume_css():
 
     def margin_parts(decl, unit="pt"):
         # 3-value margin shorthand: top, left+right, bottom. A bare 0 needs
-        # no unit in CSS (render_resume.py's CSS uses this for every 0).
+        # no unit in CSS (render_resume.mjs's CSS uses this for every 0).
         val = rf"([0-9.]+(?:{unit})?|0)"
         m = re.search(rf"\bmargin\s*:\s*{val}\s+{val}\s+{val}\s*;", decl)
         assert m, decl

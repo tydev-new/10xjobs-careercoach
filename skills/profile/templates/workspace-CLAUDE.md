@@ -1,4 +1,4 @@
-<!-- 10xjobs guardrails v7 — written at setup; yours to edit -->
+<!-- 10xjobs guardrails v8 — written at setup; yours to edit -->
 
 # Coaching this candidate
 
@@ -38,7 +38,7 @@ Skills say which files they own — don't invent new ones.
 Before a reply ends: name the stage the search is in; every question
 you asked the candidate is a row in `plan.md` § Waiting on you, this
 turn; "what's my plan?" writes the plan, even beside another ask; then
-run the coach skill's `check_closeout.py` (in its scripts folder): `--workspace .
+run the coach skill's close-out check (the `check_closeout` script in its scripts folder): `--workspace .
 --stage <stage> --asked "<each question>"` and fix any FAIL before
 sending. Another skill serving the ask does not end the coaching turn.
 Report check results as outcomes, never narration (clean is one line).

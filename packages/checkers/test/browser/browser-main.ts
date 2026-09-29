@@ -5,7 +5,7 @@
 // browser-only imports" (docs/plan-portable-skills-and-web-agent.md).
 import { Bash } from "just-bash";
 // @ts-expect-error - plain .mjs, no type declarations needed for this proof
-import { python3Command } from "../../src/just-bash-command.mjs";
+import { nodeCommand } from "../../src/just-bash-command.mjs";
 
 const RESUME_CLEAN = `# Alex Chen
 
@@ -28,21 +28,21 @@ async function main() {
   const el = document.getElementById("result")!;
   const done = document.getElementById("done")!;
   try {
-    // 1. check_materials.py, dispatched by file name, in-memory fs.
+    // 1. check_materials.mjs, dispatched by file name, in-memory fs.
     const bash1 = new Bash({
-      customCommands: [python3Command],
+      customCommands: [nodeCommand],
       files: { "/home/user/ws/resume.md": RESUME_CLEAN },
       cwd: "/home/user/ws",
     });
-    const r1 = await bash1.exec("python3 skills/apply/scripts/check_materials.py --workspace . --resume resume.md");
+    const r1 = await bash1.exec("node skills/apply/scripts/check_materials.mjs --workspace . --resume resume.md");
     const pass1 = r1.exitCode === 0 && r1.stdout.includes("automatic checks clean");
 
-    // 2. record_verdict.py: a real write (jobs.md) through just-bash's
+    // 2. record_verdict.mjs: a real write (jobs.md) through just-bash's
     // in-memory fs — proves the writer path (not just a reader) works in
     // the browser too.
-    const bash2 = new Bash({ customCommands: [python3Command], cwd: "/home/user/ws2" });
+    const bash2 = new Bash({ customCommands: [nodeCommand], cwd: "/home/user/ws2" });
     const r2 = await bash2.exec(
-      'python3 skills/evaluate/scripts/record_verdict.py --workspace . --company "Acme" --title "Staff Engineer" --verdict strong --score 90'
+      'node skills/evaluate/scripts/record_verdict.mjs --workspace . --company "Acme" --title "Staff Engineer" --verdict strong --score 90'
     );
     const jobsCat = await bash2.exec("cat jobs.md");
     const pass2 =

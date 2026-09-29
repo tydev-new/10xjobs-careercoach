@@ -4,7 +4,7 @@
 // byte-for-byte diff lives in test/parity.mjs.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { run } from "../../src/proposal-block.mjs";
+import { run } from "../../../../skills/apply/scripts/lib/proposal-block.mjs";
 import { makeFakeIo } from "./fake-io.mjs";
 
 const BASE = "# Base\n## Experience\n- Set up scheduled job monitoring with alerting on failed overnight loads.\n- Built tested dbt models with peer review.\n";

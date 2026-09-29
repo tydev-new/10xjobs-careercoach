@@ -1,0 +1,29 @@
+{
+ "note": "packages/checkers/test/parity.mjs: rewording-cannot-self-issue (covers: test_reworded_block_cannot_self_issue_its_exemption)",
+ "steps": [
+  {
+   "script": "apply/scripts/check_materials.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--resume",
+    "<ws>/resume.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "base-resume.md": "# Alex Chen\n\n## Professional Experience\n\n### Meridian Health — Senior Data Analyst\n**2022 - Present**\n\n- Wrote and maintained SQL pipelines in Postgres over claims data, feeding the finance team.\n- Collaborated with team on the quarterly forecast.\n\n## Claim rules\n- never \"solo\" — team of two.\n",
+  "resume.md": "# Alex Chen\n\n## Summary\n\nSenior analyst.\n\n## Selected Experience\n\n### Meridian Health\n**2022**\n\n- Led a 60-person organization across three continents.\n\n## Reworded\n\n- base: Led a 60-person organization across three continents.\n  tailored: Led a 60-person organization across three continents.\n"
+ },
+ "expect": [
+  {
+   "stdout": "structure tier, base résumé loaded for the verbatim check — language tier (never-say, struck forms, confirm-tier, paraphrases) → independent checker: profile/references/language-check.md (#29)\n\nRESUME resume.md: FAIL (2 fail, 1 warn)\n  [FAIL] § Reworded declares a base line that is not in the base: \"Led a 60-person organization across three continents.…\" — the exemption cannot be self-issued\n  [FAIL] Experience bullet not verbatim from base: \"Led a 60-person organization across three continents.…\" — patterns.md: selection is the tailoring. A JD-vocabulary rewording is allowed only when the candidate approved it and it is declared in § Reworded (base: / tailored: pair)\n  [WARN] non-standard section name \"Reworded\" — ATS parsers rank on standard names ('Professional Experience', not 'Where I've Made Impact'); put the ambition in a subtitle line instead\n\n✘ fix the FAILs before delivering\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

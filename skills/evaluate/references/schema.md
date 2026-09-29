@@ -7,7 +7,7 @@ and `learn` can read them without asking.
 
 ## `jobs.md` — the verdict row
 
-Written ONLY by `scripts/record_verdict.py` — never hand-edit a row. The
+Written ONLY by `scripts/record_verdict.mjs` — never hand-edit a row. The
 script owns the field set, the verdict tier values, and the track
 values (`--help` lists them); it upserts on the canonical (company,
 title) key and prints whether it created or updated. Re-verdict

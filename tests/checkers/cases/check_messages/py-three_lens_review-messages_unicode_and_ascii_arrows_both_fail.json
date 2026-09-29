@@ -1,0 +1,28 @@
+{
+ "note": "tests/test_three_lens_review.py::test_messages_unicode_and_ascii_arrows_both_fail",
+ "steps": [
+  {
+   "script": "outreach/scripts/check_messages.py",
+   "argv": [
+    "--workspace",
+    "<ws>",
+    "--contacts",
+    "<ws>/acme.md"
+   ],
+   "cwd": ".",
+   "clock": "2026-09-23T12:34:56+00:00"
+  }
+ ],
+ "before": {
+  "acme.md": "# Acme\n\n> Cut cost 80%→<1%, then 80->90 all year.\n"
+ },
+ "expect": [
+  {
+   "stdout": "acme.md: FAIL (2 fail, 1 warn, 1 drafts)\n  [WARN] pitch.md Messages rubric is PROPOSED/absent — drafts need the candidate's pin before finalizing (WATCH forms enforced anyway)\n  [FAIL] draft 1: arrow glyph \"→\" — write it in words\n  [FAIL] draft 1: arrow chain \"->\" — write it in words (\"from 80% to under 1%\"); a reader sees an arrow as notes, not a sentence\n  [INFO] draft 1: 39 chars / 7 words\n✘ fix the FAILs before finalizing\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stderr": "",
+   "stderrMatch": "exact",
+   "exit": 1
+  }
+ ],
+ "after": {}
+}

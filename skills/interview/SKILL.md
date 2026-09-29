@@ -84,7 +84,7 @@ Brief construction, gated ladder, round mechanics, and root-cause diagnostics li
 Owned: `prep/`, `practice/`, `practice-log.md`, `question-bank.md`, `composite-target.md`, `negotiation/` (shapes in `references/schema.md`).
 
 - **Hands back:** Thin storybank → `storybank`; TMAY re-tuning → `profile`; missing course → `learn`; funnel pattern → `coach`.
-- **Session close:** Run `../profile/scripts/check_files.py --workspace .`. No checker-subagent is spawned (coach voice). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
+- **Session close:** Run `../profile/scripts/check_files.mjs --workspace .`. No checker-subagent is spawned (coach voice). Report outcomes, never narration (clean is 1 line; fix FAILs before reply ends).
 
 ## Guardrails
 

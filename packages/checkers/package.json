@@ -3,12 +3,10 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "description": "JS ports of the MVP skill checkers (docs/design-web-agent.md § 5), plus the just-bash python3 dispatch adapter and the Python parity harness.",
+  "description": "The just-bash node/python3 dispatch adapter for the skills' own ported checkers (docs/design-js-only.md § 6; docs/design-web-agent.md § 5) — the checkers themselves live under skills/*/scripts/. Expected-output cases: tests/checkers/.",
   "scripts": {
     "test:unit": "node --test test/unit/*.test.mjs",
-    "parity": "node test/parity.mjs",
-    "coverage-gate": "node test/coverage-gate.mjs",
-    "test": "npm run test:unit && npm run parity && npm run coverage-gate",
+    "test": "npm run test:unit",
     "build:browser": "vite build test/browser",
     "verify:browser": "node test/browser/verify.mjs"
   },

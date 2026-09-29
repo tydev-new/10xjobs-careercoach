@@ -40,7 +40,7 @@ test("bash record_verdict.py, exit 0 -> verdict card from the jobs.md row it wro
   });
   const cards = await cb.forToolResult(
     "bash",
-    { command: 'python3 evaluate/scripts/record_verdict.py --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --track A --reasons "x" --jd-file jd-analysis/acme-staff-pm.md' },
+    { command: 'node evaluate/scripts/record_verdict.mjs --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --track A --reasons "x" --jd-file jd-analysis/acme-staff-pm.md' },
     { stdout: "recorded (created NEW role): Acme — Staff PM → strong (82)", stderr: "", exitCode: 0, changed: ["jobs.md"] },
     ws,
   );
@@ -68,7 +68,7 @@ test("bash record_verdict.py: no jd_file row -> card has no ref (never guesses a
   });
   const cards = await cb.forToolResult(
     "bash",
-    { command: "python3 evaluate/scripts/record_verdict.py --company Beta --title PM --verdict weak" },
+    { command: "node evaluate/scripts/record_verdict.mjs --company Beta --title PM --verdict weak" },
     { stdout: "recorded", stderr: "", exitCode: 0, changed: ["jobs.md"] },
     ws,
   );
@@ -90,7 +90,7 @@ test("bash check_materials.py -> one checker card per checked file, findings wor
   ].join("\n");
   const cards = await cb.forToolResult(
     "bash",
-    { command: "python3 apply/scripts/check_materials.py --workspace . --resume applications/acme-staff-pm-resume.md --letter applications/acme-staff-pm-cover-letter.md --base base-resume.md" },
+    { command: "node apply/scripts/check_materials.mjs --workspace . --resume applications/acme-staff-pm-resume.md --letter applications/acme-staff-pm-cover-letter.md --base base-resume.md" },
     { stdout, stderr: "", exitCode: 0, changed: [] },
     ws,
   );
@@ -128,7 +128,7 @@ test("bash render_resume.py, exit 0 -> document card; badge from the chat's late
   // no checker has run yet for this .md -> not-run
   let cards = await cb.forToolResult(
     "bash",
-    { command: "python3 apply/scripts/render_resume.py --md applications/r.md --html applications/r.html" },
+    { command: "node apply/scripts/render_resume.mjs --md applications/r.md --html applications/r.html" },
     { stdout: "words: 109  ->  applications/r.html", stderr: "", exitCode: 0, changed: ["applications/r.html"] },
     ws,
   );
@@ -137,13 +137,13 @@ test("bash render_resume.py, exit 0 -> document card; badge from the chat's late
   // after a clean checker card for the SAME .md, the badge is "clean"
   await cb.forToolResult(
     "bash",
-    { command: "python3 apply/scripts/check_materials.py --resume applications/r.md" },
+    { command: "node apply/scripts/check_materials.mjs --resume applications/r.md" },
     { stdout: "RESUME r.md: pass (0 fail, 0 warn)\n", stderr: "", exitCode: 0, changed: [] },
     ws,
   );
   cards = await cb.forToolResult(
     "bash",
-    { command: "python3 apply/scripts/render_resume.py --md applications/r.md --html applications/r.html" },
+    { command: "node apply/scripts/render_resume.mjs --md applications/r.md --html applications/r.html" },
     { stdout: "words: 112  ->  applications/r.html", stderr: "", exitCode: 0, changed: ["applications/r.html"] },
     ws,
   );
@@ -157,7 +157,7 @@ test("bash check_closeout.py, exit 0 -> plan card via parsePlanTodo(plan.md), re
   });
   const cards = await cb.forToolResult(
     "bash",
-    { command: "python3 coach/scripts/check_closeout.py --workspace . --stage applying" },
+    { command: "node coach/scripts/check_closeout.mjs --workspace . --stage applying" },
     { stdout: "close-out clean", stderr: "", exitCode: 0, changed: [] },
     ws,
   );
@@ -175,7 +175,7 @@ test("a non-zero exit produces no card", async () => {
   const ws = createInMemoryWorkspaceStore();
   const cards = await cb.forToolResult(
     "bash",
-    { command: "python3 coach/scripts/check_closeout.py --stage applying" },
+    { command: "node coach/scripts/check_closeout.mjs --stage applying" },
     { stdout: "", stderr: "FAIL", exitCode: 1, changed: [] },
     ws,
   );

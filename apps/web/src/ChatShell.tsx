@@ -9,6 +9,7 @@ import type { FixtureEntry } from "./fixtures";
 import { MockChatTransport } from "./mock-transport.ts";
 import { FixtureStore } from "./store.ts";
 import type { AppMessage, DataCardData, DataErrorData, FileRead } from "./types.ts";
+import { WorkspaceError } from "./types.ts";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,6 +65,11 @@ export function ChatShell({
   const { fixture, id } = entry;
   const transport = useMemo(() => new MockChatTransport(fixture), [fixture]);
   const store = useMemo(() => new FixtureStore(fixture), [fixture]);
+  // Stage 3a: a STABLE function identity per `store` — Documents' own
+  // effect is keyed on this prop (§ 5.2 rule 4, "reads when it's shown"),
+  // so a NEW closure every render would re-list on every keystroke
+  // elsewhere in ChatShell, not just when Documents is actually shown.
+  const listDocuments = useCallback(() => store.list(), [store]);
 
   const chat = useChat<AppMessage>({ id, transport, messages: [] });
   const { messages, sendMessage, status } = chat;
@@ -73,6 +79,11 @@ export function ChatShell({
   const [storeEmpty, setStoreEmpty] = useState(false);
   const [openRef, setOpenRef] = useState<string | undefined>(undefined);
   const [openFile, setOpenFile] = useState<FileRead | undefined>(undefined);
+  // § 5.2 rule 6, "the file being viewed": a non-missing read() failure —
+  // B1 (Stage 3a review). Bumped `openAttempt` re-runs the read effect
+  // below (Retry), without a second copy of its logic.
+  const [openError, setOpenError] = useState<{ path: string } | undefined>(undefined);
+  const [openAttempt, setOpenAttempt] = useState(0);
   const [panelOpenOnPhone, setPanelOpenOnPhone] = useState(false);
   const [balanceUsd, setBalanceUsd] = useState<number | undefined>(undefined);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -139,29 +150,48 @@ export function ChatShell({
 
   // Resolve openRef through the store (§ 2's async read) whenever it
   // changes — the UI never reads a fixture's `files` directly.
+  // B1 (Stage 3a review, § 5.2 rule 6): a `resource_missing` read shows
+  // the viewer's ordinary empty state (openFile/openError both clear —
+  // "missing is empty"); any OTHER failure is loud (openError set,
+  // openFile stays clear — never silently falls back to "Nothing open
+  // yet.", which used to happen here for every failure alike).
   useEffect(() => {
     let cancelled = false;
     if (!openRef) {
       setOpenFile(undefined);
+      setOpenError(undefined);
       return;
     }
     store
       .read(openRef)
       .then((f) => {
-        if (!cancelled) setOpenFile(f);
+        if (cancelled) return;
+        setOpenFile(f);
+        setOpenError(undefined);
       })
-      .catch(() => {
-        if (!cancelled) setOpenFile(undefined);
+      .catch((err) => {
+        if (cancelled) return;
+        setOpenFile(undefined);
+        setOpenError(err instanceof WorkspaceError && err.code === "resource_missing" ? undefined : { path: openRef });
       });
     return () => {
       cancelled = true;
     };
-  }, [openRef, store]);
+  }, [openRef, store, openAttempt]);
 
-  const handleOpen = (ref: string) => {
+  // R2 fix, § 5.5: the opener element itself (a row/chip's own
+  // `event.currentTarget`), never `document.activeElement` (WebKit
+  // leaves that at BODY after a tap). A ref, not state: it must never
+  // itself trigger a re-render, and SidePanel only ever reads it at
+  // close time.
+  const openerElRef = useRef<HTMLElement | null>(null);
+  const handleOpen = (ref: string, opener?: HTMLElement) => {
+    openerElRef.current = opener ?? null;
     setOpenRef(ref);
     setPanelOpenOnPhone(true);
   };
+
+  const retryOpenFile = () => setOpenAttempt((n) => n + 1);
 
   const handlePrint = (htmlPath: string) => {
     handleOpen(htmlPath);
@@ -239,7 +269,11 @@ export function ChatShell({
       onAutoplayToggle={() => setAutoplay((v) => !v)}
       theme={theme}
       onThemeToggle={onThemeToggle}
-      viewerOpen={openFile !== undefined}
+      viewerOpen={openFile !== undefined || openError !== undefined}
+      listDocuments={listDocuments}
+      onOpenFile={handleOpen}
+      composerValue={composerValue}
+      onComposerDraft={setComposerValue}
       talkToTen={
         <>
           {isFirstRun ? (
@@ -265,7 +299,10 @@ export function ChatShell({
         <SidePanel
           ref={iframeRef}
           file={openFile}
+          error={openError}
+          onRetry={retryOpenFile}
           open={panelOpenOnPhone}
+          opener={openerElRef.current}
           onClose={() => setPanelOpenOnPhone(false)}
         />
       }

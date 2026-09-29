@@ -85,11 +85,17 @@ const ASK = find(/Documents/, /^a row, entry, detail or file control$/); // P1
 const TALK = find(/Documents/, /^empty state's button$/); // P3
 const TURN_LINE = ROWS.find((r) => r.str.startsWith("Ten is working."))!.str; // F34 / F35
 const draftFor = (label: string) => find(/Documents/, /^the draft P1 puts/).replace("<label>", label); // P2
-/** § 5.3 names the folders by `check_files.py`'s MANIFEST_DIRS. */
+/** § 5.3 names the folders by check_files' own MANIFEST_DIRS. Mechanical
+ *  update only (PR #24, the JS-only switch, merged main): the source
+ *  moved from `skills/profile/scripts/check_files.py`'s `MANIFEST_DIRS =
+ *  {...}` dict to `skills/profile/scripts/lib/check-files.mjs`'s
+ *  `MANIFEST_DIRS = new Map([...])` — same folder-name extraction, new
+ *  path and new Map-entry syntax. No assertion below is touched. */
 const MANIFEST_DIRS = (() => {
-  const src = readFileSync(path.join(REPO, "skills/profile/scripts/check_files.py"), "utf8");
-  const block = src.slice(src.indexOf("MANIFEST_DIRS = {"), src.indexOf("}", src.indexOf("MANIFEST_DIRS = {")));
-  return [...block.matchAll(/"([a-z-]+)":/g)].map((m) => m[1]).sort();
+  const src = readFileSync(path.join(REPO, "skills/profile/scripts/lib/check-files.mjs"), "utf8");
+  const start = src.indexOf("MANIFEST_DIRS = new Map([");
+  const block = src.slice(start, src.indexOf("]);", start));
+  return [...block.matchAll(/\["([a-z-]+)",/g)].map((m) => m[1]).sort();
 })();
 /** § 5.2 rule 6's loud line. */
 const RULE6 = squash(DOC.match(/Any other read\s+failure\s+shows\s+"([^"]+)"/)![1]);

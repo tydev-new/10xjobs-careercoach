@@ -245,10 +245,15 @@ async function scanSkillLibs(skillsRootIn: string) {
     };
     visit(src);
   }
-  return { inputs: inputs.map(rel), badImports, notLib, globals };
+  // Browser globals too (S2 review: a `window` planted in a lib passed this
+  // scan and the package lint). A lib runs in Node as well as the browser
+  // (the command files import it), where `window`/`document`/`localStorage`
+  // do not exist: the same globalUses() the agent package is held to.
+  const browserGlobals = inputs.flatMap((f) => globalUses(f).map((h) => `${path.relative(skillsRoot, path.dirname(f))}/${h}`));
+  return { inputs: inputs.map(rel), badImports, notLib, globals, browserGlobals };
 }
 
-test("skills/*/scripts/lib: a browser bundle of every lib file reaches no node:/builtin/Supabase import, no command file, and not io-node.mjs; no Node-only global", async () => {
+test("skills/*/scripts/lib: a browser bundle of every lib file reaches no node:/builtin/Supabase import, no command file, and not io-node.mjs; no Node-only or browser global", async () => {
   const r = await scanSkillLibs(path.join(REPO, "skills"));
   assert.ok(r.inputs.length >= 15, `scanned ${r.inputs.length} lib files`);
   for (const must of ["apply/scripts/lib/check-materials.mjs", "profile/scripts/lib/shapecheck.mjs", "search/scripts/lib/jobs-md.mjs", "coach/scripts/lib/check-closeout.mjs"]) {
@@ -257,6 +262,7 @@ test("skills/*/scripts/lib: a browser bundle of every lib file reaches no node:/
   assert.deepEqual(r.badImports, []);
   assert.deepEqual(r.notLib, []);
   assert.deepEqual(r.globals, []);
+  assert.deepEqual(r.browserGlobals, []);
   console.log(`[tester] skills lib scan: ${r.inputs.length} files`);
 });
 
@@ -284,6 +290,13 @@ const LIB_MUTANTS: Record<string, string> = {
   "lib imports a command file": 'import "../render_resume.mjs";\n',
   "process.env in a lib": "export const __m = () => process.env.HOME;\n",
   "Buffer in a lib": 'export const __m = () => Buffer.from("x");\n',
+  "window in a lib": "export const __m = () => window.location.href;\n",
+  "typeof window in a lib": 'export const __m = typeof window !== "undefined";\n',
+  "document in a lib": 'export const __m = () => document.createElement("a");\n',
+  "localStorage in a lib": 'export const __m = () => localStorage.getItem("k");\n',
+  "globalThis.localStorage in a lib": "export const __m = () => globalThis.localStorage;\n",
+  "destructured document in a lib": "const { document: __d } = globalThis;\nexport const __m = __d;\n",
+  "navigator in a lib": "export const __m = () => navigator.userAgent;\n",
 };
 
 function skillsCopy(target: string, code: string): string {
@@ -298,12 +311,12 @@ test("skills lib mutants: a planted node:fs import (and each sibling form) in a 
   const missed: string[] = [];
   for (const [name, code] of Object.entries(LIB_MUTANTS)) {
     const r = await scanSkillLibs(skillsCopy("apply/scripts/lib/check-materials.mjs", code));
-    if (!(r.badImports.length || r.notLib.length || r.globals.length)) missed.push(name);
+    if (!(r.badImports.length || r.notLib.length || r.globals.length || r.browserGlobals.length)) missed.push(name);
   }
   assert.deepEqual(missed, []);
   // controls: a harmless mutant passes, and so does a node: import in the named exception
   const ok = await scanSkillLibs(skillsCopy("apply/scripts/lib/check-materials.mjs", "export const __m = 1;\n"));
-  assert.deepEqual([ok.badImports, ok.notLib, ok.globals], [[], [], []]);
+  assert.deepEqual([ok.badImports, ok.notLib, ok.globals, ok.browserGlobals], [[], [], [], []]);
   const exc = await scanSkillLibs(skillsCopy(LIB_EXCEPTION, 'import { stat as __s } from "node:fs/promises";\nexport const __m = __s;\n'));
-  assert.deepEqual([exc.badImports, exc.notLib, exc.globals], [[], [], []]);
+  assert.deepEqual([exc.badImports, exc.notLib, exc.globals, exc.browserGlobals], [[], [], [], []]);
 });

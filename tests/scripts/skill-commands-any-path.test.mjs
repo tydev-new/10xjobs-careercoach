@@ -76,6 +76,20 @@ test("render_resume.mjs --md writes the HTML from a symlinked folder (the harnes
   assert.ok(existsSync(join(ws, "r.html")), "the HTML was written");
 });
 
+// Round 2: c28903b wraps `await main()` inside the guard's try/catch, so an
+// error thrown inside main() is swallowed: exit 0, nothing printed. The
+// retired Python crashed loudly on the same input (open(html_path, "w") on a
+// directory: IsADirectoryError, a traceback, exit 1), and every other command
+// turns a crash into Python's traceback shape (lib/traceback.mjs).
+test("render_resume.mjs fails loudly when main() throws (--html names a folder), never a silent exit 0", () => {
+  const ws = join(base, "crash");
+  mkdirSync(join(ws, "adir"), { recursive: true });
+  writeFileSync(join(ws, "r.md"), "# A\n\n## Summary\n\n- x.\n");
+  const r = spawnSync(process.execPath, [join(SKILLS, "apply/scripts/render_resume.mjs"), "--md", "r.md", "--html", "adir"], { encoding: "utf-8", cwd: ws });
+  assert.notEqual(r.status, 0, `exit ${r.status}, stdout=${JSON.stringify(r.stdout)} stderr=${JSON.stringify(r.stderr)}`);
+  assert.ok(r.stderr.length > 0, "the failure is said, on stderr");
+});
+
 test("toPdf with a stand-in Chrome that writes 1 MB to stderr returns promptly with the PDF (stderr is drained)", async () => {
   const d = join(base, "chatty");
   mkdirSync(d, { recursive: true });

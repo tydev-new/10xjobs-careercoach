@@ -71,8 +71,18 @@ export const HISTORY_HEADERS = {
   "pitch-history.md": "| date | round | driver | scored vs FIXED | what changed |",
   "storybank-history.md": "| date | story | round | what changed | scored |",
 };
+// Only the loop-owned history files are bound to the header — derived from
+// the manifest annotation, not a third list. A CANDIDATE's own *-history.md
+// is theirs: the stray WARN mentions it, nothing FAILs it (reviewer-measured
+// 2026-08-18: the bare glob hard-failed a candidate-authored
+// interview-history.md while the same run called it a stray — the manifest
+// docstring's own rule, contradicted one function down).
 const LOOP_HISTORY = new Set(Object.keys(HISTORY_HEADERS));
 
+// Stray = WARN, never FAIL — the workspace is the candidate's; code
+// surfaces, the human decides. Receipt: a full parallel master-resume sat
+// unnoticed beside base-resume.md in the live workspace (found 2026-08-17)
+// — exactly the second-source-of-truth start goal 3 predicts.
 export const MANIFEST_FILES = new Map([
   ["CLAUDE.md", "profile (written at setup from the template)"],
   ["jobs.md", "search scripts"],
@@ -120,6 +130,11 @@ export const SELECTION_ENUMS = new Map([
   [3, new Set(["in", "out"])],
   [4, new Set(["base", "story", "new"])],
 ]);
+// The tailoring loop's round record and the panel's findings (2026-08-21,
+// the loop-alignment design): the same five columns as the history files,
+// inside the application file; the panel table's outcome cell is
+// "fixed" or "discarded — <why>". Header + cell counts checked; the
+// scored cell's form (N/M held; unmet: …) is the agent's discipline.
 export const ROUNDS_HEADER = "| date | round | driver | scored | what changed |";
 export const ROUNDS_ENUMS = new Map();
 export const PANEL_HEADER = "| lens | finding | outcome |";

@@ -6,6 +6,9 @@ import { parseFlags, argError, argHelp } from "../../../profile/scripts/lib/argx
 import { HELP } from "../../../profile/scripts/lib/help-text.mjs";
 import { restoreLineSeparators } from "../../../profile/scripts/lib/py-text.mjs";
 
+// Exactly the four tiers the skill prose defines — a fifth ("good") survived
+// here from the board era with no prose defining it and no row using it;
+// removed in the 2026-08-14 closing drift review.
 const VERDICTS = ["strong", "investable_stretch", "long_shot", "weak"];
 const TRACKS = ["A", "B", "C"];
 

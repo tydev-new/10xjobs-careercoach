@@ -28,6 +28,8 @@ const LETTER_MAX_BLOCKS = 6;
 
 const YEAR_COUNT = /\b\d{2}\+?\s*(?:\+\s*)?years\b/i;
 const INFORMAL_SALUTATION = new RegExp(`^${PY_S}*(hello|hi|hey|greetings)\\b[^,]*[—,-]?${PY_S}*$`, "i");
+// patterns.md assembly table: arrows garble in ATS parsers and read as audit
+// scaffolding that leaked into the document (candidate-caught 2026-08-16).
 const ARROW_GLYPHS = /[→⇒▸►◄←↔]/;
 // Owner ruling 6 (2026-09-25, docs/design-apply-three-lens.md § 4): ASCII
 // arrow chains — catches "->", "-->", "<-", "<->", "=>", "==>", "<=>";
@@ -74,6 +76,10 @@ export function checkResume(text, baseText = null, appText = null) {
   if (baseText) {
     const norm = (s) => normSpace(s.replaceAll("**", "").replaceAll("*", ""));
     const normBase = norm(baseText);
+    // § Reworded declares JD-vocabulary rewordings the candidate approved
+    // line by line (patterns.md § Rewording, candidate ruling 2026-08-19).
+    // Each pair must name a REAL base line — a pair whose `base:` half is
+    // not in the base would let anything through, so it is its own FAIL.
     const declared = section(text, "reworded") + "\n" + section(appText || "", "reworded");
     const approved = new Set();
     const reRw = /-\s*base:\s*(.+?)\n\s*tailored:\s*(.+?)(?=\n\s*-\s*base:|\n\s*#|$)/gs;
@@ -174,6 +180,10 @@ export function checkLetter(text) {
 }
 
 function shared(text, add) {
+  // § Claim rules is internal ("never ships") AND it is meta-text ABOUT
+  // forbidden forms — a rule that names the hazard it bans would fail the
+  // scan that enforces it. Strip it before scanning the shippable body.
+  // Earned 2026-08-18: the rebuilt base FAILed on its own age-tag rule.
   const claimIdx = text.match(/^##\s*Claim rules/im);
   if (claimIdx) text = text.slice(0, claimIdx.index);
   let m = text.match(ARROW_GLYPHS);
@@ -188,6 +198,12 @@ function shared(text, add) {
   if (m) {
     add("FAIL", `banned filler "${m[0]}" — patterns.md § Shape`);
   }
+  // Rule 3 bans the candidate's OWN aggregate year count ("25+ years of
+  // experience"). It does NOT ban quoting the JD's bar, which the checklist
+  // pattern actively requires — a bullet opening "**10+ years in software
+  // engineering:** yes — ..." is the pattern working. So strip the bolded
+  // JD-requirement openers before scanning.
+  // Earned 2026-08-03: a Vercel résumé failed for echoing Vercel's own stated bar.
   const prose = text.replace(/^-\s*\*\*[^*]+\*\*/gm, "- ");
   m = prose.match(YEAR_COUNT);
   if (m) {

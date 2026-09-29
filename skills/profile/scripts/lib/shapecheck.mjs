@@ -42,12 +42,14 @@ function countChar(s, ch) {
 // Silent when the table is absent — not every application has one yet.
 // `opts.titleForHeader` maps a table's exact header text to the "##
 // Section" title check_table WARNs about when that title is present but
-// the header beneath it isn't exactly right (2026-08-21 alignment
-// review, L1). `opts.columnValidators` maps a column index to a function
-// `(cellValue) => message|null` for a check an enum set can't express
-// (e.g. apply's panel-outcome column) — both maps are supplied by the
-// host, since the titles/headers/extra rules are domain-specific, not
-// part of this domain-neutral core.
+// the header beneath it isn't exactly right: a section titled for this
+// table but carrying a near-miss header is not "absent" — it is the
+// altered-header case check_history FAILs on; here it WARNs (2026-08-21
+// alignment review, L1). `opts.columnValidators` maps a column index to
+// a function `(cellValue) => message|null` for a check an enum set
+// can't express (e.g. apply's panel-outcome column) — both maps are
+// supplied by the host, since the titles/headers/extra rules are
+// domain-specific, not part of this domain-neutral core.
 export async function checkTable(io, path, header, enums, opts = {}) {
   const { titleForHeader = new Map(), columnValidators = new Map() } = opts;
   const res = [];
@@ -64,9 +66,11 @@ export async function checkTable(io, path, header, enums, opts = {}) {
   }
   // The table is the CONTIGUOUS run of pipe rows under the header; stop
   // at the first line that is not one. An application file holds several
-  // tables and free prose, so walking to EOF measured the next table's
-  // rows against this header — four bogus WARNs on the design's own
-  // normal file (measured 2026-08-18).
+  // tables and free prose (apply/references/schema.md), so walking to
+  // EOF measured the next table's rows against this header — four bogus
+  // WARNs on the design's own normal file (measured 2026-08-18; the
+  // first tests each used a single-table fixture, so this rung was
+  // green because it never ran).
   const block = [];
   for (const l of allLines.slice(idx + 1)) {
     if (!l.startsWith("|")) break;
@@ -130,9 +134,25 @@ const LINK_RE = /\]\((\.\.?\/[^)#\s]+)\)|`([\w./-]*\/[\w./-]+\.(?:md|mjs|py|html
 //         in a `node <path>.mjs …` command that does not resolve
 //   WARN  a table row whose cell count differs from its header
 //
-// Deliberately NOT checked: "§ Some Section" pointers — indistinguishable
-// from a local reference without parsing intent, and a noisy rung trains
-// people to ignore it.
+// Deliberately NOT checked: "§ Some Section" pointers. A prototype
+// flagged 12 files and most were pointers into ANOTHER file
+// ("base-resume.md § Claim rules"), indistinguishable from a local
+// reference without parsing intent — a noisy rung trains people to
+// ignore it, the earned-FAIL bar's warning, applied to a rung before it
+// shipped.
+//
+// Earned 2026-08-19: two cross-skill links were one `../` short. One was
+// tailoring.md's FIRST instruction ("read resume-engine.md first"), so
+// an agent following it found nothing and assembled without the
+// base-résumé resolution ladder.
+//
+// Widened 2026-08-19, same day, by the independent review of the CMF
+// and negotiate deletions: the first pattern only matched links
+// STARTING with `./` or `../`, so six more of the identical class were
+// invisible to it — `apply/scripts/check_materials.py` written from
+// inside profile, where the repo's own convention is `../../apply/...`.
+// A rung that misses the bug it was built for is worse than no rung: it
+// reports green.
 export async function checkSkillProse(io, skillsRoot) {
   const res = [];
   const files = await walkFilesRecursive(io, skillsRoot, ".md");
@@ -200,7 +220,9 @@ export async function checkSkillProse(io, skillsRoot) {
 //   - `## Other notes` — optional
 // Two declaration forms: the inline `**\`file.md\`**` block (SKILL.md §
 // State), and a `## \`file.md\` — ...` heading (a references/schema.md
-// organised per file).
+// organised per file). Added 2026-08-20 when profile's schema.md gained
+// per-file headings and the old pattern silently dropped all five of
+// its schemas — the printed schema count is what caught it.
 export const FILE_RE = /^(?:\*\*|##\s+)`([\w\-.]+\.md)`/;
 
 // Some files carry the candidate's own structure (a résumé body). Their
@@ -211,9 +233,12 @@ export const FREEFORM = "free-form body";
 export const SECTION_RE = /^(\s*)-\s+`(#{2,3})\s+([^`]+)`(.*)$/;
 
 // Parse every skill's schema blocks into {filename: schema}. Read from
-// BOTH `SKILL.md` and `references/schema.md`, because a skill may declare
-// its file shapes in either. A filename declared in both places is a
-// duplicate the caller reports.
+// BOTH `SKILL.md` and `references/schema.md`, because a skill may
+// declare its file shapes in either. Extended 2026-08-20: profile's
+// § State held 516 words of schema in the always-loaded tier; moving it
+// to a reference cuts that from every session that fires the skill, and
+// a schema is consulted when writing a record, not continuously. A
+// filename declared in both places is a duplicate the caller reports.
 export async function loadSchemas(io, skillsRoot) {
   const schemas = {};
   const paths = [
@@ -231,7 +256,9 @@ export async function loadSchemas(io, skillsRoot) {
         current = { sections: [], freeform: line.toLowerCase().includes(FREEFORM), owner: basename(skillDir) };
         // A bare bold mention of a file in ANOTHER skill's prose must
         // never clobber the owner's real schema: only a block that
-        // gathers sections may claim the name.
+        // gathers sections may claim the name (caught 2026-08-14 —
+        // search's "criteria.md is INPUT only" sentence silently
+        // deleted profile's criteria schema).
         if (!(m[1] in schemas) || schemas[m[1]].sections.length === 0) {
           schemas[m[1]] = current;
         }
@@ -303,6 +330,8 @@ export async function checkFile(io, path, schema, allSchemas, fname) {
   const known = new Set(schema.sections.map((s) => norm(s.name)));
   known.add(norm("Other notes"));
   // Sections owned by some OTHER file — the cross-contamination class.
+  // Also mechanical, because every schema is known; this is what catches
+  // interview history landing in criteria.md, measured 2026-08-13.
   const foreign = new Map();
   for (const [other, osch] of Object.entries(allSchemas)) {
     if (other === fname) continue;

@@ -25,8 +25,9 @@
 //     profile with anything else, so that hint would point at the wrong
 //     culprit (and, before this fix, invited exactly the wrong one).
 import { spawn } from "node:child_process";
-import { promises as fsp, existsSync, accessSync, constants as fsConstants } from "node:fs";
+import { promises as fsp, existsSync, accessSync, realpathSync, constants as fsConstants } from "node:fs";
 import os from "node:os";
+import { fileURLToPath } from "node:url";
 // node:path (not lib/path-util.mjs's pure POSIX join): this is a
 // Node-only command file (like lib/io-node.mjs), and PATH search needs
 // the host's own separator conventions, not a browser-safe POSIX-only
@@ -112,6 +113,32 @@ export function findChrome() {
 
 /**
  * Render htmlPath to pdfPath with headless Chrome.
+ *
+ * Earned 2026-09-26 (the Chrome-hang incident): headless Chrome with no
+ * --user-data-dir reaches for the CALLER's default profile, and a real
+ * Chrome window already holding that profile's singleton lock makes the
+ * headless run hang instead of failing fast. The old (Python) code also
+ * called its subprocess with a timeout and no except around it — an
+ * uncaught timeout crashed the script with a traceback instead of a plain
+ * message, and left the agent under test to freelance its own fix; it
+ * chose a name-based pkill, which killed every Chrome process on the
+ * machine, including the owner's own browser.
+ *
+ * Independent review (2026-09-27) of that first fix found two more
+ * holes, both closed here: (1) killing only Chrome's own top PID leaves
+ * its own helper/renderer children orphaned and still running — Chrome
+ * is started in its own process group so a timeout can kill the WHOLE
+ * group, not one PID; (2) the default timeout (120s) was not under the
+ * agent Bash tool's own 120s default, so the tool could cut this script
+ * off before its own plain message ever printed — default dropped to
+ * 90s, safely under it.
+ *
+ * RENDER_RESUME_CHROME (owner ruling 2026-09-26, replacing the test-user
+ * isolation plan): the always-on harness must never launch a REAL
+ * browser at all — that's what hung in the first place. A harness
+ * runner sets this env var to point at its own fake, which writes a
+ * small, realistically-sized PDF immediately and never hangs.
+ *
  * @param {string} htmlPath
  * @param {string} pdfPath
  * @param {string} [chrome] an explicit binary path — always wins over
@@ -135,6 +162,23 @@ export async function toPdf(htmlPath, pdfPath, chrome, timeoutMs = 90_000) {
       ],
       { stdio: ["ignore", "ignore", "pipe"], detached: true },
     );
+
+    // J2 review, finding M1: an unread stderr pipe fills (a real Chrome
+    // can write plenty of it) and then the CHILD blocks on its own next
+    // write — the call would sit until the timeout, reporting "did not
+    // finish" for a render that actually completed. The retired Python
+    // drained stderr the same way (`proc.communicate(timeout=timeout)`
+    // reads stdout AND stderr to EOF); here that's an explicit `data`
+    // listener. Kept as a bounded tail (last 4KB) for the exited-with-
+    // no-PDF error message below — not because a real caller is
+    // expected to read it, but so a genuine Chrome failure isn't
+    // reported with strictly less information than draining it costs.
+    let stderrTail = "";
+    const STDERR_TAIL_MAX = 4096;
+    child.stderr.on("data", (chunk) => {
+      stderrTail += chunk.toString("utf-8");
+      if (stderrTail.length > STDERR_TAIL_MAX) stderrTail = stderrTail.slice(-STDERR_TAIL_MAX);
+    });
 
     const outcome = await new Promise((resolve) => {
       let settled = false;
@@ -177,7 +221,11 @@ export async function toPdf(htmlPath, pdfPath, chrome, timeoutMs = 90_000) {
       return { ok: false, err: "Chrome produced no file" };
     }
     if (outcome.code !== 0 && outcome.code !== null && !pdfExists) {
-      return { ok: false, err: `Chrome exited ${outcome.code} with no PDF produced` };
+      const tail = stderrTail.trim();
+      return {
+        ok: false,
+        err: tail ? `Chrome exited ${outcome.code} with no PDF produced: ${tail}` : `Chrome exited ${outcome.code} with no PDF produced`,
+      };
     }
     return pdfExists ? { ok: true } : { ok: false, err: "Chrome produced no file" };
   } finally {
@@ -271,12 +319,29 @@ async function main() {
   process.exitCode = exitCode;
 }
 
-// Node's fileURLToPath dance would be overkill here — this file is only
-// ever invoked as `node render_resume.mjs ...`, never imported as a
-// library by another CLI (unlike lib/check-files.mjs's resolver dance),
-// so a plain top-level call is enough. Guarded so the harness's own
-// import of this module's named exports (findChrome/toPdf/pdfPages/CSS)
-// never triggers a second CLI run as a side effect.
-if (import.meta.url === `file://${process.argv[1]}`) {
-  await main();
+// J2 review, finding B1: a bare `import.meta.url === \`file://${process.argv[1]}\``
+// compares an ENCODED URL string against a RAW filesystem path — they
+// diverge (silently making this guard false, so `main()` never runs and
+// the process exits 0 having done nothing) the moment either side has a
+// symlink component (macOS's /var -> /private/var, so EVERY `mktemp -d`
+// workspace and every harness run), a space, `%`, `#`, or a non-ASCII
+// character (URL-encoded on the left, literal on the right). Guarded so
+// the harness's own import of this module's named exports
+// (findChrome/toPdf/pdfPages/CSS) never triggers a second CLI run as a
+// side effect — but that comparison has to survive real filesystem
+// paths, not just the tidy ones a developer's own checkout happens to
+// have. Fix: resolve BOTH sides to their real, symlink-free filesystem
+// path first, then compare those directly — mirrored in every other
+// Node CLI entry under skills/*/scripts/*.mjs (grepped one at a time,
+// § 6 J2's tester check).
+try {
+  if (
+    process.argv[1] &&
+    realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
+  ) {
+    await main();
+  }
+} catch {
+  // process.argv[1] doesn't resolve (e.g. this file was imported, not
+  // run) — never treat that as "run main()".
 }

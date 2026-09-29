@@ -8,7 +8,7 @@
 // "Binary" needs no definition, § 5.3.1), "Print / Save as PDF" (F43, now
 // also the viewer's own control, not only the document card's), "Close",
 // "File preview".
-import { forwardRef, useEffect, useRef, type ReactElement } from "react";
+import { forwardRef, useEffect, type ReactElement } from "react";
 import { kindOf } from "../store.ts";
 import type { FileRead } from "../types.ts";
 import { Icon } from "../icons.tsx";
@@ -28,6 +28,17 @@ export interface SidePanelProps {
   /** Re-attempts the same read (the loud error's Retry button). Required
    *  whenever `error` can be set. */
   onRetry?: () => void;
+  /** § 5.5: "Back, or the Escape key, closes it and returns focus to the
+   *  row or chip that opened it." The exact element that opened this
+   *  file — the caller's own `event.currentTarget` from the row/chip's
+   *  click handler, threaded through `onOpenFile`. R2 fix: NEVER
+   *  `document.activeElement` — WebKit (iOS Safari, § 5.5's own target
+   *  engine) does not focus a tapped button, so `activeElement` reads
+   *  BODY after a tap and focus-return silently does nothing. A caller
+   *  that doesn't supply one (a card/chip from an earlier stage) simply
+   *  gets no focus-return, same as before this feature existed — never a
+   *  crash (`opener?.focus()` below). */
+  opener?: HTMLElement | null;
 }
 
 // No allow-scripts, ever: a candidate's own rendered HTML must never be
@@ -65,7 +76,7 @@ function bodyModifier(path: string | undefined): string {
 }
 
 export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function SidePanel(
-  { file, open, onClose, error, onRetry },
+  { file, open, onClose, error, onRetry, opener },
   iframeRef
 ): ReactElement {
   const kind = file ? kindOf(file.path) : undefined;
@@ -83,30 +94,37 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
   };
 
   // § 5.5: "Back, or the Escape key, closes it and returns focus to the
-  // row or chip that opened it." `open` flips true the instant a
-  // row/chip/card calls the caller's `onOpenFile` — at that exact moment
-  // the browser has already focused the element that was clicked (a
-  // native button click), so capturing `document.activeElement` on the
-  // rising edge of `open` is "the opener", with no extra wiring needed
-  // from any caller. Read through a ref (never state): this must never
-  // itself trigger a re-render.
-  const openerRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    if (open) openerRef.current = document.activeElement as HTMLElement | null;
-  }, [open]);
+  // row or chip that opened it." `opener` (above) is the caller's own
+  // captured element — this component only ever reads it, never
+  // captures anything itself (R2 fix: document.activeElement, tried in
+  // round 1, reads BODY after a WebKit tap).
   const closeAndRestoreFocus = (): void => {
     onClose();
-    openerRef.current?.focus();
+    opener?.focus();
   };
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") closeAndRestoreFocus();
+      if (e.key !== "Escape") return;
+      // § 5.6 "Stacking": "Escape closes the top-most first: dialog,
+      // then menu, then sheet." R2 fix: this listener used to close the
+      // sheet unconditionally, so with the ⋯ menu (or a dialog) open
+      // ABOVE it, one Escape closed both at once. A dialog's own
+      // listener (use-dialog-focus.ts) runs in the CAPTURE phase and
+      // stopPropagation()s, so it already never reaches here — this
+      // check is for the ⋯ menu, which has no dialog beneath it and
+      // doesn't stop propagation (Header.tsx's own comment). Checked
+      // fresh at keydown time, never cached: by the time this listener
+      // runs (a plain bubble-phase document listener, ahead of the
+      // menu's own window-level one), the menu/dialog's DOM is still
+      // exactly as it was when the key was pressed.
+      if (document.querySelector('[role="dialog"], .menu-panel')) return;
+      closeAndRestoreFocus();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, opener]);
 
   return (
     <aside className={`side-panel${open ? " side-panel--open" : ""}`} aria-label="File preview">

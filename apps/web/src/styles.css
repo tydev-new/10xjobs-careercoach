@@ -2182,7 +2182,10 @@ select:focus-visible {
 @container frame (max-width: 1100px) {
   .side-panel {
     position: absolute;
-    top: 0;
+    /* R2 fix: never the app's own header — the ⋯ menu (and everything
+       else in it) must stay reachable whether the drawer is covering or
+       not, so the drawer only ever occupies the page area below it. */
+    top: var(--header-h);
     right: 0;
     bottom: 0;
     width: min(var(--panel-w), 100%);
@@ -2192,6 +2195,32 @@ select:focus-visible {
 
   .side-panel-back {
     display: inline-flex;
+  }
+
+  /* R2 fix (§ 5.6 "Breakpoint"): "the drawer must not cover the page
+     when nothing is open." Unlike phone (≤760px, below), this
+     breakpoint's drawer keeps its close ✕ reachable even with nothing
+     open (the stage2-review fixture check for this breakpoint finds one
+     with no turn ever run) — so only the COVERING part (the body, and
+     the space it would otherwise occupy) collapses; the header row
+     (holding the close ✕) never does. `pointer-events: none` is a second
+     line of defence: a hit-test at any point still inside the now-
+     shrunk box (its own border/shadow) must still pass through to
+     whatever real control sits behind it. */
+  .side-panel:not(.side-panel--open) {
+    bottom: auto;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
+  }
+
+  .side-panel:not(.side-panel--open) .side-panel-header {
+    pointer-events: auto;
+  }
+
+  .side-panel:not(.side-panel--open) .side-panel-path,
+  .side-panel:not(.side-panel--open) .side-panel-body {
+    display: none;
   }
 }
 

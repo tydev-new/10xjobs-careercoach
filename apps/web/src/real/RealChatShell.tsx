@@ -337,7 +337,14 @@ export function RealChatShell({
 
   const retryOpenFile = () => setOpenAttempt((n) => n + 1);
 
-  const handleOpen = (ref: string) => {
+  // R2 fix, § 5.5: the opener element itself (a row/chip's own
+  // `event.currentTarget`), never `document.activeElement` (WebKit
+  // leaves that at BODY after a tap). A ref, not state: it must never
+  // itself trigger a re-render, and SidePanel only ever reads it at
+  // close time.
+  const openerElRef = useRef<HTMLElement | null>(null);
+  const handleOpen = (ref: string, opener?: HTMLElement) => {
+    openerElRef.current = opener ?? null;
     setOpenRef(ref);
     setPanelOpenOnPhone(true);
   };
@@ -590,6 +597,7 @@ export function RealChatShell({
             error={openError}
             onRetry={retryOpenFile}
             open={panelOpenOnPhone}
+            opener={openerElRef.current}
             onClose={() => setPanelOpenOnPhone(false)}
           />
         }

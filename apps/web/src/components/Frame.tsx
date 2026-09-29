@@ -63,8 +63,11 @@ export interface FrameProps extends Omit<HeaderProps, "pageTitle"> {
    *  upload and the side panel's reads). */
   listDocuments: () => Promise<FileInfo[]>;
   /** Opens a path in the pinned viewer (§ 5.2 rule 8) — the caller's own
-   *  `handleOpen`, the exact function Talk to Ten's chips and cards call. */
-  onOpenFile: (path: string) => void;
+   *  `handleOpen`, the exact function Talk to Ten's chips and cards call.
+   *  `opener` (R2 fix, § 5.5) is the clicked/tapped element itself, for
+   *  the viewer's focus-return on close — never guessed from
+   *  `document.activeElement`, which WebKit leaves at BODY after a tap. */
+  onOpenFile: (path: string, opener?: HTMLElement) => void;
   /** The composer's current text and its setter (§ 5.4, "Ask Ten about
    *  this... only when the composer is empty; unsent text is never
    *  overwritten"). Frame decides whether to write the draft; it never

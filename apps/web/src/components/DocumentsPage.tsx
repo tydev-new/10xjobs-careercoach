@@ -18,8 +18,11 @@ export interface DocumentsPageProps {
    *  `upload()` itself; opening a file is `onOpenFile`, below. */
   list: () => Promise<FileInfo[]>;
   /** Opens the path in the pinned viewer (§ 5.2 rule 8) — the exact same
-   *  handler Talk to Ten's chips and cards use. */
-  onOpenFile: (path: string) => void;
+   *  handler Talk to Ten's chips and cards use. `opener` is the row's own
+   *  `event.currentTarget` (R2 fix, § 5.5): WebKit (iOS Safari) doesn't
+   *  focus a tapped button, so the viewer's focus-return-on-close reads
+   *  this instead of guessing from `document.activeElement`. */
+  onOpenFile: (path: string, opener?: HTMLElement) => void;
   /** "Ask Ten about this" (§ 5.4) on a file: puts `About <path>: ` in the
    *  composer (only when it's empty) and opens Talk to Ten. Never sends
    *  (§ 5.2 rule 2). */
@@ -155,7 +158,7 @@ export function DocumentsPage({ list, onOpenFile, onAskTen, onOpenTalkToTen, tur
                     <button
                       type="button"
                       className="doc-row-open"
-                      onClick={() => onOpenFile(file.path)}
+                      onClick={(e) => onOpenFile(file.path, e.currentTarget)}
                     >
                       <Icon name="fileText" size={16} />
                       <span className="doc-row-path">

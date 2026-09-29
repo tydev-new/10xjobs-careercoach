@@ -179,7 +179,7 @@ test("known item 8: a `window` use planted in board-readers.mjs is caught by at 
 
 test(
   "known item 8 gap: the TESTER-owned scan and the package lint check browser GLOBALS only under packages/agent/src — a `window` in board-readers.mjs passes both",
-  { todo: "design-js-only.md § 3 says browser-safety.test.ts is widened to scan skills/*/scripts/lib/; it isn't (J2 gap). Today only tests/boards.test.mjs's regex covers globals in board-readers.mjs." },
+  { todo: "design-js-only.md § 3 says browser-safety.test.ts is widened to scan skills/*/scripts/lib/; it isn't on this branch (J2 gap). Closed on feat/js-only-j2 at 5748614, not yet merged into feat/search-s2; drop this todo once it is. Until then only tests/boards.test.mjs's regex covers globals in board-readers.mjs." },
   async () => {
     const { root, outer } = layout("new-copied-skills");
     plant(path.join(outer!, "skills/search/scripts/lib/board-readers.mjs"), 'export const __s2tW = () => typeof window !== "undefined";\n');

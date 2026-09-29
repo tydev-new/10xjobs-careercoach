@@ -467,7 +467,10 @@ form shows as written (§ 5.3, "The plan item").
 Receipt of a successfully rendered résumé only (C § 6.2, row 4) — **a
 cover letter never gets a `document` card**, only a `checker` card,
 because it isn't rendered. `props = { words, htmlPath?, checker }`,
-`ref` = the `.md` path. **Side panel:** opens `ref`; `Print / Save as PDF`
+`ref` = the `.md` path. `checker` is `clean`, `warn` or `fail` from the
+latest check of this `.md`, or `not-run`; `warn` shows "no failures, 1
+warning" or "no failures, N warnings" (`design-honest-ceilings.md`
+§ 6A). **Side panel:** opens `ref`; `Print / Save as PDF`
 (§ 5.3.1, C6)
 appears when `htmlPath` is set and prints that sandboxed iframe (the
 browser's own print-to-PDF — `render_resume`'s `--pdf` is ignored, and
@@ -485,7 +488,9 @@ yields two cards. `props = { label, name, status, failCount, warnCount,
 findings }`, parsed from the script's own `LABEL name: pass|FAIL (n
 fail, m warn)` / `  [LEVEL] msg` lines, word for word — the same parse
 feeds the `document` card's badge, one parse not two. `ref` = the
-checked file. **Copy:** zero findings renders as "clean"; a `FAIL` is
+checked file. **Copy:** zero findings renders as "clean"; a pass with
+warnings never renders as "clean", on this card or the `document`
+badge (`design-honest-ceilings.md` § 6A). A `FAIL` is
 styled distinct, not alarm-red, since it means the agent's own next
 turn must fix it before delivery, not that the candidate must act.
 **Open for the architect:** neither this card nor any reply currently

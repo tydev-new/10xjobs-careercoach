@@ -6,7 +6,7 @@
 //     suffix and an unmatched key;
 //   - `proposalRows` (docs/design-web-agent.md § 19): C § 19's own table
 //     test, and a differential check that `run()` re-expressed through it
-//     prints exactly what main's pre-3d `run()` (8a4eef7) printed (the parity corpus
+//     prints exactly what main's pre-3d `run()` (c3d6b08) printed (the parity corpus
 //     itself is replayed, unchanged, by tests/checkers/run-cases.mjs);
 //   - the stage steps (§ 5.3 "Pieces the pages share"): exactly one current
 //     step, jobs.md's own words, in STAGES order;
@@ -273,16 +273,21 @@ test("C § 19: a U+2028 inside a cell — the page reads what the script reads (
 
 // ------------------------------------------------------------ run() unchanged
 
-/** proposal-block.mjs as main last shipped it before 3d (8a4eef7, the last
- *  main commit that touched it), with its relative imports
- *  pointed at this checkout's helpers, so its run() can be called beside
- *  today's. */
+/** proposal-block.mjs as main last shipped it before 3d (c3d6b08), with its
+ *  relative imports pointed at this checkout's helpers, so its run() can be
+ *  called beside today's.
+ *  Re-pinned from 8a4eef7: main itself changed run() after that commit
+ *  (8da873b, design-honest-ceilings.md § 6A — no script says "clean" while
+ *  a WARN stands), so 8a4eef7 stopped being main's pre-3d run() and the
+ *  differential failed on main's change, not 3d's. Pinned to a fixed commit,
+ *  not origin/main: once 3d merges, origin/main carries proposalRows and the
+ *  guard below would trip. */
 async function oldRun(): Promise<(argv: string[], io: any) => Promise<any>> {
-  const g = spawnSync("git", ["show", "8a4eef7:skills/apply/scripts/lib/proposal-block.mjs"], { cwd: REPO, encoding: "utf8" });
+  const g = spawnSync("git", ["show", "c3d6b08:skills/apply/scripts/lib/proposal-block.mjs"], { cwd: REPO, encoding: "utf8" });
   assert.equal(g.status, 0, g.stderr);
   const lib = path.join(REPO, "skills/profile/scripts/lib");
   const src = g.stdout.replace(/from "\.\.\/\.\.\/\.\.\/profile\/scripts\/lib\/([^"]+)"/g, (_m, f) => `from "${pathToFileURL(path.join(lib, f)).href}"`);
-  assert.ok(!src.includes("proposalRows"), "8a4eef7 already has proposalRows — this differential compares nothing");
+  assert.ok(!src.includes("proposalRows"), "c3d6b08 already has proposalRows — this differential compares nothing");
   const dir = mkdtempSync(path.join(tmpdir(), "stage3d-review-oldpb-"));
   const f = path.join(dir, "proposal-block-main.mjs");
   writeFileSync(f, src);
@@ -293,7 +298,7 @@ async function oldRun(): Promise<(argv: string[], io: any) => Promise<any>> {
   }
 }
 
-test("C § 19 'run() ... its output can't change': today's run() equals main's pre-3d run() (8a4eef7) on every parity-corpus application file and on malformed rows", async () => {
+test("C § 19 'run() ... its output can't change': today's run() equals main's pre-3d run() (c3d6b08) on every parity-corpus application file and on malformed rows", async () => {
   const before = await oldRun();
   const inputs: string[] = [APP];
   const dir = path.join(REPO, "tests/checkers/cases/proposal_block");

@@ -13,6 +13,7 @@
 // own FIELDS table already carries `["Analysis", "analysis_file"]`).
 import { load, STAGES } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import type { FileInfo, WorkspaceStore } from "../types.ts";
+import { rowAnalysisFile } from "../../../../packages/agent/src/analysis-file.ts";
 import { datePart as documentsDatePart } from "./documents.ts";
 import { isMissingError, type ReadOnlyIo } from "./store-io.ts";
 import { pickSection, splitSections, type Section } from "./sections.ts";
@@ -38,6 +39,10 @@ export interface JobsMdRow {
   fit_reason?: string | null;
   dealbreakers?: string | null;
   analysis_file?: string | null;
+  /** The raw posting — or, on a row written before S1, the analysis
+   *  itself (`jd-analysis/<key>.md`). Read only through `rowAnalysisFile`
+   *  (C § 6.2, issue #32). */
+  jd_file?: string | null;
   company_file?: string | null;
   evaluated_at?: string | null;
   was_stage?: string | null;
@@ -267,12 +272,14 @@ const APPLICATION_SUFFIXES = [
   ".md",
 ] as const;
 
-/** The `<key>` in the row's own `Analysis` field (`jd-analysis/<key>.md`)
- *  — the same slug apply names its own application files with.
- *  `undefined` when the row has no `Analysis` field, or it isn't in
- *  exactly that shape (never guessed from the company/title, § 5.3). */
-export function applicationKeyForRow(row: Pick<JobsMdRow, "analysis_file">): string | undefined {
-  const m = row.analysis_file?.match(/^jd-analysis\/(.+)\.md$/);
+/** The `<key>` in the row's analysis file (`jd-analysis/<key>.md`) — the
+ *  same slug apply names its own application files with. The analysis file
+ *  is `rowAnalysisFile(row)` (C § 6.2, issue #32: its `Analysis` field,
+ *  else a legacy `JD: jd-analysis/…`). `undefined` when the row has none,
+ *  or it isn't in exactly that shape (never guessed from the company/title,
+ *  § 5.3). */
+export function applicationKeyForRow(row: Pick<JobsMdRow, "analysis_file" | "jd_file">): string | undefined {
+  const m = rowAnalysisFile(row)?.match(/^jd-analysis\/(.+)\.md$/);
   return m ? m[1] : undefined;
 }
 

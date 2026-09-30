@@ -3,6 +3,7 @@
 // card is a receipt of a file or a script's output; reasoning stays in
 // the model's prose.
 import { parsePlanTodo } from "./helpers.ts";
+import { rowAnalysisFile } from "./analysis-file.ts";
 // S2 review blocker 4 (design-web-search.md § 9 S2: "S2 lands before
 // W3b" deletes the stub): the verdict card's row lookup now reads
 // jobs.md through the real port, never the retired
@@ -138,11 +139,14 @@ export class CardBuilder {
     };
     const card: DataCardData = { card: "verdict", props };
     // design-web-search.md § 7.1 (S1, the `Analysis` field): the card's
-    // `ref` moves to the row's `analysis_file` — `record_verdict` gets
+    // `ref` moves to the row's analysis file — `record_verdict` gets
     // `--analysis-file` whenever an analysis was written; with none, the
     // card has no `ref` and shows "no analysis file linked", never a
-    // guess (design-web-agent.md § 6.2's own table).
-    if (row.analysis_file) card.ref = row.analysis_file;
+    // guess (design-web-agent.md § 6.2's own table). A pre-S1 row's
+    // `JD: jd-analysis/<key>.md` counts (§ 6.2, "A row's analysis file,
+    // legacy rows included") — read through rowAnalysisFile, the one reader.
+    const analysis = rowAnalysisFile(row);
+    if (analysis) card.ref = analysis;
     return [card];
   }
 

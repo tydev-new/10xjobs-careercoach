@@ -32,6 +32,7 @@ import {
   snapshotSection,
   verdictLabel,
 } from "./jobs.ts";
+import { rowAnalysisFile } from "../../../../packages/agent/src/analysis-file.ts";
 import { splitSections } from "./sections.ts";
 import { storeIo } from "./store-io.ts";
 
@@ -45,7 +46,7 @@ test("workspace-pages fixture: every role shows once, in its stage, in file orde
   assert.deepEqual(
     groups.map((g) => [g.stage, g.rows.length, g.rows.map((r) => r.company)]),
     [
-      ["To Review", 1, ["Cascadia Analytics"]],
+      ["To Review", 2, ["Cascadia Analytics", "Kestrel Utilities"]],
       ["Interested", 1, ["Brightloom Foods"]],
       ["Applied", 1, ["NovaGrid Energy"]],
       ["Interviewing", 1, ["Fernway Robotics"]],
@@ -140,6 +141,34 @@ test("workspace-pages fixture: the detail's sections equal the fixture files' se
   assert.equal(company.kind, "ready");
   const expectedCompany = splitSections(FIXTURE.files["company/novagrid-energy.md"]);
   if (company.kind === "ready") assert.deepEqual(company.sections, expectedCompany);
+});
+
+test("workspace-pages fixture: Kestrel is a legacy row (JD: jd-analysis/…, no Analysis) — its detail shows its analysis sections (C § 6.2, issue #32)", async () => {
+  const store = new FixtureStore(FIXTURE);
+  const rows = await loadJobsRows(storeIo(store));
+  const kestrel = rows.find((r) => r.company === "Kestrel Utilities")!;
+  // The row as the port reads it: no Analysis field, the analysis under JD.
+  assert.equal(kestrel.analysis_file, undefined);
+  assert.equal(kestrel.jd_file, "jd-analysis/kestrel-utilities-senior-pm.md");
+  assert.equal(rowAnalysisFile(kestrel), "jd-analysis/kestrel-utilities-senior-pm.md");
+
+  // The detail reads rowAnalysisFile(row) (JobsPage's loadFiles), so the
+  // analysis parts show, string for string.
+  const analysis = await loadFieldFile(store, rowAnalysisFile(kestrel));
+  assert.equal(analysis.kind, "ready");
+  if (analysis.kind === "ready") {
+    assert.deepEqual(analysis.sections, splitSections(FIXTURE.files["jd-analysis/kestrel-utilities-senior-pm.md"]));
+    assert.equal(competencySection(analysis.sections)?.heading, "Competency extraction");
+    assert.equal(fitSection(analysis.sections)?.heading, "Fit assessment (Track A lens)");
+  }
+  // No Company file on this row.
+  assert.deepEqual(await loadFieldFile(store, kestrel.company_file), { kind: "absent" });
+
+  // "Open application": its key comes from the legacy JD; no application
+  // file exists under it.
+  const key = applicationKeyForRow(kestrel);
+  assert.equal(key, "kestrel-utilities-senior-pm");
+  assert.equal(hasLinkedApplication(await store.list("applications"), key!), false);
 });
 
 test("workspace-pages fixture: a failing (non-missing) read is loud, never the missing-file line", async () => {

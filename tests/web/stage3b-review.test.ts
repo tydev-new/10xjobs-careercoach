@@ -35,7 +35,8 @@ import { CardBuilder } from "../../packages/agent/src/cards.ts";
 import { WorkspaceError as WebWorkspaceError } from "../../apps/web/src/types.ts";
 import { storeIo } from "../../apps/web/src/workspace/store-io.ts";
 import { pickSection, splitSections } from "../../apps/web/src/workspace/sections.ts";
-import { dismissedRows, groupJobsByStage, loadFieldFile, loadJobsRows, safeHref } from "../../apps/web/src/workspace/jobs.ts";
+import { applicationKeyForRow, dismissedRows, groupJobsByStage, loadFieldFile, loadJobsRows, safeHref } from "../../apps/web/src/workspace/jobs.ts";
+import { groupApplications, linkedApplicationRow } from "../../apps/web/src/workspace/applications.ts";
 import { buildAskTenDraft } from "../../apps/web/src/workspace/ask-ten.ts";
 import { matchGateReply } from "../../packages/agent/src/helpers.ts";
 
@@ -104,6 +105,20 @@ function specRows(md: string): SpecRow[] {
   return out.filter((r) => STAGES_SPEC.includes(r.group) || r.group === "Dismissed");
 }
 const JOBS = specRows(FILES["jobs.md"]);
+/** The row's analysis file, read from the spec text alone — NOT via
+ *  packages/agent's rowAnalysisFile (design-web-agent.md C § 6.2, "A row's
+ *  analysis file, legacy rows included", lead ruling 2026-09-30, issue #32;
+ *  design-web-ui.md § 5.3 Jobs "Row controls"): its `Analysis` field; else
+ *  its `JD` when that names a path under `jd-analysis/`; else none. A JD
+ *  anywhere else (jd-inbox/…) is the raw posting, never the analysis.
+ *  Updated for the ruling (issue #32): these tests used to decide "has an
+ *  analysis" from the `Analysis` line alone, the superseded rule. */
+function specAnalysis(r: SpecRow): string | undefined {
+  const a = r.fields.get("Analysis");
+  if (a) return a;
+  const jd = r.fields.get("JD");
+  return jd && jd.startsWith("jd-analysis/") && jd.length > "jd-analysis/".length ? jd : undefined;
+}
 const datePart = (iso: string | undefined) => (iso ? iso.slice(0, 10) : undefined);
 
 /** What § 5.3 says a row shows, as strings that must each appear in it. */
@@ -126,7 +141,8 @@ function rowStrings(r: SpecRow): { must: string[]; mustNot: string[] } {
     if (f.get("Dismissed")) must.push(f.get("Dismissed")!);
     must.push(S("J5").replace("<stage>", f.get("Was") ?? "To Review"));
   }
-  must.push(f.get("Analysis") ? S("J6") : S("J7"));
+  // issue #32 ruling (C § 6.2): Open analysis for a legacy `JD: jd-analysis/…` row too.
+  must.push(specAnalysis(r) ? S("J6") : S("J7"));
   must.push(S("P1"));
   return { must, mustNot };
 }
@@ -307,6 +323,8 @@ test("§ 5.7 fixture holds what 3b's exit needs: a role in each of the five stag
   assert.ok(JOBS.some((j) => j.fields.get("Reason")?.startsWith("quick-scan:")), "no quick-scan row");
   assert.ok(JOBS.some((j) => j.fields.get("Analysis") && !(j.fields.get("Analysis")! in FILES)), "no Analysis naming a missing file");
   assert.ok(JOBS.some((j) => j.fields.get("Analysis")! in FILES && j.fields.get("Company file")! in FILES), "no row with both files");
+  // issue #32 (C § 6.2 "Proved by": "a legacy row in the § 5.7 fixture"): a pre-S1 row — `JD: jd-analysis/…`, no `Analysis` — whose file exists.
+  assert.ok(JOBS.some((j) => !j.fields.has("Analysis") && j.fields.get("JD")?.startsWith("jd-analysis/") && j.fields.get("JD")! in FILES), "no legacy JD: jd-analysis/ row");
 });
 
 test("§ 5.9 3b exit 'the detail's sections equal the fixture files' sections, string for string' (reader level): for every row, each named section splitSections/pickSection returns equals the file's section by § 5.3's rule", () => {
@@ -314,7 +332,8 @@ test("§ 5.9 3b exit 'the detail's sections equal the fixture files' sections, s
   let checked = 0;
   for (const j of JOBS) {
     for (const [field, prefixes] of [["Analysis", ["Competency extraction", "Fit assessment"]], ["Company file", ["Snapshot", "Culture & hiring signals"]]] as const) {
-      const p = j.fields.get(field);
+      // issue #32 ruling (C § 6.2): the analysis slot reads a legacy `JD: jd-analysis/…` too.
+      const p = field === "Analysis" ? specAnalysis(j) : j.fields.get(field);
       if (!p || !(p in FILES)) continue;
       for (const prefix of prefixes) {
         const want = specPick(FILES[p], prefix);
@@ -329,7 +348,10 @@ test("§ 5.9 3b exit 'the detail's sections equal the fixture files' sections, s
   assert.deepEqual(bad, []);
 });
 
-test("C § 6.2 / § 5.9 3b: the verdict card's `ref` is the row's `analysis_file` — never its `JD` (the raw posting); no Analysis, no ref, even when JD is set", async () => {
+// Retitled for the issue #32 ruling (C § 6.2, "A row's analysis file, legacy rows included"): a JD under
+// jd-analysis/ now IS the analysis; a JD anywhere else (the raw posting) still never is. The assertions below
+// are unchanged; the legacy cases are added.
+test("C § 6.2 / § 5.9 3b: the verdict card's `ref` is the row's analysis file — never a JD outside jd-analysis/ (the raw posting); a jd-inbox JD alone gives no ref; a legacy `JD: jd-analysis/…` alone gives that ref (issue #32)", async () => {
   const cb = new CardBuilder();
   const cmd = { command: 'node evaluate/scripts/record_verdict.mjs --workspace . --company Acme --title "Staff PM" --verdict strong --score 82 --reasons "x"' };
   const out = { stdout: "recorded (created NEW role): Acme — Staff PM → strong (82)", stderr: "", exitCode: 0, changed: ["jobs.md"] };
@@ -339,6 +361,12 @@ test("C § 6.2 / § 5.9 3b: the verdict card's `ref` is the row's `analysis_file
   const jdOnly = await new CardBuilder().forToolResult("bash", cmd, out, createInMemoryWorkspaceStore({ "jobs.md": row(["- JD: jd-inbox/acme-staff-pm.md"]) }) as any);
   assert.equal((jdOnly[0] as any).card, "verdict");
   assert.equal((jdOnly[0] as any).ref, undefined, "a JD-only row must not give the card a ref");
+  // issue #32 ruling: legacy JD under jd-analysis/ alone -> that is the ref; the bare folder -> none.
+  const legacy = await new CardBuilder().forToolResult("bash", cmd, out, createInMemoryWorkspaceStore({ "jobs.md": row(["- JD: jd-analysis/acme-staff-pm.md"]) }) as any);
+  assert.equal((legacy[0] as any).ref, "jd-analysis/acme-staff-pm.md");
+  const bare = await new CardBuilder().forToolResult("bash", cmd, out, createInMemoryWorkspaceStore({ "jobs.md": row(["- JD: jd-analysis/"]) }) as any);
+  assert.equal((bare[0] as any).card, "verdict");
+  assert.equal((bare[0] as any).ref, undefined, "a bare `jd-analysis/` JD is no analysis file");
 });
 
 test("§ 5.9 3b: mvp-journey.json's record_verdict passes `--analysis-file` (not `--jd-file`), and its verdict card's ref equals it", () => {
@@ -573,7 +601,8 @@ test("§ 5.9 3b exit 'the detail's sections equal the fixture files' sections st
   const bad: string[] = [];
   let checked = 0;
   for (const j of JOBS) {
-    const a = j.fields.get("Analysis");
+    // issue #32 ruling (C § 6.2): a legacy `JD: jd-analysis/…` row's analysis counts.
+    const a = specAnalysis(j);
     const c = j.fields.get("Company file");
     if (!(a && a in FILES) && !(c && c in FILES)) continue;
     await chooseRow(page, j.heading);
@@ -642,7 +671,8 @@ test("§ 5.3 detail on the fixture (real shell, 1440): the first row in page ord
     if (f.get("Reason")) want.push(f.get("Reason")!);
     if (v) want.push(S("J2"), f.get("Dealbreakers") ?? S("J3"));
     if (f.get("URL")) want.push(S("J8"));
-    want.push(f.get("Analysis") ? S("J6") : S("J7"));
+    // issue #32 ruling (C § 6.2): Open analysis for a legacy `JD: jd-analysis/…` row too.
+    want.push(specAnalysis(j) ? S("J6") : S("J7"));
     if (f.get("Company file")) want.push(S("J14"));
     want.push(S("P1"));
     for (const s of want) if (!t.includes(s)) bad.push(`${j.heading} detail: missing ${JSON.stringify(s)}`);
@@ -655,7 +685,7 @@ test("§ 5.3 detail on the fixture (real shell, 1440): the first row in page ord
       for (const lab of [S("J9"), S("J10"), S("J12")]) if (t.includes(lab)) bad.push(`${j.heading} (quick scan): shows "${lab}"`);
       if (t.includes(S("J11").replace("<Company>", j.company))) bad.push(`${j.heading} (quick scan): shows About`);
     }
-    const a = f.get("Analysis");
+    const a = specAnalysis(j); // issue #32 ruling (C § 6.2)
     if (a && !(a in FILES)) {
       if (!t.includes(MISSING_LINE(a))) bad.push(`${j.heading}: no "${MISSING_LINE(a)}" (J13); detail says ${JSON.stringify(t.slice(0, 300))}`);
       if (t.includes(COULDNT(a))) bad.push(`${j.heading}: a MISSING analysis shows the rule 6 error line instead of J13`);
@@ -787,7 +817,7 @@ test("§ 5.2 rules 1, 2, 8 and § 5.4 on Jobs (real shell, 1440): Open analysis 
   const appKeys = new Set(Object.keys(FILES).filter((p) => p.startsWith("applications/")).map((p) => p.slice(13).replace(/(-resume\.html|-resume\.pdf|-resume\.md|-cover-letter\.md|-application\.md|\.md)$/, "")));
   for (const j of JOBS) {
     await chooseRow(page, j.heading);
-    const a = j.fields.get("Analysis");
+    const a = specAnalysis(j); // issue #32 ruling (C § 6.2): the key and Open analysis read the legacy JD too
     const key = a?.match(/^jd-analysis\/(.+)\.md$/)?.[1];
     const linked = !!key && appKeys.has(key);
     const has = (await detail(page).getByRole("button", { name: S("J15") }).count()) > 0;
@@ -1108,4 +1138,131 @@ test("§ 5.5 at 375 (the viewer is a full-screen sheet): Back or Escape closes a
   }
   await ctx.close();
   assert.deepEqual(bad, []);
+});
+
+// ------------------------------------------------------------ issue #32: legacy `JD: jd-analysis/…` rows
+// design-web-agent.md C § 6.2, "A row's analysis file, legacy rows included" (lead ruling 2026-09-30);
+// design-web-ui.md § 5.3 Jobs "Row controls". Expected values come from specAnalysis (above, the ruling's
+// words) and the fixture's raw files — never from packages/agent's rowAnalysisFile.
+
+const LEGACY = JOBS.find((j) => !j.fields.has("Analysis") && j.fields.get("JD")?.startsWith("jd-analysis/"))!;
+
+test("issue #32: the § 5.7 legacy row was made by the REAL record_verdict with --jd-file only (meta), and jobs.md holds it as `JD: jd-analysis/…` with no `Analysis` line, its file present with J9/J10's sections", () => {
+  assert.ok(LEGACY, "no legacy row in the fixture");
+  const jd = LEGACY.fields.get("JD")!;
+  const cmds = (fx("workspace-pages").meta.commands as string[]).filter((c) => /record_verdict\.mjs/.test(c) && c.includes(`--company "${LEGACY.company}"`));
+  assert.equal(cmds.length, 1, `record_verdict commands for ${LEGACY.company}: ${cmds.length}`);
+  assert.match(cmds[0], new RegExp(`--jd-file ${jd.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}(\\s|$)`));
+  assert.doesNotMatch(cmds[0], /--analysis-file/);
+  assert.ok(jd in FILES, `${jd} is not in the fixture`);
+  for (const p of ["Competency extraction", "Fit assessment"]) assert.ok(specPick(FILES[jd], p), `${jd} has no "${p}" section`);
+});
+
+test("issue #32 / C § 6.2 'Proved by … whose verdict card carries the ref': the fixture's own Kestrel record_verdict command, over the fixture's own jobs.md, gives a verdict card whose ref is the legacy JD (and it exists, ui § 4)", async () => {
+  const raw = (fx("workspace-pages").meta.commands as string[]).find((c) => /record_verdict\.mjs/.test(c) && c.includes(`--company "${LEGACY.company}"`))!;
+  const command = raw.replace(/^[A-Z_]+=\S+\s+/, "").replace(/\s+#.*$/, "");
+  const cards = await new CardBuilder().forToolResult(
+    "bash",
+    { command },
+    { stdout: `recorded (created NEW role): ${LEGACY.heading} → investable_stretch (62)`, stderr: "", exitCode: 0, changed: ["jobs.md"] },
+    createInMemoryWorkspaceStore(FILES) as any,
+  );
+  assert.equal(cards.length, 1);
+  assert.equal((cards[0] as any).card, "verdict");
+  assert.equal((cards[0] as any).ref, LEGACY.fields.get("JD"));
+  assert.ok((cards[0] as any).ref in FILES);
+});
+
+test("issue #32: Jobs' 'Open application' key and Applications' row join read the legacy JD (the port's own load() rows); a jd-inbox JD, a bare `jd-analysis/`, and a JD beside an Analysis never key/join by the JD", () => {
+  const legacyKey = LEGACY.fields.get("JD")!.match(/^jd-analysis\/(.+)\.md$/)![1];
+  assert.equal(applicationKeyForRow({ jd_file: `jd-analysis/${legacyKey}.md` } as any), legacyKey);
+  assert.equal(applicationKeyForRow({ jd_file: "jd-inbox/acme-pm.md" } as any), undefined);
+  assert.equal(applicationKeyForRow({ jd_file: "jd-analysis/" } as any), undefined);
+  assert.equal(applicationKeyForRow({ analysis_file: "jd-analysis/a.md", jd_file: "jd-analysis/b.md" } as any), "a");
+  const fi = (p: string) => ({ path: p, version: "v1", size: 1, updatedAt: "2026-09-29T00:00:00.000Z", editable: true });
+  const entry = groupApplications([fi(`applications/${legacyKey}-application.md`)])[0];
+  const rows = [
+    { company: "Inbox", title: "t", jd_file: `jd-inbox/${legacyKey}.md` },
+    { company: "Bare", title: "t", jd_file: "jd-analysis/" },
+    { company: "Both", title: "t", analysis_file: "jd-analysis/other.md", jd_file: `jd-analysis/${legacyKey}.md` },
+  ];
+  assert.equal(linkedApplicationRow(entry, rows as any), undefined);
+  assert.equal(linkedApplicationRow(entry, [...rows, { company: LEGACY.company, title: LEGACY.title, jd_file: LEGACY.fields.get("JD") }] as any)?.company, LEGACY.company);
+});
+
+async function legacyJobsCase(vp: { width: number; height: number }, tag: string): Promise<string[]> {
+  const bad: string[] = [];
+  const jd = LEGACY.fields.get("JD")!;
+  const ctx = await ctxFor(vp);
+  const r = await openReal(ctx, FILES);
+  const page = r.page;
+  await go(page, "Jobs");
+  // the row in the list: Open analysis, never J7
+  const got = await readJobs(page, JOBS.map((j) => j.heading), S("P1"));
+  const g = got.find((x) => x.label === LEGACY.heading);
+  if (!g) bad.push(`${tag}: ${LEGACY.heading} not in the list`);
+  else {
+    if (!g.text.includes(S("J6"))) bad.push(`${tag}: row has no "${S("J6")}"`);
+    if (g.text.includes(S("J7"))) bad.push(`${tag}: row still reads "${S("J7")}"`);
+  }
+  await shot(page, `issue32-jobs-list-${tag}`);
+  // the row's own Open analysis opens the viewer on the legacy path
+  const listRow = pane(page).locator(".jobs-list-pane").getByText(LEGACY.heading, { exact: true }).first().locator(`xpath=ancestor::*[.//button[normalize-space()="${S("P1")}"]][1]`);
+  const rowBtn = listRow.getByRole("button", { name: S("J6") });
+  if ((await rowBtn.count()) !== 1) bad.push(`${tag}: ${await rowBtn.count()} "${S("J6")}" buttons in the row`);
+  else {
+    const h = await rowBtn.evaluate((e) => e.getBoundingClientRect().height);
+    if (vp.width < 500 && h < 44) bad.push(`${tag}: row's Open analysis is ${h}px high`);
+    await rowBtn.click();
+    await page.waitForTimeout(350);
+    const v = await page.locator(".side-panel").evaluate((e) => ({ path: e.querySelector(".side-panel-path")?.textContent, md: !!e.querySelector(".markdown-view") }));
+    if (v.path !== jd || !v.md) bad.push(`${tag}: row's Open analysis shows ${v.path} (md ${v.md}), want ${jd}`);
+    await shot(page, `issue32-row-open-analysis-${tag}`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+  }
+  // the detail: J9/J10 sections equal the file's, through MarkdownView; J6 not J7; J13 not shown
+  await chooseRow(page, LEGACY.heading);
+  const t = squash(await detail(page).innerText());
+  if (!t.includes(LEGACY.heading)) bad.push(`${tag}: the detail is not ${LEGACY.heading}`);
+  if (t.includes(S("J7"))) bad.push(`${tag}: detail reads "${S("J7")}"`);
+  if (t.includes(MISSING_LINE(jd))) bad.push(`${tag}: detail shows J13 for a file that exists`);
+  for (const [prefix, label] of [["Competency extraction", S("J9")], ["Fit assessment", S("J10")]] as const) {
+    const want = specPick(FILES[jd], prefix)!;
+    const shown = await detailSection(page, label);
+    if (!shown) {
+      bad.push(`${tag}: detail has no "${label}" section`);
+      continue;
+    }
+    const md: string = await page.evaluate((src) => {
+      const tpl = document.createElement("template");
+      tpl.innerHTML = (window as any).__md(src);
+      return tpl.innerHTML;
+    }, want.body);
+    if (!shown.html.includes(md)) bad.push(`${tag} "${label}": not the MarkdownView rendering of ${jd}'s "${want.heading}"`);
+  }
+  await shot(page, `issue32-detail-${tag}`);
+  const dBtn = detail(page).getByRole("button", { name: S("J6") });
+  if ((await dBtn.count()) !== 1) bad.push(`${tag}: ${await dBtn.count()} "${S("J6")}" buttons in the detail`);
+  else {
+    await dBtn.click();
+    await page.waitForTimeout(350);
+    const v = await page.locator(".side-panel").evaluate((e) => ({ path: e.querySelector(".side-panel-path")?.textContent, md: !!e.querySelector(".markdown-view") }));
+    if (v.path !== jd || !v.md) bad.push(`${tag}: detail's Open analysis shows ${v.path} (md ${v.md}), want ${jd}`);
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(300);
+  }
+  // jobs.md is never rewritten (C § 6.2): no writes, uploads, or model calls
+  const s = await spy(page);
+  if (s.writes.length || s.uploads.length || r.proxyHits) bad.push(`${tag}: writes ${JSON.stringify(s.writes)} uploads ${s.uploads} model calls ${r.proxyHits}`);
+  await ctx.close();
+  return bad;
+}
+
+test("issue #32 on the § 5.7 fixture (real shell, 1440): the legacy row shows Open analysis (row and detail) opening its `JD: jd-analysis/…` file, and its analysis sections; never 'No analysis file linked'; zero writes", async () => {
+  assert.deepEqual(await legacyJobsCase(DESK, "1440x900"), []);
+});
+
+test("issue #32 on the § 5.7 fixture (real shell, 375): the same, on the phone", async () => {
+  assert.deepEqual(await legacyJobsCase(PHONE, "375x812"), []);
 });

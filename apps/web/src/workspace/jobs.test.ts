@@ -263,6 +263,18 @@ test("applicationKeyForRow: the exact jd-analysis/<key>.md shape only", () => {
   assert.equal(applicationKeyForRow({ analysis_file: "company/acme.md" }), undefined);
 });
 
+test("applicationKeyForRow: a legacy row (JD: jd-analysis/…, no Analysis) keys from its JD (C § 6.2, issue #32)", () => {
+  assert.equal(applicationKeyForRow({ jd_file: "jd-analysis/acme-staff-pm.md" }), "acme-staff-pm");
+  assert.equal(applicationKeyForRow({ analysis_file: null, jd_file: "jd-analysis/acme-staff-pm.md" }), "acme-staff-pm");
+  // The raw posting (jd-inbox/) is never the analysis.
+  assert.equal(applicationKeyForRow({ jd_file: "jd-inbox/acme-staff-pm.md" }), undefined);
+  // Both: the Analysis field wins.
+  assert.equal(
+    applicationKeyForRow({ analysis_file: "jd-analysis/acme-staff-pm-v2.md", jd_file: "jd-analysis/acme-staff-pm.md" }),
+    "acme-staff-pm-v2"
+  );
+});
+
 test("hasLinkedApplication: any of the six suffix forms, exact key match", () => {
   const files: FileInfo[] = [
     { path: "applications/acme-staff-pm-resume.md", version: "v1", size: 1, updatedAt: "x", editable: true },

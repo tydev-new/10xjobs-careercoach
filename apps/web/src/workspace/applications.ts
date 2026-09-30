@@ -10,6 +10,7 @@
 // <key>-application.md"). No window/document/localStorage/Node-only API
 // — runs in the browser and on a server.
 import type { FileInfo } from "../types.ts";
+import { rowAnalysisFile, type AnalysisFileRow } from "../../../../packages/agent/src/analysis-file.ts";
 import type { PlanBoard, PlanBoardItem } from "../../../../packages/agent/src/plan-board.ts";
 // design-web-agent.md § 19 (the restore ruling): proposalRows is the ONE
 // reader of an application file's Coverage and Selection tables — the
@@ -144,12 +145,14 @@ export function notesFilesOf(entry: ApplicationEntry): FileInfo[] {
  *  from a company name (§ 5.3), and an entry whose key is a full path
  *  (an unmatched suffix, above) can never coincidentally match, since
  *  `jd-analysis/<full path>.md` names no real file. */
-export function linkedApplicationRow<T extends { analysis_file?: string | null }>(
+export function linkedApplicationRow<T extends AnalysisFileRow>(
   entry: ApplicationEntry,
   rows: readonly T[]
 ): T | undefined {
   const wanted = `jd-analysis/${entry.key}.md`;
-  return rows.find((r) => r.analysis_file === wanted);
+  // The row's analysis file, legacy `JD: jd-analysis/…` rows included
+  // (C § 6.2, issue #32) — through the one reader, never `analysis_file`.
+  return rows.find((r) => rowAnalysisFile(r) === wanted);
 }
 
 /** "Next, from you" (§ 5.3 Applications, part 4; also Home's Active

@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import type { PlanBoard } from "../../../../packages/agent/src/plan-board.ts";
 import { readPlanBoard } from "../../../../packages/agent/src/plan-board.ts";
+import { rowAnalysisFile } from "../../../../packages/agent/src/analysis-file.ts";
 import { load as loadJobsRows } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import { Icon } from "../icons.tsx";
 import type { FileInfo, WorkspaceStore } from "../types.ts";
@@ -45,6 +46,7 @@ export interface JobsRow {
   fit_reason?: string | null;
   dealbreakers?: string | null;
   analysis_file?: string | null;
+  jd_file?: string | null;
   company_file?: string | null;
   seen_at?: string | null;
   updated_at?: string | null;
@@ -271,7 +273,10 @@ function ApplicationDetail({
   onBack: () => void;
 }): ReactElement {
   const label = roleLabel(entry, row);
-  const items = detail.plan ? nextFromYou(detail.plan, entry, row?.analysis_file) : [];
+  // The linked row's analysis file, legacy `JD: jd-analysis/…` rows
+  // included (C § 6.2, issue #32) — the one reader.
+  const analysisFile = row ? rowAnalysisFile(row) : undefined;
+  const items = detail.plan ? nextFromYou(detail.plan, entry, analysisFile) : [];
 
   return (
     <div className="app-detail">
@@ -291,8 +296,8 @@ function ApplicationDetail({
                 {typeof row.fit_score === "number" ? <span className="app-entry-score">{row.fit_score}/100</span> : null}
               </div>
             ) : null}
-            {row.analysis_file ? (
-              <button type="button" className="btn btn--sec" onClick={() => onOpenJobsRow(row.analysis_file as string)}>
+            {analysisFile ? (
+              <button type="button" className="btn btn--sec" onClick={() => onOpenJobsRow(analysisFile)}>
                 Role details
               </button>
             ) : null}

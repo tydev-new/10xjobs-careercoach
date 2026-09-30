@@ -82,6 +82,49 @@ test("bash record_verdict.py: no analysis_file row -> card has no ref (never gue
   assert.equal("ref" in cards[0], false);
 });
 
+test("bash record_verdict.py: a legacy row (JD: jd-analysis/…, no Analysis) -> card ref is that JD (C § 6.2, issue #32)", async () => {
+  const cb = new CardBuilder();
+  const ws = createInMemoryWorkspaceStore({
+    // Rows written before design-web-search.md S1 carry the analysis under
+    // `JD:` and no `Analysis:` line; the verdict card's ref reads it through
+    // rowAnalysisFile, never a guess.
+    "jobs.md": [
+      "## To Review",
+      "",
+      "### Gamma — Senior PM",
+      "- Verdict: strong",
+      "- Score: 78",
+      "- Reason: platform fit",
+      "- JD: jd-analysis/gamma-senior-pm.md",
+      "",
+      "### Delta — PM",
+      "- Verdict: weak",
+      "- Score: 30",
+      "- Reason: no fit",
+      "- JD: jd-inbox/delta-pm.md",
+      "",
+    ].join("\n"),
+  });
+  const cards = await cb.forToolResult(
+    "bash",
+    { command: 'node evaluate/scripts/record_verdict.mjs --company Gamma --title "Senior PM" --verdict strong' },
+    { stdout: "recorded", stderr: "", exitCode: 0, changed: ["jobs.md"] },
+    ws,
+  );
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].ref, "jd-analysis/gamma-senior-pm.md");
+
+  // A JD outside jd-analysis/ is the raw posting, never the analysis.
+  const inbox = await cb.forToolResult(
+    "bash",
+    { command: "node evaluate/scripts/record_verdict.mjs --company Delta --title PM --verdict weak" },
+    { stdout: "recorded", stderr: "", exitCode: 0, changed: ["jobs.md"] },
+    ws,
+  );
+  assert.equal(inbox.length, 1);
+  assert.equal("ref" in inbox[0], false);
+});
+
 test("bash check_materials.py -> one checker card per checked file, findings word for word", async () => {
   const cb = new CardBuilder();
   const ws = createInMemoryWorkspaceStore();

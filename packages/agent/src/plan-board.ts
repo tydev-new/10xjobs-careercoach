@@ -78,6 +78,8 @@ function labelAt(line: string): PlanBoardLabel | undefined {
 }
 
 const BULLET_RE = /^\s*(?:\d+\.|[-*•])\s+(.*)$/;
+/** waitingRows' own bullet test (check-closeout.mjs `waitingRows`). */
+const WAITING_BULLET_RE = /^\s*[-*•]\s+/;
 
 /** The grammar the "To do"/"Doing"/"Done" sections share with
  *  `waitingRows` (§ 18): a bullet (now also an indented one, or numbered,
@@ -119,7 +121,7 @@ export function readPlanBoard(md: string): PlanBoard {
     if (budgetLine === undefined && line.startsWith("Budget:")) budgetLine = restoreLineSeparators(line);
   }
 
-  // The first occurrence of each label, in file order.
+  // The first occurrence of each label wins, in file order.
   const found: Array<{ label: PlanBoardLabel; index: number }> = [];
   const seenLabels = new Set<PlanBoardLabel>();
   lines.forEach((line, index) => {
@@ -129,13 +131,15 @@ export function readPlanBoard(md: string): PlanBoard {
       found.push({ label, index });
     }
   });
-  found.sort((a, b) => a.index - b.index);
 
-  const sections: PlanBoardSection[] = found.map(({ label, index }, i) => {
-    const nextLabelIndex = found[i + 1]?.index ?? lines.length;
-    let end = nextLabelIndex;
-    for (let j = index + 1; j < nextLabelIndex; j++) {
-      if (lines[j].startsWith("#")) {
+  const sections: PlanBoardSection[] = found.map(({ label, index }) => {
+    // § 18: a section runs "from their label to the next board label, a
+    // line starting `#`, or the end of the file" — ANY occurrence of a
+    // board label ends it, including a repeat of a label seen earlier
+    // (which starts no section of its own: the first occurrence wins).
+    let end = lines.length;
+    for (let j = index + 1; j < lines.length; j++) {
+      if (lines[j].startsWith("#") || labelAt(lines[j])) {
         end = j;
         break;
       }
@@ -149,11 +153,20 @@ export function readPlanBoard(md: string): PlanBoard {
       // below, per § 18).
       const rows = waitingRows(text) as string[];
       const items = rows.map((r) => withRef(restoreLineSeparators(r)));
-      const hasNonBlank = bodyLines.some((l) => l.trim() !== "");
-      const unreadable =
-        items.length === 0 && hasNonBlank
-          ? bodyLines.filter((l) => l.trim() !== "").map((l) => restoreLineSeparators(l))
-          : [];
+      // § 18 "Unreadable": with no rows, every non-blank line is
+      // unreadable; with rows, the non-blank lines before the first
+      // bullet are (waitingRows drops them silently — a note written
+      // above the list must still show, loudly, § 5.2 rule 6). The
+      // bullet test is waitingRows' own, so the two never disagree.
+      let unreadable: string[];
+      if (items.length === 0) {
+        unreadable = bodyLines.filter((l) => l.trim() !== "").map((l) => restoreLineSeparators(l));
+      } else {
+        // split as waitingRows splits its block (pySplitlines)
+        const nonBlank = pySplitlines(bodyLines.join("\n")).filter((l: string) => l.trim() !== "");
+        const first = nonBlank.findIndex((l: string) => WAITING_BULLET_RE.test(l));
+        unreadable = nonBlank.slice(0, first === -1 ? 0 : first).map((l: string) => restoreLineSeparators(l));
+      }
       return { label, items, unreadable };
     }
     const { items, unreadable } = parseSectionBody(bodyLines.join("\n"));

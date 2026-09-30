@@ -130,7 +130,12 @@ export const SidePanel = forwardRef<HTMLIFrameElement, SidePanelProps>(function 
     <aside className={`side-panel${open ? " side-panel--open" : ""}`} aria-label="File preview">
       <div className="side-panel-header">
         <button type="button" className="side-panel-back" onClick={closeAndRestoreFocus} aria-label="Close">
-          <Icon name="arrowLeft" size={18} />
+          {/* Both glyphs render; CSS shows one: the back arrow on the
+              phone sheet and the drawer, the ✕ on Home's own viewer at
+              desktop (§ 5.6: "on Home it appears only while a file is
+              open, with a ✕"; § 5.3.1 F46). */}
+          <Icon name="arrowLeft" size={18} className="side-panel-back-arrow" />
+          <Icon name="x" size={18} className="side-panel-back-x" />
         </button>
         <span className="side-panel-path">{file ? file.path : error ? error.path : "Nothing open yet."}</span>
         {file && !file.binary && kind === "html" ? (

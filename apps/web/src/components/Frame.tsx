@@ -42,6 +42,13 @@ export interface FrameProps extends Omit<HeaderProps, "pageTitle"> {
    *  (§ 5.2 rules 1 and 4). Pages never write; this is a read-only use of
    *  the store's own `read`/`list`. */
   store: WorkspaceStore;
+  /** True when the shell knows no conversation is saved yet (§ 5.3 Home
+   *  Empty; § 5.3.1 P3): Home's empty-state button then reads "Talk to
+   *  Ten" instead of Continue with Ten. Only the real shell sets it — it
+   *  restores the saved conversation (C § 11). The mock shell has no
+   *  conversation store, so "saved" means nothing there; it leaves this
+   *  unset and Home keeps H3 (what stage2-review pins on the mock). */
+  noConversationSaved?: boolean;
   /** Opens a chip's file in the pinned viewer — the same mechanism a
    *  card's `ref` already uses (§ 1.1); Frame forwards it to whichever
    *  page needs it (today, only Home's plan items). */
@@ -108,6 +115,7 @@ export function Frame(props: FrameProps): ReactElement {
     status,
     chatStatus,
     store,
+    noConversationSaved,
     onOpenRef,
     talkToTen,
     sidePanel,
@@ -216,6 +224,8 @@ export function Frame(props: FrameProps): ReactElement {
               chatStatus={chatStatus}
               onOpenRef={onOpenRef}
               onContinueWithTen={continueWithTen}
+              onOpenTalkToTen={openTalkToTen}
+              noConversationSaved={noConversationSaved === true}
               onOpenJobs={() => navigate("jobs")}
             />
           ) : page === "jobs" ? (
@@ -277,7 +287,7 @@ export function Frame(props: FrameProps): ReactElement {
           iframe/print state, § 2.3) — hidden with a class, the same
           posture as Talk to Ten's own page above, never conditionally
           unmounted. */}
-      <div className={`viewer-slot${page === "home" && !viewerOpen ? " viewer-slot--hidden" : ""}`}>
+      <div className={`viewer-slot${page === "home" ? " viewer-slot--home" : ""}${page === "home" && !viewerOpen ? " viewer-slot--hidden" : ""}`}>
         {sidePanel}
       </div>
     </div>

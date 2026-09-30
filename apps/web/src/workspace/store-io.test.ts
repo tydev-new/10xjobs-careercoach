@@ -114,3 +114,8 @@ test("store-io: exists(p) is false on the REAL store's own WorkspaceError('resou
   const io = storeIo(store);
   assert.equal(await io.exists("jobs.md"), false, "must read as missing (empty state), never throw");
 });
+
+test("storeIo.readFile passes text through universalNewlines: a lone-CR file reads as \\n lines", async () => {
+  const io = storeIo(fakeStore({ "jobs.md": "# Pipeline\r## To Review\r### A — PM\r" }));
+  assert.equal(await io.readFile("jobs.md"), "# Pipeline\n## To Review\n### A — PM\n");
+});

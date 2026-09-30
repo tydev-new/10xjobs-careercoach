@@ -34,8 +34,14 @@ export interface HomeViewProps {
   minutes?: MinutesSum;
   lastReply?: LastReply;
   working: boolean;
+  /** No conversation is saved yet (the real shell's restored `messages`
+   *  is empty, the same test § 5.1's landing rule uses): the empty state's button is
+   *  P3 "Talk to Ten", which opens Talk to Ten without focusing the
+   *  composer (§ 5.4), instead of H3 Continue with Ten. */
+  noConversation: boolean;
   onOpenRef: (ref: string) => void;
   onContinueWithTen: () => void;
+  onOpenTalkToTen: () => void;
   onOpenJobs: () => void;
   onRetryPlan: () => void;
   onRetryPipeline: () => void;
@@ -113,14 +119,19 @@ export function HomeView(props: HomeViewProps): ReactElement {
     minutes,
     lastReply,
     working,
+    noConversation,
     onOpenRef,
     onContinueWithTen,
+    onOpenTalkToTen,
     onOpenJobs,
     onRetryPlan,
     onRetryPipeline,
   } = props;
 
-  const planEmpty = !goalLine && !budgetLine && sectionEmpty(waitingOnYou) && sectionEmpty(toDo);
+  // § 5.3 Home Empty: "the two files have no items and no unreadable
+  // lines between them" — the Goal/Budget head lines are neither, so a
+  // plan.md holding only those (and empty sections) is still Empty.
+  const planEmpty = sectionEmpty(waitingOnYou) && sectionEmpty(toDo);
   const pipelineEmpty = !pipeline || (pipeline.stages.every((s) => s.count === 0) && pipeline.dismissed === 0);
   const isEmpty = !planReadError && !pipelineReadError && planEmpty && pipelineEmpty;
 
@@ -175,19 +186,9 @@ export function HomeView(props: HomeViewProps): ReactElement {
     // message and its own button (the page's one Continue with Ten) sit
     // under it (§ 5.6 "Empty state").
     //
-    // Coder note (reported, not silently dropped): § 5.3's own Empty text
-    // reads "...and Continue with Ten, or 'Talk to Ten' when no
-    // conversation is saved yet" (docs/design-web-ui.md line ~1037-1038),
-    // and § 5.3.1 gives that second case its own row (P3, "Home when no
-    // conversation is saved"). This view always shows H3 "Continue with
-    // Ten" instead, unconditionally — the same button the pre-Stage-3c
-    // placeholder on `main` always showed (`Frame.tsx`, `cta="continue"`,
-    // no condition). The P3 half is undetectable through THIS app's own
-    // mock preview: `useChat` there always mounts with `messages: []`
-    // regardless of which fixture is picked (no fixture ever restores a
-    // saved conversation into the mock), so a `messages.length > 0` check
-    // can never read true in the mock, on ANY fixture — the mock-side half
-    // of the P3/H3 split could never be exercised at all, mock or real.
+    // The button is P3 "Talk to Ten" when no conversation is saved yet,
+    // H3 "Continue with Ten" once one is (§ 5.3 Home Empty; § 5.3.1 P3,
+    // H3).
     return (
       <div className="page-home">
         {workingLine}
@@ -198,16 +199,26 @@ export function HomeView(props: HomeViewProps): ReactElement {
           </div>
           <p className="page-empty-title">Nothing here yet.</p>
           <p className="page-empty-body">Talk to Ten to start your plan and your job list; they show here.</p>
-          <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
-            Continue with Ten
-          </button>
+          {noConversation ? (
+            <button type="button" className="btn btn--sec" onClick={onOpenTalkToTen}>
+              Talk to Ten
+            </button>
+          ) : (
+            <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
+              Continue with Ten
+            </button>
+          )}
         </div>
       </div>
     );
   }
 
+  // Order (§ 5.3 "Shows" and § 5.6's "To restore" Home bullet): the goal,
+  // the pipeline strip, Ten's last reply band, then Waiting on you and To
+  // do. The working line sits above the page (§ 5.3.1 F35).
   return (
     <div className="page-home">
+      {workingLine}
       {planReadError ? (
         <ReadError path="plan.md" onRetry={onRetryPlan} />
       ) : (
@@ -216,8 +227,6 @@ export function HomeView(props: HomeViewProps): ReactElement {
           {budgetLine ? <p className="home-budget">{budgetLine}</p> : null}
         </>
       )}
-
-      {workingLine}
 
       {pipelineReadError ? (
         <ReadError path="jobs.md" onRetry={onRetryPipeline} />
@@ -244,14 +253,14 @@ export function HomeView(props: HomeViewProps): ReactElement {
         </div>
       ) : null}
 
+      {renderBand(true)}
+
       {!planReadError ? (
         <div className="home-plan-columns">
           <PlanColumn icon="user" title="Waiting on you" section={waitingOnYou} onOpenRef={onOpenRef} />
           <PlanColumn icon="listTodo" title="To do" section={toDo} minutes={minutes} onOpenRef={onOpenRef} />
         </div>
       ) : null}
-
-      {renderBand(true)}
     </div>
   );
 }
@@ -270,6 +279,8 @@ export function Home({
   chatStatus,
   onOpenRef,
   onContinueWithTen,
+  onOpenTalkToTen,
+  noConversationSaved,
   onOpenJobs,
 }: {
   store: WorkspaceStore;
@@ -277,6 +288,9 @@ export function Home({
   chatStatus: ChatRawStatus;
   onOpenRef: (ref: string) => void;
   onContinueWithTen: () => void;
+  onOpenTalkToTen: () => void;
+  /** Frame's `noConversationSaved` (only the real shell knows it). */
+  noConversationSaved: boolean;
   onOpenJobs: () => void;
 }): ReactElement {
   const [planState, setPlanState] = useState<{ goalLine?: string; budgetLine?: string; waitingOnYou?: PlanBoardSection; toDo?: PlanBoardSection; error: boolean }>({ error: false });
@@ -362,8 +376,10 @@ export function Home({
       minutes={minutes}
       lastReply={lastReply}
       working={working}
+      noConversation={noConversationSaved}
       onOpenRef={onOpenRef}
       onContinueWithTen={onContinueWithTen}
+      onOpenTalkToTen={onOpenTalkToTen}
       onOpenJobs={onOpenJobs}
       onRetryPlan={() => setPlanRetryToken((v) => v + 1)}
       onRetryPipeline={() => setPipelineRetryToken((v) => v + 1)}

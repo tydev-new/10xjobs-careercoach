@@ -9,7 +9,6 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { readPlanBoard } from "../../../../packages/agent/src/plan-board.ts";
-// @ts-expect-error - plain .mjs, no type declarations
 import { load as loadJobsRows } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import { FixtureStore } from "../store.ts";
 import type { Fixture } from "../types.ts";

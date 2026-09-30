@@ -1,0 +1,4 @@
+WARN  `have` row "Own partner ecosystem end to end (roadmap)": their word(s) ['end', 'end'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move
+WARN  `have` row "Cross-functional work with engineering & partnersh": their word(s) ['engineering', 'partnerships'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move
+WARN  `have` row "6+ years B2B SaaS PM (preferred)": their word(s) ['preferred'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move
+All checks clean. Here's the package.

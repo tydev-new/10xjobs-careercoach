@@ -11,8 +11,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from "react";
 import type { PlanBoard } from "../../../../packages/agent/src/plan-board.ts";
 import { readPlanBoard } from "../../../../packages/agent/src/plan-board.ts";
-// @ts-expect-error - plain .mjs, no type declarations (script-runner.ts's
-// own posture for a skills/*/scripts/lib import).
 import { load as loadJobsRows } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import { Icon } from "../icons.tsx";
 import type { FileInfo, WorkspaceStore } from "../types.ts";

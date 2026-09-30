@@ -19,11 +19,7 @@ import type { PlanBoard, PlanBoardItem } from "../../../../packages/agent/src/pl
 // and puts each returned cell through restoreLineSeparators before
 // showing it" — readApplicationTables (below) does exactly that, the
 // same posture readPlanBoard already uses for plan.md (C § 18).
-// @ts-expect-error - plain .mjs, no type declarations (script-runner.ts's
-// own posture for a skills/*/scripts/lib import; PR #24, the js-only J2
-// switch, moved this out of packages/checkers/src).
 import { proposalRows } from "../../../../skills/apply/scripts/lib/proposal-block.mjs";
-// @ts-expect-error - plain .mjs, no type declarations
 import { restoreLineSeparators, universalNewlines } from "../../../../skills/profile/scripts/lib/py-text.mjs";
 
 // § 5.3's own ordered list — the FIRST one that matches a file's leaf

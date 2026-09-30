@@ -19,7 +19,7 @@
  },
  "expect": [
   {
-   "stdout": "\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nWARN  `have` row \"𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀 \": their word(s) ['Kubernetes'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\n",
+   "stdout": "\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nWARN  `have` row \"𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀𝐀 \": their word(s) ['Kubernetes'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\nno failures, 1 warning above — fix each one or tell the candidate\n",
    "stderr": "",
    "stderrMatch": "exact",
    "exit": 0

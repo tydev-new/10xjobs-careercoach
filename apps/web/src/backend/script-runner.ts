@@ -16,8 +16,11 @@
 // Node-only/browser-only imports; this file itself touches no
 // window/document/localStorage/node:*.
 import { Bash } from "just-bash";
-// @ts-expect-error - plain .mjs, no type declarations (same posture as
-// packages/checkers/test/browser/browser-main.ts's own import of it).
+// Plain .mjs, no type declarations — apps/web/tsconfig.json's `allowJs`
+// (added for design-web-search.md's board-readers.mjs/jobs-md.mjs
+// imports, packages/agent/src/tools/boards.ts) now resolves this the same
+// way, so the `@ts-expect-error` this line used to need is gone (an
+// unused one is itself a `tsc` error).
 import { nodeCommand, python3Command } from "../../../../packages/checkers/src/just-bash-command.mjs";
 import type { RunResult, ScriptRunner } from "../../../../packages/agent/src/types.ts";
 

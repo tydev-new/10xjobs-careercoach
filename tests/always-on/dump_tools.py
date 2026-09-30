@@ -32,6 +32,11 @@ def collect_results(path):
             except json.JSONDecodeError:
                 continue
             msg = ev.get("message") or {}
+            # a claude -p run under --permission-mode can emit
+            # {"type":"system","subtype":"permission_denied","message":"<string>"}
+            # -- "message" is a plain string there, not the usual dict.
+            if not isinstance(msg, dict):
+                continue
             for block in msg.get("content") or []:
                 if not (isinstance(block, dict) and block.get("type") == "tool_result"):
                     continue
@@ -62,6 +67,8 @@ def walk(path, show_results):
             except json.JSONDecodeError:
                 continue
             msg = ev.get("message") or {}
+            if not isinstance(msg, dict):
+                continue
             for block in msg.get("content") or []:
                 if isinstance(block, dict) and block.get("type") == "tool_use":
                     name = block.get("name", "?")

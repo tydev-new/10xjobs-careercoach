@@ -19,7 +19,7 @@
  },
  "expect": [
   {
-   "stdout": "**Cut — 3 of 4 bullets, weakest first.** Say \"keep\" and the bullet's name or number to bring one back.\n1. A — two — *weakest*\n2. A — three — *next*\n3. A — four — *furthest*\n\n**Gaps — evidence you might have?** (\"no\" is a fine answer)\n- A/B testing — none\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nWARN  the `out` rows are in base order (# strictly rising) — rank them weakest-first for THIS posting, in the file, then re-run\nWARN  `have` row \"Orchestrate scheduled data workflows\": their word(s) ['Orchestrate', 'workflows'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\n",
+   "stdout": "**Cut — 3 of 4 bullets, weakest first.** Say \"keep\" and the bullet's name or number to bring one back.\n1. A — two — *weakest*\n2. A — three — *next*\n3. A — four — *furthest*\n\n**Gaps — evidence you might have?** (\"no\" is a fine answer)\n- A/B testing — none\n\nOtherwise this is the version.\n\n--- paste everything above this line into the reply, beside the delivered document ---\nWARN  the `out` rows are in base order (# strictly rising) — rank them weakest-first for THIS posting, in the file, then re-run\nWARN  `have` row \"Orchestrate scheduled data workflows\": their word(s) ['Orchestrate', 'workflows'] do not appear in the base — true in the base but missing THEIR word is `shown-but-unnamed`, and then it is a placement the candidate can move\nno failures, 2 warnings above — fix each one or tell the candidate\n",
    "stderr": "",
    "stderrMatch": "exact",
    "exit": 0

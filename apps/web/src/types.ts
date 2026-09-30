@@ -37,7 +37,10 @@ export interface PlanCardProps {
 export interface DocumentCardProps {
   words: number;
   htmlPath?: string;
-  checker: "clean" | "fail" | "not-run" | string;
+  // design-honest-ceilings.md § 6A: a pass with N >= 1 warnings is its own
+  // "warn" state — never folded into "clean" — and carries warnCount.
+  checker: "clean" | "fail" | "not-run" | "warn" | string;
+  warnCount?: number;
 }
 
 export interface CheckerFinding {

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Spike 4 — board API CORS, from the browser</title>
+<style>
+  body { font-family: ui-monospace, monospace; max-width: 900px; margin: 2rem auto; }
+  .pass { color: #0a7a2a; }
+  .fail { color: #b00020; }
+  pre { white-space: pre-wrap; background: #f4f4f4; padding: 0.5rem; }
+</style>
+</head>
+<body>
+<h1>Spike 4 — board API CORS, from the browser</h1>
+<p>
+  design-web-search.md &sect; 12: <code>curl</code> with an <code>Origin</code> header
+  found <code>Access-Control-Allow-Origin</code> on the four list endpoints and the
+  Greenhouse/SmartRecruiters single postings, and Lever's single posting echoes the
+  origin; Workday's <code>cxs</code> preflight had no CORS header. This page repeats
+  those seven calls as REAL cross-origin <code>fetch()</code> calls, made by the
+  browser itself (not curl), from wherever this page is served — the design's own
+  "browser access to single-posting endpoints" UNVERIFIED note (design-web-agent.md
+  &sect; 4) is what this settles.
+</p>
+<p><b>No key, no login, no personal data.</b> Every address below is a public job
+  board a real candidate could open directly; nothing here writes anywhere.</p>
+<button id="run">Run the 7 calls</button>
+<pre id="out">(not run yet)</pre>
+<script type="module">
+const CASES = [
+  // Four list endpoints
+  { label: "Greenhouse list (gitlab)", url: "https://boards-api.greenhouse.io/v1/boards/gitlab/jobs" },
+  { label: "Lever list (leverdemo)", url: "https://api.lever.co/v0/postings/leverdemo?mode=json" },
+  { label: "Ashby list (ashby)", url: "https://api.ashbyhq.com/posting-api/job-board/ashby?includeCompensation=true" },
+  { label: "SmartRecruiters list (smartrecruiters)", url: "https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings?limit=100&offset=0" },
+  // Three single-posting endpoints (Ashby has none -- it reads the list once, see design § 4.1)
+  { label: "Greenhouse posting", url: "https://boards-api.greenhouse.io/v1/boards/gitlab/jobs/8556658002?content=true" },
+  { label: "Lever posting", url: "https://api.lever.co/v0/postings/leverdemo/681fbc53-1e34-4a46-8677-3a78118674eb" },
+  { label: "SmartRecruiters posting", url: "https://api.smartrecruiters.com/v1/companies/smartrecruiters/postings/744000148454651" },
+];
+
+async function runOne(c) {
+  const started = performance.now();
+  try {
+    const res = await fetch(c.url, { redirect: "error" });
+    const ms = Math.round(performance.now() - started);
+    const text = await res.text();
+    let jsonOk = false;
+    try { JSON.parse(text); jsonOk = true; } catch {}
+    return {
+      ...c,
+      ok: res.ok && jsonOk,
+      status: res.status,
+      ms,
+      bytes: text.length,
+      corsHeaderSeenByBrowser: true, // if this resolved at all, the browser accepted the CORS answer
+    };
+  } catch (e) {
+    // A CORS refusal in a real browser throws a generic TypeError("Failed to
+    // fetch") with NO status code visible to page JS (the browser hides the
+    // reason) -- that opaque failure is itself the negative signal.
+    return { ...c, ok: false, error: String(e), corsHeaderSeenByBrowser: false };
+  }
+}
+
+document.getElementById("run").addEventListener("click", async () => {
+  const out = document.getElementById("out");
+  out.textContent = "running...\n";
+  const lines = [];
+  for (const c of CASES) {
+    const r = await runOne(c);
+    lines.push(
+      `${r.ok ? "PASS" : "FAIL"} ${r.label}\n` +
+      `  ${r.url}\n` +
+      `  ${r.ok ? `status=${r.status} bytes=${r.bytes} ${r.ms}ms` : (r.error || `status=${r.status}`)}`,
+    );
+    out.textContent = lines.join("\n\n");
+  }
+  out.textContent = lines.join("\n\n") + `\n\n${lines.filter((l) => l.startsWith("PASS")).length}/${CASES.length} passed`;
+});
+</script>
+</body>
+</html>

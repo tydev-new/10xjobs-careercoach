@@ -9,8 +9,6 @@
 // copy (rule 12; the same words Home's pipeline cells and the Jobs
 // groups use, P11-P15 § 5.3.1). No window/document/localStorage/
 // Node-only API.
-// @ts-expect-error - plain .mjs, no type declarations (script-runner.ts's
-// own posture for a skills/*/scripts/lib import).
 import { STAGES } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 
 export const STAGE_LABELS: string[] = STAGES;

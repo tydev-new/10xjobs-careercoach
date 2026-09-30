@@ -129,7 +129,11 @@ export function HomeView(props: HomeViewProps): ReactElement {
   // Ten") when none does — Continue with Ten (H3) always sits in the same
   // band either way (§ 5.6 restore text: "Ten's last reply in the --hero
   // band ... Continue with Ten").
-  const band = (
+  // `withButton` false is the Empty layout's reply-only band: § 5.3 Home
+  // Empty gives the page ONE Continue with Ten (the empty state's own,
+  // below the message), with the last reply "still shown above it" — two
+  // same-named buttons on one page would be two controls for one action.
+  const renderBand = (withButton: boolean) => (
     <div className="home-continue-band">
       <div className="home-continue-content">
         <div className="home-continue-label">
@@ -147,10 +151,12 @@ export function HomeView(props: HomeViewProps): ReactElement {
           </>
         ) : null}
       </div>
-      <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
-        Continue with Ten
-        <Icon name="arrowRight" size={16} />
-      </button>
+      {withButton ? (
+        <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
+          Continue with Ten
+          <Icon name="arrowRight" size={16} />
+        </button>
+      ) : null}
     </div>
   );
 
@@ -165,7 +171,8 @@ export function HomeView(props: HomeViewProps): ReactElement {
     // "Ten's last reply still shows above it when one qualifies" (§ 5.3
     // Home, Empty) — the SAME band as the non-empty layout, so H1/H4 and
     // the quote never have a second rendering to drift from the first
-    // (rule 12); the plain empty-state message and its own button sit
+    // (rule 12), but without the band's button: the plain empty-state
+    // message and its own button (the page's one Continue with Ten) sit
     // under it (§ 5.6 "Empty state").
     //
     // Coder note (reported, not silently dropped): § 5.3's own Empty text
@@ -184,7 +191,7 @@ export function HomeView(props: HomeViewProps): ReactElement {
     return (
       <div className="page-home">
         {workingLine}
-        {lastReply ? band : null}
+        {lastReply ? renderBand(false) : null}
         <div className="page-empty">
           <div className="page-empty-icon" aria-hidden="true">
             <Icon name="house" size={26} />
@@ -244,7 +251,7 @@ export function HomeView(props: HomeViewProps): ReactElement {
         </div>
       ) : null}
 
-      {band}
+      {renderBand(true)}
     </div>
   );
 }

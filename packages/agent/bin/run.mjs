@@ -97,8 +97,30 @@ async function main() {
     ...(upstream.cacheControl ? { cache_control: upstream.cacheControl } : {}),
   });
 
-  const coach = createCoach({ ...deps, model });
+  // The turn's spend, from the coach's OWN per-step cost recorder
+  // (coach.ts recordStepCost: providerMetadata.openrouter.usage.cost, one
+  // call per recorded step) — printed once at the end as one fixed line:
+  //   [cost] usd=<sum> steps=<n>                      every step reported a cost
+  //   [cost] unknown steps=<n> reported=<k> usd=<sum>  any step reported none
+  const stepCosts = [];
+  const coach = createCoach({ ...deps, model, onStepCost: (s) => stepCosts.push(s.reportedUsd) });
+  try {
+    await streamTurn(coach, args);
+  } finally {
+    console.error(costLine(stepCosts));
+  }
+}
 
+function costLine(stepCosts) {
+  const reported = stepCosts.filter((c) => typeof c === "number");
+  const usd = reported.reduce((a, b) => a + b, 0).toFixed(6);
+  if (stepCosts.length > 0 && reported.length === stepCosts.length) {
+    return `[cost] usd=${usd} steps=${stepCosts.length}`;
+  }
+  return `[cost] unknown steps=${stepCosts.length} reported=${reported.length} usd=${usd}`;
+}
+
+async function streamTurn(coach, args) {
   const stream = coach.stream({
     chatId: args.chatId,
     messages: [{ id: "u1", role: "user", parts: [{ type: "text", text: args.prompt }], metadata: { origin: "typed" } }],

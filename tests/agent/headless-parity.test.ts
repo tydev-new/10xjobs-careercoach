@@ -192,6 +192,8 @@ test("e2e: a checker whose stdout carries a raw status name (update_job's `stage
   assert.match(after, /Applied/);
   assert.notEqual(after, readFileSync(path.join(FIXTURE, "jobs.md"), "utf8"));
   assert.match(r.stdout, /DONE-FROM-MOCK/);
+  // both steps' usage.cost (0.0001 each), summed by the coach's own recorder
+  assert.match(r.stderr, /^\[cost\] usd=0\.000200 steps=2$/m, r.stderr);
   assert.ok(!r.all.includes(FAKE_KEY), "key printed");
 });
 

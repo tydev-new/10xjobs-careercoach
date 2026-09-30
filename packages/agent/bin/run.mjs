@@ -13,6 +13,15 @@
 // hardcoded key, and the key's VALUE is never printed (only the env var
 // NAME appears in any message).
 //
+// Model request: the same per-model options ten-model-proxy sends
+// upstream (upstreamModelOptions in supabase/functions/ten-model-proxy/
+// core.ts — the proxy's own buildUpstreamBody uses it): the no-data-kept
+// provider filter (+ require_parameters for DeepSeek), cache_control for
+// Claude only, max_tokens at the proxy's cap. --model must be one of the
+// proxy's allowed ids (MODEL_IDS); anything else is refused, since
+// production would refuse it (400 model_not_allowed) and a headless run
+// of it would measure nothing the site can send.
+//
 // Scripts: the REAL ScriptRunner the web app uses (just-bash + the
 // skills' ported checkers, apps/web/src/backend/script-runner.ts, wired
 // in bin/headless-deps.mjs), so a skill's `node scripts/check_*.mjs ...`
@@ -24,6 +33,7 @@ import { readUIMessageStream } from "ai";
 
 import { createCoach } from "../src/coach.ts";
 import { buildHeadlessDeps } from "./headless-deps.mjs";
+import { MODEL_IDS, upstreamModelOptions } from "../../../supabase/functions/ten-model-proxy/core.ts";
 
 function parseArgs(argv) {
   const args = { keyEnv: "OPENROUTER_API_KEY", chatId: "run-" + Date.now(), balance: 5 };
@@ -43,12 +53,11 @@ function parseArgs(argv) {
   for (const required of ["workspace", "skills", "model", "prompt"]) {
     if (!args[required]) throw new Error(`--${required} is required`);
   }
+  if (!MODEL_IDS.includes(args.model)) {
+    throw new Error(`--model must be one of the site's allowed models (${MODEL_IDS.join(", ")}); got ${args.model}`);
+  }
   return args;
 }
-
-/** A provider filter matching the spike-1-proven no-data-kept routing
- *  (docs/spikes/spike-1-browser-loop.md, "Item 3"). */
-const NO_DATA_KEPT_PROVIDER_FILTER = { data_collection: "deny", zdr: true };
 
 async function main() {
   let args;
@@ -80,9 +89,12 @@ async function main() {
   });
 
   const openrouter = createOpenRouter({ apiKey });
+  // What ten-model-proxy sends upstream for this model (see header).
+  const upstream = upstreamModelOptions(args.model);
   const model = openrouter.chat(args.model, {
-    provider: NO_DATA_KEPT_PROVIDER_FILTER,
-    cache_control: { type: "ephemeral" },
+    provider: upstream.provider,
+    maxTokens: upstream.maxTokens,
+    ...(upstream.cacheControl ? { cache_control: upstream.cacheControl } : {}),
   });
 
   const coach = createCoach({ ...deps, model });

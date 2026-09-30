@@ -214,7 +214,7 @@ test("e2e: no key → refusal before any deps are built: no request, fixture wor
 
 // ------------------------------------------------------------ 3. model-request parity (the issue names a DeepSeek measurement)
 
-test("model parity: a headless DeepSeek request carries what ten-model-proxy sends upstream for DeepSeek (require_parameters, no cache_control, max_tokens cap)", { todo: "FINDING (medium, pre-existing, not introduced by 808c1cc): bin/run.mjs sends provider {data_collection,zdr} + cache_control and no max_tokens; supabase/functions/ten-model-proxy/core.ts:177-189 sends DeepSeek require_parameters:true, no cache_control, max_tokens 8192." }, () => {
+test("model parity: a headless DeepSeek request carries what ten-model-proxy sends upstream for DeepSeek (require_parameters, no cache_control, max_tokens cap)", () => {
   const r = runHeadless("echo hi", { OPENROUTER_API_KEY: FAKE_KEY }, "deepseek/deepseek-v4.1-flash");
   assert.ok(r.requests.length >= 1, r.all);
   const body = JSON.parse(r.requests[0].body);

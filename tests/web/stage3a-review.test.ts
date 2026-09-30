@@ -493,6 +493,13 @@ test("§ 5.2 rule 8 from Documents (real shell, 1440): the one viewer opens .md 
   const page = r.page;
   const bad: string[] = [];
   await go(page, "Documents");
+  // spy.reads is cumulative from page load. Since Stage 3c the real shell
+  // lands on Home for a saved conversation (§ 5.1 "Where the app opens"),
+  // and Home legitimately reads plan.md and jobs.md (§ 5.3 Home "Reads")
+  // before this test reaches Documents. So only reads made from here on
+  // are Documents' own. (Named, allowed change by the lead, Stage 3c
+  // review round 1; no other assertion changed.)
+  const readsBefore = (await spy(page)).reads.length;
   const viewers = await page.locator(".side-panel, [aria-label='File preview']").count();
   if (viewers !== 1) bad.push(`${viewers} viewers in the DOM, § 5.2 rule 8 wants one`);
 
@@ -549,7 +556,7 @@ test("§ 5.2 rule 8 from Documents (real shell, 1440): the one viewer opens .md 
   await shot(page, "documents-viewer-binary-1440x900");
   const s = await spy(page);
   const opened = ["profile.md", "applications/beta-co-resume.html", "documents/old-resume.pdf", "documents/references.docx"];
-  const strayReads = s.reads.filter((p: string) => !opened.includes(p));
+  const strayReads = s.reads.slice(readsBefore).filter((p: string) => !opened.includes(p));
   if (strayReads.length) bad.push(`reads beyond the files opened: ${JSON.stringify(strayReads)} (§ 5.3 "Reads: store.list(); read() for the file being viewed")`);
   if (s.writes.length || s.uploads.length || r.proxyHits || s.saves) bad.push(`writes ${s.writes} uploads ${s.uploads} model calls ${r.proxyHits} saves ${s.saves}`);
   await ctx.close();

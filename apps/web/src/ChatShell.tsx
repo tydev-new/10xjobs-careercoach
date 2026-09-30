@@ -260,6 +260,9 @@ export function ChatShell({
     <Frame
       messages={messages}
       status={currentStatus}
+      chatStatus={status}
+      store={store}
+      onOpenRef={handleOpen}
       onFocusComposer={() => composerRef.current?.focus()}
       balanceUsd={balanceUsd}
       fixtures={fixtures}

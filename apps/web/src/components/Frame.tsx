@@ -15,10 +15,12 @@ import { Rail } from "./Rail";
 import { TabBar } from "./TabBar";
 import { EmptyPage } from "./EmptyPage";
 import { DocumentsPage } from "./DocumentsPage";
+import { Home } from "./Home";
 import { VersionNotice, type VersionNoticeMode } from "../real/VersionNotice";
 import { landingPage } from "../workspace/landing.ts";
 import { buildAskTenDraft } from "../workspace/ask-ten.ts";
-import type { AppMessage, FileInfo, Page, Status } from "../types.ts";
+import type { ChatRawStatus } from "../workspace/home-reader.ts";
+import type { AppMessage, FileInfo, Page, Status, WorkspaceStore } from "../types.ts";
 
 export interface FrameVersionNotice {
   mode: VersionNoticeMode;
@@ -28,6 +30,30 @@ export interface FrameVersionNotice {
 export interface FrameProps extends Omit<HeaderProps, "pageTitle"> {
   messages: AppMessage[];
   status: Status;
+  /** The RAW `useChat().status` ("submitted" | "streaming" | "ready" |
+   *  "error") — Home's own reader needs this (design-web-ui.md § 5.3,
+   *  "Ten's last reply") to tell a turn that's still running apart from
+   *  one that just ended in error, which the derived avatar `status`
+   *  above can't (both collapse to "done"). § 5.2 rule 1: Home receives
+   *  only `messages` and this — never the `useChat` object itself. */
+  chatStatus: ChatRawStatus;
+  /** The same `WorkspaceStore` instance the agent uses (C § 2) — Home
+   *  reads `plan.md`/`jobs.md` through it, fresh every time it's shown
+   *  (§ 5.2 rules 1 and 4). Pages never write; this is a read-only use of
+   *  the store's own `read`/`list`. */
+  store: WorkspaceStore;
+  /** True when the shell knows no conversation is saved yet (§ 5.3 Home
+   *  Empty; § 5.3.1 P3): Home's empty-state button then reads "Talk to
+   *  Ten" instead of Continue with Ten. Only the real shell sets it — it
+   *  restores the saved conversation (C § 11). The mock shell has no
+   *  conversation store, so "saved" means nothing there; it leaves this
+   *  unset and Home keeps H3 (what stage2-review pins on the mock). */
+  noConversationSaved?: boolean;
+  /** Opens a chip's file in the pinned viewer — the same mechanism a
+   *  card's `ref` already uses (§ 1.1); Frame forwards it to whichever
+   *  page needs it (today, only Home's plan items). `opener` is the chip
+   *  or link clicked, so Back/Escape return focus to it (§ 5.5). */
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
   /** The Talk to Ten page's own content — Transcript, Composer, the
    *  empty-first-run line: unchanged from today, just now shown or hidden
    *  by Frame instead of being the only page there is. Always mounted
@@ -88,6 +114,10 @@ export function Frame(props: FrameProps): ReactElement {
   const {
     messages,
     status,
+    chatStatus,
+    store,
+    noConversationSaved,
+    onOpenRef,
     talkToTen,
     sidePanel,
     viewerOpen,
@@ -186,14 +216,18 @@ export function Frame(props: FrameProps): ReactElement {
             <VersionNotice mode={versionNotice.mode} saveFailed={versionNotice.saveFailed} />
           ) : null}
           {page === "home" ? (
-            // § 5.3.1 H17/H18 (lead ruling, 2026-09-28: word for word from
-            // main's docs/design-web-ui.md — Stage 3c replaces this page).
-            <EmptyPage
-              icon="house"
-              first="Nothing here yet."
-              rest="Talk to Ten to start your plan and your job list; they show here."
-              cta="continue"
-              onOpenTalkToTen={continueWithTen}
+            // Home's own empty state matches § 5.3.1 H17/H18 word for word
+            // (design-web-ui.md § 5.3, restore ruling) — same text 3a's
+            // placeholder used here before Stage 3c replaced this page.
+            <Home
+              store={store}
+              messages={messages}
+              chatStatus={chatStatus}
+              onOpenRef={onOpenRef}
+              onContinueWithTen={continueWithTen}
+              onOpenTalkToTen={openTalkToTen}
+              noConversationSaved={noConversationSaved === true}
+              onOpenJobs={() => navigate("jobs")}
             />
           ) : page === "jobs" ? (
             // § 5.3.1 J17/J18, NOT J19 (lead ruling, 2026-09-28): C1's own
@@ -254,7 +288,7 @@ export function Frame(props: FrameProps): ReactElement {
           iframe/print state, § 2.3) — hidden with a class, the same
           posture as Talk to Ten's own page above, never conditionally
           unmounted. */}
-      <div className={`viewer-slot${page === "home" && !viewerOpen ? " viewer-slot--hidden" : ""}`}>
+      <div className={`viewer-slot${page === "home" ? " viewer-slot--home" : ""}${page === "home" && !viewerOpen ? " viewer-slot--hidden" : ""}`}>
         {sidePanel}
       </div>
     </div>

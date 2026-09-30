@@ -12,6 +12,8 @@
 export { createCoach, ERROR_MESSAGES } from "./coach.ts";
 export { matchGateReply, statusOf, parsePlanTodo, latestGateStatuses, gateIdsWithCards } from "./helpers.ts";
 export type { GateReplyResult, ChatStatus, PlanTodoItem } from "./helpers.ts";
+export { readPlanBoard, splitPlanMinutes, budgetMinutesPerDay } from "./plan-board.ts";
+export type { PlanBoard, PlanBoardItem, PlanBoardLabel, PlanBoardSection, PlanMinutes } from "./plan-board.ts";
 export { createInMemoryWorkspaceStore } from "./workspace/in-memory-store.ts";
 export { validateRef, isReadOnlyPath, isEditableExt, isUploadExt } from "./workspace/path-rules.ts";
 export { createInMemoryGate, buildGateLine, textHashOf, sha256Hex, findSpendLineTemplate } from "./gate.ts";

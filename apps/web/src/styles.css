@@ -1579,6 +1579,26 @@ select:focus-visible {
   justify-content: center;
 }
 
+/* Home's viewer (§ 5.6 "Page layouts": "on Home it appears only while a
+   file is open, with a ✕"; § 5.3.1 F46): unlike the pinned viewer on the
+   other pages, it carries its close control at desktop too, drawn as a ✕.
+   The phone sheet (≤760px, below) keeps its back arrow. */
+.side-panel-back-x {
+  display: none;
+}
+
+.viewer-slot--home .side-panel-back {
+  display: inline-flex;
+}
+
+.viewer-slot--home .side-panel-back-arrow {
+  display: none;
+}
+
+.viewer-slot--home .side-panel-back-x {
+  display: inline;
+}
+
 .side-panel-print {
   flex: none;
   margin-left: auto;
@@ -2085,6 +2105,354 @@ select:focus-visible {
   }
 }
 
+/* =====================================================================
+   Home (design-web-ui.md § 5.3 "Home: the state of the search", § 5.6
+   "Home"; stage 3c). Kept together, under this one marker, so a merge
+   with the other Stage 3 pages' own CSS stays easy — nothing here reaches
+   outside the `.page-home`/`.home-*`/`.plan-item*`/`.unreadable-lines*`/
+   `.link-inline` prefixes.
+   ===================================================================== */
+
+.page-home {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: var(--page-max);
+  padding: var(--space-6) var(--space-8) var(--space-12);
+}
+
+.home-goal {
+  margin: 0;
+  font: var(--type-page);
+  letter-spacing: var(--track-page);
+  color: var(--fg);
+}
+
+.home-budget {
+  margin: var(--space-1) 0 0;
+  font: var(--type-body-sm);
+  color: var(--fg-muted);
+}
+
+/* The pipeline in numbers: one card, six cells (design-web-ui.md § 5.6
+   "Home", point 3). A 0 is --fg-subtle, never a warning color (rule 8 —
+   this is a fact, not urgency). */
+.home-pipeline {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.home-pipeline-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 14px 18px 16px;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border);
+  text-align: left;
+}
+
+.home-pipeline-cell:first-child {
+  border-left: none;
+}
+
+.home-pipeline-cell--dismissed {
+  border-left-width: 2px;
+}
+
+.home-pipeline-cell:hover {
+  background: var(--bg-hover);
+}
+
+.home-pipeline-label {
+  font: var(--type-small);
+  color: var(--fg-muted);
+}
+
+.home-pipeline-count {
+  font: var(--type-number);
+  letter-spacing: var(--track-number);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.home-pipeline-count--zero {
+  color: var(--fg-subtle);
+}
+
+/* Ten's last reply (restore ruling) lives INSIDE the --hero band
+   (design-web-ui.md § 5.6 "To restore": "Ten's last reply in the --hero
+   band (the quote, the activity line, Continue with Ten; no reply
+   field)") — .home-continue-content is that band's left-hand stack; see
+   .home-continue-band below. */
+.home-continue-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.home-last-reply-quote {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--on-hero);
+  white-space: pre-wrap;
+}
+
+.home-activity-line {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0 var(--space-2);
+  height: 26px;
+  border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 1px var(--on-hero-muted);
+  font: var(--type-small);
+  color: var(--on-hero-muted);
+}
+
+.home-working {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  height: 30px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  font: var(--type-small);
+  color: var(--fg-muted);
+}
+
+/* Waiting on you / To do (design-web-ui.md § 5.6 "Home", point 2). */
+.home-plan-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.home-plan-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.home-plan-column-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg-muted);
+}
+
+.home-plan-column-head h3 {
+  margin: 0;
+  font: var(--type-card-title);
+  color: var(--fg);
+}
+
+.home-minutes-sum {
+  margin-left: auto;
+  font: var(--type-small);
+  color: var(--fg-muted);
+}
+
+.home-plan-empty {
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--fg-muted);
+}
+
+/* Continue with Ten (design-web-ui.md § 5.6 "Home", point 4). Lime is a
+   fill only, and this is one of its six named uses (§ 5.6 chain rules). */
+.home-continue-band {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 20px 22px;
+  background: var(--hero);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+}
+
+.home-continue-band .btn {
+  flex: none;
+}
+
+.home-continue-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-card-title);
+  color: var(--on-hero);
+}
+
+.home-read-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 14px 16px;
+  background: var(--bg-panel);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--red);
+}
+
+.home-read-error p {
+  flex: 1 1 auto;
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--fg);
+}
+
+/* The plan item (design-web-ui.md § 5.3 "Pieces the pages share"): shared
+   between Home's two lists today, and later "Next, from you" on an
+   application (3d). */
+.plan-item-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.plan-item {
+  padding: var(--space-3) 0 0;
+  border-top: 1px solid var(--border);
+}
+
+.plan-item:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.plan-item-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.plan-item-action {
+  flex: 1 1 auto;
+  font: var(--type-body-sm);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.plan-item-pill {
+  flex: none;
+  padding: 0 9px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  background: var(--bg-sunken);
+  box-shadow: inset 0 0 0 1px var(--border);
+  font: var(--type-small);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-item-why {
+  margin: var(--space-1) 0 0;
+  font: var(--type-meta);
+  color: var(--fg-muted);
+}
+
+.plan-item-text {
+  margin: 0;
+  font: var(--type-body-sm);
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.plan-item-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  min-height: 44px; /* § 5.5 tap-target floor at 760px or less */
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--border);
+  font: var(--type-small);
+  color: var(--fg-muted);
+}
+
+/* Unreadable lines (design-web-ui.md § 5.2 rule 6, "unreadable is
+   loud") — shared by every page that reads a board section. */
+.unreadable-lines {
+  padding: var(--space-3);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.unreadable-lines-title {
+  margin: 0 0 var(--space-2);
+  font: var(--type-body-sm);
+  color: var(--fg-muted);
+}
+
+.unreadable-lines-body {
+  margin: 0;
+  font: var(--type-mono);
+  color: var(--fg);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.link-inline {
+  background: none;
+  border: none;
+  padding: 0;
+  font: var(--type-body-sm);
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+@container frame (max-width: 760px) {
+  .home-plan-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .home-pipeline {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .home-pipeline-cell:nth-child(3n + 1) {
+    border-left: none;
+  }
+
+  .home-pipeline-cell:nth-child(n + 4) {
+    border-top: 1px solid var(--border);
+  }
+
+  .home-continue-band .btn {
+    width: 100%;
+  }
+
+  .home-continue-band {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 /* ---- Phone tab bar (design-web-ui.md § 5.5). Hidden at desktop widths;
    the container query below turns it on. Hidden again whenever the
    composer has focus, at any width (§ 5.5: "nothing then sits between
@@ -2254,6 +2622,14 @@ select:focus-visible {
 
   .side-panel-back {
     display: inline-flex;
+  }
+
+  .viewer-slot--home .side-panel-back-arrow {
+    display: inline;
+  }
+
+  .viewer-slot--home .side-panel-back-x {
+    display: none;
   }
 
   /* N5 (Stage 3a review), § 5.5: "A long path or URL wraps with

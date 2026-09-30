@@ -4,6 +4,7 @@
 //
 // MOVED from apps/web/src/agent-helpers.ts (2026-09) — apps/web now
 // re-exports from here; this is the one copy.
+import { readPlanBoard, type PlanBoardItem } from "./plan-board.ts";
 import type { AppMessage, GateStatus, MessageOrigin, Status } from "./types.ts";
 
 export type GateReplyResult = "approve" | "decline" | "none";
@@ -139,51 +140,16 @@ export function statusOf(messages: AppMessage[], chat: ChatStatus): Status {
 }
 
 // ---------------------------------------------------------------------
-// parsePlanTodo — § 6.2: lines under "To do", up to the next board
-// heading or "##". Accepts "1. ", "- ", "* " bullets. text = the line
-// minus its bullet, word for word. ref = the first backticked workspace
-// path in the line, else absent.
+// parsePlanTodo — § 6.2, now re-expressed through readPlanBoard (§ 18):
+// parsePlanTodo(md) === the "To do" section's items, or [] when absent.
+// readPlanBoard is the one reader; this is a view of it, kept for the
+// plan card (design-web-ui.md § 2.2, unchanged) and every existing
+// caller.
 // ---------------------------------------------------------------------
 
-export interface PlanTodoItem {
-  text: string;
-  ref?: string;
-}
-
-const BULLET_RE = /^(?:\d+\.|-|\*)\s+(.*)$/;
-// "To do" or "To do (2)" (apps/workspace-ui's own board-count heading form,
-// which § 6.2 says parsePlanTodo also has to accept).
-const TODO_HEADING_RE = /^to do\b/i;
-
-/** The first backticked span in `text` that looks like a workspace path
- *  (contains "/" or ends in a file extension) — not just the first
- *  backticked span (a line can quote a non-path word first, e.g. "keep"). */
-function firstPathRef(text: string): string | undefined {
-  const re = /`([^`]+)`/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    const candidate = m[1];
-    if (candidate.includes("/") || /\.[A-Za-z0-9]+$/.test(candidate)) return candidate;
-  }
-  return undefined;
-}
+export type PlanTodoItem = PlanBoardItem;
 
 export function parsePlanTodo(md: string): PlanTodoItem[] {
-  // CRLF files keep every line word for word (no trailing \r on `text`).
-  const lines = md.replace(/\r\n/g, "\n").split("\n");
-  const startIndex = lines.findIndex((line) => TODO_HEADING_RE.test(line.trim()));
-  if (startIndex === -1) return [];
-
-  const items: PlanTodoItem[] = [];
-  for (let i = startIndex + 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (line.trim() === "") continue; // blank lines inside the section are skipped
-    if (line.trim().startsWith("#")) break; // next "##" heading
-    const match = line.match(BULLET_RE);
-    if (!match) break; // next board heading (e.g. "Doing")
-    const text = match[1];
-    const ref = firstPathRef(text);
-    items.push(ref ? { text, ref } : { text });
-  }
-  return items;
+  const todo = readPlanBoard(md).sections.find((s) => s.label === "To do");
+  return todo ? todo.items : [];
 }

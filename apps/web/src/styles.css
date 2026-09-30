@@ -2453,7 +2453,8 @@ select:focus-visible {
   }
 }
 
-/* ==============================================================   Jobs (design-web-ui.md § 5.3 "Jobs: the pipeline record", § 5.6
+/* =====================================================================
+   Jobs (design-web-ui.md § 5.3 "Jobs: the pipeline record", § 5.6
    "Jobs"; § 5.9 Stage 3b). Reuses `.workspace-page`/`.workspace-page-inner`
    (the shared list pane, above Documents' own block) and the tier-pill /
    badge classes the verdict card already defines (§ 2.1's table is
@@ -2775,7 +2776,6 @@ summary.job-group-head {
   }
 }
 
-=======
 /* ---- Phone tab bar (design-web-ui.md § 5.5). Hidden at desktop widths;
    the container query below turns it on. Hidden again whenever the
    composer has focus, at any width (§ 5.5: "nothing then sits between

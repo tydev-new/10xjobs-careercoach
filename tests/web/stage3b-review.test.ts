@@ -990,3 +990,122 @@ test("§ 5.3.1 J19 is not in the bundle before web search S5 (C1): neither J19 n
   assert.ok(js.includes(S("J18")) || js.includes(S("J18").replace("'", "\\'")), "J18 is not in the bundle");
   assert.ok(!js.includes("Ask Ten to look for roles"), "J19's words are in the bundle");
 });
+
+// ---------------------------------------------------------------- round 2 (final): the merge with Stage 3c Home
+
+/** Home's pipeline strip as shown: [label, count] per cell. */
+const homeCells = (page: Page) =>
+  pane(page).evaluate((root) =>
+    Array.from(root.querySelector(".home-pipeline")?.children ?? []).map((c) => {
+      const leaves = Array.from(c.querySelectorAll("*")).filter((e) => !e.childElementCount).map((e) => (e.textContent ?? "").trim()).filter(Boolean);
+      return { label: leaves[0] ?? "", count: leaves[leaves.length - 1] ?? "" };
+    }),
+  );
+
+test("§ 5.3 Home + § 5.3 Jobs after the 3c merge (real shell, 1440): one stage has one name and one number (rule 18) — each Home count equals load()'s rows in that stage and the Jobs heading's count; a Jobs stage with no roles has no heading while Home shows 0; the Dismissed count equals the Dismissed group's; a Home count above 0 opens Jobs (title 'Jobs') with that stage's group present; zero writes, uploads, model calls", async () => {
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, FILES);
+  const page = r.page;
+  const bad: string[] = [];
+  const rows = await loadJobsRows(storeIo(createInMemoryWorkspaceStore({ "jobs.md": FILES["jobs.md"] }) as any));
+  const byStage = new Map(STAGES_SPEC.map((st) => [st, rows.filter((x) => !x.dismissed && x.stage === st).length]));
+  const nDismissed = dismissedRows(rows).length;
+  await go(page, "Home");
+  assert.equal(await title(page), "Home");
+  const cells = await homeCells(page);
+  const want = [...STAGES_SPEC.map((st) => [st, String(byStage.get(st))]), ["Dismissed", String(nDismissed)]];
+  assert.deepEqual(cells.map((c) => [c.label, c.count]), want, "Home's pipeline strip is not load()'s rows by stage, in STAGES order then Dismissed");
+  await go(page, "Jobs");
+  const heads = await pane(page).locator(".jobs-list-pane").evaluate((root) =>
+    Array.from(root.querySelectorAll("h2, summary")).map((h) => Array.from(h.querySelectorAll("*")).filter((e) => !e.childElementCount).map((e) => (e.textContent ?? "").trim()).filter(Boolean)),
+  );
+  for (const [st, n] of byStage) {
+    const h = heads.find((w) => w[0] === st);
+    if (n === 0 && h) bad.push(`Jobs shows an empty "${st}" heading`);
+    if (n > 0 && (!h || !h.includes(String(n)))) bad.push(`Jobs "${st}" heading ${JSON.stringify(h)} != Home's ${n}`);
+  }
+  const dh = heads.find((w) => w[0] === "Dismissed");
+  if (nDismissed > 0 && (!dh || !dh.includes(String(nDismissed)))) bad.push(`Jobs Dismissed heading ${JSON.stringify(dh)} != Home's ${nDismissed}`);
+  for (const st of STAGES_SPEC.filter((s) => byStage.get(s)! > 0)) {
+    await go(page, "Home");
+    await pane(page).locator(".home-pipeline").getByText(st, { exact: true }).click();
+    await page.waitForTimeout(300);
+    if ((await title(page)) !== "Jobs") {
+      bad.push(`Home's ${st} count opened "${await title(page)}", not Jobs`);
+      continue;
+    }
+    if (!(await pane(page).locator(".jobs-list-pane h2").filter({ hasText: st }).first().isVisible())) bad.push(`Jobs opened from Home's ${st} count has no visible ${st} heading`);
+  }
+  const s = await spy(page);
+  if (s.writes.length || s.uploads.length || r.proxyHits) bad.push(`writes ${s.writes} uploads ${s.uploads} model calls ${r.proxyHits}`);
+  await ctx.close();
+  assert.deepEqual(bad, []);
+});
+
+test("§ 5.4 / § 5.5 at 375 after the 3c merge: a Home count opens the Jobs LIST with no detail (a count is about the stage, not one role)", async () => {
+  const ctx = await ctxFor(PHONE);
+  const r = await openReal(ctx, FILES);
+  const page = r.page;
+  const st = STAGES_SPEC.find((x) => JOBS.some((j) => j.group === x))!;
+  await go(page, "Home");
+  await pane(page).locator(".home-pipeline").getByText(st, { exact: true }).click();
+  await page.waitForTimeout(400);
+  const t = await title(page);
+  const listShown = await pane(page).locator(".jobs-list-pane").isVisible();
+  const detailShown = await detail(page).isVisible();
+  await ctx.close();
+  assert.equal(t, "Jobs");
+  assert.ok(listShown, "the Jobs list is not shown");
+  assert.ok(!detailShown, "a Home count opened a role's detail on the phone");
+});
+
+test(
+  "§ 5.3 Jobs / § 5.4 'Pages to pages': a Home count opens Jobs at THAT stage — wider than 760px, that stage's first row is chosen (3e adds the 375 case: the list scrolled to that stage's heading)",
+  { todo: "Stage 3e (§ 5.9 3e: '§ 5.4's page-to-page links, one e2e case each ... at 375px § 5.5's entry-link and count cases'); Frame.tsx passes no stage (Home's onOpenJobs() takes none) and JobsPage's initialStage is unwired" },
+  async () => {
+    const ctx = await ctxFor(DESK);
+    const r = await openReal(ctx, FILES);
+    const page = r.page;
+    const later = STAGES_SPEC.filter((x) => JOBS.some((j) => j.group === x))[1];
+    const first = JOBS.find((j) => j.group === later)!;
+    await go(page, "Home");
+    await pane(page).locator(".home-pipeline").getByText(later, { exact: true }).click();
+    await page.waitForTimeout(500);
+    const head = squash(await detail(page).innerText());
+    await ctx.close();
+    assert.ok(head.includes(first.heading), `Home's ${later} count chose a row other than ${first.heading}`);
+  },
+);
+
+test("§ 5.5 at 375 (the viewer is a full-screen sheet): Back or Escape closes a file opened from a Jobs row or its detail and returns focus to the control that opened it", async () => {
+  const bad: string[] = [];
+  const ctx = await ctxFor(PHONE);
+  const r = await openReal(ctx, FILES);
+  const page = r.page;
+  await go(page, "Jobs");
+  const both = JOBS.find((j) => j.group !== "Dismissed" && j.fields.get("Analysis")! in FILES && j.fields.get("Company file")! in FILES)!;
+  const listRow = pane(page).locator(".jobs-list-pane").getByText(both.heading, { exact: true }).first().locator("xpath=ancestor::*[.//button[normalize-space()='" + S("P1") + "']][1]");
+  const cases: { where: string; opener: () => ReturnType<Page["locator"]>; before?: () => Promise<void> }[] = [
+    { where: "row's Open analysis", opener: () => listRow.getByRole("button", { name: "Open analysis" }) },
+    { where: "detail's Open company notes", opener: () => detail(page).getByRole("button", { name: "Open company notes" }), before: () => chooseRow(page, both.heading) },
+  ];
+  for (const c of cases) {
+    if (c.before) await c.before();
+    for (const how of ["Back", "Escape"] as const) {
+      const opener = c.opener();
+      await opener.click();
+      await page.waitForTimeout(350);
+      if (!(await page.locator(".side-panel--open").count())) {
+        bad.push(`${c.where}: no sheet opened`);
+        continue;
+      }
+      if (how === "Back") await page.locator(".side-panel-back").click();
+      else await page.keyboard.press("Escape");
+      await page.waitForTimeout(400);
+      if (await page.locator(".side-panel--open").count()) bad.push(`${c.where}/${how}: the sheet did not close`);
+      if (!(await opener.evaluate((e) => document.activeElement === e))) bad.push(`${c.where}/${how}: focus is on ${await page.evaluate(() => `${document.activeElement?.tagName}.${document.activeElement?.className}`)}, not the control that opened the sheet`);
+    }
+  }
+  await ctx.close();
+  assert.deepEqual(bad, []);
+});

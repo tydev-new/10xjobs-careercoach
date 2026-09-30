@@ -136,19 +136,30 @@ test("§ 5.3 'Entries are ordered newest change first, by the latest updatedAt a
   }
 });
 
-test("§ 5.3 the join is exact: `Analysis` equal to `jd-analysis/<key>.md`, nothing looser (case, a `./`, a trailing space trimmed by load(), a JD field, a company name)", () => {
+// Updated for the issue #32 ruling (design-web-agent.md C § 6.2, "A row's analysis file, legacy rows
+// included"; design-web-ui.md § 5.3 Jobs "Row controls"): the join reads the row's analysis file — its
+// `Analysis`, else a legacy `JD:` under `jd-analysis/`. So `{ jd_file: "jd-analysis/acme-pm.md" }` moved
+// from the near side (the superseded rule) to the exact side; a jd-inbox/ JD (the raw posting) and a bare
+// `jd-analysis/` JD stay near. Every other near case is unchanged.
+test("§ 5.3 the join is exact: the row's analysis file (Analysis, else a legacy JD under jd-analysis/, C § 6.2 issue #32) equal to `jd-analysis/<key>.md`, nothing looser (case, a `./`, a trailing space trimmed by load(), a jd-inbox JD, a company name)", () => {
   const e = groupApplications([fi("applications/acme-pm.md")])[0];
   const near = [
     { company: "acme-pm", title: "t", analysis_file: "jd-analysis/Acme-PM.md" },
     { company: "Acme", title: "t", analysis_file: "./jd-analysis/acme-pm.md" },
     { company: "Acme", title: "t", analysis_file: "jd-analysis/acme-pm.md.bak" },
     { company: "Acme", title: "t", analysis_file: "jd-inbox/acme-pm.md" },
-    { company: "Acme", title: "t", jd_file: "jd-analysis/acme-pm.md" } as any,
+    { company: "Acme", title: "t", jd_file: "jd-inbox/acme-pm.md" } as any,
+    { company: "Acme", title: "t", jd_file: "jd-analysis/" } as any,
+    { company: "Acme", title: "t", jd_file: "./jd-analysis/acme-pm.md" } as any,
+    // both set: the Analysis wins, so a JD naming the key never joins past a different Analysis
+    { company: "Acme", title: "t", analysis_file: "jd-analysis/other.md", jd_file: "jd-analysis/acme-pm.md" } as any,
     { company: "Acme", title: "t", analysis_file: null },
   ];
   assert.equal(linkedApplicationRow(e, near), undefined);
   const exact = [...near, { company: "Acme", title: "Staff PM", analysis_file: "jd-analysis/acme-pm.md" }];
   assert.equal(linkedApplicationRow(e, exact)?.title, "Staff PM");
+  const legacy = [...near, { company: "Acme", title: "Legacy PM", jd_file: "jd-analysis/acme-pm.md" } as any];
+  assert.equal(linkedApplicationRow(e, legacy)?.title, "Legacy PM");
 });
 
 // ------------------------------------------------------------ proposalRows, C § 19

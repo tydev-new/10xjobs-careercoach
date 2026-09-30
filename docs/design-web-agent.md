@@ -491,8 +491,11 @@ this table. A card is a
   *Proved by:* a table test over the function (Analysis only; JD under
   `jd-analysis/` only; JD under `jd-inbox/` only → none; both → Analysis;
   neither → none), and a legacy row in the § 5.7 fixture whose Jobs
-  detail shows its analysis sections and whose verdict card carries the
-  `ref`.
+  detail shows its analysis sections, and whose own `record_verdict`
+  command, run through the card builder over the fixture's `jobs.md`,
+  gives a verdict card carrying the `ref` (lead ruling, 2026-09-30: the
+  fixture's conversation gains no card for it; a pre-S1 row predates the
+  conversation).
 - **`parsePlanTodo(md) → { text, ref? }[]`** is pure and exported from
   `packages/agent`. The card builder uses it. (Corrected 2026-09-26: this
   line used to say `apps/workspace-ui`'s `parsePlan` maps from it. It

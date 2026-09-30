@@ -370,7 +370,12 @@ test("§ 5.2 rule 6: store-io.ts's isMissingError is byte-identical to origin/fe
   assert.equal(here, fn(g.stdout));
 });
 
-test("§ 5.2 rule 6: a grep finds no `instanceof WorkspaceError` in page, viewer or adapter code", () => {
+// Lead ruling, Stage 3c review round 1: the viewer's two hits (ChatShell.tsx,
+// RealChatShell.tsx) are Stage 4's — design-web-ui.md § 5.2 rule 6, "The
+// viewer's missing state" (lead ruling 2026-09-29) names it a Stage 4 build
+// item, and stage3a-review.test.ts:804 pins today's viewer empty state until
+// the Stage 4 tester changes it. The assertion stays; it is marked todo.
+test("§ 5.2 rule 6: a grep finds no `instanceof WorkspaceError` in page, viewer or adapter code", { todo: "Stage 4: § 5.2 rule 6 'The viewer's missing state' (lead ruling 2026-09-29); stage3a-review.test.ts:804 pins today's viewer" }, () => {
   const files = ["src/components/Home.tsx", "src/components/PlanItem.tsx", "src/components/UnreadableLines.tsx", "src/components/DocumentsPage.tsx", "src/components/SidePanel.tsx", "src/components/Frame.tsx", "src/workspace/store-io.ts", "src/workspace/pipeline.ts", "src/workspace/home-reader.ts", "src/ChatShell.tsx", "src/real/RealChatShell.tsx"];
   const bad: string[] = [];
   for (const f of files) {
@@ -677,7 +682,11 @@ test("§ 5.3 'The activity line' on the § 5.7 fixture: Home's lines under the l
   assert.deepEqual(h.activity, talk);
 });
 
-test("§ 5.3 'The activity line' in § 5.3.1's words (L1-L20, § 3: `Read its instructions · Searched the web ×3`) on the § 5.7 fixture's last message", async () => {
+// Lead ruling, Stage 3c review round 1: Stage 4. § 5.3's activity line says
+// Home and Talk to Ten change together when the § 3 amendment lands
+// (TOOL_LABELS in packages/agent/src/helpers.ts). 3c's requirement is one
+// function and no words of Home's own (the "ran " test above). Kept, todo.
+test("§ 5.3 'The activity line' in § 5.3.1's words (L1-L20, § 3: `Read its instructions · Searched the web ×3`) on the § 5.7 fixture's last message", { todo: "Stage 4: § 5.3 activity line — Home and Talk to Ten change together when the § 3 amendment (TOOL_LABELS) lands" }, async () => {
   const last = MESSAGES[MESSAGES.length - 1];
   const lines: string[] = [];
   let group: string[] = [];
@@ -767,6 +776,8 @@ test("§ 5.3 Home Empty with no conversation saved (P3): H17 + H18, and the one 
   await btn.first().click().catch(() => {});
   await r.page.waitForTimeout(200);
   const t = await title(r.page);
+  const focused = await r.page.evaluate(() => !!document.activeElement?.closest(".composer"));
+  const draft = await r.page.locator(".composer-input").inputValue();
   await ctx.close();
   const bad: string[] = [];
   if (landed !== "Talk to Ten") bad.push(`first run landed on "${landed}" (§ 5.1: Talk to Ten when no conversation is saved)`);
@@ -774,7 +785,24 @@ test("§ 5.3 Home Empty with no conversation saved (P3): H17 + H18, and the one 
   if (label !== S.talkToTen) bad.push(`the empty state's button reads "${label}"; § 5.3 Empty / § 5.3.1 P3: "${S.talkToTen}" when no conversation is saved yet`);
   if (h.buttons.includes(S.continue)) bad.push(`"${S.continue}" shows with no conversation saved`);
   if (t !== "Talk to Ten") bad.push(`the button opened "${t}"`);
+  if (focused) bad.push("P3 focused the composer (§ 5.4 amended: only Continue with Ten focuses it)");
+  if (draft !== "") bad.push(`P3 put a draft in the composer: ${JSON.stringify(draft)}`);
   assert.deepEqual(bad, []);
+});
+
+test("§ 5.3 Home Empty (P3 -> H3): once the first turn of a first run has ended and been saved, the empty Home's button reads Continue with Ten", async () => {
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, {}, { seed: "none" });
+  await r.page.locator(".composer-input").fill("hi");
+  await r.page.locator(".composer-input").press("Enter");
+  await idle(r.page);
+  await r.page.waitForTimeout(300);
+  const saves = (await spy(r.page)).saves;
+  await go(r.page, "Home");
+  const h = await readHome(r.page);
+  await ctx.close();
+  assert.equal(saves, 1, "the turn was not saved");
+  assert.ok(h.buttons.includes(S.continue) && !h.buttons.includes(S.talkToTen), `buttons ${JSON.stringify(h.buttons)}`);
 });
 
 test("§ 5.3 Home Empty with a saved conversation: H17 + H18 and Continue with Ten (H3); Ten's last reply still shows above it under H1", async () => {
@@ -1082,6 +1110,65 @@ test("§ 5.5 at 375px on Home (§ 5.7 fixture): no horizontal scroll; the pipeli
   if (lay.sw > lay.vw) bad.push(`scrollWidth ${lay.sw} > ${lay.vw}`);
   if (lay.rows !== 2 || lay.perRow !== 3) bad.push(`pipeline grid ${lay.perRow} × ${lay.rows}, § 5.5 says 3 × 2`);
   if (!lay.stacked) bad.push("the plan cards do not stack");
+  assert.deepEqual(bad, []);
+});
+
+// ---------------------------------------------------------------- round 2
+
+test("§ 5.3 'Shows' order (lead ruling, round 1: § 5.3 and § 5.6's amended 'To restore' Home bullet): the goal, the pipeline strip, the last-reply band, then Waiting on you and To do", async () => {
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, FILES, { messages: MESSAGES });
+  await r.page.waitForTimeout(300);
+  const tops = await pane(r.page).evaluate((root) =>
+    [".home-goal", ".home-pipeline", ".home-continue-band", ".home-plan-columns"].map((sel) => {
+      const e = root.querySelector(sel);
+      return e ? Math.round(e.getBoundingClientRect().top) : null;
+    }),
+  );
+  await ctx.close();
+  assert.ok(tops.every((t) => t !== null), `missing a block: ${JSON.stringify(tops)}`);
+  const sorted = [...(tops as number[])].sort((a, b) => a - b);
+  assert.deepEqual(tops, sorted, `top edges goal/pipeline/band/plan: ${JSON.stringify(tops)}`);
+});
+
+test("§ 5.3 counts by code over the port's io: a jobs.md with lone-CR line endings counts its rows as load() does over the ports' own node io (universalNewlines)", async () => {
+  const cr = EDGE_JOBS.replace(/\n/g, "\r");
+  const want = await loadCounts(cr);
+  assert.deepEqual(want, [2, 0, 3, 1, 0, 2]);
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, { "jobs.md": cr, "plan.md": FILES["plan.md"] });
+  const h = await readHome(r.page);
+  await ctx.close();
+  assert.deepEqual(h.cells.map((c: string[]) => c[1]), want.map(String));
+});
+
+test("§ 5.6 viewer close control on Home at 1440 (Home's ✕), 900 (the drawer, 'a close ✕') and 375 (the sheet's back arrow, § 5.5): a chip opens the file; the control named Close is visible and closes it; at 375 focus returns to the chip", async () => {
+  const bad: string[] = [];
+  for (const vp of [DESK, { width: 900, height: 800 }, PHONE]) {
+    const ctx = await ctxFor(vp);
+    const r = await openReal(ctx, FILES, { messages: MESSAGES });
+    const page = r.page;
+    const ref = sec(FILES["plan.md"], T)!.items.find((i) => i.ref)!.ref!;
+    const chip = pane(page).locator(".plan-item-chip", { hasText: ref }).first();
+    await chip.scrollIntoViewIfNeeded();
+    await chip.click();
+    await page.waitForTimeout(300);
+    const v = await page.locator(".side-panel").evaluate((e) => {
+      const b = e.querySelector<HTMLElement>(".side-panel-back");
+      const vis = (x: Element | null) => !!x && (x as HTMLElement).getClientRects().length > 0 && getComputedStyle(x).display !== "none";
+      const svgs = b ? Array.from(b.querySelectorAll("svg")).filter((s) => vis(s)).length : 0;
+      return { path: e.querySelector(".side-panel-path")?.textContent, open: e.classList.contains("side-panel--open"), closeVisible: vis(b), glyphs: svgs };
+    });
+    await shot(page, `r2-home-viewer-${vp.width}`);
+    if (!v.open || v.path !== ref) bad.push(`${vp.width}: the chip did not open ${ref}: ${JSON.stringify(v)}`);
+    if (!v.closeVisible) bad.push(`${vp.width}: no visible Close control`);
+    if (v.glyphs !== 1) bad.push(`${vp.width}: the Close control draws ${v.glyphs} glyphs, want exactly one`);
+    await page.locator(".side-panel").getByRole("button", { name: "Close" }).click().catch(() => bad.push(`${vp.width}: Close not clickable`));
+    await page.waitForTimeout(400);
+    if (await page.locator(".side-panel--open").count()) bad.push(`${vp.width}: Close did not close the viewer`);
+    if (vp === PHONE && !(await chip.evaluate((e) => document.activeElement === e))) bad.push("375: focus did not return to the chip");
+    await ctx.close();
+  }
   assert.deepEqual(bad, []);
 });
 

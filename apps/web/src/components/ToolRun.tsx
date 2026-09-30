@@ -7,7 +7,7 @@ import { Icon } from "../icons.tsx";
 // Moved to tool-run-summary.ts (plain .ts, no JSX; see its own header) —
 // re-exported here so this file stays the one design-web-ui.md § 3/§ 5.3
 // points at, and used below for this component's own rendering.
-import { displayName, summarize, toolName, type ToolPartLike } from "./tool-run-summary.ts";
+import { activityLine, displayName, summarize, toolName, type ToolPartLike } from "./tool-run-summary.ts";
 export { summarize, type ToolPartLike };
 
 function pretty(value: unknown): string {
@@ -74,7 +74,7 @@ export function ToolRun({ parts }: { parts: ToolPartLike[] }): ReactElement {
         <span className="tool-run-caret">
           <Icon name="chevronRight" size={14} />
         </span>
-        <span className={`tool-run-label${live ? " tool-run-label--shimmer" : ""}`}>ran {summarize(parts)}</span>
+        <span className={`tool-run-label${live ? " tool-run-label--shimmer" : ""}`}>{activityLine(parts)}</span>
       </button>
       {open ? (
         <div className="tool-run-detail">

@@ -1579,6 +1579,26 @@ select:focus-visible {
   justify-content: center;
 }
 
+/* Home's viewer (§ 5.6 "Page layouts": "on Home it appears only while a
+   file is open, with a ✕"; § 5.3.1 F46): unlike the pinned viewer on the
+   other pages, it carries its close control at desktop too, drawn as a ✕.
+   The phone sheet (≤760px, below) keeps its back arrow. */
+.side-panel-back-x {
+  display: none;
+}
+
+.viewer-slot--home .side-panel-back {
+  display: inline-flex;
+}
+
+.viewer-slot--home .side-panel-back-arrow {
+  display: none;
+}
+
+.viewer-slot--home .side-panel-back-x {
+  display: inline;
+}
+
 .side-panel-print {
   flex: none;
   margin-left: auto;
@@ -2602,6 +2622,14 @@ select:focus-visible {
 
   .side-panel-back {
     display: inline-flex;
+  }
+
+  .viewer-slot--home .side-panel-back-arrow {
+    display: inline;
+  }
+
+  .viewer-slot--home .side-panel-back-x {
+    display: none;
   }
 
   /* N5 (Stage 3a review), § 5.5: "A long path or URL wraps with

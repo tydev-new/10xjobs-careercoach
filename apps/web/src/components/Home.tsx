@@ -11,7 +11,6 @@ import type { PlanBoardSection } from "../../../../packages/agent/src/plan-board
 import { readPlanBoard } from "../../../../packages/agent/src/plan-board.ts";
 import { Icon } from "../icons.tsx";
 import type { AppMessage, WorkspaceStore } from "../types.ts";
-import { WorkspaceError } from "../types.ts";
 import {
   lastReply as readLastReply,
   minutesSum as readMinutesSum,
@@ -20,7 +19,7 @@ import {
   type MinutesSum,
 } from "../workspace/home-reader.ts";
 import { pipelineCounts, type PipelineCounts } from "../workspace/pipeline.ts";
-import { storeIo } from "../workspace/store-io.ts";
+import { isMissingError, storeIo } from "../workspace/store-io.ts";
 import { PlanItem } from "./PlanItem";
 import { UnreadableLines } from "./UnreadableLines";
 
@@ -35,13 +34,12 @@ export interface HomeViewProps {
   minutes?: MinutesSum;
   lastReply?: LastReply;
   working: boolean;
-  /** design-web-ui.md § 5.3.1 (docs/workspace-labels, tip 091e094): the
-   *  EMPTY state's button is P3 "Talk to Ten" while no conversation is
-   *  saved yet (landing.ts's own "no conversation is saved" test,
-   *  `messages.length === 0`), H3 "Continue with Ten" once one is —
-   *  even though plan.md/jobs.md are still both empty either way. */
-  hasConversation: boolean;
-  onOpenRef: (ref: string) => void;
+  /** No conversation is saved yet (the real shell's restored `messages`
+   *  is empty, the same test § 5.1's landing rule uses): the empty state's button is
+   *  P3 "Talk to Ten", which opens Talk to Ten without focusing the
+   *  composer (§ 5.4), instead of H3 Continue with Ten. */
+  noConversation: boolean;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
   onContinueWithTen: () => void;
   onOpenTalkToTen: () => void;
   onOpenJobs: () => void;
@@ -76,7 +74,7 @@ function PlanColumn({
   title: string;
   section: PlanBoardSection | undefined;
   minutes?: MinutesSum;
-  onOpenRef: (ref: string) => void;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
 }): ReactElement {
   return (
     <div className="home-plan-column">
@@ -121,7 +119,7 @@ export function HomeView(props: HomeViewProps): ReactElement {
     minutes,
     lastReply,
     working,
-    hasConversation,
+    noConversation,
     onOpenRef,
     onContinueWithTen,
     onOpenTalkToTen,
@@ -130,7 +128,10 @@ export function HomeView(props: HomeViewProps): ReactElement {
     onRetryPipeline,
   } = props;
 
-  const planEmpty = !goalLine && !budgetLine && sectionEmpty(waitingOnYou) && sectionEmpty(toDo);
+  // § 5.3 Home Empty: "the two files have no items and no unreadable
+  // lines between them" — the Goal/Budget head lines are neither, so a
+  // plan.md holding only those (and empty sections) is still Empty.
+  const planEmpty = sectionEmpty(waitingOnYou) && sectionEmpty(toDo);
   const pipelineEmpty = !pipeline || (pipeline.stages.every((s) => s.count === 0) && pipeline.dismissed === 0);
   const isEmpty = !planReadError && !pipelineReadError && planEmpty && pipelineEmpty;
 
@@ -139,7 +140,11 @@ export function HomeView(props: HomeViewProps): ReactElement {
   // Ten") when none does — Continue with Ten (H3) always sits in the same
   // band either way (§ 5.6 restore text: "Ten's last reply in the --hero
   // band ... Continue with Ten").
-  const band = (
+  // `withButton` false is the Empty layout's reply-only band: § 5.3 Home
+  // Empty gives the page ONE Continue with Ten (the empty state's own,
+  // below the message), with the last reply "still shown above it" — two
+  // same-named buttons on one page would be two controls for one action.
+  const renderBand = (withButton: boolean) => (
     <div className="home-continue-band">
       <div className="home-continue-content">
         <div className="home-continue-label">
@@ -157,10 +162,12 @@ export function HomeView(props: HomeViewProps): ReactElement {
           </>
         ) : null}
       </div>
-      <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
-        Continue with Ten
-        <Icon name="arrowRight" size={16} />
-      </button>
+      {withButton ? (
+        <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
+          Continue with Ten
+          <Icon name="arrowRight" size={16} />
+        </button>
+      ) : null}
     </div>
   );
 
@@ -175,25 +182,30 @@ export function HomeView(props: HomeViewProps): ReactElement {
     // "Ten's last reply still shows above it when one qualifies" (§ 5.3
     // Home, Empty) — the SAME band as the non-empty layout, so H1/H4 and
     // the quote never have a second rendering to drift from the first
-    // (rule 12); the plain empty-state message and its own button sit
+    // (rule 12), but without the band's button: the plain empty-state
+    // message and its own button (the page's one Continue with Ten) sit
     // under it (§ 5.6 "Empty state").
+    //
+    // The button is P3 "Talk to Ten" when no conversation is saved yet,
+    // H3 "Continue with Ten" once one is (§ 5.3 Home Empty; § 5.3.1 P3,
+    // H3).
     return (
       <div className="page-home">
         {workingLine}
-        {lastReply ? band : null}
+        {lastReply ? renderBand(false) : null}
         <div className="page-empty">
           <div className="page-empty-icon" aria-hidden="true">
             <Icon name="house" size={26} />
           </div>
           <p className="page-empty-title">Nothing here yet.</p>
           <p className="page-empty-body">Talk to Ten to start your plan and your job list; they show here.</p>
-          {hasConversation ? (
-            <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
-              Continue with Ten
-            </button>
-          ) : (
+          {noConversation ? (
             <button type="button" className="btn btn--sec" onClick={onOpenTalkToTen}>
               Talk to Ten
+            </button>
+          ) : (
+            <button type="button" className="btn btn--lime" onClick={onContinueWithTen}>
+              Continue with Ten
             </button>
           )}
         </div>
@@ -201,8 +213,12 @@ export function HomeView(props: HomeViewProps): ReactElement {
     );
   }
 
+  // Order (§ 5.3 "Shows" and § 5.6's "To restore" Home bullet): the goal,
+  // the pipeline strip, Ten's last reply band, then Waiting on you and To
+  // do. The working line sits above the page (§ 5.3.1 F35).
   return (
     <div className="page-home">
+      {workingLine}
       {planReadError ? (
         <ReadError path="plan.md" onRetry={onRetryPlan} />
       ) : (
@@ -211,8 +227,6 @@ export function HomeView(props: HomeViewProps): ReactElement {
           {budgetLine ? <p className="home-budget">{budgetLine}</p> : null}
         </>
       )}
-
-      {workingLine}
 
       {pipelineReadError ? (
         <ReadError path="jobs.md" onRetry={onRetryPipeline} />
@@ -239,14 +253,14 @@ export function HomeView(props: HomeViewProps): ReactElement {
         </div>
       ) : null}
 
+      {renderBand(true)}
+
       {!planReadError ? (
         <div className="home-plan-columns">
           <PlanColumn icon="user" title="Waiting on you" section={waitingOnYou} onOpenRef={onOpenRef} />
           <PlanColumn icon="listTodo" title="To do" section={toDo} minutes={minutes} onOpenRef={onOpenRef} />
         </div>
       ) : null}
-
-      {band}
     </div>
   );
 }
@@ -266,14 +280,17 @@ export function Home({
   onOpenRef,
   onContinueWithTen,
   onOpenTalkToTen,
+  noConversationSaved,
   onOpenJobs,
 }: {
   store: WorkspaceStore;
   messages: AppMessage[];
   chatStatus: ChatRawStatus;
-  onOpenRef: (ref: string) => void;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
   onContinueWithTen: () => void;
   onOpenTalkToTen: () => void;
+  /** Frame's `noConversationSaved` (only the real shell knows it). */
+  noConversationSaved: boolean;
   onOpenJobs: () => void;
 }): ReactElement {
   const [planState, setPlanState] = useState<{ goalLine?: string; budgetLine?: string; waitingOnYou?: PlanBoardSection; toDo?: PlanBoardSection; error: boolean }>({ error: false });
@@ -293,7 +310,13 @@ export function Home({
         error: false,
       });
     } catch (err) {
-      if (err instanceof WorkspaceError && err.code === "resource_missing") {
+      // Blocking fix (Stage 3d review): duck-typed via isMissingError, not
+      // `instanceof WorkspaceError` — the real Supabase store throws
+      // packages/agent/src/types.ts's WorkspaceError, a DIFFERENT class
+      // from this file's own apps/web/src/types.ts import; an `instanceof`
+      // check against only the latter silently missed every real
+      // "missing" throw in production (see store-io.ts's own note).
+      if (isMissingError(err)) {
         setPlanState({ error: false });
       } else {
         setPlanState({ error: true });
@@ -353,7 +376,7 @@ export function Home({
       minutes={minutes}
       lastReply={lastReply}
       working={working}
-      hasConversation={messages.length > 0}
+      noConversation={noConversationSaved}
       onOpenRef={onOpenRef}
       onContinueWithTen={onContinueWithTen}
       onOpenTalkToTen={onOpenTalkToTen}

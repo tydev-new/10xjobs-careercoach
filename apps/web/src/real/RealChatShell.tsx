@@ -516,6 +516,7 @@ export function RealChatShell({
         status={currentStatus}
         chatStatus={status}
         store={workspace}
+        noConversationSaved={messages.length === 0}
         onOpenRef={handleOpen}
         onFocusComposer={() => composerRef.current?.focus()}
         versionNotice={frameVersionNotice}

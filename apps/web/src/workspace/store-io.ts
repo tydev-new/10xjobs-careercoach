@@ -9,10 +9,13 @@
 // `exists(p)` is true when `read(p)` succeeds and false on
 // `resource_missing` (any other error is thrown, so design-web-ui.md
 // § 5.2 rule 6 — "unreadable is loud" — can show it, never silently
-// treated as "missing"). `readFile(p)` returns the text. `writeFile`
+// treated as "missing"). `readFile(p)` returns the text through
+// `universalNewlines`, as the ports' own node io does (a lone-CR file
+// still splits into lines). `writeFile`
 // throws: no page writes (§ 5.2 rule 1).
 import type { WorkspaceStore } from "../types.ts";
 import { WorkspaceError } from "../types.ts";
+import { universalNewlines } from "../../../../skills/profile/scripts/lib/py-text.mjs";
 
 // Lead ruling (Stage 3d review, blocker 1): the REAL store
 // (supabase-workspace-store.ts) throws `packages/agent`'s own
@@ -51,7 +54,7 @@ export function storeIo(store: WorkspaceStore): ReadOnlyIo {
     async readFile(path: string): Promise<string> {
       const file = await store.read(path);
       if (file.binary) throw new WorkspaceError("unsupported_type", path);
-      return file.content;
+      return universalNewlines(file.content);
     },
     async writeFile(): Promise<void> {
       throw new Error("store-io.ts is read-only: pages never write (design-web-ui.md § 5.2 rule 1)");

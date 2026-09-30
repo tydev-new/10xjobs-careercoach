@@ -13,20 +13,17 @@
 // hardcoded key, and the key's VALUE is never printed (only the env var
 // NAME appears in any message).
 //
-// STUBBED pending packages/checkers (a parallel worktree porting the
-// real checker scripts to JS): `scripts` is a FakeScriptRunner with no
-// canned scripts, so every `python3 ...` command a skill tries will exit
-// 127 "not available in the web app: <name>" until the real
-// ScriptRunner lands and this line is swapped for it.
+// Scripts: the REAL ScriptRunner the web app uses (just-bash + the
+// skills' ported checkers, apps/web/src/backend/script-runner.ts, wired
+// in bin/headless-deps.mjs), so a skill's `node scripts/check_*.mjs ...`
+// runs here exactly as in the browser — its output (and any jobs.md
+// write-back) reaches the model the same way. A still-unported script
+// exits 127 "not available in the web app: <name>", same as the web app.
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { readUIMessageStream } from "ai";
-import path from "node:path";
 
 import { createCoach } from "../src/coach.ts";
-import { createInMemoryGate } from "../src/gate.ts";
-import { createFakeScriptRunner } from "../src/tools/fake-script-runner.ts";
-import { createLocalFolderWorkspaceStore } from "../src/workspace/local-folder-store.ts";
-import { buildSkillBundleFromDisk } from "../src/skills/skill-bundle-fs.ts";
+import { buildHeadlessDeps } from "./headless-deps.mjs";
 
 function parseArgs(argv) {
   const args = { keyEnv: "OPENROUTER_API_KEY", chatId: "run-" + Date.now(), balance: 5 };
@@ -76,13 +73,11 @@ async function main() {
     return;
   }
 
-  const workspaceDir = path.resolve(args.workspace);
-  const skillsDir = path.resolve(args.skills);
-
-  const [workspace, skills] = await Promise.all([
-    Promise.resolve(createLocalFolderWorkspaceStore(workspaceDir)),
-    buildSkillBundleFromDisk(skillsDir),
-  ]);
+  const deps = await buildHeadlessDeps({
+    workspaceDir: args.workspace,
+    skillsDir: args.skills,
+    balance: args.balance,
+  });
 
   const openrouter = createOpenRouter({ apiKey });
   const model = openrouter.chat(args.model, {
@@ -90,21 +85,7 @@ async function main() {
     cache_control: { type: "ephemeral" },
   });
 
-  const coach = createCoach({
-    model,
-    workspace,
-    skills,
-    gate: createInMemoryGate(),
-    balance: async () => args.balance,
-    fetch: globalThis.fetch,
-    clock: { now: () => new Date() },
-    scripts: createFakeScriptRunner([]), // STUBBED — see file header.
-    logger: {
-      info: (e) => console.error("[agent:info]", JSON.stringify(e)),
-      warn: (e) => console.error("[agent:warn]", JSON.stringify(e)),
-      error: (e) => console.error("[agent:error]", JSON.stringify(e)),
-    },
-  });
+  const coach = createCoach({ ...deps, model });
 
   const stream = coach.stream({
     chatId: args.chatId,

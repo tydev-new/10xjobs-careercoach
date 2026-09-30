@@ -17,6 +17,11 @@ export async function buildSkillBundleFromDisk(skillsRoot: string): Promise<Skil
     const entries = await readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;
+      // Same exclusions as the web app's build-time glob
+      // (apps/web/src/backend/skills-bundle.ts): machine-local Python
+      // build junk (git-ignored, but possibly on disk) never enters the
+      // bundle, so the headless snapshot matches the web one.
+      if (entry.name === "__pycache__" || entry.name.endsWith(".pyc")) continue;
       const abs = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         await walk(abs);

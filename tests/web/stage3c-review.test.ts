@@ -226,11 +226,46 @@ test("C § 18 parity: for every check_closeout case with a plan.md, readPlanBoar
   assert.deepEqual(bad, []);
 });
 
-test("C § 18 'these existing tables pass unchanged': tests/web/helpers.test.ts, apps/web/src/agent-helpers.test.ts, tests/agent/cards.test.ts, packages/agent/test/cards.test.ts carry no diff against origin/main", () => {
-  const files = ["tests/web/helpers.test.ts", "apps/web/src/agent-helpers.test.ts", "tests/agent/cards.test.ts", "packages/agent/test/cards.test.ts"];
-  const d = spawnSync("git", ["diff", "--stat", "origin/main", "--", ...files], { cwd: REPO, encoding: "utf8" });
+// Rescoped (Stage 3b round-2 tester, a named change allowed by the lead):
+// C § 18 ("these existing tables pass unchanged") protects the PLAN tables
+// that readPlanBoard re-expresses parsePlanTodo through. The two helpers
+// tables are plan-reader tables whole, so they stay byte-for-byte. The two
+// cards tables also hold verdict-card cases, which Stage 3b legitimately
+// changes (design-web-search.md § 7.1: the verdict card's `ref` moves to
+// `analysis_file`; design-web-ui.md § 5.9 Stage 3b names
+// tests/agent/cards.test.ts:109-116). So for those two files only the
+// plan-card / parsePlanTodo test blocks, and the plan.md fixture lines they
+// read, must be identical to origin/main. Nothing else is loosened.
+test("C § 18 'these existing tables pass unchanged': tests/web/helpers.test.ts and apps/web/src/agent-helpers.test.ts carry no diff against origin/main; in tests/agent/cards.test.ts and packages/agent/test/cards.test.ts every plan-card / parsePlanTodo test and the plan.md fixture lines are unchanged", () => {
+  const whole = ["tests/web/helpers.test.ts", "apps/web/src/agent-helpers.test.ts"];
+  const d = spawnSync("git", ["diff", "--stat", "origin/main", "--", ...whole], { cwd: REPO, encoding: "utf8" });
   assert.equal(d.status, 0, d.stderr);
   assert.equal(d.stdout.trim(), "", `changed: ${d.stdout}`);
+
+  const planBlocks = (src: string) => {
+    const parts = src.split(/^(?=test\()/m);
+    const pre = parts[0];
+    const blocks = new Map<string, string>();
+    for (const b of parts.slice(1)) {
+      const title = /^test\(\s*(["'`])((?:\\.|(?!\1).)*)\1/.exec(b)?.[2] ?? "";
+      if (/plan/i.test(title)) blocks.set(title, b.trimEnd());
+    }
+    // the fixture lines a plan test reads (tests/agent/cards.test.ts builds plan.md in its preamble)
+    const s = pre.indexOf('out["plan.md"]');
+    const fixture = s < 0 ? "" : pre.slice(s, pre.indexOf("].join", s));
+    return { blocks, fixture };
+  };
+  const minimum: Record<string, number> = { "tests/agent/cards.test.ts": 3, "packages/agent/test/cards.test.ts": 1 };
+  for (const f of Object.keys(minimum)) {
+    const old = spawnSync("git", ["show", `origin/main:${f}`], { cwd: REPO, encoding: "utf8" });
+    assert.equal(old.status, 0, old.stderr);
+    const a = planBlocks(old.stdout);
+    const b = planBlocks(readFileSync(path.join(REPO, f), "utf8"));
+    assert.ok(a.blocks.size >= minimum[f], `${f}: only ${a.blocks.size} plan tests on origin/main — vacuous`);
+    assert.deepEqual([...b.blocks.keys()], [...a.blocks.keys()], `${f}: the plan tests' titles changed`);
+    for (const [t, body] of a.blocks) assert.equal(b.blocks.get(t), body, `${f}: plan test changed: ${t}`);
+    assert.equal(b.fixture, a.fixture, `${f}: the plan.md fixture changed`);
+  }
 });
 
 test("C § 18/§ 18.1: readPlanBoard, splitPlanMinutes and budgetMinutesPerDay are exports of packages/agent", () => {

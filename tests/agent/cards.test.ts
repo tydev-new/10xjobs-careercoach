@@ -103,12 +103,17 @@ async function runBash(commands: string[], opts: { files?: Record<string, string
   return { cards: dataChunks(chunks, "data-card").map((c) => c.data), outputs, workspace, chunks };
 }
 
+// design-web-search.md § 7.1 (S1, the `Analysis` field): `--jd-file` ->
+// `--analysis-file` — the verdict card's `ref` now reads the row's
+// `analysis_file`, never `jd_file` (design-web-ui.md § 5.9 Stage 3b;
+// design-web-agent.md § 6.2). The ref VALUE is unchanged; only the flag
+// (and so the jobs.md field it lands in) moves.
 const VERDICT_CMD =
-  'node evaluate/scripts/record_verdict.mjs --workspace . --company "Nimbus Robotics" --title "Analytics Engineer" --verdict strong --score 82 --reasons "SQL depth matches; dbt ownership" --dealbreakers "on-site 5 days" --jd-file jd-analysis/nimbus-analytics-engineer.md --track A';
+  'node evaluate/scripts/record_verdict.mjs --workspace . --company "Nimbus Robotics" --title "Analytics Engineer" --verdict strong --score 82 --reasons "SQL depth matches; dbt ownership" --dealbreakers "on-site 5 days" --analysis-file jd-analysis/nimbus-analytics-engineer.md --track A';
 
 // ------------------------------------------------------------------ verdict
 
-test("verdict card: props from the jobs.md row record_verdict wrote, word for word; ref = the row's JD file", async () => {
+test("verdict card: props from the jobs.md row record_verdict wrote, word for word; ref = the row's Analysis file", async () => {
   const { cards, outputs, workspace } = await runBash([VERDICT_CMD]);
   assert.equal(outputs[0].exitCode, 0, outputs[0].stderr);
   const jobs = (await workspace.read("jobs.md")) as any;
@@ -127,7 +132,7 @@ test("verdict card: props from the jobs.md row record_verdict wrote, word for wo
   assert.equal(p.dealbreakers, "on-site 5 days");
 });
 
-test("verdict card: no --jd-file -> no ref (never guessed)", async () => {
+test("verdict card: no --analysis-file -> no ref (never guessed)", async () => {
   const { cards } = await runBash(['node skills/evaluate/scripts/record_verdict.mjs --workspace . --company "Acme Labs" --title "Data Analyst" --verdict long_shot --score 40 --reasons "stretch on python"']);
   const v = cards.filter((c) => c.card === "verdict");
   assert.equal(v.length, 1);

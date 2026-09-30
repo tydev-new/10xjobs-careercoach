@@ -2453,6 +2453,329 @@ select:focus-visible {
   }
 }
 
+/* =====================================================================
+   Jobs (design-web-ui.md § 5.3 "Jobs: the pipeline record", § 5.6
+   "Jobs"; § 5.9 Stage 3b). Reuses `.workspace-page`/`.workspace-page-inner`
+   (the shared list pane, above Documents' own block) and the tier-pill /
+   badge classes the verdict card already defines (§ 2.1's table is
+   shared, rule 12). List-plus-detail: side by side at desktop widths, the
+   detail REPLACES the list on the phone with a back control (§ 5.3,
+   restore ruling; J16) — driven by `.jobs-page--detail`, never a second
+   JS width check (Frame.tsx's own `clientWidth` read is for the composer
+   focus decision only). ===================================================================== */
+
+.jobs-page-panes {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+.jobs-list-pane {
+  flex: 1 1 380px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.jobs-detail-pane {
+  flex: 1 1 420px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--bg-panel);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.job-group {
+  margin: 0 0 var(--space-2);
+}
+
+.job-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: var(--space-6) 0 var(--space-2);
+  font: var(--type-small);
+  font-weight: 600;
+  color: var(--fg-muted);
+  cursor: default;
+  list-style: none;
+}
+
+.job-group-head::-webkit-details-marker {
+  display: none;
+}
+
+summary.job-group-head {
+  cursor: pointer;
+}
+
+.job-group:first-child .job-group-head,
+.job-group--dismissed .job-group-head {
+  margin-top: 0;
+}
+
+.job-group-count {
+  font-weight: 400;
+  color: var(--fg-subtle);
+}
+
+.job-group-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.job-row {
+  padding: 14px var(--space-4);
+  background: var(--bg-panel);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.job-row--selected {
+  box-shadow: inset 0 0 0 2px var(--lime-ink);
+}
+
+/* Stage 3b review: a <button> is phrasing content only (no block-level
+   descendant) — the row's title IS the button's own text, styled like
+   the old `.job-row-title` span it replaces; the rest of the row sits
+   outside it as plain siblings (§ 5.5's whole-row tap target is
+   `.job-row-select` alone, at least 44px tall). */
+.job-row-select {
+  padding: 0;
+  min-height: 44px; /* § 5.5 tap-target floor at 760px or less */
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  text-align: left;
+  font: var(--type-card-title);
+  color: var(--fg);
+}
+
+.job-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.job-row-score {
+  flex: none;
+  font: var(--type-number);
+  font-size: 20px;
+  line-height: 24px;
+  color: var(--fg);
+}
+
+.job-row-meta {
+  font: var(--type-meta);
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.job-row-tier {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.job-row-reason,
+.job-row-dealbreakers {
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--fg);
+}
+
+.job-row-dismissed {
+  margin-top: var(--space-1);
+}
+
+.job-row-dismissed-from {
+  margin: 0;
+  font: var(--type-small);
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.job-row-dismissed-note {
+  margin: var(--space-1) 0 0;
+  font: var(--type-body-sm);
+  color: var(--fg);
+}
+
+.job-url {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 44px; /* § 5.5 tap-target floor at 760px or less */
+  font: var(--type-meta);
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+
+/* § 5.2 rule 7: an unsafe URL (Stage 3b review, B3) — shown, never a
+   link, so it carries no tap-target floor (it isn't a control). */
+.job-url--unsafe {
+  min-height: 0;
+}
+
+.job-row-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.job-no-analysis {
+  font: var(--type-meta);
+  color: var(--fg-subtle);
+}
+
+.job-back-button {
+  display: none; /* desktop: the list is always visible beside the detail */
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  font: var(--type-small);
+  font-weight: 600;
+  color: var(--fg-muted);
+  min-height: 44px; /* § 5.5 tap-target floor at 760px or less */
+}
+
+.job-detail-head h2 {
+  margin: 0 0 var(--space-1);
+  font: var(--type-card-title);
+  font-size: 18px;
+  color: var(--fg);
+}
+
+.job-detail-location {
+  margin: 0 0 var(--space-1);
+  font: var(--type-body-sm);
+  color: var(--fg-muted);
+}
+
+.job-detail-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font: var(--type-meta);
+  color: var(--fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.job-detail-dismissed {
+  padding: var(--space-3);
+  background: var(--bg-sunken);
+  border-radius: var(--radius-md);
+}
+
+.job-detail-verdict {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.job-detail-score {
+  font: var(--type-number);
+  font-size: 22px;
+  color: var(--fg);
+}
+
+.job-detail-reason,
+.job-detail-dealbreakers {
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--fg);
+}
+
+.job-detail-posting {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.job-detail-field-label {
+  font: var(--type-small);
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.job-detail-section h3 {
+  margin: 0 0 var(--space-2);
+  font: var(--type-card-title);
+  font-size: 14px;
+  color: var(--fg);
+}
+
+.job-field-missing {
+  margin: 0;
+  font: var(--type-body-sm);
+  color: var(--fg-muted);
+}
+
+.job-read-error {
+  color: var(--red);
+}
+
+.job-detail-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+@container frame (max-width: 760px) {
+  .jobs-page-panes {
+    flex-direction: column;
+  }
+
+  .jobs-list-pane,
+  .jobs-detail-pane {
+    flex-basis: auto;
+    width: 100%;
+  }
+
+  /* § 5.3, restore ruling: "on the phone the detail replaces the list,
+     with a back control." `.jobs-page--detail` is set only once a row has
+     been chosen (JobsPage's own `phoneShowingDetail` state); before that,
+     the phone shows the list alone, matching every other workspace page
+     (§ 5.5, "Jobs, Applications and Documents are the list alone"). */
+  .jobs-page:not(.jobs-page--detail) .jobs-detail-pane {
+    display: none;
+  }
+
+  .jobs-page--detail .jobs-list-pane {
+    display: none;
+  }
+
+  .jobs-page--detail .job-back-button {
+    display: inline-flex;
+  }
+
+  /* Stage 3b review, B6: the Dismissed group's own <summary> is an
+     interactive control (it toggles open/closed) — § 5.5's 44px
+     tap-target floor applies to it same as any other button. */
+  summary.job-group-head {
+    min-height: 44px;
+  }
+}
+
 /* ---- Phone tab bar (design-web-ui.md § 5.5). Hidden at desktop widths;
    the container query below turns it on. Hidden again whenever the
    composer has focus, at any width (§ 5.5: "nothing then sits between

@@ -51,8 +51,9 @@ export interface FrameProps extends Omit<HeaderProps, "pageTitle"> {
   noConversationSaved?: boolean;
   /** Opens a chip's file in the pinned viewer — the same mechanism a
    *  card's `ref` already uses (§ 1.1); Frame forwards it to whichever
-   *  page needs it (today, only Home's plan items). */
-  onOpenRef: (ref: string) => void;
+   *  page needs it (today, only Home's plan items). `opener` is the chip
+   *  or link clicked, so Back/Escape return focus to it (§ 5.5). */
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
   /** The Talk to Ten page's own content — Transcript, Composer, the
    *  empty-first-run line: unchanged from today, just now shown or hidden
    *  by Frame instead of being the only page there is. Always mounted

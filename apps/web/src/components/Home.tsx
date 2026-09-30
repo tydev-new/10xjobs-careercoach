@@ -39,7 +39,7 @@ export interface HomeViewProps {
    *  P3 "Talk to Ten", which opens Talk to Ten without focusing the
    *  composer (§ 5.4), instead of H3 Continue with Ten. */
   noConversation: boolean;
-  onOpenRef: (ref: string) => void;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
   onContinueWithTen: () => void;
   onOpenTalkToTen: () => void;
   onOpenJobs: () => void;
@@ -74,7 +74,7 @@ function PlanColumn({
   title: string;
   section: PlanBoardSection | undefined;
   minutes?: MinutesSum;
-  onOpenRef: (ref: string) => void;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
 }): ReactElement {
   return (
     <div className="home-plan-column">
@@ -286,7 +286,7 @@ export function Home({
   store: WorkspaceStore;
   messages: AppMessage[];
   chatStatus: ChatRawStatus;
-  onOpenRef: (ref: string) => void;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
   onContinueWithTen: () => void;
   onOpenTalkToTen: () => void;
   /** Frame's `noConversationSaved` (only the real shell knows it). */

@@ -19,7 +19,7 @@ export function PlanItem({
   onOpenRef,
 }: {
   item: PlanBoardItem;
-  onOpenRef: (ref: string) => void;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
 }): ReactElement {
   const split = splitPlanMinutes(item.text);
   return (
@@ -38,7 +38,7 @@ export function PlanItem({
         <p className="plan-item-text">{item.text}</p>
       )}
       {item.ref ? (
-        <button type="button" className="plan-item-chip" onClick={() => onOpenRef(item.ref as string)}>
+        <button type="button" className="plan-item-chip" onClick={(e) => onOpenRef(item.ref as string, e.currentTarget)}>
           <Icon name="fileText" size={14} />
           <span className="mono">{item.ref}</span>
         </button>

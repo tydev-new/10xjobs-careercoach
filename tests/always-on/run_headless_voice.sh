@@ -34,7 +34,9 @@
 #                 judge_voice.sh passes them
 # then prints a summary table. A trial whose exit.txt says 0 is SKIPPED
 # on a re-run of the same tag, so `TRIALS=3 ... <tag> <failing cases>`
-# adds trials 2-3 for just those cases; a crashed trial is re-run.
+# adds trials 2-3 for just those cases; an unfinished trial (non-zero
+# exit, e.g. run.mjs's 3 for a provider error, or an empty reply) shows
+# as FAILED in the table, makes the driver exit 1, and is re-run.
 #
 # NO model call happens unless the key variable is set; the key's VALUE is
 # never printed (only KEY_ENV's name). Harness workspaces are temp dirs
@@ -142,9 +144,23 @@ stage_case() { # $1 case name, $2 workspace dir
   esac
 }
 
+# A trial is FINISHED only when run.mjs exited 0 AND the reply has text.
+# Anything else — a provider error (run.mjs exit 3, an [error] line), a
+# crash, an empty reply — is a failed, unfinished trial: an empty reply
+# scans as 0 HARD, so counting it would read as a clean pass. Unfinished
+# trials are re-run on the next same-tag invocation.
+trial_status() { # $1 trial dir -> "ok" or "FAILED:<why>"
+  local ex; ex="$(cat "$1/exit.txt" 2>/dev/null)"
+  if [ -z "$ex" ]; then echo "FAILED:not-run"
+  elif [ "$ex" != 0 ]; then echo "FAILED:exit-$ex"
+  elif ! grep -q '[^[:space:]]' "$1/reply.md" 2>/dev/null; then echo "FAILED:empty-reply"
+  else echo ok
+  fi
+}
+
 run_trial() { # $1 case, $2 trial
   local c="$1" t="$2" CASE="$ROOT/cases/$1" out="$RESULTS/$1/$2" WS PROMPT_FILE leak
-  if [ "$(cat "$out/exit.txt" 2>/dev/null)" = 0 ]; then
+  if [ "$(trial_status "$out")" = ok ]; then
     echo "skip $c trial $t (exists)"; return 0
   fi
   rm -rf "$out"; mkdir -p "$out"
@@ -217,25 +233,32 @@ total=0; unpriced=0
 bad=0
 echo
 echo "== hv-$TAG  model=$MODEL_ID  skills=$RUNNER_SKILLS_DIR"
-printf '%-24s %5s %5s %6s %4s %5s %5s %6s %10s\n' case trial HARD REVIEW exit gate error search cost_usd
+printf '%-24s %5s %5s %6s %4s %5s %5s %6s %-24s %10s\n' case trial HARD REVIEW exit gate error search status cost_usd
 for c in $CASES; do
   for t in $(seq 1 "$TRIALS"); do
     out="$RESULTS/$c/$t"
     ex="$(cat "$out/exit.txt" 2>/dev/null || echo -)"
-    [ "$ex" = 0 ] || bad=1
+    status="$(trial_status "$out")"
+    hard="$(cnt '^HARD' "$out/scan.txt")"; review="$(cnt '^REVIEW' "$out/scan.txt")"
+    # an unfinished trial reports no scan counts — its 0 HARD means nothing
+    [ "$status" = ok ] || { bad=1; hard=-; review=-; }
+    # t4-intake is two turns in the harness; here only turn1.md is sent,
+    # so its row is a screen, not comparable to a run_t4.sh trial.
+    case "$c" in t4-*) status="$status,turn1-only" ;; esac
     cost="$(cost_of "$out/stderr.txt")"
     case "$cost" in
       [0-9]*) total="$(awk -v a="$total" -v b="$cost" 'BEGIN{printf "%.6f", a+b}')" ;;
       *) unpriced=$((unpriced + 1)) ;;
     esac
-    printf '%-24s %5s %5s %6s %4s %5s %5s %6s %10s\n' "$c" "$t" \
-      "$(cnt '^HARD' "$out/scan.txt")" "$(cnt '^REVIEW' "$out/scan.txt")" "$ex" \
+    printf '%-24s %5s %5s %6s %4s %5s %5s %6s %-24s %10s\n' "$c" "$t" \
+      "$hard" "$review" "$ex" \
       "$(cnt '^\[gate\]' "$out/stderr.txt")" "$(cnt '^\[error\]' "$out/stderr.txt")" \
-      "$(cnt '^\[ran\] web_search' "$out/stderr.txt")" "$cost"
+      "$(cnt '^\[ran\] web_search' "$out/stderr.txt")" "$status" "$cost"
   done
 done
 # The total covers every trial listed, including ones skipped as already
 # done on an earlier invocation of this tag (their stderr.txt is kept).
 echo "total cost_usd=$total  (trials without a reported cost: $unpriced — check OpenRouter's activity page for those)"
+[ "$bad" = 0 ] || echo "FAILED trials above are unfinished (provider error, crash or empty reply) — not measurements; re-run the same tag to retry them."
 echo "hits: $RESULTS/<case>/<trial>/scan.txt   done: $RESULTS"
 exit "$bad"

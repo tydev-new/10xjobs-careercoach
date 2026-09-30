@@ -7,6 +7,15 @@
 //     --prompt "<text>" [--chat-id <id>] [--key-env OPENROUTER_API_KEY] \
 //     [--balance <usd>]
 //
+// Exit codes: 0 the turn finished (a reply, or a pause at the spend
+// gate — its `[gate]` line is on stderr); 1 refused (no key) or the run
+// crashed; 2 usage error (bad arguments, --model off the allowlist);
+// 3 the turn ended on an error (each one logged as an `[error]` line on
+// stderr; the reply on stdout is whatever came before it, often empty).
+// Once a turn starts, stderr carries exactly one `[cost]` line, the turn's
+// spend: `[cost] usd=<x> steps=<n>`, or `[cost] unknown ...` when the
+// provider reported none.
+//
 // Refuses to run without an EXPLICIT key env var: the name is always
 // named on the command line (--key-env, default OPENROUTER_API_KEY) and
 // that named variable must actually be set — no silent fallback, no
@@ -151,13 +160,20 @@ async function streamTurn(coach, args) {
     }
   }
   // gate/error parts logged from the final snapshot only, each once.
+  // A turn that ended on an error (any data-error part, e.g. a provider
+  // failure or the step cap) exits 3 — never 0, so a caller can't
+  // read an errored turn as a finished one. A gate is a legitimate end of
+  // a turn (the model asked for a yes) and keeps exit 0.
+  let errored = false;
   for (const part of lastMessage?.parts ?? []) {
     if (part.type === "data-gate") {
       console.error(`[gate] ${part.data.gateLine}`);
     } else if (part.type === "data-error") {
+      errored = true;
       console.error(`[error] ${part.data.code}: ${part.data.message}`);
     }
   }
+  if (errored) process.exitCode = 3;
 
   const text = (lastMessage?.parts ?? [])
     .filter((p) => p.type === "text")

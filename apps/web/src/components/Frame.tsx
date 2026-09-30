@@ -16,6 +16,7 @@ import { TabBar } from "./TabBar";
 import { EmptyPage } from "./EmptyPage";
 import { DocumentsPage } from "./DocumentsPage";
 import { Home } from "./Home";
+import { JobsPage } from "./JobsPage";
 import { VersionNotice, type VersionNoticeMode } from "../real/VersionNotice";
 import { landingPage } from "../workspace/landing.ts";
 import { buildAskTenDraft } from "../workspace/ask-ten.ts";
@@ -230,16 +231,21 @@ export function Frame(props: FrameProps): ReactElement {
               onOpenJobs={() => navigate("jobs")}
             />
           ) : page === "jobs" ? (
-            // § 5.3.1 J17/J18, NOT J19 (lead ruling, 2026-09-28): C1's own
-            // gate — J19's "Ask Ten to look for roles" ships only once
-            // design-web-search.md § 9 S5 lands; until then (and until
-            // Stage 3b replaces this page) it's J18's words only.
-            <EmptyPage
-              icon="briefcase"
-              first="No roles yet."
-              rest="Paste a job link or a posting's text into the conversation."
-              cta="talk"
+            // Stage 3b (design-web-ui.md § 5.3, "Jobs: the pipeline
+            // record"; § 5.9). J17/J18's empty state lives inside
+            // JobsPage itself now; NOT J19 (lead ruling, 2026-09-28) —
+            // that waits for design-web-search.md § 9 S5.
+            <JobsPage
+              store={store}
+              onOpenFile={onOpenFile}
+              onAskTen={askTenAbout}
               onOpenTalkToTen={openTalkToTen}
+              // "Open application" (§ 5.4) stays unwired here (Stage 3b
+              // review, lead ruling): the control is hidden until Stage
+              // 3e can wire it to 3d's Applications page WITH the entry
+              // chosen — a page that only opens Applications, with no
+              // entry, would be a half-built link (rule 8).
+              turnRunning={status.state === "thinking" || status.state === "working"}
             />
           ) : page === "applications" ? (
             // § 5.3.1 AP16/AP17 (lead ruling, 2026-09-28 — Stage 3d

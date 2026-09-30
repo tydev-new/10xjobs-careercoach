@@ -344,10 +344,22 @@ function JobsDetail({
   turnRunning: boolean;
   onBack: () => void;
 }): ReactElement | null {
-  const [analysis, setAnalysis] = useState<FieldFileState>({ kind: "absent" });
-  const [company, setCompany] = useState<FieldFileState>({ kind: "absent" });
+  // The two reads' results carry the row key they were read FOR. Only a
+  // result whose key is the row showing now is rendered: the moment a new
+  // row is chosen, the previous row's sections leave the screen, before
+  // the new row's read comes back (§ 5.3 restore ruling, § 5.2 rules 4
+  // and 8 — never a stale copy shown as the chosen row's file). A turn-end
+  // re-read of the SAME row keeps its sections up until the fresh read lands.
+  const [files, setFiles] = useState<{ key: string | undefined; analysis: FieldFileState; company: FieldFileState }>({
+    key: undefined,
+    analysis: { kind: "absent" },
+    company: { kind: "absent" },
+  });
   const [attempt, setAttempt] = useState(0);
   const key = row ? rowKey(row) : undefined;
+  const current = files.key === key;
+  const analysis: FieldFileState = current ? files.analysis : { kind: "absent" };
+  const company: FieldFileState = current ? files.company : { kind: "absent" };
   // Stage 3b review, B5: a request token, bumped on every row change (and
   // every retry). A read that resolves after a NEWER request has started
   // is a stale read — its result is dropped, never applied over the row
@@ -359,16 +371,14 @@ function JobsDetail({
     const id = ++requestIdRef.current;
     const [a, c] = await Promise.all([loadFieldFile(store, r.analysis_file), loadFieldFile(store, r.company_file)]);
     if (requestIdRef.current !== id) return; // a later row/retry started; drop this one
-    setAnalysis(a);
-    setCompany(c);
+    setFiles({ key: rowKey(r), analysis: a, company: c });
   };
 
   useEffect(() => {
     if (row) void loadFiles(row);
     else {
       requestIdRef.current++; // cancel any read still in flight for the previous row
-      setAnalysis({ kind: "absent" });
-      setCompany({ kind: "absent" });
+      setFiles({ key: undefined, analysis: { kind: "absent" }, company: { kind: "absent" } });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, attempt]);

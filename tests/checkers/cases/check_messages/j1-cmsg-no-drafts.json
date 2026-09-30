@@ -19,7 +19,7 @@
  },
  "expect": [
   {
-   "stdout": "acme.md: pass (0 fail, 1 warn, 0 drafts)\n  [WARN] no draft blockquotes found in the file\n✔ message floor clean\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
+   "stdout": "acme.md: pass (0 fail, 1 warn, 0 drafts)\n  [WARN] no draft blockquotes found in the file\nno failures, 1 warning above — fix each one or tell the candidate\n  language tier (never-say, WATCH forms, paraphrases) → independent checker: profile/references/language-check.md\n",
    "stderr": "",
    "stderrMatch": "exact",
    "exit": 0

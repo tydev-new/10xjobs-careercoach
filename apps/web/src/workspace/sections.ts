@@ -6,8 +6,6 @@
 // function doesn't parse the prose either. It only finds where each
 // `## ` section starts and ends; each body is still shown whole, through
 // MarkdownView. No window/document/localStorage/Node-only API.
-// @ts-expect-error - plain .mjs, no type declarations (script-runner.ts's
-// own posture for a skills/*/scripts/lib import).
 import { restoreLineSeparators, universalNewlines } from "../../../../skills/profile/scripts/lib/py-text.mjs";
 
 export interface Section {

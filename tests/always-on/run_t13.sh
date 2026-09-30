@@ -21,25 +21,32 @@ TRIALS="${TRIALS:-1}"
 # comment for the race this fixes (a sibling run_*.sh unlocking early).
 vault_lock; trap vault_unlock EXIT; trap 'vault_unlock; kill 0 2>/dev/null' INT TERM
 FIX="$ROOT/fixtures/apply"
+# design-honest-ceilings.md § 4.3: a selectable case. CASE_NAME defaults to
+# t13-ceiling; ws-extra/ falls back to t13-ceiling's (the defined reuse: a
+# control like t13-clears gets the same pitch rubric and the same draft).
+# Run each case under its own tag: CASE_NAME=t13-clears ./run_t13.sh hc-clears-<n>
+CASE_NAME="${CASE_NAME:-t13-ceiling}"
+[ -f "$ROOT/cases/$CASE_NAME/prompt.md" ] || { echo "FATAL: no cases/$CASE_NAME/prompt.md" >&2; exit 2; }
 for trial in $(seq 1 "$TRIALS"); do
   # trials run concurrently (PAR, default 6); the vault lock is held by
   # THIS process until the final wait.
   while [ "$(jobs -rp | wc -l)" -ge "${PAR:-6}" ]; do sleep 2; done
   (
-    CASE="$ROOT/cases/t13-ceiling"
-    out="$RESULTS/t13-ceiling-t$trial"
+    CASE="$ROOT/cases/$CASE_NAME"
+    EXTRA="$CASE/ws-extra"; [ -d "$EXTRA" ] || EXTRA="$ROOT/cases/t13-ceiling/ws-extra"
+    out="$RESULTS/$CASE_NAME-t$trial"
     [ -f "$out.md" ] && { echo "skip t$trial (exists)"; exit 0; }
     WS="$(mktemp -d)"
     cp "$ROOT/fixtures/profile.md" "$WS/"
     cp "$FIX"/base-resume.md "$FIX"/voice.md "$FIX"/storybank.md "$FIX"/jobs.md "$WS/"
     cp -r "$FIX/stories" "$FIX/jd-inbox" "$FIX/jd-analysis" "$FIX/company" "$WS/"
-    cp -r "$CASE/ws-extra/." "$WS/"
+    cp -r "$EXTRA/." "$WS/"
     cp "$RUNNER_SKILLS_DIR/profile/templates/workspace-CLAUDE.md" "$WS/CLAUDE.md"
     mkdir -p "$WS/.claude/skills"
     # coach ships in every real workspace — an agent without it hunts the
     # disk and finds the owner's DEPLOYED coach (env contract rule 1).
     cp -r "$RUNNER_SKILLS_DIR/outreach" "$RUNNER_SKILLS_DIR/profile" "$RUNNER_SKILLS_DIR/coach" "$WS/.claude/skills/"
-    echo "=== t13-ceiling / trial $trial -> $WS"
+    echo "=== $CASE_NAME / trial $trial -> $WS"
     sandbox_home_setup
     : > "$out.err"
     ( cd "$WS" && HOME="$FAKEHOME" USER=candidate LOGNAME=candidate CLAUDE_CODE_OAUTH_TOKEN="$HTOK" claude -p "$(cat "$CASE/prompt.md")" \

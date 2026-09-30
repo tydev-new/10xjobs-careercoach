@@ -3,7 +3,16 @@
 // card is a receipt of a file or a script's output; reasoning stays in
 // the model's prose.
 import { parsePlanTodo } from "./helpers.ts";
-import { findJobsMdRow } from "./jobs-md.ts";
+// S2 review blocker 4 (design-web-search.md § 9 S2: "S2 lands before
+// W3b" deletes the stub): the verdict card's row lookup now reads
+// jobs.md through the real port, never the retired
+// packages/agent/src/jobs-md.ts stand-in. `jm.find()` isn't used here —
+// it does a fuzzy, PARTIAL title match (`canon(title).includes(...)`),
+// meant for a human's `update_job.mjs --title` fragment; the card needs
+// an EXACT match on the same company+title record_verdict.mjs was
+// called with, so it looks the row up by `jm.key()` instead (the same
+// exact-match identity add_roles/dedupe already use).
+import * as jm from "../../../skills/search/scripts/lib/jobs-md.mjs";
 import { parseFlagsFromCommand, tokenizeCommand } from "./shell-tokenize.ts";
 import type {
   BashOutput,
@@ -34,12 +43,16 @@ function scriptName(command: string): string {
   return basename(scriptArg);
 }
 
+/** design-honest-ceilings.md § 6A: a pass with warnings is its own badge
+ *  state — never "clean" beside a standing WARN. */
+type CheckerBadge = { status: "clean" | "fail" | "warn"; warnCount?: number };
+
 /** Holds the one piece of cross-tool-call state § 6.2 needs: the chat's
  *  latest checker result per checked file, for the document card's
  *  badge. One instance per chat, held by the coach for the chat's
  *  lifetime (mirrors VersionTracker). */
 export class CardBuilder {
-  #checkerStatusByRef = new Map<string, "clean" | "fail">();
+  #checkerStatusByRef = new Map<string, CheckerBadge>();
 
   async forToolResult(
     toolName: string,
@@ -109,16 +122,19 @@ export class CardBuilder {
     } catch {
       return [];
     }
-    const row = findJobsMdRow(jobsMd, company, title);
+    const io = { exists: async () => true, readFile: async () => jobsMd };
+    const rows: any[] = await jm.load(io, "");
+    const wantKey = jm.key({ company, title });
+    const row = rows.find((r) => jm.key(r) === wantKey);
     if (!row) return [];
     const props: VerdictCardProps = {
       company: row.company,
       title: row.title,
-      verdict: row.verdict as VerdictCardProps["verdict"],
-      score: row.score,
-      track: row.track,
-      reason: row.reason ?? "",
-      dealbreakers: row.dealbreakers,
+      verdict: row.fit_verdict as VerdictCardProps["verdict"],
+      score: row.fit_score ?? undefined,
+      track: row.track ?? undefined,
+      reason: row.fit_reason ?? "",
+      dealbreakers: row.dealbreakers ?? undefined,
     };
     const card: DataCardData = { card: "verdict", props };
     // design-web-search.md § 7.1 (S1, the `Analysis` field): the card's
@@ -126,7 +142,7 @@ export class CardBuilder {
     // `--analysis-file` whenever an analysis was written; with none, the
     // card has no `ref` and shows "no analysis file linked", never a
     // guess (design-web-agent.md § 6.2's own table).
-    if (row.analysisFile) card.ref = row.analysisFile;
+    if (row.analysis_file) card.ref = row.analysis_file;
     return [card];
   }
 
@@ -162,7 +178,16 @@ export class CardBuilder {
       const card: DataCardData = { card: "checker", props };
       if (ref) {
         card.ref = ref;
-        this.#checkerStatusByRef.set(ref, status === "pass" ? "clean" : "fail");
+        // design-honest-ceilings.md § 6A: a pass with 0 warnings is
+        // "clean", a pass with N >= 1 warnings is "warn" (never folded
+        // into "clean"), and a FAIL is "fail".
+        if (status !== "pass") {
+          this.#checkerStatusByRef.set(ref, { status: "fail" });
+        } else if (props.warnCount > 0) {
+          this.#checkerStatusByRef.set(ref, { status: "warn", warnCount: props.warnCount });
+        } else {
+          this.#checkerStatusByRef.set(ref, { status: "clean" });
+        }
       }
       cards.push(card);
     }
@@ -180,8 +205,9 @@ export class CardBuilder {
     // trusting the parsed stdout path there would point the side panel
     // at a file the workspace store can't read.
     const htmlPath = flags.html;
-    const checker = this.#checkerStatusByRef.get(mdPath) ?? "not-run";
-    const props: DocumentCardProps = { words, checker };
+    const badge = this.#checkerStatusByRef.get(mdPath);
+    const props: DocumentCardProps = { words, checker: badge?.status ?? "not-run" };
+    if (badge?.status === "warn") props.warnCount = badge.warnCount;
     if (htmlPath) props.htmlPath = htmlPath;
     return [{ card: "document", props, ref: mdPath }];
   }

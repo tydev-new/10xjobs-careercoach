@@ -6,8 +6,6 @@
 // the read-only store-io.ts adapter. Counts are rows BY STAGE, counted by
 // code (rule 14); this never reads jobs.md's own bold "Active:" line,
 // which would be a second source for one number.
-// @ts-expect-error - plain .mjs, no type declarations (script-runner.ts's
-// own posture for a skills/*/scripts/lib import).
 import { load, STAGES } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import type { ReadOnlyIo } from "./store-io.ts";
 

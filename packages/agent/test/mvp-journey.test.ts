@@ -91,7 +91,7 @@ test("mvp journey: evaluate verdict -> tailor -> check -> plan, across three tur
       "c6",
     ),
     toolCallStep("bash", { command: "node apply/scripts/render_resume.mjs --md applications/acme-resume.md --html applications/acme-resume.html" }, "c7"),
-    textStep("Résumé is 109 words. Both documents pass the automatic checks — nothing failed, nothing flagged."),
+    textStep("Résumé is 109 words. Both documents pass the automatic checks — no failures, no warnings."),
 
     // ---- turn 3: what's next ----
     toolCallStep(

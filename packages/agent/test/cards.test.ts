@@ -66,7 +66,11 @@ test("bash record_verdict.py, exit 0 -> verdict card from the jobs.md row it wro
 test("bash record_verdict.py: no analysis_file row -> card has no ref (never guesses a path)", async () => {
   const cb = new CardBuilder();
   const ws = createInMemoryWorkspaceStore({
-    "jobs.md": ["### Beta — PM", "- Verdict: weak", "- Score: 40", "- Reason: no fit", ""].join("\n"),
+    // A stage heading is required for the real port's load() to parse a
+    // row at all (S2 review blocker 4: the verdict card now reads jobs.md
+    // through skills/search/scripts/lib/jobs-md.mjs, not the retired
+    // stub's lenient regex) — a real jobs.md always has one.
+    "jobs.md": ["## To Review", "", "### Beta — PM", "- Verdict: weak", "- Score: 40", "- Reason: no fit", ""].join("\n"),
   });
   const cards = await cb.forToolResult(
     "bash",
@@ -150,6 +154,43 @@ test("bash render_resume.py, exit 0 -> document card; badge from the chat's late
     ws,
   );
   assert.equal((cards[0].props as any).checker, "clean");
+});
+
+test("bash check_materials.py, pass with a warning -> document badge is \"warn\" with warnCount, never \"clean\" (design-honest-ceilings.md § 6A)", async () => {
+  const cb = new CardBuilder();
+  const ws = createInMemoryWorkspaceStore();
+  await cb.forToolResult(
+    "bash",
+    { command: "node apply/scripts/check_materials.mjs --resume applications/w.md" },
+    { stdout: "RESUME w.md: pass (0 fail, 1 warn)\n  [WARN] letter is 127 words\n", stderr: "", exitCode: 0, changed: [] },
+    ws,
+  );
+  const cards = await cb.forToolResult(
+    "bash",
+    { command: "node apply/scripts/render_resume.mjs --md applications/w.md --html applications/w.html" },
+    { stdout: "words: 109  ->  applications/w.html", stderr: "", exitCode: 0, changed: ["applications/w.html"] },
+    ws,
+  );
+  assert.equal((cards[0].props as any).checker, "warn");
+  assert.equal((cards[0].props as any).warnCount, 1);
+
+  // a pass with NO warnings still gives "clean" (unchanged)
+  const cb2 = new CardBuilder();
+  const ws2 = createInMemoryWorkspaceStore();
+  await cb2.forToolResult(
+    "bash",
+    { command: "node apply/scripts/check_materials.mjs --resume applications/c.md" },
+    { stdout: "RESUME c.md: pass (0 fail, 0 warn)\n", stderr: "", exitCode: 0, changed: [] },
+    ws2,
+  );
+  const cleanCards = await cb2.forToolResult(
+    "bash",
+    { command: "node apply/scripts/render_resume.mjs --md applications/c.md --html applications/c.html" },
+    { stdout: "words: 109  ->  applications/c.html", stderr: "", exitCode: 0, changed: ["applications/c.html"] },
+    ws2,
+  );
+  assert.equal((cleanCards[0].props as any).checker, "clean");
+  assert.equal((cleanCards[0].props as any).warnCount, undefined);
 });
 
 test("bash check_closeout.py, exit 0 -> plan card via parsePlanTodo(plan.md), ref plan.md", async () => {

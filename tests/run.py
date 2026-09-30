@@ -97,6 +97,38 @@ else:
     else:
         passed += 1
 
+# tests/boards.test.mjs — design-web-search.md § 4.1/§ 4.2/§ 4.4/§ 4.8's
+# own expected-output cases and table tests for the shared board readers
+# (skills/search/scripts/lib/board-readers.mjs) and the local CLI
+# (skills/search/scripts/boards.mjs), over synthetic board answers — "no
+# second language to agree with" (§ 4.4), so this one file is the
+# specification. Skips loudly when `node` isn't on PATH.
+if not node:
+    print("\nSKIPPED tests/boards.test.mjs: no `node` on PATH")
+else:
+    print("\n--- node --test tests/boards.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(HERE, "boards.test.mjs")], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/boards.test.mjs (node --test) — see output above")
+    else:
+        passed += 1
+
+# tests/search-s2-local.test.mjs — the INDEPENDENT tester's own suite for
+# skills/search/scripts/boards.mjs (S2 review), separate from the coder's
+# own tests/boards.test.mjs above. Same node --test pattern; skips
+# loudly when `node` isn't on PATH.
+if not node:
+    print("\nSKIPPED tests/search-s2-local.test.mjs: no `node` on PATH")
+else:
+    print("\n--- node --test tests/search-s2-local.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(HERE, "search-s2-local.test.mjs")], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/search-s2-local.test.mjs (node --test) — see output above")
+    else:
+        passed += 1
+
 # packages/checkers: the JS ports' own unit tests (docs/design-web-agent.md
 # § 5). The parity machinery (parity.mjs, coverage-gate.mjs) is gone at J2
 # (docs/design-js-only.md § 6): tests/checkers/run-cases.mjs's
@@ -165,6 +197,22 @@ else:
             print("FAIL tests/checkers/run-cases.mjs on Node 18 — see output above")
         else:
             passed += 1
+
+# tests/checkers/recapture_closing_line.mjs: the mechanical-substitution
+# proof for design-honest-ceilings.md § 6A's frozen-corpus recapture
+# (design-js-only.md § 5.5's rename pattern). Its own .test.mjs covers
+# the substitution rules AND the CLI's --base contract (honest-ceilings
+# review: --base is required, never silently defaults to HEAD).
+if not node:
+    print("\nSKIPPED tests/checkers/recapture_closing_line.test.mjs: no `node` on PATH")
+else:
+    print("\n--- node --test tests/checkers/recapture_closing_line.test.mjs ---")
+    result = subprocess.run([node, "--test", os.path.join(CASES, "recapture_closing_line.test.mjs")], cwd=os.path.join(HERE, ".."))
+    if result.returncode != 0:
+        failed += 1
+        print("FAIL tests/checkers/recapture_closing_line.test.mjs — see output above")
+    else:
+        passed += 1
 
 # packages/agent's own suite (node --test) — plan step 4. Run with cwd
 # set to packages/agent so its own node_modules (ai,

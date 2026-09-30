@@ -179,7 +179,15 @@ test("checker cards on a passing check_materials (exit 0) + document badge from 
   const words = Number(outputs[1].stdout.match(/words: (\d+)/)[1]);
   assert.equal(doc.props.words, words);
   assert.equal(doc.props.htmlPath, "applications/nimbus/resume.html");
-  assert.equal(doc.props.checker, "clean");
+  // design-honest-ceilings.md § 6A: the fixture résumé (base-resume.md
+  // copied as-is) carries its own real WARN (a non-standard "Claim
+  // rules" section name) — the badge must say so, never fold a standing
+  // WARN into "clean" (the badge-side twin of the "clean" beside a
+  // warning miss). Was asserted "clean" before this fix, silently
+  // swallowing the résumé's own warning.
+  assert.equal(resume.props.warnCount, 1, stdout);
+  assert.equal(doc.props.checker, "warn");
+  assert.equal(doc.props.warnCount, 1);
 });
 
 test("document card after a FAILING check of the same .md shows fail, not not-run", async () => {

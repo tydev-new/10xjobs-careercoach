@@ -11,8 +11,6 @@
 // verdict` writes it via `--analysis-file`; `JD` stays the raw posting.
 // 3b waits for S1 (§ 5.9) — S1 is already in this snapshot (the port's
 // own FIELDS table already carries `["Analysis", "analysis_file"]`).
-// @ts-expect-error - plain .mjs, no type declarations (script-runner.ts's
-// own posture for a skills/*/scripts/lib import).
 import { load, STAGES } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import type { FileInfo, WorkspaceStore } from "../types.ts";
 import { datePart as documentsDatePart } from "./documents.ts";

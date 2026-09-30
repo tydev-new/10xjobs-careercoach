@@ -12,14 +12,14 @@ export function UnreadableLines({
 }: {
   path: string;
   lines: string[];
-  onOpenRef: (ref: string) => void;
+  onOpenRef: (ref: string, opener?: HTMLElement) => void;
 }): ReactElement | null {
   if (lines.length === 0) return null;
   return (
     <div className="unreadable-lines">
       <p className="unreadable-lines-title">
         This page couldn't read these lines of{" "}
-        <button type="button" className="link-inline" onClick={() => onOpenRef(path)}>
+        <button type="button" className="link-inline" onClick={(e) => onOpenRef(path, e.currentTarget)}>
           {path}
         </button>
         :

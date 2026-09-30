@@ -9,7 +9,7 @@ import { budgetMinutesPerDay, splitPlanMinutes, type PlanBoardItem, type PlanBoa
 // plain-.ts homes directly so this file (and its own unit test) never
 // pulls a .tsx/JSX file into the graph.
 import { groupParts, type Group } from "../components/group-parts.ts";
-import { summarize } from "../components/tool-run-summary.ts";
+import { activityLine } from "../components/tool-run-summary.ts";
 import type { AppMessage } from "../types.ts";
 
 /** The raw value `useChat()` returns as `status` — never the derived
@@ -67,7 +67,8 @@ export function cutQuote(raw: string): string {
 /** design-web-ui.md § 5.3, "The activity line": the whole collapsed
  *  "ran ..." line (§ 3) Talk to Ten would show for each tool group in
  *  this message, prefix included, in order — reusing `groupParts`
- *  (Transcript.tsx) and `summarize` (ToolRun.tsx) so the two places can
+ *  (Transcript.tsx) and `activityLine` (tool-run-summary.ts, which
+ *  ToolRun.tsx shows too) so the two places can
  *  never disagree about what one line says. Home adds no words of its
  *  own; a message with no tool parts contributes no line. */
 export function activityLinesFor(message: AppMessage): string[] {
@@ -75,7 +76,7 @@ export function activityLinesFor(message: AppMessage): string[] {
   const lines: string[] = [];
   for (const group of groups) {
     if ((group as Group).kind === "tool") {
-      lines.push(`ran ${summarize((group as Extract<Group, { kind: "tool" }>).parts)}`);
+      lines.push(activityLine((group as Extract<Group, { kind: "tool" }>).parts));
     }
   }
   return lines;

@@ -269,3 +269,16 @@ for (const [line, want] of BUDGET_TABLE) {
     assert.equal(budgetMinutesPerDay(line), want);
   });
 }
+
+test("§ 18 Unreadable: a prose line before Waiting on you's first bullet is unreadable even when the section has rows", () => {
+  const s = sectionOf("Waiting on you\nA note I wrote before the list\n- tell me the comp floor\n  more words\n\nTo do\n- x\n", "Waiting on you")!;
+  assert.deepEqual(s.items.map((i) => i.text), ["tell me the comp floor more words"]);
+  assert.deepEqual(s.unreadable, ["A note I wrote before the list"]);
+});
+
+test("§ 18 section end: a repeat of a board label ends the section above it (the first occurrence still wins)", () => {
+  const md = "To do\n- a\nDone\n- d\nTo do\n- x\n";
+  assert.deepEqual(sectionOf(md, "Done")!.items.map((i) => i.text), ["d"]);
+  assert.deepEqual(sectionOf(md, "To do")!.items.map((i) => i.text), ["a"]);
+  assert.deepEqual(readPlanBoard(md).sections.map((s) => s.label), ["To do", "Done"]);
+});

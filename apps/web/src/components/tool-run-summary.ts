@@ -36,3 +36,11 @@ export function summarize(parts: ToolPartLike[]): string {
   }
   return labels.join(" · ");
 }
+
+/** design-web-ui.md § 5.3, "The activity line": the WHOLE collapsed line,
+ *  "ran " prefix included — the one place its words are written. Talk to
+ *  Ten's ToolRun and Home's activity line both show exactly this string
+ *  and add no words of their own. */
+export function activityLine(parts: ToolPartLike[]): string {
+  return `ran ${summarize(parts)}`;
+}

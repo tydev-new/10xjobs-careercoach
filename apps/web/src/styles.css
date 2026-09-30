@@ -1579,6 +1579,26 @@ select:focus-visible {
   justify-content: center;
 }
 
+/* Home's viewer (§ 5.6 "Page layouts": "on Home it appears only while a
+   file is open, with a ✕"; § 5.3.1 F46): unlike the pinned viewer on the
+   other pages, it carries its close control at desktop too, drawn as a ✕.
+   The phone sheet (≤760px, below) keeps its back arrow. */
+.side-panel-back-x {
+  display: none;
+}
+
+.viewer-slot--home .side-panel-back {
+  display: inline-flex;
+}
+
+.viewer-slot--home .side-panel-back-arrow {
+  display: none;
+}
+
+.viewer-slot--home .side-panel-back-x {
+  display: inline;
+}
+
 .side-panel-print {
   flex: none;
   margin-left: auto;
@@ -2433,8 +2453,7 @@ select:focus-visible {
   }
 }
 
-/* =====================================================================
-   Jobs (design-web-ui.md § 5.3 "Jobs: the pipeline record", § 5.6
+/* ==============================================================   Jobs (design-web-ui.md § 5.3 "Jobs: the pipeline record", § 5.6
    "Jobs"; § 5.9 Stage 3b). Reuses `.workspace-page`/`.workspace-page-inner`
    (the shared list pane, above Documents' own block) and the tier-pill /
    badge classes the verdict card already defines (§ 2.1's table is
@@ -2756,6 +2775,7 @@ summary.job-group-head {
   }
 }
 
+=======
 /* ---- Phone tab bar (design-web-ui.md § 5.5). Hidden at desktop widths;
    the container query below turns it on. Hidden again whenever the
    composer has focus, at any width (§ 5.5: "nothing then sits between
@@ -2925,6 +2945,14 @@ summary.job-group-head {
 
   .side-panel-back {
     display: inline-flex;
+  }
+
+  .viewer-slot--home .side-panel-back-arrow {
+    display: inline;
+  }
+
+  .viewer-slot--home .side-panel-back-x {
+    display: none;
   }
 
   /* N5 (Stage 3a review), § 5.5: "A long path or URL wraps with

@@ -4,8 +4,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { WorkspaceError, type WorkspaceStore } from "../types.ts";
-// The REAL store throws packages/agent's own WorkspaceError, a DIFFERENT
-// class with the same `{ code }` shape (Stage 3d review, blocker 1).
+// The REAL Supabase store throws packages/agent/src/types.ts's own
+// WorkspaceError — a DIFFERENT class from apps/web/src/types.ts's, even
+// though both are named "WorkspaceError" and shaped the same. Stage 3d
+// review, blocking: an `instanceof` check against only one of these two
+// classes silently missed every "missing" throw the OTHER class produced
+// (in production, that's every one — the mock FixtureStore only ever
+// throws apps/web's own class, which is why this bug never showed up
+// against the fixtures). isMissingError must work for either.
 import { WorkspaceError as AgentWorkspaceError } from "../../../../packages/agent/src/types.ts";
 import { isMissingError, storeIo } from "./store-io.ts";
 
@@ -63,36 +69,36 @@ test("store-io: writeFile always throws (pages never write, § 5.2 rule 1)", asy
 });
 
 // ---------------------------------------------------------------------
-// isMissingError — Stage 3d review, blocker 1: the real Supabase store
-// throws packages/agent's OWN WorkspaceError class, not this file's.
+// isMissingError — Stage 3d review, blocking fix: duck-typed on `code`,
+// so "missing is empty" (§ 5.2 rule 6) holds for whichever WorkspaceError
+// class actually threw, real store included.
 // ---------------------------------------------------------------------
 
 test("isMissingError: true for apps/web's own WorkspaceError('resource_missing')", () => {
-  assert.equal(isMissingError(new WorkspaceError("resource_missing", "x")), true);
+  assert.equal(isMissingError(new WorkspaceError("resource_missing", "plan.md")), true);
 });
 
-test("isMissingError: true for packages/agent's WorkspaceError('resource_missing') — the class the REAL store throws", () => {
-  assert.equal(isMissingError(new AgentWorkspaceError("resource_missing", "x")), true);
+test("isMissingError: true for packages/agent's WorkspaceError('resource_missing') — the real store's own class", () => {
+  assert.equal(isMissingError(new AgentWorkspaceError("resource_missing", "plan.md")), true);
 });
 
-test("isMissingError: false for any other code, on either class", () => {
-  assert.equal(isMissingError(new WorkspaceError("outside_workspace", "x")), false);
-  assert.equal(isMissingError(new AgentWorkspaceError("outside_workspace", "x")), false);
-});
-
-test("isMissingError: false for a plain Error, undefined, null, a string, or a bare object with no code", () => {
-  assert.equal(isMissingError(new Error("boom")), false);
-  assert.equal(isMissingError(undefined), false);
-  assert.equal(isMissingError(null), false);
-  assert.equal(isMissingError("resource_missing"), false);
-  assert.equal(isMissingError({}), false);
-});
-
-test("isMissingError: true for a duck-typed plain object (works by shape, not by class)", () => {
+test("isMissingError: true for any plain object shaped the same (pure duck typing)", () => {
   assert.equal(isMissingError({ code: "resource_missing" }), true);
 });
 
-test("store-io: exists(p) treats packages/agent's WorkspaceError('resource_missing') as missing too (the real store's own class)", async () => {
+test("isMissingError: false for a WorkspaceError with a different code", () => {
+  assert.equal(isMissingError(new WorkspaceError("outside_workspace", "plan.md")), false);
+  assert.equal(isMissingError(new AgentWorkspaceError("outside_workspace", "plan.md")), false);
+});
+
+test("isMissingError: false for a plain Error, a string, null, or undefined", () => {
+  assert.equal(isMissingError(new Error("boom")), false);
+  assert.equal(isMissingError("resource_missing"), false);
+  assert.equal(isMissingError(null), false);
+  assert.equal(isMissingError(undefined), false);
+});
+
+test("store-io: exists(p) is false on the REAL store's own WorkspaceError('resource_missing') — the exact production bug (Stage 3d review)", async () => {
   const store: WorkspaceStore = {
     list: async () => [],
     read: async () => {
@@ -106,5 +112,10 @@ test("store-io: exists(p) treats packages/agent's WorkspaceError('resource_missi
     },
   };
   const io = storeIo(store);
-  assert.equal(await io.exists("jobs.md"), false);
+  assert.equal(await io.exists("jobs.md"), false, "must read as missing (empty state), never throw");
+});
+
+test("storeIo.readFile passes text through universalNewlines: a lone-CR file reads as \\n lines", async () => {
+  const io = storeIo(fakeStore({ "jobs.md": "# Pipeline\r## To Review\r### A — PM\r" }));
+  assert.equal(await io.readFile("jobs.md"), "# Pipeline\n## To Review\n### A — PM\n");
 });

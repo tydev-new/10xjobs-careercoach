@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "
 import { Icon } from "../icons.tsx";
 import type { FileInfo, WorkspaceStore } from "../types.ts";
 import { EmptyPage } from "./EmptyPage";
+import { MarkdownView } from "./MarkdownView";
 import {
   applicationKeyForRow,
   competencySection,
@@ -49,11 +50,15 @@ export interface JobsPageProps {
   onAskTen: (label: string) => void;
   onOpenTalkToTen: () => void;
   /** § 5.4: "a Jobs detail's 'Open application' opens Applications with
-   *  the linked entry chosen." Not wired by 3b's own Frame — that full
-   *  cross-page link is Stage 3e's own exit (§ 5.9, once 3d's
-   *  Applications page exists to choose an entry in); `key` is the
-   *  Applications entry's own file key (jobs.ts's `applicationKeyForRow`).
-   *  `undefined` (3b's own default) means the control is never shown. */
+   *  the linked entry chosen." The CONTROL shows whenever an application
+   *  links to the chosen row (jobs.ts's presence check, `has === linked`,
+   *  Stage 3b review) regardless of this prop; `key` is the Applications
+   *  entry's own file key (`applicationKeyForRow`). Full cross-page
+   *  navigation (opening Applications WITH that entry chosen) is Stage
+   *  3e's own exit (§ 5.9, once 3d's Applications page exists to choose
+   *  an entry in) — `undefined` (3b's own default, left unwired in
+   *  Frame.tsx) means the button is present but its click is a no-op
+   *  until 3e provides a handler. */
   onOpenApplication?: (key: string) => void;
   /** § 5.2 rule 4: "While a turn is running, the page shows one neutral
    *  line... reads again when a turn ends while it's showing." */
@@ -101,9 +106,14 @@ function QuickScanBadge({ reason }: { reason: string | null | undefined }): Reac
   return isQuickScan(reason) ? <span className="badge badge--quick-scan">Quick scan</span> : null; // P9
 }
 
+/** § 5.2 rule 7: a `URL:` field always shows — a safe `https://`/`http://`
+ *  value becomes a link (new tab, `rel="noopener noreferrer"`); anything
+ *  else (a `javascript:`/`data:` URL, or any other scheme) shows as
+ *  plain text, never hidden (Stage 3b review, B3: "Never hide it"). */
 function PostingLink({ url, label }: { url: string | null | undefined; label?: string }): ReactElement | null {
+  if (!url) return null;
   const href = safeHref(url);
-  if (!href) return null;
+  if (!href) return <span className="job-url job-url--unsafe">{url}</span>;
   return (
     <a className="job-url" href={href} target="_blank" rel="noopener noreferrer">
       {label ?? href}
@@ -182,25 +192,30 @@ function JobRow({
   const dealbreakers = dealbreakersDisplay(row);
   return (
     <div className={`job-row${selected ? " job-row--selected" : ""}`}>
-      <button type="button" className="job-row-select" aria-current={selected ? "true" : undefined} onClick={onSelect}>
-        <div className="job-row-head">
-          <span className="job-row-title">{roleLabel(row)}</span>
-          {scoreDisplay(row.fit_score) ? <span className="job-row-score">{scoreDisplay(row.fit_score)}</span> : null}
+      <div className="job-row-head">
+        {/* Stage 3b review: a <button> is phrasing content only — no
+            block-level descendants (div/p). Its accessible name is the
+            row's own concise label (company and title, P4); the rest of
+            the row's content sits OUTSIDE it, as this row's own plain
+            (non-interactive) siblings. */}
+        <button type="button" className="job-row-select" aria-current={selected ? "true" : undefined} onClick={onSelect}>
+          {roleLabel(row)}
+        </button>
+        {scoreDisplay(row.fit_score) ? <span className="job-row-score">{scoreDisplay(row.fit_score)}</span> : null}
+      </div>
+      <RowMeta row={row} />
+      <div className="job-row-tier">
+        <TierPill fitVerdict={row.fit_verdict} />
+        <QuickScanBadge reason={row.fit_reason} />
+      </div>
+      {row.fit_reason ? <p className="job-row-reason">{row.fit_reason}</p> : null}
+      {dealbreakers !== undefined ? <p className="job-row-dealbreakers">Dealbreakers: {dealbreakers}</p> : null}
+      {row.dismissed ? (
+        <div className="job-row-dismissed">
+          <p className="job-row-dismissed-from">{dismissedFromLabel(row)}</p>
+          {row.dismiss_note ? <p className="job-row-dismissed-note">{row.dismiss_note}</p> : null}
         </div>
-        <RowMeta row={row} />
-        <div className="job-row-tier">
-          <TierPill fitVerdict={row.fit_verdict} />
-          <QuickScanBadge reason={row.fit_reason} />
-        </div>
-        {row.fit_reason ? <p className="job-row-reason">{row.fit_reason}</p> : null}
-        {dealbreakers !== undefined ? <p className="job-row-dealbreakers">Dealbreakers: {dealbreakers}</p> : null}
-        {row.dismissed ? (
-          <div className="job-row-dismissed">
-            <p className="job-row-dismissed-from">{dismissedFromLabel(row)}</p>
-            {row.dismiss_note ? <p className="job-row-dismissed-note">{row.dismiss_note}</p> : null}
-          </div>
-        ) : null}
-      </button>
+      ) : null}
       <PostingLink url={row.url} />
       <RowControls row={row} onOpenFile={onOpenFile} onAskTen={onAskTen} />
     </div>
@@ -276,16 +291,15 @@ function JobsList({
 // view's files too").
 // ---------------------------------------------------------------------
 
+/** § 5.3: "Each section body goes through `MarkdownView`, word for word"
+ *  (§ 5.2 rule 8, the one viewer's own renderer — never a second,
+ *  hand-rolled splitter, Stage 3b review B2). */
 function FieldSection({ label, section }: { label: string; section: Section | undefined }): ReactElement | null {
   if (!section) return null;
   return (
     <div className="job-detail-section">
       <h3>{label}</h3>
-      <div className="markdown-view">
-        {section.body.split("\n").map((line, i) => (
-          <p key={i}>{line}</p>
-        ))}
-      </div>
+      <MarkdownView content={section.body} />
     </div>
   );
 }
@@ -334,15 +348,25 @@ function JobsDetail({
   const [company, setCompany] = useState<FieldFileState>({ kind: "absent" });
   const [attempt, setAttempt] = useState(0);
   const key = row ? rowKey(row) : undefined;
+  // Stage 3b review, B5: a request token, bumped on every row change (and
+  // every retry). A read that resolves after a NEWER request has started
+  // is a stale read — its result is dropped, never applied over the row
+  // that's showing now (a slow analysis read for row A must never land
+  // under row B's header once B has been chosen).
+  const requestIdRef = useRef(0);
 
   const loadFiles = async (r: JobsMdRow) => {
-    setAnalysis(await loadFieldFile(store, r.analysis_file));
-    setCompany(await loadFieldFile(store, r.company_file));
+    const id = ++requestIdRef.current;
+    const [a, c] = await Promise.all([loadFieldFile(store, r.analysis_file), loadFieldFile(store, r.company_file)]);
+    if (requestIdRef.current !== id) return; // a later row/retry started; drop this one
+    setAnalysis(a);
+    setCompany(c);
   };
 
   useEffect(() => {
     if (row) void loadFiles(row);
     else {
+      requestIdRef.current++; // cancel any read still in flight for the previous row
       setAnalysis({ kind: "absent" });
       setCompany({ kind: "absent" });
     }
@@ -394,14 +418,25 @@ function JobsDetail({
         {dealbreakers !== undefined ? <p className="job-detail-dealbreakers">Dealbreakers: {dealbreakers}</p> : null}
       </div>
 
-      {safeHref(row.url) ? (
+      {row.url ? (
         <div className="job-detail-posting">
           <span className="job-detail-field-label">Posting</span>
           <PostingLink url={row.url} />
         </div>
       ) : null}
 
+      {/* `key={key}`: forces a fresh subtree per row (React's own
+          "resetting state with a key" pattern). Without it, two rows
+          whose section bodies are BOTH plain bullet lists render
+          structurally-identical MarkdownView output (one <ul>, no other
+          block type ever flushes early) — found live: Fernway's "How you
+          fit" list stayed mounted alongside Solstice's own after
+          choosing Fernway then Solstice, because both keyed their sole
+          child "end" and React reused the DOM node in a way that left a
+          stray sibling instead of a clean replace. Never rely on content
+          shape to imply identity; the ROW is the identity here. */}
       <FieldFileBlock
+        key={`${key}-analysis`}
         state={analysis}
         onRetry={() => setAttempt((n) => n + 1)}
         sections={(sections) => (
@@ -413,6 +448,7 @@ function JobsDetail({
       />
 
       <FieldFileBlock
+        key={`${key}-company`}
         state={company}
         onRetry={() => setAttempt((n) => n + 1)}
         sections={(sections) => (
@@ -425,19 +461,35 @@ function JobsDetail({
 
       <div className="job-detail-controls">
         {row.analysis_file ? (
-          <button type="button" className="btn btn--sec" onClick={() => onOpenFile(row.analysis_file as string)}>
+          <button
+            type="button"
+            className="btn btn--sec"
+            onClick={(e) => onOpenFile(row.analysis_file as string, e.currentTarget)}
+          >
             Open analysis
           </button>
         ) : (
           <span className="job-no-analysis">No analysis file linked</span>
         )}
         {row.company_file ? (
-          <button type="button" className="btn btn--sec" onClick={() => onOpenFile(row.company_file as string)}>
+          <button
+            type="button"
+            className="btn btn--sec"
+            onClick={(e) => onOpenFile(row.company_file as string, e.currentTarget)}
+          >
             Open company notes
           </button>
         ) : null}
-        {showOpenApplication && onOpenApplication ? (
-          <button type="button" className="btn btn--sec" onClick={() => onOpenApplication(applicationKey as string)}>
+        {/* § 5.3 detail item 6: shows only on a row an application links
+            to (jobs.ts's presence check, Stage 3b review). Clicking it
+            is a no-op until Stage 3e wires `onOpenApplication` to 3d's
+            Applications page WITH the entry chosen. */}
+        {showOpenApplication ? (
+          <button
+            type="button"
+            className="btn btn--sec"
+            onClick={() => applicationKey && onOpenApplication?.(applicationKey)}
+          >
             Open application
           </button>
         ) : null}
@@ -545,13 +597,15 @@ export function JobsPage({
   }
 
   if (state.kind === "error") {
+    // § 5.2 rule 6 (F40): the loud line names the file, "jobs.md" — never
+    // a generic "your files" (Stage 3b review, B4).
     return (
       <div className="workspace-page">
         <div className="workspace-page-inner">
           {workingLine}
           <div className="page-error-card">
             <Icon name="circleAlert" size={18} />
-            <p className="page-error-message">Couldn't read your files. Try again in a moment.</p>
+            <p className="page-error-message">Couldn't read jobs.md. Try again in a moment.</p>
             <button type="button" className="btn btn--sec" onClick={() => setAttempt((n) => n + 1)}>
               Retry
             </button>

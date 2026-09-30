@@ -15,8 +15,8 @@
 // own posture for a skills/*/scripts/lib import).
 import { load, STAGES } from "../../../../skills/search/scripts/lib/jobs-md.mjs";
 import type { FileInfo, WorkspaceStore } from "../types.ts";
-import { WorkspaceError } from "../types.ts";
-import type { ReadOnlyIo } from "./store-io.ts";
+import { datePart as documentsDatePart } from "./documents.ts";
+import { isMissingError, type ReadOnlyIo } from "./store-io.ts";
 import { pickSection, splitSections, type Section } from "./sections.ts";
 
 /** `load()`'s own row shape (the port's FIELDS table) — only the fields
@@ -113,6 +113,9 @@ export function rowKey(row: Pick<JobsMdRow, "company" | "title">): string {
   return `${row.company}\u0000${row.title}`;
 }
 
+// TODO(3e): import from Cards.tsx once it exports this table (3d, on
+// another branch, per the Stage 3b review) — keeping a second copy here
+// for now, flagged for the lead to reconcile at merge.
 const VERDICT_LABEL: Record<string, string> = {
   strong: "Strong Fit",
   investable_stretch: "Investable Stretch",
@@ -122,10 +125,7 @@ const VERDICT_LABEL: Record<string, string> = {
 
 /** § 2.1's static label table (P5-P8), plus J1's "no verdict" case and
  *  the "an unknown value is shown as written" fallback (§ 5.3 Jobs). The
- *  same four words Cards.tsx's own `VERDICT_LABEL` table uses — kept as
- *  its own copy here (this module stays a plain, `.tsx`-free reader; see
- *  the hand-back note on reconciling the two if a future stage centralizes
- *  it) rather than importing a component file into a pure reader. */
+ *  same four words Cards.tsx's own `VERDICT_LABEL` table uses. */
 export function verdictLabel(fitVerdict: string | null | undefined): string {
   if (!fitVerdict) return "Not evaluated yet"; // J1
   return VERDICT_LABEL[fitVerdict] ?? fitVerdict; // unknown value: as written
@@ -152,13 +152,14 @@ export function scoreDisplay(score: number | null | undefined): string | undefin
 }
 
 /** The date part of an ISO field, as written (`2026-09-22`, never
- *  reformatted) — documents.ts's own `datePart`, kept as its own copy
- *  here for the same reason `verdictLabel` is (a pure-reader module, no
- *  cross-page-module import for one line of logic). `undefined` when the
- *  field itself is absent (Posted is very often unset; Evaluated only
- *  ever exists once a verdict has been recorded). */
+ *  reformatted) — reuses documents.ts's own `datePart` (Stage 3b review:
+ *  reuse instead of copying) rather than a second copy of the same one
+ *  line. `undefined` when the field itself is absent (Posted is very
+ *  often unset; Evaluated only ever exists once a verdict has been
+ *  recorded) — documents.ts's own version takes a required string, since
+ *  every `FileInfo.updatedAt` it reads always has one. */
 export function datePart(iso: string | null | undefined): string | undefined {
-  return iso ? iso.slice(0, 10) : undefined;
+  return iso ? documentsDatePart(iso) : undefined;
 }
 
 /** P4: "<Company> — <Title>", the role's label as written. */
@@ -212,7 +213,7 @@ export async function loadFieldFile(
     const content = file.binary ? "" : file.content;
     return { kind: "ready", path, sections: splitSections(content) };
   } catch (err) {
-    if (err instanceof WorkspaceError && err.code === "resource_missing") {
+    if (isMissingError(err)) {
       return { kind: "missing", path };
     }
     return { kind: "error", path };
@@ -251,10 +252,12 @@ export function cultureSection(sections: Section[]): Section | undefined {
 // with the same slug evaluate used for the analysis." Full cross-page
 // navigation (opening Applications WITH that entry chosen) is Stage 3e's
 // own exit (§ 5.9: "page-to-page links"), once 3d's Applications page
-// exists to choose an entry in. FLAGGED FOR THE LEAD: once
-// `groupApplications` lands (3d), consider replacing `hasLinkedApplication`
-// below with a shared export of its own suffix table, so the two can
-// never silently diverge (rule 12).
+// exists to choose an entry in — `onOpenApplication` stays unwired in
+// Frame.tsx until then; the control shows (Stage 3b review requires
+// `has === linked`) but clicking it is a no-op until 3e wires a handler.
+// FLAGGED FOR THE LEAD: once `groupApplications` lands (3d), consider
+// replacing `hasLinkedApplication` below with a shared export of its own
+// suffix table, so the two can never silently diverge (rule 12).
 // ---------------------------------------------------------------------
 
 const APPLICATION_SUFFIXES = [

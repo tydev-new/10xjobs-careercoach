@@ -230,11 +230,11 @@ export function Frame(props: FrameProps): ReactElement {
               onOpenFile={onOpenFile}
               onAskTen={askTenAbout}
               onOpenTalkToTen={openTalkToTen}
-              // "Open application" (§ 5.4): full cross-page linking (the
-              // Applications entry CHOSEN) is Stage 3e's own exit, once
-              // 3d's Applications page exists to choose an entry in —
-              // this only opens the page today.
-              onOpenApplication={() => navigate("applications")}
+              // "Open application" (§ 5.4) stays unwired here (Stage 3b
+              // review, lead ruling): the control is hidden until Stage
+              // 3e can wire it to 3d's Applications page WITH the entry
+              // chosen — a page that only opens Applications, with no
+              // entry, would be a half-built link (rule 8).
               turnRunning={status.state === "thinking" || status.state === "working"}
             />
           ) : page === "applications" ? (

@@ -14,6 +14,23 @@
 import type { WorkspaceStore } from "../types.ts";
 import { WorkspaceError } from "../types.ts";
 
+// Lead ruling (Stage 3d review, blocker 1): the REAL store
+// (supabase-workspace-store.ts) throws `packages/agent`'s own
+// `WorkspaceError` class, not this file's — two different classes with
+// the same `{ code }` shape (apps/web/src/types.ts and
+// packages/agent/src/types.ts each declare their own). An `instanceof`
+// check against only one of them silently treats a genuinely MISSING
+// file as an unreadable error on the real store, against § 5.2 rule 6
+// ("missing is empty"). `isMissingError` checks by SHAPE (duck-typed:
+// any object carrying `code === "resource_missing"`), not by which
+// class threw it — the one check every "is this file just missing?"
+// site in the workspace/ layer uses, on both classes and both stores.
+// Home's own reader adds this identical helper to this same file, word
+// for word, so the two builds merge without disagreeing on it.
+export function isMissingError(err: unknown): boolean {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code: unknown }).code === "resource_missing";
+}
+
 export interface ReadOnlyIo {
   exists(path: string): Promise<boolean>;
   readFile(path: string): Promise<string>;
@@ -27,7 +44,7 @@ export function storeIo(store: WorkspaceStore): ReadOnlyIo {
         await store.read(path);
         return true;
       } catch (err) {
-        if (err instanceof WorkspaceError && err.code === "resource_missing") return false;
+        if (isMissingError(err)) return false;
         throw err;
       }
     },

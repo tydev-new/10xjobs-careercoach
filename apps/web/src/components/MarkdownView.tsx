@@ -104,7 +104,17 @@ export function MarkdownView({ content }: { content: string }): ReactElement {
     }
     flushList(key);
     if (line.trim() === "") {
-      blocks.push(<div key={key} className="md-gap" />);
+      // A distinct key from `key` alone (Stage 3b review, found live): a
+      // blank line right after a list or table flushes THAT block with
+      // `key` on the very same line index, then this gap div would push
+      // a SECOND sibling under the identical key — React key collisions
+      // are undefined behavior on an UPDATE (a later render with
+      // different content can leave the earlier render's node stuck
+      // alongside the new one instead of replacing it, exactly the
+      // symptom that surfaced choosing one Jobs detail row then another
+      // whose analysis file also ends its section with a blank line
+      // after a bullet list, the common case for every evaluate file).
+      blocks.push(<div key={`${key}-gap`} className="md-gap" />);
     } else {
       blocks.push(<p key={key}>{inline(line, key)}</p>);
     }

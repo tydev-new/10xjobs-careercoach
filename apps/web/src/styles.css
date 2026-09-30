@@ -2524,16 +2524,21 @@ summary.job-group-head {
   box-shadow: inset 0 0 0 2px var(--lime-ink);
 }
 
+/* Stage 3b review: a <button> is phrasing content only (no block-level
+   descendant) — the row's title IS the button's own text, styled like
+   the old `.job-row-title` span it replaces; the rest of the row sits
+   outside it as plain siblings (§ 5.5's whole-row tap target is
+   `.job-row-select` alone, at least 44px tall). */
 .job-row-select {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  width: 100%;
   padding: 0;
+  min-height: 44px; /* § 5.5 tap-target floor at 760px or less */
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
   text-align: left;
-  color: inherit;
+  font: var(--type-card-title);
+  color: var(--fg);
 }
 
 .job-row-head {
@@ -2541,11 +2546,6 @@ summary.job-group-head {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
-}
-
-.job-row-title {
-  font: var(--type-card-title);
-  color: var(--fg);
 }
 
 .job-row-score {
@@ -2601,6 +2601,12 @@ summary.job-group-head {
   font: var(--type-meta);
   color: var(--fg-muted);
   overflow-wrap: anywhere;
+}
+
+/* § 5.2 rule 7: an unsafe URL (Stage 3b review, B3) — shown, never a
+   link, so it carries no tap-target floor (it isn't a control). */
+.job-url--unsafe {
+  min-height: 0;
 }
 
 .job-row-controls {
@@ -2740,6 +2746,13 @@ summary.job-group-head {
 
   .jobs-page--detail .job-back-button {
     display: inline-flex;
+  }
+
+  /* Stage 3b review, B6: the Dismissed group's own <summary> is an
+     interactive control (it toggles open/closed) — § 5.5's 44px
+     tap-target floor applies to it same as any other button. */
+  summary.job-group-head {
+    min-height: 44px;
   }
 }
 

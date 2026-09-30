@@ -13,6 +13,8 @@ export { createCoach, ERROR_MESSAGES } from "./coach.ts";
 export { matchGateReply, statusOf, parsePlanTodo, latestGateStatuses, gateIdsWithCards } from "./helpers.ts";
 export type { GateReplyResult, ChatStatus, PlanTodoItem } from "./helpers.ts";
 export { readPlanBoard, splitPlanMinutes, budgetMinutesPerDay } from "./plan-board.ts";
+export { rowAnalysisFile } from "./analysis-file.ts";
+export type { AnalysisFileRow } from "./analysis-file.ts";
 export type { PlanBoard, PlanBoardItem, PlanBoardLabel, PlanBoardSection, PlanMinutes } from "./plan-board.ts";
 export { createInMemoryWorkspaceStore } from "./workspace/in-memory-store.ts";
 export { validateRef, isReadOnlyPath, isEditableExt, isUploadExt } from "./workspace/path-rules.ts";

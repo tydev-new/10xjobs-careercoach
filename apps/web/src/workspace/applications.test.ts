@@ -203,6 +203,27 @@ test("linkedApplicationRow: a row with no Analysis field at all never matches", 
   assert.equal(linkedApplicationRow(entry, rows), undefined);
 });
 
+test("linkedApplicationRow: a legacy row (JD: jd-analysis/<key>.md, no Analysis) joins (C § 6.2, issue #32)", () => {
+  const entry: ApplicationEntry = { key: "acme-staff-pm", files: [] };
+  const rows = [
+    { company: "Globex", analysis_file: "jd-analysis/globex-pm.md" },
+    { company: "Acme", jd_file: "jd-analysis/acme-staff-pm.md" },
+  ];
+  assert.equal(linkedApplicationRow(entry, rows), rows[1]);
+});
+
+test("linkedApplicationRow: a JD under jd-inbox/ (the raw posting) never joins", () => {
+  const entry: ApplicationEntry = { key: "acme-staff-pm", files: [] };
+  const rows = [{ company: "Acme", jd_file: "jd-inbox/acme-staff-pm.md" }];
+  assert.equal(linkedApplicationRow(entry, rows), undefined);
+});
+
+test("linkedApplicationRow: a row's Analysis field wins over its legacy JD", () => {
+  const entry: ApplicationEntry = { key: "acme-staff-pm", files: [] };
+  const rows = [{ company: "Acme", analysis_file: "jd-analysis/acme-other.md", jd_file: "jd-analysis/acme-staff-pm.md" }];
+  assert.equal(linkedApplicationRow(entry, rows), undefined);
+});
+
 // ---------------------------------------------------------------------
 // readApplicationTables — C § 19's proposalRows, wrapped with the page's
 // own universalNewlines-in / restoreLineSeparators-out (§ 18's posture).

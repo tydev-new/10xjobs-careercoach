@@ -27,7 +27,7 @@ test("workspace-pages fixture: pipelineCounts — one count per stage, one dismi
   const store = new FixtureStore(FIXTURE);
   const counts = await pipelineCounts(storeIo(store));
   assert.deepEqual(counts.stages, [
-    { label: "To Review", count: 1 },
+    { label: "To Review", count: 2 }, // Cascadia + Kestrel (the legacy row, issue #32)
     { label: "Interested", count: 1 },
     { label: "Applied", count: 1 },
     { label: "Interviewing", count: 1 },

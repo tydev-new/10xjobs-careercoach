@@ -12,6 +12,7 @@ import { Icon } from "../icons.tsx";
 import type { FileInfo, WorkspaceStore } from "../types.ts";
 import { EmptyPage } from "./EmptyPage";
 import { MarkdownView } from "./MarkdownView";
+import { rowAnalysisFile } from "../../../../packages/agent/src/analysis-file.ts";
 import {
   applicationKeyForRow,
   competencySection,
@@ -146,15 +147,18 @@ function RowControls({
   onOpenFile: (path: string, opener?: HTMLElement) => void;
   onAskTen: (label: string) => void;
 }): ReactElement {
+  // The row's analysis file (C § 6.2, issue #32): its Analysis field, else a
+  // legacy `JD: jd-analysis/…` — the one reader, never `analysis_file`.
+  const analysisFile = rowAnalysisFile(row);
   return (
     <div className="job-row-controls">
-      {row.analysis_file ? (
+      {analysisFile ? (
         <button
           type="button"
           className="btn btn--sec"
           onClick={(e) => {
             e.stopPropagation();
-            onOpenFile(row.analysis_file as string, e.currentTarget);
+            onOpenFile(analysisFile, e.currentTarget);
           }}
         >
           Open analysis
@@ -369,7 +373,7 @@ function JobsDetail({
 
   const loadFiles = async (r: JobsMdRow) => {
     const id = ++requestIdRef.current;
-    const [a, c] = await Promise.all([loadFieldFile(store, r.analysis_file), loadFieldFile(store, r.company_file)]);
+    const [a, c] = await Promise.all([loadFieldFile(store, rowAnalysisFile(r)), loadFieldFile(store, r.company_file)]);
     if (requestIdRef.current !== id) return; // a later row/retry started; drop this one
     setFiles({ key: rowKey(r), analysis: a, company: c });
   };
@@ -394,6 +398,8 @@ function JobsDetail({
 
   const dealbreakers = dealbreakersDisplay(row);
   const applicationKey = applicationKeyForRow(row);
+  // The row's analysis file (C § 6.2, issue #32) — the one reader.
+  const analysisFile = rowAnalysisFile(row);
   const showOpenApplication = applicationKey !== undefined && hasLinkedApplication(applicationFiles, applicationKey);
 
   return (
@@ -470,11 +476,11 @@ function JobsDetail({
       />
 
       <div className="job-detail-controls">
-        {row.analysis_file ? (
+        {analysisFile ? (
           <button
             type="button"
             className="btn btn--sec"
-            onClick={(e) => onOpenFile(row.analysis_file as string, e.currentTarget)}
+            onClick={(e) => onOpenFile(analysisFile, e.currentTarget)}
           >
             Open analysis
           </button>

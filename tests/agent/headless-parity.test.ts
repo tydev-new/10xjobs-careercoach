@@ -222,3 +222,40 @@ test("model parity: a headless DeepSeek request carries what ten-model-proxy sen
   assert.equal(body.cache_control, undefined, JSON.stringify(body.cache_control));
   assert.equal(body.max_tokens, 8192);
 });
+
+// Round 2 (83b9319): the headless request, fed through the proxy's OWN
+// buildUpstreamBody, comes out with the same routing fields it went in
+// with — i.e. headless sends upstream exactly what production would for
+// provider / cache_control / max_tokens / model, for both allowed models.
+// And nothing else the proxy would strip is present in the headless body.
+import { buildUpstreamBody, MODEL_IDS } from "../../supabase/functions/ten-model-proxy/core.ts";
+
+for (const model of MODEL_IDS) {
+  test(`model parity (${model}): headless body's routing fields == buildUpstreamBody(headless body)`, () => {
+    const r = runHeadless("echo hi", { OPENROUTER_API_KEY: FAKE_KEY }, model);
+    assert.equal(r.status, 0, r.all);
+    assert.ok(r.requests.length >= 1, r.all);
+    const sent = JSON.parse(r.requests[0].body);
+    const built = buildUpstreamBody(sent) as any;
+    assert.equal(built.ok, true, JSON.stringify(built));
+    const up = built.body;
+    assert.equal(sent.model, up.model);
+    assert.deepEqual(sent.provider, up.provider);
+    assert.equal("cache_control" in sent, "cache_control" in up);
+    assert.deepEqual(sent.cache_control, up.cache_control);
+    assert.equal(sent.max_tokens, up.max_tokens);
+    assert.equal(sent.stream, true);
+    // every field the proxy would drop — the headless body must carry none
+    const dropped = Object.keys(sent).filter((k) => !(k in up));
+    assert.deepEqual(dropped, [], `headless sends fields production strips: ${dropped.join(", ")}`);
+    assert.deepEqual(sent.tools?.length, up.tools?.length, "every tool is a function tool (none stripped)");
+  });
+}
+
+test("allowlist: a --model outside MODEL_IDS is refused before any request, even with a key", () => {
+  const r = runHeadless("echo hi", { OPENROUTER_API_KEY: FAKE_KEY }, "openai/gpt-5");
+  assert.equal(r.status, 2, r.all);
+  assert.match(r.stderr, /--model/);
+  assert.equal(r.requests.length, 0);
+  assert.ok(!r.all.includes(FAKE_KEY));
+});

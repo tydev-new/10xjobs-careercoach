@@ -295,6 +295,83 @@ export interface FetchJobOutputUnsupported {
 }
 export type FetchJobOutput = FetchJobOutputOk | FetchJobOutputUnsupported;
 
+// ---------------------------------------------------------------------
+// § 4.1/§ 4.2 (design-web-search.md) — list_board / add_roles
+// ---------------------------------------------------------------------
+
+export interface BoardRef {
+  url: string;
+  company: string;
+}
+
+export interface ListBoardInput {
+  boards: BoardRef[]; // 1-10
+  titleWords?: string[]; // <= 12, each <= 4 words
+  postedWithinDays?: number; // whole number, 1-365
+}
+
+export interface ListBoardPosting {
+  posting: string;
+  title: string;
+  location: string;
+  postedAt?: string;
+}
+
+export type BoardReadStatus = "ok" | "empty" | "not_found" | "unsupported_url" | "error" | "request_limit";
+
+export interface ListBoardBoardResult {
+  url: string;
+  company: string;
+  status: BoardReadStatus;
+  boardName?: string; // the board's own name, where the API gives one
+  total: number; // postings on the board (SmartRecruiters: totalFound)
+  read: number; // postings actually read (SmartRecruiters stops at 300)
+  matched: number; // after titleWords and postedWithinDays
+  alreadyInJobList: number;
+  shown: number;
+  postings: ListBoardPosting[];
+  gone: { company: string; title: string }[];
+}
+
+export interface ListBoardOutput {
+  boards: ListBoardBoardResult[];
+  requestsLeftThisTurn: number;
+}
+
+export interface AddRolesRole {
+  posting: string;
+  company: string;
+}
+
+export interface AddRolesInput {
+  roles: AddRolesRole[]; // 1-20
+}
+
+export type AddRolesFailureReason =
+  | "unsupported_url"
+  | "not_found"
+  | "company_mismatch"
+  | "empty_field"
+  | "company_limit"
+  | "active_cap"
+  | "error"
+  | "request_limit";
+
+export interface AddRolesFailure {
+  posting: string;
+  reason: AddRolesFailureReason;
+  // Additive beyond § 4.2's own wire shape (naming both companies on a
+  // company_mismatch, per its own "Proved by" line) — never required by a
+  // caller, so it can't break the documented contract.
+  message?: string;
+}
+
+export interface AddRolesOutput {
+  added: { company: string; title: string; url: string }[];
+  alreadyInJobList: { company: string; title: string; stage: string }[];
+  failed: AddRolesFailure[];
+}
+
 export interface EstimateCostInput {
   action: string;
   steps: number;

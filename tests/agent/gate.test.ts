@@ -258,7 +258,23 @@ test("no tool sends or submits: the registered tool set is exactly § 4's table"
   const m = scriptedModel([textStep("hi")]);
   await runTurn(makeCoach({ model: m.model }).coach, "c1", [user("u1", "hi")]);
   const names = (m.calls[0].tools ?? []).map((t: any) => t.name).sort();
-  assert.deepEqual(names, ["bash", "check_language", "estimate_cost", "fetch_job", "list_files", "load_skill", "read_file", "web_search", "write_file"]);
+  // design-web-search.md § 7.4 (S2): design-web-agent.md § 4's tool table
+  // gains list_board and add_roles rows — the two-tool growth here is
+  // that contract landing, not a loosened check; every other name (and
+  // "no send/submit tool") is unchanged.
+  assert.deepEqual(names, [
+    "add_roles",
+    "bash",
+    "check_language",
+    "estimate_cost",
+    "fetch_job",
+    "list_board",
+    "list_files",
+    "load_skill",
+    "read_file",
+    "web_search",
+    "write_file",
+  ]);
 });
 
 test("step cap: defaults to 25 steps, then a step_cap data-error (§ 1 stopWhen: stepCountIs(maxSteps))", async () => {

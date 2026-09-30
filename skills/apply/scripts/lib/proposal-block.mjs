@@ -28,6 +28,77 @@ function table(lines, header) {
   return rows;
 }
 
+// proposalRows — docs/design-web-agent.md § 19 (the restore ruling): the
+// Applications page's own reader of an application file's two tables. It
+// does EXACTLY what run() did, between reading the file and building the
+// reply, before this export existed: the `\|`-strip, pySplitlines, each
+// line trimmed, table(lines, COVERAGE_HEADER) and table(lines,
+// SELECTION_HEADER), and the same in/out test run() already used. `run()`
+// (below) is re-expressed through this export so there is exactly one
+// reader of the file's tables (rule 12) — its own output is unchanged
+// (every place it read coverage/selection rows already filtered by cell
+// count, so a row this function now routes to `unreadable` never reached
+// run()'s output either way).
+//
+// A row under either header whose cell count isn't the table's own (4 for
+// Coverage, 7 for Selection) is dropped from `coverage`/`cuts`/`kept` and
+// added to `unreadable`, AS SPLIT (the page joins the cells back with
+// " | " when it shows them, design-web-ui.md § 5.2 rule 6) — never
+// dropped outright, so a malformed row is said, not silently lost. A
+// 7-cell Selection row whose in/out cell is neither `in` nor `out` (after
+// the port's own `` `*_ `` strip) is simply not `cuts` or `kept` — that
+// matches run()'s own behaviour today, which never flagged such a row
+// either.
+// **A coverage status is matched once, here** (lead ruling, 2026-09-29,
+// docs/workspace-review-drift). `run()` used to re-derive a status cell's
+// normalised form in three separate places (`stripChars(r[1].toLowerCase(),
+// "`*_ ")`) — a second normalisation the page would have had to copy
+// exactly to agree with the reply. `statuses[i]` is coverage[i]'s own
+// normalised status, computed once, here; `run()` (below) uses it in all
+// three places instead of normalising again, and the page keys its status
+// label table on it too (never the raw cell) — so `**gap**`, `` `gap` ``
+// and `Gap` all read `gap` everywhere, page and reply alike.
+export function proposalRows(text) {
+  const raw = text.split("\\|").join("");
+  const lines = pySplitlines(raw).map((l) => l.trim());
+  const covAll = table(lines, COVERAGE_HEADER);
+  const selAll = table(lines, SELECTION_HEADER);
+  const unreadable = [];
+
+  let coverage = null;
+  let statuses = null;
+  if (covAll !== null) {
+    coverage = [];
+    statuses = [];
+    for (const r of covAll) {
+      if (r.length === 4) {
+        coverage.push(r);
+        statuses.push(stripChars(r[1].toLowerCase(), "`*_ "));
+      } else {
+        unreadable.push(r);
+      }
+    }
+  }
+
+  let cuts = null;
+  let kept = null;
+  if (selAll !== null) {
+    cuts = [];
+    kept = [];
+    for (const r of selAll) {
+      if (r.length !== 7) {
+        unreadable.push(r);
+        continue;
+      }
+      const io = stripChars(r[3].toLowerCase(), "`*_ ");
+      if (io === "out") cuts.push(r);
+      else if (io === "in") kept.push(r);
+    }
+  }
+
+  return { coverage, statuses, cuts, kept, unreadable };
+}
+
 function stem(w) {
   w = w.toLowerCase();
   const sufs = ["ations", "ation", "ings", "ing", "ies", "ers", "er", "ed", "es", "s"];
@@ -72,25 +143,28 @@ export async function run(argv, io) {
   } catch (e) {
     return crashToTraceback("", e);
   }
-  const raw = rawFile.split("\\|").join("");
-  const lines = pySplitlines(raw).map((l) => l.trim());
   const baseText = (await io.exists(bpath)) ? await io.readFile(bpath) : "";
   const baseStems = new Set(contentWords(baseText).map(stem));
 
   const findings = [];
   const out = [];
-  const cov = table(lines, COVERAGE_HEADER);
-  const sel = table(lines, SELECTION_HEADER);
+  // § 19 (the restore ruling): run() reads the file's two tables through
+  // the same `proposalRows` export the Applications page uses — one
+  // reader of the file, never two (rule 12). `cov`/`outs`/`ins` are
+  // exactly what `table(lines, COVERAGE_HEADER)`/the old inline `sel`
+  // filters returned before this change: every row below is already
+  // filtered to the right cell count, so this output is unchanged.
+  const { coverage: cov, statuses, cuts, kept } = proposalRows(rawFile);
   if (cov === null) findings.push(["FAIL", "no coverage table under the declared header — write it to the file first"]);
-  if (sel === null) findings.push(["FAIL", "no selection table under the declared header — write it to the file first"]);
+  if (cuts === null) findings.push(["FAIL", "no selection table under the declared header — write it to the file first"]);
 
   // The block is the candidate's DECISIONS, short, beside the delivered
   // document (founder 2026-08-21: deliver first, disclose beside, silence
   // is a yes). The full seven-column tables stay in the file as the
   // record; ~20 trials showed a 26-row table never reaches a reply.
-  if (sel !== null) {
-    const outs = sel.filter((r) => r.length === 7 && stripChars(r[3].toLowerCase(), "`*_ ") === "out");
-    const ins = sel.filter((r) => r.length === 7 && stripChars(r[3].toLowerCase(), "`*_ ") === "in");
+  if (cuts !== null) {
+    const outs = cuts;
+    const ins = kept;
     if (outs.length) {
       out.push(`**Cut — ${outs.length} of ${outs.length + ins.length} bullets, weakest first.** Say "keep" and the bullet's name or number to bring one back.`);
       outs.forEach((r, idx) => {
@@ -119,8 +193,12 @@ export async function run(argv, io) {
   }
 
   if (cov !== null) {
-    const sbu = cov.filter((r) => r.length === 4 && stripChars(r[1].toLowerCase(), "`*_ ") === "shown-but-unnamed");
-    const gaps = cov.filter((r) => r.length === 4 && stripChars(r[1].toLowerCase(), "`*_ ") === "gap");
+    // statuses[i] is coverage[i]'s own normalised status (the port's
+    // single `stripChars(...toLowerCase(), "`*_ ")` pass, computed once
+    // in proposalRows above) — every row in `cov` already has exactly 4
+    // cells, so this index always lines up.
+    const sbu = cov.filter((r, i) => statuses[i] === "shown-but-unnamed");
+    const gaps = cov.filter((r, i) => statuses[i] === "gap");
     if (sbu.length) {
       out.push("");
       out.push('**Their words, placed** — say "Summary", "Skills", or "leave it out" to move any of these:');
@@ -137,10 +215,9 @@ export async function run(argv, io) {
         out.push(`- ${r[0]} — ${ev}`);
       }
     }
-    for (const r of cov) {
-      if (r.length !== 4) continue;
+    for (const [i, r] of cov.entries()) {
       const req = r[0];
-      const status = stripChars(r[1].toLowerCase(), "`*_ ");
+      const status = statuses[i];
       if (status === "have" && baseText) {
         const missing = contentWords(req).filter((w) => !baseStems.has(stem(w)));
         if (missing.length) {

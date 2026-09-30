@@ -13,7 +13,10 @@ import type {
 import { formatUsd } from "../format.ts";
 import { Icon } from "../icons.tsx";
 
-const VERDICT_LABEL: Record<string, string> = {
+// § 2.1's own tier-label table — exported so Home, Jobs and Applications
+// (design-web-ui.md § 5.3: "tier label (§ 2.1's table)", P5-P8) reuse this
+// ONE table instead of each page keeping its own copy (rule 12).
+export const VERDICT_LABEL: Record<string, string> = {
   strong: "Strong Fit",
   investable_stretch: "Investable Stretch",
   long_shot: "Long-Shot Stretch",
@@ -29,9 +32,19 @@ function OpenInPanel({ onOpen }: { onOpen: () => void }): ReactElement {
 }
 
 // § 5.6, "Cards — Tier pills": the words carry the meaning, color only
-// marks the category. Strong Fit alone gets the check icon.
-function TierPill({ verdict }: { verdict: string }): ReactElement {
-  const label = VERDICT_LABEL[verdict] ?? verdict;
+// marks the category. Strong Fit alone gets the check icon. Exported for
+// the same reason as VERDICT_LABEL above (§ 5.3: Home, Jobs and
+// Applications all show this pill from the same row/card data).
+export function TierPill({ verdict }: { verdict: string }): ReactElement {
+  // Object.hasOwn, not a plain index + `?? verdict`: a verdict string that
+  // happens to spell an inherited Object.prototype property name
+  // (`constructor`, `toString`, `hasOwnProperty`, `__proto__`) would read
+  // back that PROPERTY (a function, or the prototype itself), not
+  // `undefined` — `?? verdict` never catches that, and React crashes
+  // trying to render a function as a child (found live, this review's own
+  // build). A row-written word must always show as written when it isn't
+  // one of § 2.1's own four keys, never a JS-object accident.
+  const label = Object.hasOwn(VERDICT_LABEL, verdict) ? VERDICT_LABEL[verdict] : verdict;
   return (
     <span className={`tier-pill tier-pill--${verdict}`}>
       {verdict === "strong" ? <Icon name="check" size={13} /> : null}

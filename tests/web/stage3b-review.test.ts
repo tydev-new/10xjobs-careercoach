@@ -595,7 +595,15 @@ test("§ 5.9 3b exit 'the detail's sections equal the fixture files' sections st
         continue;
       }
       checked++;
-      const md: string = await page.evaluate((src) => (window as any).__md(src), want.body);
+      // MarkdownView's markup, re-serialized by the DOM (a <template>) so both
+      // sides use the same serializer: React's renderToStaticMarkup escapes a
+      // text-node `"` as `&quot;`, the live DOM's innerHTML leaves it as `"`
+      // (lead-authorized fix, round 2). Still exactly MarkdownView's markup.
+      const md: string = await page.evaluate((src) => {
+        const t = document.createElement("template");
+        t.innerHTML = (window as any).__md(src);
+        return t.innerHTML;
+      }, want.body);
       if (!shown.html.includes(md)) bad.push(`${j.heading} "${label}": not the MarkdownView rendering of ${file}'s "${want.heading}" section`);
       const mdText = await page.evaluate((h) => { const d = document.createElement("div"); d.innerHTML = h; return (d.textContent ?? "").replace(/\s+/g, " ").trim(); }, md);
       if (shown.text !== mdText) bad.push(`${j.heading} "${label}": text ${JSON.stringify(shown.text.slice(0, 90))}… != ${JSON.stringify(mdText.slice(0, 90))}…`);
@@ -943,6 +951,38 @@ test("§ 5.3 detail + § 5.2 rule 4 (restore ruling: read when the row is chosen
   assert.ok(shown, "no J9 section");
   assert.ok(!shown!.text.includes(firstLine(aWant.body)), `${b.heading}'s detail shows ${a.heading}'s "${S("J9")}" (a read that resolved late overwrote it)`);
   assert.ok(shown!.text.includes(firstLine(bWant.body)), `${b.heading}'s "${S("J9")}" is not its own file's section`);
+});
+
+test("§ 5.3 detail under latency, while the new row's read is still in flight (real shell, 1440): the previous row's sections never show under the newly chosen row's header", async () => {
+  const withBoth = JOBS.filter((j) => j.group !== "Dismissed" && j.fields.get("Analysis")! in FILES && j.fields.get("Company file")! in FILES);
+  const [a, b] = withBoth;
+  const bFile = b.fields.get("Analysis")!;
+  const ctx = await ctxFor(DESK);
+  const r = await openReal(ctx, FILES);
+  const page = r.page;
+  await go(page, "Jobs");
+  await chooseRow(page, a.heading); // A's sections are showing
+  const aShown = await detailSection(page, S("J9"));
+  assert.ok(aShown, `no J9 for ${a.heading}`);
+  // B's analysis read now takes 2 s
+  await page.evaluate((slow) => {
+    const inner = (window as any).__inner;
+    const orig = inner.read.bind(inner);
+    inner.read = async (p: string) => {
+      if (p === slow) await new Promise((res) => setTimeout(res, 2000));
+      return orig(p);
+    };
+  }, bFile);
+  await pane(page).locator(".jobs-list-pane").getByText(b.heading, { exact: true }).first().click();
+  await page.waitForTimeout(400); // B chosen, its read not back yet
+  const head = squash(await detail(page).innerText());
+  const during = await detailSection(page, S("J9"));
+  await page.waitForTimeout(2200);
+  const settled = await detailSection(page, S("J9"));
+  await ctx.close();
+  assert.ok(head.includes(b.heading), `the detail is not ${b.heading}`);
+  assert.ok(!during || during.text !== aShown!.text, `for 2 s ${b.heading}'s header shows ${a.heading}'s "${S("J9")}" (the previous row's read result stays on screen)`);
+  assert.ok(settled && settled.text !== aShown!.text, `${b.heading} never shows its own "${S("J9")}"`);
 });
 
 test("§ 5.3.1 J19 is not in the bundle before web search S5 (C1): neither J19 nor 'Ask Ten to look for roles' appears in the built JS", () => {

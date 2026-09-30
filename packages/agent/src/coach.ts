@@ -635,11 +635,16 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
   function recordStepCost(step: { providerMetadata?: any }): void {
     // § 13.3: the fallback (when the stream reports no cost at all) is
     // the ACTIVE model's own median, not always Claude's.
-    const measuredUsd = step.providerMetadata?.openrouter?.usage?.cost ?? fallbackStepMedianUsd;
+    const reportedUsd = step.providerMetadata?.openrouter?.usage?.cost;
+    const measuredUsd = reportedUsd ?? fallbackStepMedianUsd;
     const sample: StepCostSample = { usd: measuredUsd };
     turnState.measuredSteps.push(sample);
     state.chatMeasuredSteps.push(sample);
     turnState.spentSoFarUsd += measuredUsd;
+    // The same per-step value, handed out once per recorded step (null
+    // when the provider reported none — the fallback above is an
+    // estimate, never passed off as a measured cost).
+    deps.onStepCost?.({ reportedUsd: typeof reportedUsd === "number" ? reportedUsd : null });
   }
 
   // ONE combined stop condition per call (not an array) so its side

@@ -14,6 +14,35 @@ export const DEEPSEEK_MODEL_ID = "deepseek/deepseek-v4.1-flash";
 export const MODEL_IDS = [CLAUDE_MODEL_ID, DEEPSEEK_MODEL_ID] as const;
 export type ModelId = (typeof MODEL_IDS)[number];
 
+/** The per-model upstream routing decision (§ 13.1), in ONE place:
+ *  buildUpstreamBody uses it for every proxied call, and the headless
+ *  runner (packages/agent/bin/run.mjs, issue #33) imports it so a
+ *  headless measurement sends what production sends upstream. Pure, no
+ *  imports — loadable from Deno and Node alike. Returns fresh objects on
+ *  every call (callers put them straight into a request body). */
+export interface UpstreamModelOptions {
+  /** The max_tokens cap (the proxy clamps a client's value to it). */
+  maxTokens: number;
+  provider: { data_collection: "deny"; zdr: true; require_parameters?: true };
+  /** Present for Claude only. */
+  cacheControl?: { type: "ephemeral" };
+}
+
+export function upstreamModelOptions(model: ModelId): UpstreamModelOptions {
+  // § 13.1: DeepSeek gets `require_parameters: true` (OpenRouter routes a
+  // `tools` request to tool hosts only "best effort", weighted toward the
+  // cheapest — the cheapest no-data-kept DeepSeek host, DekaLLM, lists no
+  // tool support). Claude does not get it: every Claude host supports
+  // tools, and its body must stay byte-identical to before § 13.
+  // § 13.1: no `cache_control` for DeepSeek at all (OpenRouter's prompt
+  // caching docs list top-level `cache_control` for Anthropic/Vertex/
+  // Azure/Bedrock only; DeepSeek caching, if any, is automatic).
+  if (model === DEEPSEEK_MODEL_ID) {
+    return { maxTokens: MAX_TOKENS_CAP, provider: { data_collection: "deny", zdr: true, require_parameters: true } };
+  }
+  return { maxTokens: MAX_TOKENS_CAP, provider: { data_collection: "deny", zdr: true }, cacheControl: { type: "ephemeral" } };
+}
+
 /** Kept for callers that only ever spoke of one model (pre-§ 13 tests,
  *  code that hasn't been touched by § 13 yet): the fallback model — the
  *  one Claude Sonnet 5 is the "measured model; the fallback" (§ 13's own
@@ -172,21 +201,11 @@ export function buildUpstreamBody(input: unknown): BuildResult {
   if ("temperature" in client) out.temperature = client.temperature;
 
   out.model = model;
-  out.max_tokens = clampPositiveInt(client.max_tokens, MAX_TOKENS_CAP, MAX_TOKENS_CAP);
+  const opts = upstreamModelOptions(model);
+  out.max_tokens = clampPositiveInt(client.max_tokens, opts.maxTokens, opts.maxTokens);
   out.stream = true;
-  // § 13.1: DeepSeek gets `require_parameters: true` (OpenRouter routes a
-  // `tools` request to tool hosts only "best effort", weighted toward the
-  // cheapest — the cheapest no-data-kept DeepSeek host, DekaLLM, lists no
-  // tool support). Claude does not get it: every Claude host supports
-  // tools, and its body must stay byte-identical to before § 13.
-  out.provider =
-    model === DEEPSEEK_MODEL_ID
-      ? { data_collection: "deny", zdr: true, require_parameters: true }
-      : { data_collection: "deny", zdr: true };
-  // § 13.1: no `cache_control` for DeepSeek at all (OpenRouter's prompt
-  // caching docs list top-level `cache_control` for Anthropic/Vertex/
-  // Azure/Bedrock only; DeepSeek caching, if any, is automatic).
-  if (model === CLAUDE_MODEL_ID) out.cache_control = { type: "ephemeral" };
+  out.provider = opts.provider;
+  if (opts.cacheControl) out.cache_control = opts.cacheControl;
 
   const plugins = Array.isArray(client.plugins) ? client.plugins : [];
   const webPlugin = plugins.find(

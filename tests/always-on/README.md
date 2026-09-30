@@ -44,6 +44,39 @@ python3 score_t15.py <tag>     #   deterministic scorer vs truth.json)
 Results land in `results/<tag>/` (gitignored). Verdicts are JSON, one per
 run. Re-running skips work that already exists, so a crashed run resumes.
 
+## Headless voice runs on a site model (#33)
+
+`run_headless_voice.sh` measures the plain-words rule
+(docs/design-plain-replies.md § 4) on a model the site serves, through
+the headless runner (`packages/agent/bin/run.mjs`: the web app's coach
+loop, skill bundle and real script runner), on your own OpenRouter key:
+
+```bash
+export OPENROUTER_API_KEY=...          # or KEY_ENV=<var name>; never printed
+./run_headless_voice.sh deepseek/deepseek-v4.1-flash <tag>          # 9 cases, 1 trial
+TRIALS=3 ./run_headless_voice.sh deepseek/deepseek-v4.1-flash <tag> <case> ...  # re-run failures
+```
+
+- **What it measures:** `scan_voice.py`'s HARD/REVIEW hits on each reply
+  (plus plan.md lines added), for the nine § 4 cases, staged with the same
+  data files each case's own runner plants — never its expected.md,
+  prompt.md, turn*.md or `_*.txt` captures. No judge runs.
+- **One trial first.** Run every case once, read the table, then re-run
+  only the cases with HARD hits under the SAME tag with `TRIALS=3` —
+  finished trials are skipped, so only trials 2-3 of those cases cost money.
+- **Results:** `results/hv-<tag>/<case>/<trial>/` (gitignored): `reply.md`,
+  `stderr.txt`, `exit.txt`, `scan.txt`, `plan-added.txt`, `planted/`, `ws/`.
+  The summary prints HARD, REVIEW, exit, `[gate]`/`[error]`/web_search
+  counts, and each trial's cost from `bin/run.mjs`'s last stderr line
+  (`[cost] usd=<x> steps=<n>`, the provider's own per-step cost summed;
+  `[cost] unknown ...` when it reported none), then a total.
+- **Gaps:** one turn only — `t4-intake` sends its turn1.md, not turn2.md.
+  web_search is not configured headless (F2): a search returns "not
+  configured". These cases don't need one; a non-zero `search` column
+  means the trial saw a failed search.
+- Tests drive it with a mock `fetch` preload, no model call:
+  `python3 tests/test_headless_voice_driver.py`.
+
 ## Pinned models
 
 Every runner and judge sources `lib_env.sh`, which resolves two models and

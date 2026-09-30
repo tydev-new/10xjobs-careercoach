@@ -431,6 +431,10 @@ export interface Deps {
   checkLanguage?: (input: CheckLanguageInput) => Promise<CheckLanguageOutput>;
   logger?: Logger;
   limits?: Limits;
+  /** Called once per step the coach records toward the turn's spend,
+   *  with the provider's reported cost for that step (OpenRouter's
+   *  usage.cost), or null when it reported none. Observation only. */
+  onStepCost?: (step: { reportedUsd: number | null }) => void;
 }
 
 export interface CoachStreamInput {

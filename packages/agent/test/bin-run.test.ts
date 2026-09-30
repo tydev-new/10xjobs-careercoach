@@ -9,7 +9,7 @@
 // fresh mkdtemp dirs, never a literal "/tmp" path.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -113,4 +113,40 @@ test("never prints the key value, even with a real (stubbed-network) run", () =>
   assert.doesNotMatch(res.stdout, /TOTALLY-FAKE-NOT-REAL-SECRET-VALUE/);
   assert.doesNotMatch(res.stderr, /TOTALLY-FAKE-NOT-REAL-SECRET-VALUE/);
   assert.equal(res.status, 0, res.stderr);
+});
+
+// Issue #33 / tester F1: the headless model request carries what
+// ten-model-proxy sends upstream (supabase/functions/ten-model-proxy/
+// core.ts's upstreamModelOptions — the same function the proxy's
+// buildUpstreamBody uses), read back from the stubbed fetch's log.
+function firstBody(requestLog: string): Record<string, any> {
+  const line = readFileSync(requestLog, "utf8").trim().split("\n")[0];
+  return JSON.parse(JSON.parse(line).body);
+}
+
+test("model request = the proxy's upstream options: Claude keeps cache_control, no require_parameters, max_tokens 8192", () => {
+  const res = run(["--model", "anthropic/claude-sonnet-5"], { OPENROUTER_API_KEY: "sk-or-v1-FAKE" });
+  assert.equal(res.status, 0, res.stderr);
+  const body = firstBody(res.requestLog);
+  assert.equal(body.model, "anthropic/claude-sonnet-5");
+  assert.deepEqual(body.provider, { data_collection: "deny", zdr: true });
+  assert.deepEqual(body.cache_control, { type: "ephemeral" });
+  assert.equal(body.max_tokens, 8192);
+});
+
+test("model request = the proxy's upstream options: DeepSeek gets require_parameters, no cache_control, max_tokens 8192", () => {
+  const res = run(["--model", "deepseek/deepseek-v4.1-flash"], { OPENROUTER_API_KEY: "sk-or-v1-FAKE" });
+  assert.equal(res.status, 0, res.stderr);
+  const body = firstBody(res.requestLog);
+  assert.equal(body.model, "deepseek/deepseek-v4.1-flash");
+  assert.deepEqual(body.provider, { data_collection: "deny", zdr: true, require_parameters: true });
+  assert.equal("cache_control" in body, false);
+  assert.equal(body.max_tokens, 8192);
+});
+
+test("a model outside the proxy's allowlist is refused (usage error, exit 2), before any request", () => {
+  const res = run(["--model", "openai/gpt-9"], { OPENROUTER_API_KEY: "sk-or-v1-FAKE" });
+  assert.equal(res.status, 2, res.stderr);
+  assert.match(res.stderr, /--model must be one of .*anthropic\/claude-sonnet-5.*deepseek\/deepseek-v4\.1-flash/);
+  assert.equal(existsSync(res.requestLog), false);
 });

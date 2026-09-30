@@ -14,7 +14,7 @@ const BIN = path.join(AGENT, "bin/run.mjs");
 const KEY = "sk-or-v1-TESTERFAKE-9d1c2b7e4a6f0e3d5c8b1a2f";
 const KEY_FRAGMENTS = [KEY, "TESTERFAKE", "9d1c2b7e4a6f0e3d5c8b1a2f"];
 
-function preload(mode: "ok" | "401" | "throw"): { file: string; log: string } {
+function preload(mode: "ok" | "401" | "throw" | "cost"): { file: string; log: string } {
   const dir = tmp("agent-bin-preload-");
   const log = path.join(dir, "requests.jsonl");
   const file = path.join(dir, "preload.mjs");
@@ -31,7 +31,7 @@ globalThis.fetch = async (url, init = {}) => {
     sse({ id, model: "m", choices: [{ index: 0, delta: { role: "assistant", content: "" }, finish_reason: null }] }),
     sse({ id, model: "m", choices: [{ index: 0, delta: { content: "HELLO-FROM-MOCK " }, finish_reason: null }] }),
     sse({ id, model: "m", choices: [{ index: 0, delta: { content: "second-chunk" }, finish_reason: null }] }),
-    sse({ id, model: "m", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 } }),
+    sse({ id, model: "m", choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8, ...(${JSON.stringify(mode)} === "cost" ? { cost: 0.00123 } : {}) } }),
     "data: [DONE]\\n\\n",
   ].join("");
   return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
@@ -40,7 +40,7 @@ globalThis.fetch = async (url, init = {}) => {
   return { file, log };
 }
 
-function run(extraArgs: string[], env: Record<string, string | undefined>, mode: "ok" | "401" | "throw" = "ok") {
+function run(extraArgs: string[], env: Record<string, string | undefined>, mode: "ok" | "401" | "throw" | "cost" = "ok") {
   const p = preload(mode);
   const ws = tmp("agent-bin-ws-");
   const e: Record<string, string> = {};
@@ -106,4 +106,24 @@ test("the reply text is printed once (not once per streamed snapshot)", () => {
   const r = run([], { OPENROUTER_API_KEY: KEY });
   const n = r.stdout.split("HELLO-FROM-MOCK").length - 1;
   assert.equal(n, 1, `stdout:\n${r.stdout}`);
+});
+
+test("the turn's cost: the provider's usage.cost printed as one [cost] line on stderr", () => {
+  const r = run([], { OPENROUTER_API_KEY: KEY }, "cost");
+  assert.equal(r.status, 0, r.all);
+  const lines = r.stderr.split("\n").filter((l) => l.startsWith("[cost]"));
+  assert.deepEqual(lines, ["[cost] usd=0.001230 steps=1"], r.stderr);
+  assert.ok(!r.stdout.includes("[cost]"), "cost stays off the reply");
+});
+
+test("no usage.cost from the provider: [cost] unknown, never the fallback estimate", () => {
+  const r = run([], { OPENROUTER_API_KEY: KEY }, "ok");
+  assert.equal(r.status, 0, r.all);
+  const lines = r.stderr.split("\n").filter((l) => l.startsWith("[cost]"));
+  assert.deepEqual(lines, ["[cost] unknown steps=1 reported=0 usd=0.000000"], r.stderr);
+});
+
+test("a failed request still prints the [cost] line (no step recorded)", () => {
+  const r = run([], { OPENROUTER_API_KEY: KEY }, "401");
+  assert.match(r.stderr, /^\[cost\] unknown steps=0 reported=0 usd=0\.000000$/m, r.stderr);
 });

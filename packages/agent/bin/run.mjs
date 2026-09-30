@@ -7,26 +7,42 @@
 //     --prompt "<text>" [--chat-id <id>] [--key-env OPENROUTER_API_KEY] \
 //     [--balance <usd>]
 //
+// Exit codes: 0 the turn finished (a reply, or a pause at the spend
+// gate — its `[gate]` line is on stderr); 1 refused (no key) or the run
+// crashed; 2 usage error (bad arguments, --model off the allowlist);
+// 3 the turn ended on an error (each one logged as an `[error]` line on
+// stderr; the reply on stdout is whatever came before it, often empty).
+// Once a turn starts, stderr carries exactly one `[cost]` line, the turn's
+// spend: `[cost] usd=<x> steps=<n>`, or `[cost] unknown ...` when the
+// provider reported none.
+//
 // Refuses to run without an EXPLICIT key env var: the name is always
 // named on the command line (--key-env, default OPENROUTER_API_KEY) and
 // that named variable must actually be set — no silent fallback, no
 // hardcoded key, and the key's VALUE is never printed (only the env var
 // NAME appears in any message).
 //
-// STUBBED pending packages/checkers (a parallel worktree porting the
-// real checker scripts to JS): `scripts` is a FakeScriptRunner with no
-// canned scripts, so every `python3 ...` command a skill tries will exit
-// 127 "not available in the web app: <name>" until the real
-// ScriptRunner lands and this line is swapped for it.
+// Model request: the same per-model options ten-model-proxy sends
+// upstream (upstreamModelOptions in supabase/functions/ten-model-proxy/
+// core.ts — the proxy's own buildUpstreamBody uses it): the no-data-kept
+// provider filter (+ require_parameters for DeepSeek), cache_control for
+// Claude only, max_tokens at the proxy's cap. --model must be one of the
+// proxy's allowed ids (MODEL_IDS); anything else is refused, since
+// production would refuse it (400 model_not_allowed) and a headless run
+// of it would measure nothing the site can send.
+//
+// Scripts: the REAL ScriptRunner the web app uses (just-bash + the
+// skills' ported checkers, apps/web/src/backend/script-runner.ts, wired
+// in bin/headless-deps.mjs), so a skill's `node scripts/check_*.mjs ...`
+// runs here exactly as in the browser — its output (and any jobs.md
+// write-back) reaches the model the same way. A still-unported script
+// exits 127 "not available in the web app: <name>", same as the web app.
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { readUIMessageStream } from "ai";
-import path from "node:path";
 
 import { createCoach } from "../src/coach.ts";
-import { createInMemoryGate } from "../src/gate.ts";
-import { createFakeScriptRunner } from "../src/tools/fake-script-runner.ts";
-import { createLocalFolderWorkspaceStore } from "../src/workspace/local-folder-store.ts";
-import { buildSkillBundleFromDisk } from "../src/skills/skill-bundle-fs.ts";
+import { buildHeadlessDeps } from "./headless-deps.mjs";
+import { MODEL_IDS, upstreamModelOptions } from "../../../supabase/functions/ten-model-proxy/core.ts";
 
 function parseArgs(argv) {
   const args = { keyEnv: "OPENROUTER_API_KEY", chatId: "run-" + Date.now(), balance: 5 };
@@ -46,12 +62,11 @@ function parseArgs(argv) {
   for (const required of ["workspace", "skills", "model", "prompt"]) {
     if (!args[required]) throw new Error(`--${required} is required`);
   }
+  if (!MODEL_IDS.includes(args.model)) {
+    throw new Error(`--model must be one of the site's allowed models (${MODEL_IDS.join(", ")}); got ${args.model}`);
+  }
   return args;
 }
-
-/** A provider filter matching the spike-1-proven no-data-kept routing
- *  (docs/spikes/spike-1-browser-loop.md, "Item 3"). */
-const NO_DATA_KEPT_PROVIDER_FILTER = { data_collection: "deny", zdr: true };
 
 async function main() {
   let args;
@@ -76,36 +91,45 @@ async function main() {
     return;
   }
 
-  const workspaceDir = path.resolve(args.workspace);
-  const skillsDir = path.resolve(args.skills);
-
-  const [workspace, skills] = await Promise.all([
-    Promise.resolve(createLocalFolderWorkspaceStore(workspaceDir)),
-    buildSkillBundleFromDisk(skillsDir),
-  ]);
+  const deps = await buildHeadlessDeps({
+    workspaceDir: args.workspace,
+    skillsDir: args.skills,
+    balance: args.balance,
+  });
 
   const openrouter = createOpenRouter({ apiKey });
+  // What ten-model-proxy sends upstream for this model (see header).
+  const upstream = upstreamModelOptions(args.model);
   const model = openrouter.chat(args.model, {
-    provider: NO_DATA_KEPT_PROVIDER_FILTER,
-    cache_control: { type: "ephemeral" },
+    provider: upstream.provider,
+    maxTokens: upstream.maxTokens,
+    ...(upstream.cacheControl ? { cache_control: upstream.cacheControl } : {}),
   });
 
-  const coach = createCoach({
-    model,
-    workspace,
-    skills,
-    gate: createInMemoryGate(),
-    balance: async () => args.balance,
-    fetch: globalThis.fetch,
-    clock: { now: () => new Date() },
-    scripts: createFakeScriptRunner([]), // STUBBED — see file header.
-    logger: {
-      info: (e) => console.error("[agent:info]", JSON.stringify(e)),
-      warn: (e) => console.error("[agent:warn]", JSON.stringify(e)),
-      error: (e) => console.error("[agent:error]", JSON.stringify(e)),
-    },
-  });
+  // The turn's spend, from the coach's OWN per-step cost recorder
+  // (coach.ts recordStepCost: providerMetadata.openrouter.usage.cost, one
+  // call per recorded step) — printed once at the end as one fixed line:
+  //   [cost] usd=<sum> steps=<n>                      every step reported a cost
+  //   [cost] unknown steps=<n> reported=<k> usd=<sum>  any step reported none
+  const stepCosts = [];
+  const coach = createCoach({ ...deps, model, onStepCost: (s) => stepCosts.push(s.reportedUsd) });
+  try {
+    await streamTurn(coach, args);
+  } finally {
+    console.error(costLine(stepCosts));
+  }
+}
 
+function costLine(stepCosts) {
+  const reported = stepCosts.filter((c) => typeof c === "number");
+  const usd = reported.reduce((a, b) => a + b, 0).toFixed(6);
+  if (stepCosts.length > 0 && reported.length === stepCosts.length) {
+    return `[cost] usd=${usd} steps=${stepCosts.length}`;
+  }
+  return `[cost] unknown steps=${stepCosts.length} reported=${reported.length} usd=${usd}`;
+}
+
+async function streamTurn(coach, args) {
   const stream = coach.stream({
     chatId: args.chatId,
     messages: [{ id: "u1", role: "user", parts: [{ type: "text", text: args.prompt }], metadata: { origin: "typed" } }],
@@ -136,13 +160,20 @@ async function main() {
     }
   }
   // gate/error parts logged from the final snapshot only, each once.
+  // A turn that ended on an error (any data-error part, e.g. a provider
+  // failure or the step cap) exits 3 — never 0, so a caller can't
+  // read an errored turn as a finished one. A gate is a legitimate end of
+  // a turn (the model asked for a yes) and keeps exit 0.
+  let errored = false;
   for (const part of lastMessage?.parts ?? []) {
     if (part.type === "data-gate") {
       console.error(`[gate] ${part.data.gateLine}`);
     } else if (part.type === "data-error") {
+      errored = true;
       console.error(`[error] ${part.data.code}: ${part.data.message}`);
     }
   }
+  if (errored) process.exitCode = 3;
 
   const text = (lastMessage?.parts ?? [])
     .filter((p) => p.type === "text")

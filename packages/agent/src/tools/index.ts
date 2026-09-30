@@ -37,105 +37,23 @@ import type {
   WriteFileOutput,
 } from "../types.ts";
 import { VersionTracker } from "./version-tracker.ts";
-
-function err(code: string, message: string): ToolError {
-  return { error: { code, message } };
-}
-
-function isWorkspaceError(e: unknown): e is WorkspaceError {
-  return typeof e === "object" && e !== null && "code" in e && "name" in e && (e as any).name === "WorkspaceError";
-}
+import { createBoardsTools, getAshbyCache, getBoardRequestBudget, TOOL_DESCRIPTIONS as BOARD_TOOL_DESCRIPTIONS } from "./boards.ts";
+import { err, isWorkspaceError } from "./tool-errors.ts";
+// board-readers.mjs is plain JS (browser + Node, design-web-search.md
+// § 4.4) — packages/agent/tsconfig.json's `allowJs` lets both `tsc` and
+// Node's own type-stripped execution resolve it directly; its exports are
+// untyped (inferred `any`) here, the same tradeoff boards.ts's own header
+// comment explains.
+import { parsePostingUrl, readPosting } from "../../../../skills/search/scripts/lib/board-readers.mjs";
 
 // ---------------------------------------------------------------------
 // fetch_job (§ 4) — the four supported boards, exact URL shapes.
-// ---------------------------------------------------------------------
-
-interface BoardMatch {
-  board: string;
-  apiUrl: string;
-  extract: (json: any) => { company: string; title: string; location: string; text: string; compensation?: string };
-}
-
-function matchBoard(url: string): BoardMatch | null {
-  let u: URL;
-  try {
-    u = new URL(url);
-  } catch {
-    return null;
-  }
-  let m: RegExpMatchArray | null;
-
-  if (
-    (u.hostname === "boards.greenhouse.io" || u.hostname === "job-boards.greenhouse.io") &&
-    (m = u.pathname.match(/^\/([^/]+)\/jobs\/(\d+)\/?$/))
-  ) {
-    const [, board, id] = m;
-    return {
-      board: "greenhouse",
-      apiUrl: `https://boards-api.greenhouse.io/v1/boards/${board}/jobs/${id}`,
-      extract: (j) => ({
-        company: j.company_name ?? board,
-        title: j.title ?? "",
-        location: j.location?.name ?? "",
-        text: String(j.content ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim(),
-      }),
-    };
-  }
-  if (u.hostname === "jobs.lever.co" && (m = u.pathname.match(/^\/([^/]+)\/([^/]+)\/?$/))) {
-    const [, company, id] = m;
-    return {
-      board: "lever",
-      apiUrl: `https://api.lever.co/v0/postings/${company}/${id}`,
-      extract: (j) => ({
-        company: j.categories?.team ?? company,
-        title: j.text ?? "",
-        location: j.categories?.location ?? "",
-        text: String(j.descriptionPlain ?? j.description ?? "").trim(),
-      }),
-    };
-  }
-  if (u.hostname === "jobs.ashbyhq.com" && (m = u.pathname.match(/^\/([^/]+)\/([^/]+)\/?$/))) {
-    const [, board, id] = m;
-    return {
-      board: "ashby",
-      apiUrl: `https://api.ashbyhq.com/posting-api/job-board/${board}?includeCompensation=true`,
-      extract: (j) => {
-        const jobs = Array.isArray(j.jobs) ? j.jobs : [];
-        const found = jobs.find((x: any) => x.id === id) ?? {};
-        return {
-          company: board,
-          title: found.title ?? "",
-          location: found.location ?? "",
-          text: String(found.descriptionPlain ?? found.description ?? "").trim(),
-          compensation: found.compensation?.summary,
-        };
-      },
-    };
-  }
-  if (
-    u.hostname === "jobs.smartrecruiters.com" &&
-    (m = u.pathname.match(/^\/([^/]+)\/(\d+)(?:-[^/]*)?\/?$/))
-  ) {
-    const [, company, id] = m;
-    return {
-      board: "smartrecruiters",
-      apiUrl: `https://api.smartrecruiters.com/v1/companies/${company}/postings/${id}`,
-      extract: (j) => ({
-        company: j.company?.name ?? company,
-        title: j.name ?? "",
-        location: j.location?.city ?? "",
-        text: [j.jobAd?.sections?.jobDescription?.text, j.jobAd?.sections?.qualifications?.text]
-          .filter(Boolean)
-          .join("\n\n")
-          .replace(/<[^>]+>/g, " ")
-          .replace(/\s+/g, " ")
-          .trim(),
-      }),
-    };
-  }
-  return null;
-}
-
+//
+// design-web-search.md § 4.4: "fetch_job moved onto the shared readers,
+// with both fixes" — its own URL-matching/extraction (formerly here) is
+// gone; it now calls board-readers.mjs's parsePostingUrl/readPosting, the
+// exact functions list_board and add_roles use (boards.ts), and shares
+// their 60-request-per-turn budget and per-turn Ashby cache (§ 4.8).
 // ---------------------------------------------------------------------
 
 export interface TurnState {
@@ -143,6 +61,18 @@ export interface TurnState {
   lastHighUsd?: number;
   measuredSteps: StepCostSample[];
   spentSoFarUsd: number;
+  /** M8 (design-web-search.md § 4.7): set by estimate_cost's own execute,
+   *  read by list_board/add_roles/a jobBoardsOnly web_search's own
+   *  estimate-first check. Turn-scoped (never persisted across turns). */
+  estimateCostRanThisTurn?: boolean;
+  /** § 4.8: the 60-board-request budget, shared by list_board, add_roles
+   *  and fetch_job, and the per-turn Ashby board cache (§ 4.1: "one
+   *  request"). Both created lazily, on first board-tool use in the turn,
+   *  by boards.ts — the shape is board-readers.mjs's own
+   *  (`createRequestBudget()`'s return value; untyped here on purpose,
+   *  since that file is plain JS, not part of this package's TS graph). */
+  boardRequestBudget?: unknown;
+  ashbyBoardCache?: Map<string, unknown>;
 }
 
 export interface ToolContext {
@@ -164,6 +94,12 @@ export interface ToolContext {
    *  `openGateForChat` directly for bare-ctx unit tests that never open
    *  two gates in the same step. */
   openGate?: (req: GateRequest) => Promise<void>;
+  /** design-web-search.md § 4.7 (M8): true when THIS turn was started by
+   *  a typed yes that approved a spend gate (coach.ts's own
+   *  `approvedAmountUsd !== undefined`) — the estimate-first check's other
+   *  escape hatch, besides `estimate_cost` having run this turn. Optional,
+   *  defaults to false, for bare-ctx unit tests. */
+  turnStartedByApprovedGate?: boolean;
 }
 
 // § 4's own text cap (the same 2 MB § 2 caps an editable file at):
@@ -329,32 +265,29 @@ async function webSearchTool(deps: Deps, ctx: ToolContext, input: WebSearchInput
 }
 
 async function fetchJobTool(deps: Deps, ctx: ToolContext, input: FetchJobInput): Promise<FetchJobOutput | ToolError> {
-  const match = matchBoard(input.url);
-  if (!match) {
+  const parsed = parsePostingUrl(input.url);
+  if (!parsed) {
     return { error: { code: "unsupported_url", message: "paste the posting text" } };
   }
-  let res: Response;
-  try {
-    res = await deps.fetch(match.apiUrl);
-  } catch {
+  const budget = getBoardRequestBudget(ctx);
+  const ashbyCache = getAshbyCache(ctx);
+  const read = await readPosting(parsed, { fetchImpl: deps.fetch, budget, ashbyCache });
+  if (!read.ok) {
+    if (read.reason === "request_limit") return err("request_limit", "This turn's board-request budget is used up.");
+    if (read.reason === "not_found") return err("tool_error", "That posting could not be found on the board.");
     return err("tool_error", "Could not reach the job board.");
   }
-  if (!res.ok) {
-    return err("tool_error", `The job board returned ${res.status}.`);
-  }
-  const json = await res.json();
-  const extracted = match.extract(json);
   const output: Extract<FetchJobOutput, { board: string }> = {
-    board: match.board,
-    company: extracted.company,
-    title: extracted.title,
-    location: extracted.location,
+    board: read.board,
+    company: read.companyName ?? read.boardSlug,
+    title: read.title,
+    location: read.location,
     url: input.url,
-    text: extracted.text,
-    ...(extracted.compensation ? { compensation: extracted.compensation } : {}),
+    text: read.text,
+    ...(read.compensation ? { compensation: read.compensation } : {}),
   };
   if (input.saveTo) {
-    const written = await writeFileTool(deps, ctx, { path: input.saveTo, content: extracted.text });
+    const written = await writeFileTool(deps, ctx, { path: input.saveTo, content: read.text });
     if (!("error" in written)) (output as any).savedTo = input.saveTo;
   }
   return output;
@@ -435,6 +368,10 @@ async function estimateCostTool(
     ctx.turnState.gateId = gateId;
   }
   ctx.turnState.lastHighUsd = highUsd;
+  // design-web-search.md § 4.7 (M8): "unless estimate_cost ran earlier in
+  // this turn" — set on EVERY call (gated or not), same as the cost
+  // card's own "always shows" rule just below.
+  ctx.turnState.estimateCostRanThisTurn = true;
 
   const output: EstimateCostOutput = { action: input.action, lowUsd, highUsd, balanceUsd, needsGate: gateNeeded, method };
   // § 4 "it emits a cost card"; § 6.2 row 1 — EVERY estimate_cost call,
@@ -515,6 +452,11 @@ export const TOOL_DESCRIPTIONS = {
   estimate_cost:
     "Estimate the USD cost of a run before doing it. Opens a spend gate and ends the turn when the estimate is over the threshold.",
   check_language: "Run a fresh-context language/voice check over a set of files.",
+  // boards.ts's own — target text, design-web-search.md § 4.10 — kept as
+  // one map here (not two) so § 7's word-count line item still measures
+  // every registered tool from a single source.
+  list_board: BOARD_TOOL_DESCRIPTIONS.list_board,
+  add_roles: BOARD_TOOL_DESCRIPTIONS.add_roles,
 } as const;
 
 export function toolDescriptionsWordCount(): number {
@@ -608,6 +550,7 @@ export function createTools(deps: Deps, ctx: ToolContext) {
       }),
       execute: (input: CheckLanguageInput) => checkLanguageTool(deps, ctx, input),
     }),
+    ...createBoardsTools(deps, ctx),
   };
 }
 

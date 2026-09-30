@@ -6,9 +6,7 @@ import test from "node:test";
 
 import { budgetMinutesPerDay, readPlanBoard, splitPlanMinutes } from "../src/plan-board.ts";
 import { parsePlanTodo } from "../src/helpers.ts";
-// @ts-expect-error - plain .mjs, no type declarations
 import { waitingRows } from "../../../skills/coach/scripts/lib/check-closeout.mjs";
-// @ts-expect-error - plain .mjs, no type declarations
 import { universalNewlines } from "../../../skills/profile/scripts/lib/py-text.mjs";
 
 function sectionOf(md: string, label: "Waiting on you" | "To do" | "Doing" | "Done") {

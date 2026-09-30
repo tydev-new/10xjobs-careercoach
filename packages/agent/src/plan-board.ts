@@ -13,12 +13,7 @@
 // field inside an item's text, not the plan's structure — readPlanBoard
 // itself, parsePlanTodo and the plan card all stay exactly as § 6.2/§ 18
 // already had them.
-//
-// @ts-expect-error - plain .mjs, no type declarations (script-runner.ts's
-// own posture for a skills/*/scripts/lib import; PR #24, the js-only J2
-// switch, moved this out of packages/checkers/src).
 import { waitingRows } from "../../../skills/coach/scripts/lib/check-closeout.mjs";
-// @ts-expect-error - plain .mjs, no type declarations
 import { pySplitlines, restoreLineSeparators, universalNewlines } from "../../../skills/profile/scripts/lib/py-text.mjs";
 
 export interface PlanBoardItem {

@@ -123,33 +123,32 @@ const MUTANTS: Record<string, string> = {
   "multi-line supabase import": 'import {\n  createClient,\n} from "@supabase/supabase-js";\nexport const __m = createClient;\n',
 };
 
-// design-web-agent.md § 18 (lead ruling, 2026-09-26, fix round 3; updated
-// for the js-only J2 switch, PR #24): packages/agent imports
-// waitingRows/universalNewlines/restoreLineSeparators from
-// skills/coach/scripts/lib/check-closeout.mjs and
-// skills/profile/scripts/lib/py-text.mjs (readPlanBoard, plan-board.ts;
-// jobs-md.mjs's own load()/STAGES moved the same way, to
-// skills/search/scripts/lib/jobs-md.mjs, for apps/web's store-io.ts —
-// packages/checkers/src no longer carries any of these three files). A
-// flat `<tmp>/src` copy of packages/agent alone breaks those relative
-// "../../../skills/..." imports — so the copy sits at `<tmp>/packages/agent`,
-// beside a full copy of `<tmp>/skills` (mirroring the real repo layout, and
-// this file's own skillsCopy() pattern below for the lib-mutant tests).
-// Named, allowed change to this tester-owned test; no assertion below
-// changes.
 function mutantCopy(code: string): string {
-  const root = tmp("agent-mutant-");
-  const agentRoot = path.join(root, "packages/agent");
-  for (const d of ["src", "test"]) cpSync(path.join(AGENT, d), path.join(agentRoot, d), { recursive: true });
-  for (const f of ["package.json", "tsconfig.json"]) {
-    mkdirSync(path.dirname(path.join(agentRoot, f)), { recursive: true });
-    cpSync(path.join(AGENT, f), path.join(agentRoot, f));
-  }
-  symlinkSync(path.join(AGENT, "node_modules"), path.join(agentRoot, "node_modules"));
-  cpSync(path.join(REPO, "skills"), path.join(root, "skills"), { recursive: true });
-  const target = path.join(agentRoot, "src/helpers.ts"); // reachable from index.ts
+  // design-web-search.md § 4.4 (S2): src/tools/boards.ts imports
+  // skills/search/scripts/lib/{board-readers,jobs-md}.mjs by a relative
+  // path that climbs OUT of packages/agent ("../../../../skills/..." —
+  // "one implementation", not a copy). A bare `root = tmp(...)` used
+  // directly as "AGENT" (the ORIGINAL shape here) breaks that import
+  // in the isolated copy: `root` sits directly under the OS tmpdir, four
+  // levels up from `root/src/tools/` lands nowhere near a `skills/`
+  // folder, so EVERY mutant — including harmless ones — failed to
+  // resolve and was (wrongly) reported as "caught". Fix: nest the copy
+  // two levels deeper (`outer/packages/agent`, mirroring this repo's own
+  // REPO/packages/agent), and symlink `outer/skills` to the real
+  // skills/ tree, so the same relative climb lands correctly. The
+  // returned path is still "AGENT-shaped" (src/, test/, node_modules,
+  // package.json, tsconfig.json all directly inside it) — every existing
+  // caller (scan(), theirLintCatches()) is unchanged.
+  const outer = tmp("agent-mutant-");
+  const root = path.join(outer, "packages", "agent");
+  mkdirSync(root, { recursive: true });
+  symlinkSync(path.join(REPO, "skills"), path.join(outer, "skills"));
+  for (const d of ["src", "test"]) cpSync(path.join(AGENT, d), path.join(root, d), { recursive: true });
+  for (const f of ["package.json", "tsconfig.json"]) cpSync(path.join(AGENT, f), path.join(root, f));
+  symlinkSync(path.join(AGENT, "node_modules"), path.join(root, "node_modules"));
+  const target = path.join(root, "src/helpers.ts"); // reachable from index.ts
   writeFileSync(target, code + readFileSync(target, "utf8"));
-  return agentRoot;
+  return root;
 }
 
 function theirLintCatches(root: string): boolean {

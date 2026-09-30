@@ -589,6 +589,10 @@ async function runTurn(args: RunTurnArgs): Promise<void> {
     gateGrammarMd,
     idFor: () => crypto.randomUUID(),
     openGate,
+    // design-web-search.md § 4.7 (M8): a turn a typed-yes gate approval
+    // started skips the board tools' own estimate-first check — the same
+    // condition that already picks `allowanceUsd` above.
+    turnStartedByApprovedGate: approvedAmountUsd !== undefined,
   };
   const tools = createTools(deps, ctx);
   // `tools` passed so tool RESULTS in history convert faithfully (a

@@ -474,6 +474,25 @@ this table. A card is a
   the viewer, never the viewer's empty state (`design-web-ui.md` § 5.2
   rule 6, a Stage 4 build item). A fixture may hold such a card only
   under `design-web-ui.md` § 4's one exception.
+- **A row's analysis file, legacy rows included** (lead ruling,
+  2026-09-30, issue #32). Rows written before `design-web-search.md` S1
+  added the `Analysis:` field carry the older `- JD: jd-analysis/<key>.md`
+  and no `Analysis:` line. **A row's analysis file is its `analysis_file`;
+  else its `jd_file` when that names a path under `jd-analysis/`; else
+  none.** A `jd_file` anywhere else (`jd-inbox/…`, the raw posting) is
+  never the analysis. This is reading a field the row wrote, not a guess.
+  One exported function in `packages/agent`, `rowAnalysisFile(row)`,
+  computes it; every reader uses it and none reads `analysis_file`
+  directly (PRINCIPLES rule 12): the verdict card's `ref` above, the Jobs
+  row and detail, Jobs' "Open application" key, and Applications' row
+  join (`design-web-ui.md` § 5.3). The candidate's `jobs.md` is never
+  rewritten to add the field. *Prevents:* every role evaluated before S1
+  reading "No analysis file linked" while Documents lists its analysis.
+  *Proved by:* a table test over the function (Analysis only; JD under
+  `jd-analysis/` only; JD under `jd-inbox/` only → none; both → Analysis;
+  neither → none), and a legacy row in the § 5.7 fixture whose Jobs
+  detail shows its analysis sections and whose verdict card carries the
+  `ref`.
 - **`parsePlanTodo(md) → { text, ref? }[]`** is pure and exported from
   `packages/agent`. The card builder uses it. (Corrected 2026-09-26: this
   line used to say `apps/workspace-ui`'s `parsePlan` maps from it. It

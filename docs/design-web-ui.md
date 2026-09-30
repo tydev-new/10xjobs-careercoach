@@ -1113,9 +1113,14 @@ No Track field: a bare letter is a schema label (§ 5.3.1, C4).
 A dismissed row adds its Dismissed note word for word and the stage it
 was in (`Was`).
 
-Row controls: **Open analysis** opens the row's `Analysis` file
-(`analysis_file`) in the viewer; with none, the row reads "No analysis
-file linked" (C § 6.2's own wording). **Ask Ten about this** (§ 5.4).
+Row controls: **Open analysis** opens the row's analysis file in the
+viewer; with none, the row reads "No analysis file linked" (C § 6.2's own
+wording). **Ask Ten about this** (§ 5.4). The row's analysis file is
+`rowAnalysisFile(row)` (C § 6.2, lead ruling 2026-09-30, issue #32): its
+`Analysis` field, else a legacy `JD:` that names a path under
+`jd-analysis/`. Every place on this page, the detail and Applications'
+row join reads it through that one function, never `analysis_file`
+directly.
 
 **The role's detail** (restore ruling). Choosing a row shows its detail
 beside the list (the designer places it, § 5.6; on the phone the detail

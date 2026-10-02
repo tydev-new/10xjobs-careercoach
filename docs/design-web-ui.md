@@ -125,6 +125,15 @@ same shell. A recovery link shows § 1.10's "Choose a new password"
 before this check; forgot password and the expired-link line are
 § 1.10 too.
 
+**Amended 2026-10-02 (C § 20; draft for owner approval).** Sign-up is now
+an invitation: under the form, in both modes, O5 says new accounts get
+free credit while places last, and O7 points to the terms and the privacy
+notice (§ 5.3.1). After sign-in the membership check runs as above; a
+non-member then claims the welcome credit once (C § 20.4). A grant goes
+straight to § 1.5, a refusal to § 1.6, and a failed call to the setup
+error screen (Q1). The sign-in still proves only who someone is: the
+credit row, not the sign-in, makes a member.
+
 **Amended 2026-09-26 (owner ruling, the restore ruling in § 5).** "Minimal"
 above now means one sign-in form, not a bare page. Beside the form the
 page adds a lead paragraph, three proof points and a product preview.
@@ -211,24 +220,37 @@ Ten: I don't have anything of yours yet. Drop in a résumé,
 
 Side panel: "Nothing open yet."
 
+**Amended 2026-10-02 (C § 20).** A member who got the welcome credit
+starts at the grant's amount ($1.00 by default), and the chip shows it.
+On the page load where the grant happened, O1 shows as one neutral line
+in the notice place (§ 1.8, § 5.1) until the first message is sent;
+nothing stores it. It states the amount and where to see what's left, and
+promises no spend gate: at $1.00 none ever opens (C § 20.5).
+
 ### 1.6 Not a member
 
-Sign-in is open to anyone (§ 1.4); only a member — a credit row an
-admin inserts — can use Ten (C § 8). A signed-in non-member never
-reaches the chat: same shell, no avatar, no cards, no composer, one
-plain line and nothing else to do (rule 18, honest — there is nothing
-this screen can offer them but the fact):
+**Amended 2026-10-02 (C § 20; draft for owner approval).** The old line,
+"You're signed in, but this beta is invite-only. …", is retired: the beta
+is not invite-only once anyone with a confirmed email can claim the
+welcome credit.
 
-```
-You're signed in, but this beta is invite-only. Ask the
-person who invited you to add you.
-```
+Sign-in is open to anyone (§ 1.4); only a member, an account with a
+credit row from the owner or from the welcome claim (C § 8, C § 20), can
+use Ten. A signed-in account the claim refused never reaches the chat:
+same shell, no avatar, no cards, no composer, one plain line for the
+reason, and Sign out:
 
-No balance chip (there is nothing to spend yet), no fixture/preview
-controls, no retry button — the only way forward is someone else
-adding the credit row; signing out and back in re-checks membership.
-The `⋯` menu keeps only sign out. This is C § 8's own wording for the
-app to say; this section fixes only where and how it's shown.
+| the claim's answer (C § 20.1) | the line (§ 5.3.1) |
+|---|---|
+| `paused` | O2 |
+| `unconfirmed` | O3 |
+| `already_claimed` | O4 |
+
+No balance chip (there is nothing to spend), no fixture or preview
+controls, no retry button: each line says what the person can do, and
+opening Ten again runs the check again (C § 20.4). A failed claim call is
+not this screen: it is the setup error screen with Q1 and Retry. The `⋯`
+menu keeps only Sign out.
 
 ### 1.7 Delete my beta data
 
@@ -394,9 +416,11 @@ dialog; Close or Esc shuts it. The refund contact is
   Ten adds what arrives after PayPal's fee, a few percent plus a fixed
   amount. This is a one-time payment: nothing renews, and Ten never
   charges you on its own." Then `$10`, `$20`, `$40` and PayPal's buttons.
-- Under them: "Paid credit stays if you delete your beta data. The beta
-  has a shared daily limit, so on a busy day Ten can pause until tomorrow
-  even with credit. For a refund, email support@10xjobs.co."
+- Under them (amended 2026-10-02, C § 20.6): "Paid credit stays if you
+  delete your beta data, and it has no daily limit of Ten's own. Ten's
+  model service does have a spending limit, so on a busy day Ten can pause
+  until tomorrow even with credit. For a refund, email
+  support@10xjobs.co."
 - Credited (numbers from the reply): "Added $9.16 of credit. PayPal
   charged $10.00; its fee was $0.84." The chip refreshes.
 - Pending: "PayPal is still clearing this payment. The credit is added
@@ -545,8 +569,9 @@ Rendered exactly as the envelope carries it — `{ code, message,
 retryable }` (C § 6.1 names the `code` values). `message` is
 never a UI invention: it's the literal sentence the server sent, and
 under `model_error` that sentence differs by cause even though the
-`code` doesn't — the beta-wide ceiling ("The beta has reached today's
-limit. Try again tomorrow.") and an upstream failure are both
+`code` doesn't — the free-use ceiling ("Free use of Ten has reached
+today's limit. Try again tomorrow.", C § 20.6, amended 2026-10-02) and an
+upstream failure are both
 `model_error`, told apart only by their own `message` text (C § 8),
 never by a separate code. A reply cut off at the output limit is its
 own code, `cut_off` (C § 9.3, amended 2026-09-24): a fixed message
@@ -1471,7 +1496,7 @@ commit. The coder copies each string word for word.
   `apps/web/src`: `packages/agent`'s error messages
   (`packages/agent/src/coach.ts:42-60`) and decline line
   ("Declined — nothing started.", `:537`), and the proxy's messages
-  (C § 8). The messages this doc quotes have rows (E12–E15); the rest
+  (C § 8). The messages this doc quotes have rows (E12–E16); the rest
   are a named follow-up for the lead, against the same rules.
 - **How to read a row.** Placeholders are in angle brackets (`<N>`,
   `<path>`); everything else is literal, the final period included.
@@ -1761,8 +1786,9 @@ commit. The coder copies each string word for word.
 | E11 | Talk to Ten | error card, when the error can be retried | `Send your message again to retry.` | this table; follow-up 7; was `This can be retried.` | Changed (C25) |
 | E12 | Talk to Ten | error card message, `step_cap` | `This turn ran out of steps before finishing.` | § 2.7 :581 | Given |
 | E13 | Talk to Ten | error card message, `too_large` | `This turn got too big to send, so it stopped partway.` | § 2.7 :594 | Given |
-| E14 | Talk to Ten | error card message, the beta's daily limit (`model_error`) | `The beta has reached today's limit. Try again tomorrow.` | § 2.7 :543 | Given |
+| E14 | Talk to Ten | error card message, the free-use daily limit (`model_error`; free members only, C § 20.6) | `Free use of Ten has reached today's limit. Try again tomorrow.` | § 2.7; C § 20.6 | Changed (C27) |
 | E15 | Talk to Ten | error card message, `over_balance` | `Your credit is used up. You can buy more from your balance at the top.` | § 1.11 :413; C16 | Given |
+| E16 | Talk to Ten | error card message, the model service's own spending limit (an upstream 402, `model_error`) | `Ten's model service has reached its spending limit. Try again later.` | C § 20.6 | NEW |
 | U1 | Talk to Ten, under the composer | an upload that failed | `<name> isn't a file type Ten can use yet — only .pdf and .docx.` | this table | Kept |
 | U2 | Talk to Ten, under the composer | an upload that failed | `<name> is over the 10 MB upload limit.` | this table | Kept |
 | U3 | Talk to Ten, under the composer | an upload that failed | `<name> is over the size limit.` | this table | Kept |
@@ -1798,7 +1824,6 @@ commit. The coder copies each string word for word.
 | Q4 | Setup error screen | conversation load failed | `Couldn't load your conversation. Try again in a moment.` | § 1.9 :319 | Given |
 | Q5 | Setup error screen | button (with F32 Sign out) | `Retry` | § 1.9 :318 | Given |
 | Q6 | Site not set up | the site is missing its settings | `This copy of Ten isn't set up yet, so it can't start.` | this table; was `Ten isn't configured: <setting names> missing.` | Changed (C25) |
-| Q7 | Not a member (§ 1.6) | the one line | `You're signed in, but this beta is invite-only. Ask the person who invited you to add you.` | § 1.6 :223 | Given |
 | Q8 | After delete (§ 1.7) | the report-back | `Deleted. You're signed out of Ten — your sign-in for the older app is untouched.` | § 1.7 :255 | Given |
 | Q9 | After delete (§ 1.7) | its button | `OK` | this table | Kept |
 | X1 | Delete dialog (⋯ menu) | title | `Delete my beta data` | § 1.7 :233 | Given |
@@ -1817,7 +1842,7 @@ commit. The coder copies each string word for word.
 | B4 | Buy credit dialog | a credit pack | `$20` | § 1.11 :396 | Given |
 | B5 | Buy credit dialog | a credit pack | `$40` | § 1.11 :396 | Given |
 | B6 | Buy credit dialog | accessible name of the packs | `Choose a credit pack` | this table | Kept |
-| B7 | Buy credit dialog | under the packs | `Paid credit stays if you delete your beta data. The beta has a shared daily limit, so on a busy day Ten can pause until tomorrow even with credit. For a refund, email support@10xjobs.co.` | § 1.11 :397 | Given |
+| B7 | Buy credit dialog | under the packs | `Paid credit stays if you delete your beta data, and it has no daily limit of Ten's own. Ten's model service does have a spending limit, so on a busy day Ten can pause until tomorrow even with credit. For a refund, email support@10xjobs.co.` | § 1.11; C § 20.6 | Changed (C27) |
 | B8 | Buy credit dialog | while PayPal confirms | `Confirming your payment…` | this table | Kept |
 | B9 | Buy credit dialog; the toast | credited | `Added $<credited> of credit. PayPal charged $<charged>; its fee was $<fee>.` | § 1.11 :400 | Given |
 | B10 | Buy credit dialog | pending | `PayPal is still clearing this payment. The credit is added when it clears.` | § 1.11 :402 | Given |
@@ -1889,6 +1914,14 @@ commit. The coder copies each string word for word.
 | Y50 | Passwords (§ 1.10) | recovery screen title | `Choose a new password` | § 1.10 :378 | Given |
 | Y51 | Passwords (§ 1.10) | recovery screen line | `You're signed in from your reset link. This password also works for the older app, which shares your sign-in.` | § 1.10 :380 | Given |
 | Y52 | Passwords (§ 1.10) | recovery screen button after success | `Continue` | § 1.10 :383 | Given |
+| O1 | Every member page | the notice place (§ 1.8), on the page load where the welcome credit was granted, until the first message is sent; `<amount>` is the claim's `usd`, two decimals | `You have $<amount> of free credit to try Ten. Each reply uses some of it, and your balance at the top shows what's left.` | C § 20.4 | NEW |
+| O2 | Not a member (§ 1.6) | the claim answered `paused` | `Ten has paused free credit for new accounts, so this account can't start yet. Come back later to check again.` | C § 20.1 | NEW |
+| O3 | Not a member (§ 1.6) | the claim answered `unconfirmed` | `Ten's free credit needs a confirmed email address, and this account doesn't have one yet. If we sent you a confirmation email, open its link, then come back.` | C § 20.1 | NEW |
+| O4 | Not a member (§ 1.6) | the claim answered `already_claimed` | `Ten gives free credit once per email inbox, and this inbox has already had it. To ask to join, email support@10xjobs.co.` | C § 20.1; the contact: owner, 2026-10-02 | NEW |
+| O5 | Sign-in | under the form, in both modes | `New accounts get free credit to try Ten, while places last.` | C § 20.9 | NEW |
+| O6 | Talk to Ten, under the composer (an upload); the error card (the proxy's 403) | the account has no credit row, outside the sign-in flow; replaces the old line in `upload-errors.ts`, the proxy and `ten-paypal` | `This account isn't set up to use Ten yet. Sign out, then sign in again to check.` | C § 20.4 | NEW |
+| O7 | Sign-in | under O5; "terms" links to `/terms.html`, "privacy notice" to `/privacy.html` | `Using Ten means you agree to its terms. See also the privacy notice.` | C § 20.7 | NEW |
+| O8 | Header | `⋯` menu link, beside Privacy (F33) | `Terms` | C § 20.7 | NEW |
 
 **Conflicts, and the pick.** Each names the two sides, the pick and
 why. Where the pick changed words, the source line changed in the same
@@ -2076,6 +2109,13 @@ on it.
 - **C26. "The most recently changed of N"** had no noun (rule 18).
   **Pick:** "… of <N> active applications" (H10); § 5.3, § 5.7 and
   § 5.9 are edited.
+- **C27. The daily limit is no longer one limit** (owner, 2026-10-02;
+  C § 20.6). E14 said "The beta has reached today's limit", and B7 told
+  buyers "The beta has a shared daily limit". Members who paid now have
+  no ceiling of Ten's own; free use has one; the model service's own
+  limit stops everyone. **Pick:** E14 names free use; B7 says paid credit
+  has no daily limit of Ten's own but the model service has one; E16 is
+  the model service's line. § 1.11 and § 2.7 are edited.
 
 **Decisions where the doc had a slot but no words** (the NEW rows):
 
@@ -2120,6 +2160,8 @@ on it.
    `design-plain-replies.md` § 5 says.
 
 **Removed from the screen** (proof 4 checks none of these shows):
+"this beta is invite-only" (the old Q7, retired by C § 20); "The beta has
+reached today's limit"; "The beta has a shared daily limit";
 "Error — <code>"; "Needs your word"; "Status: <status>";
 "warning(s)"; "Binary file — no preview."; "Download PDF"; "/skills";
 "Checker · "; "Unknown card"; "Import refused"; "Ten isn't configured";

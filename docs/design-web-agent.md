@@ -20,6 +20,11 @@ Again 2026-09-26: § 18 (one reader for the plan board, for the workspace
 pages of `design-web-ui.md` § 5; owner ruling 2026-09-26 on the product
 shape; the reader choice is a lead ruling, fix round 1), and § 10.2
 (the version check runs on every member page).
+Again 2026-10-02: § 13.6 amended (owner: DeepSeek for everyone, the
+measurement waived, "(testing)" dropped) and § 20 (open sign-up with a
+welcome credit, and the daily ceiling split by payer; draft for owner
+approval). § 20 wins over § 8's who-is-in text, its $5/day ceiling and its
+non-member line, and over § 17.5's unchanged $5/day.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -577,7 +582,10 @@ again tomorrow." (shown as `model_error`, not `over_balance`). So the live app
 keeps at least $15/day, less only the beta calls already in flight when the
 ceiling is crossed (each ≤ the ceiling below). Beta and live costs mix in
 OpenRouter's usage view, so the ledger is the only beta cost record; rotating
-the key means updating both apps.
+the key means updating both apps. **Amended 2026-10-02 (§ 20.6):** the
+single $5 ceiling is replaced by a $10 ceiling on free use only; members
+who paid have none of Ten's own, so the live app's share of the key is no
+longer guaranteed.
 Every model call goes through the proxy; the price list is fetched directly.
 
 The beta shares the owner's **existing production Supabase project**,
@@ -609,7 +617,9 @@ checked by `ten_is_member()`) is the **only barrier** to beta data. The proxy
 (403) and every `ten_` function and policy that reads or writes beta data
 check it; the one exception is the ledger's own-row read, where membership
 itself lives. The app says: "You're signed in, but this beta is invite-only. Ask the
-person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.)
+person who invited you to add you." (`design-web-ui.md` § 1.6 is canonical.) **Amended 2026-10-02 (§ 20):** a new
+account with a confirmed email can claim a one-time welcome credit itself,
+so that line is retired; § 20.4 and UI § 1.6 hold the new screen.
 
 **`ten-model-proxy`** accepts `POST …/ten-model-proxy/chat/completions` and
 `OPTIONS`. Any other path or method gets 404. In order:
@@ -2279,7 +2289,7 @@ content). Deploy it before `ten-paypal`, the new copy after it. When built,
 
 ### 17.5 Limits and refunds
 
-Unchanged: the $5/day beta ceiling, per-call ceilings, gate and allowance
+Unchanged: the $5/day beta ceiling (split by payer since § 20.6), per-call ceilings, gate and allowance
 (§ 3, 4, 8, 13, 14). **Refunds, by hand:** the owner refunds in PayPal, at
 most the current balance, then inserts `kind 'refund'`, `request_id
 'paypal-refund:<refundId>'`, `usd` = the amount. Disputes likewise.
@@ -2760,6 +2770,635 @@ with no `out` row (`cuts` is `[]`); a row with the wrong cell count (in
 
 ---
 
+## 20. Open sign-up with a welcome credit (amendment, 2026-10-02)
+
+**Draft for owner approval.** Owner decisions (2026-10-02): keep DeepSeek
+(`deepseek/deepseek-v4.1-flash`) as the model for everyone (§ 13.6,
+amended 2026-10-02), and give each new account a $1 welcome credit. The
+owner's answers the same day, given to the lead in session: the daily
+ceiling is split by payer (§ 20.6); O4's contact is support@10xjobs.co;
+simple terms, which the owner reviews before sign-ups open (§ 20.7). The
+lead's defaults, each a named value the owner can change: a $1.00 grant;
+grants pause after 100 accounts; credit only for a confirmed email; one
+grant per normalised email; no captcha yet. Where this section and an
+earlier one disagree, this one wins: § 8 (who is in, the $5/day ceiling,
+the non-member line), § 13.1 and § 13.5 (vi) (the $5/day ceiling),
+§ 17.5's "Unchanged: the $5/day beta ceiling", and `design-web-ui.md`
+§ 1.4–§ 1.6, § 1.11 and § 2.7. Screens and copy: `design-web-ui.md` § 1.6
+and § 5.3.1 (rows O1–O8, E14, E16, B7).
+
+**What changes.** Today a stranger can make an account but can't use Ten
+until the owner adds a credit row by hand. After this, a new account with
+a confirmed email gets one $1.00 credit row the first time it opens Ten.
+That row makes it a member by the same rule as before (`ten_is_member()`,
+unchanged). Each email inbox gets the credit once, and the grants stop
+after the first 100. Members who never paid share a $10 daily ceiling;
+members who paid have none of Ten's own.
+
+**Prevents:** a stranger waiting on the owner for a hand-inserted row; a
+grant to every sign-up of the older app (it shares the sign-in); credit
+for an email nobody proved they own; one inbox claiming twice through a
+`+tag`, gmail's dots, a second account or a deleted one; more free credit
+than the owner set; a race that grants past the cap, or twice; an email
+address kept after the account is gone; free use pausing members who
+paid; a screen that still says "invite-only" when it isn't. **Not
+prevented, by the owner's waiver (§ 13.6, amended 2026-10-02):** outside
+members coach on a model whose conduct on these skills is not measured
+(§ 13.4's caveat travels).
+
+### 20.1 The grant: `ten_claim_welcome()`
+
+A new migration, `supabase/migrations/20261002000000_ten_welcome_credit.sql`
+(the four applied files are never edited). It adds the grant function, a
+hash helper, two tables only the grant touches, and the two service-only
+functions of § 20.6.
+
+**`public.ten_claim_welcome()`**: `security definer`, `set search_path =
+''`, every name schema-qualified, owned by `postgres` (the SQL editor's
+role, like the init file's definer functions). Execute is revoked from
+`public` and `anon` and granted to `authenticated` only. It takes no
+argument and acts only on `auth.uid()`. In one transaction, in this order:
+
+1. No `auth.uid()` → raise `not_signed_in`, `PT401` (the init file's code
+   convention).
+2. **Already a member** (the same test as `ten_is_member()`: any `credit`
+   row for this user, whether an invited starter, a paid row or an
+   earlier welcome) → return `{ "status": "already_member" }`. Nothing is
+   written.
+3. **A confirmed email.** Read `email` and `email_confirmed_at` from
+   `auth.users` for this id: the table, not the token's claims (rule 11).
+   A null email (an account with no email, such as an anonymous or phone
+   sign-in) or a null `email_confirmed_at` → `{ "status": "unconfirmed" }`.
+4. **Lock the settings row** (`select … for update`). Each claim waits
+   here for the one before it, so two claims can't both see 99 grants and
+   both take the 100th, and one account's two tabs can't both grant.
+5. **One per inbox.** Compute the address's hash (§ 20.2). If the claims
+   table has it → `{ "status": "already_claimed" }`.
+6. **The cap.** If the claims table has `cap` rows or more →
+   `{ "status": "paused" }`.
+7. **Grant.** Insert the hash into the claims table, then one ledger row:
+   `kind = 'credit'`, `usd` = the settings row's `usd`, `request_id =
+   'welcome:'` followed by the uid as lowercase text, no `model`, tokens 0,
+   `gross_usd` and `fee_usd` null. Return `{ "status": "granted", "usd":
+   <usd> }`.
+
+A refusal writes nothing; only a grant leaves a claims row.
+
+**Why each part holds:**
+
+- **One per account,** twice over: step 2, and the init file's `unique`
+  on `request_id`, which refuses a second `welcome:<uid>` row even if the
+  function were later changed.
+- **The money-path checks stay valid** (read in
+  `20260925000000_ten_paypal_credit.sql`):
+  `ten_usage_ledger_paypal_breakdown` requires `gross_usd` and `fee_usd`
+  on `paypal:` rows and forbids them on every other row, so a `welcome:`
+  row carries neither. The kind check allows `credit`. `ten_balance_for`
+  adds every `credit` row, so the balance rises by `usd` with no change to
+  it. A `welcome:` row never makes anyone "paid" (§ 20.6 reads only
+  `paypal:` rows).
+- **Unchanged:** `ten_is_member()`, every policy and function that reads
+  it, the proxy's 403, and `ten-paypal`'s members-only rule. A welcome
+  member is a member, so they can buy; a refused account still can't. The
+  owner's hand-inserted $5 invited starter is unchanged too: an invited
+  person who opens Ten after their row exists gets `already_member`; one
+  who claimed $1 first and is invited later holds both rows ($6).
+- **Only the app calls it,** but anyone signed in to the shared project
+  could call it directly. They get exactly what opening Ten would give
+  them. Older-app accounts get nothing unless they open Ten (or call it),
+  which is why this is a function the app calls and not a trigger on
+  `auth.users` (§ 20.9).
+- **Email confirmation is on** (the lead read the project's public
+  `/auth/v1/settings` on 2026-10-02: `mailer_autoconfirm: false`,
+  `disable_signup: false`). It must stay on: Supabase's docs ("General
+  configuration", read 2026-10-02) say that with **Confirm email** off,
+  Supabase "implicitly confirms the user's email in the database", and
+  step 3 would then check nothing. Step 3 stays as the backstop for an
+  account with no email.
+
+### 20.2 The settings row and the claims table
+
+**`public.ten_welcome_settings`**, exactly one row (`id boolean primary
+key default true check (id)`):
+
+| column | value | check | meaning |
+|---|---|---|---|
+| `cap` | **0** when the migration is applied; the owner sets **100** to open (§ 20.12) | `>= 0` | how many grants may exist in total, counted from the claims table |
+| `usd` | **1.00** | `> 0 and <= 5` | each grant's amount; at most the $5 invited starter, so a typo can't grant $100 |
+
+The owner changes either with one `update` in the SQL editor, with no
+deploy: `update public.ten_welcome_settings set cap = 100;` opens, `set
+cap = 0` pauses at once, `set cap = 150` raises. The row is the one home of
+both values (rule 12): the docs name the defaults; the row is what runs.
+
+*Why a row and not a constant inside the function:* changing a constant
+means re-creating the whole function by hand, with its owner and grants,
+in production, which is easy to get wrong. Updating one value is not.
+*Why it starts closed (`cap = 0`):* applying the migration, deploying the
+proxy and deploying the site can then happen in any order without granting
+anyone anything before § 20.7's items are done. Opening is one owner
+`update`.
+
+**`public.ten_welcome_claims`**: `email_hash text primary key` (checked:
+exactly 64 lowercase hex characters) and `claimed_at timestamptz not null
+default now()`. Nothing else: no email, and no user id (the `welcome:<uid>`
+ledger row already says which account got it, rule 12).
+
+**The hash** comes from one helper, `public.ten_welcome_hash(p_email
+text)`, immutable, which neither `anon` nor `authenticated` may execute:
+
+1. Lower-case and trim the address. Split it at the last `@` into the
+   local part and the domain.
+2. Drop everything from the first `+` in the local part (the `+tag`).
+3. If the domain is `gmail.com` or `googlemail.com`: drop every `.` in the
+   local part, and use `gmail.com` (both domains reach the same inbox).
+4. Hash `ten-welcome-v1:` followed by `<local>@<domain>` with Postgres's
+   built-in `sha256()` over the UTF-8 bytes, written as 64 lowercase hex
+   characters. No extension is needed: `sha256(bytea)` has been built in
+   since Postgres 11.
+
+**Privacy, said plainly.** The table keeps a fingerprint of the address,
+not the address. It is not anonymous: anyone who can read the table and
+already has an email address can check whether that address claimed. Only
+the database owner and the service role can read it: RLS on, no policy,
+and every grant revoked from `anon`, `authenticated` and `public` (the init
+file revokes its tables the same way). Those same readers can already see
+every live account's plain email in `auth.users`, so a secret key on the
+hash would protect nothing from them (§ 20.9). `/privacy.html` says all of
+this (§ 20.7).
+
+The teardown drops both tables and every function this migration adds.
+
+### 20.3 What deletion does
+
+- **"Delete my beta data"** (`ten-delete-account`, § 17.4) is unchanged.
+  It deletes no ledger row, so the welcome row stays and the person stays
+  a member, with an empty workspace. It never touches the claims table.
+- **Deleting the account itself** (the shared sign-in in `auth.users`,
+  which only the owner or the older app can do): the ledger rows go with
+  it (`on delete cascade`, init file), the welcome row included. The
+  claims row has no link to the account, so it **stays**. A new account
+  on the same inbox gets `already_claimed`, and the cap still counts the
+  old grant.
+- **A deliberate exception to rule 9** ("it's gone when you delete it"),
+  approved with the lead's defaults (owner, 2026-10-02). *What stays:* a
+  fingerprint of a sign-in address and a date, with no career content.
+  *Why:* without it, deleting an account and signing up again would claim
+  again, and the cap would stop being a bound on free credit. It is the
+  same kind of keep as § 8's `call` rows (amounts, no content), and the
+  privacy page says that it stays (§ 20.7). `PRINCIPLES.md` rule 9 does
+  not name this exception yet (owner question 1).
+- Tearing down the whole beta drops the claims table too.
+
+### 20.4 The app's flow (`RealApp`)
+
+After sign-in, the existing membership check runs first (`RealApp.tsx`'s
+`checkAndAdvance`; `design-web-ui.md` § 1.4). Then:
+
+- **A member** → as today. No claim call.
+- **Not a member** → one call, `rpc("ten_claim_welcome")`, through a new
+  `claimWelcome(client)` in `apps/web/src/backend/auth.ts`, beside
+  `checkMembership`:
+  - `granted` → carry on exactly as a member does today (workspace setup,
+    balance, conversation), and show O1 with the reply's `usd`.
+  - `already_member` → carry on as a member, with no O1 (another tab won).
+  - `paused`, `unconfirmed`, `already_claimed` → the not-a-member screen
+    with that reason's line (O2, O3, O4).
+  - the call fails, or answers a status not on this list → the existing
+    setup error screen with Q1 ("Couldn't check your membership. Try
+    again in a moment.") and Retry. Retry runs the whole check again;
+    the claim is safe to repeat.
+- **O1 is never stored** (rule 12). It shows on the page load where the
+  grant happened, until the first message is sent. A reload shows the
+  balance chip alone.
+- **Nothing before membership:** the claim runs where the membership
+  check runs today, before `createRootClaudeMd`. A refused account makes
+  no workspace, balance or conversation call.
+- **`NON_MEMBER_MESSAGE` goes.** The not-a-member screen takes a reason.
+  `upload-errors.ts`'s `not_a_member` line, and the 403 `notMember` text
+  of `ten-model-proxy` and `ten-paypal`, become O6: the one line for "this
+  account has no credit row" outside the sign-in flow.
+
+### 20.5 Copy, and the spend gate at $1
+
+Every new or changed string is a row in `design-web-ui.md` § 5.3.1 (O1–O8,
+E14, E16, B7), checked there against rule 8, rule 18, § 2.7's rule and the
+plain-voice ruling. This section quotes none of them, so each lives in one
+place (rule 12). What the copy may say about money: the grant's amount,
+taken from the claim's reply, and nothing per reply. DeepSeek's per-reply
+costs are derived from listed prices, not measured (§ 13.3), so no line
+says "about N replies" until the ledger has DeepSeek's measured median,
+and then only with its date.
+
+**The spend gate at $1 (accepted, owner, 2026-10-02).** A turn may spend
+up to `spendGateUsd`, $1.00 (owner, 2026-09-22), before a gate opens (§ 4).
+A welcome account's whole balance is $1.00, so no gate ever opens for it:
+the proxy's 402 is the stop (§ 8). So no copy may promise a gate to a
+welcome account: O1 names the balance chip, not a gate. `estimate_cost`'s
+cost card still shows when the model calls it (rule 5).
+
+### 20.6 The daily ceiling, split by payer
+
+Owner answer (2026-10-02): free use shares a ceiling; paid use has none of
+Ten's own. This replaces § 8's single `BETA_CEILING_USD` check.
+
+- **Paid** means a member with at least one `paypal:` credit row (§ 17.3).
+  **Free** means every other member: welcome grants and invited $5
+  starters. A member who pays becomes paid from that moment; a refund
+  (`kind = 'refund'`) leaves their `paypal:` credit row in place, so they
+  stay paid, and their own balance still limits them.
+- **Two service-only functions** in the same migration, both `security
+  invoker`, `set search_path = ''`, execute granted to `service_role` only
+  (like `ten_balance_for`):
+  - `public.ten_is_paid(p_user uuid) returns boolean`: a `credit` row for
+    that user whose `request_id` starts with `paypal:`.
+  - `public.ten_free_spend_today() returns numeric`: the sum of today's
+    (UTC) `call` rows whose user has no such row. It uses the existing
+    call-day index (init file).
+- **The proxy** (`ten-model-proxy`, § 8 point 3), after the 402 balance
+  check:
+  - paid → no daily check at all;
+  - free → if `ten_free_spend_today()` is at or above
+    `FREE_DAILY_CEILING_USD` = **10** (in `core.ts`, replacing
+    `BETA_CEILING_USD`), answer 503, shown as `model_error`, with E14.
+  - `ten_beta_spend_today()` stays, unused by the proxy, as the owner's
+    read-only view of all of Ten's spend today (§ 20.8).
+- **An upstream 402** gets its own message, E16, instead of the general
+  "The model is temporarily unavailable. Try again." OpenRouter's errors
+  page (read 2026-10-02): 402 means "Your account or API key has
+  insufficient credits". Now that paid members have no ceiling of Ten's
+  own, this is what stops them on a busy day, so it must say so (rule 8).
+- `FREE_DAILY_CEILING_USD` is a code constant: changing it is an Edge
+  Function deploy, which only the owner runs (§ 15). The same deploy
+  carries O6 and E16.
+
+**The shared key still caps everyone, paid members included.** The proxy
+uses the owner's OpenRouter key that the older app also uses, with a $20
+daily limit (§ 8). Free use can take at most $10 of it, but paid use has
+no ceiling of Ten's own, so on a busy day paid members can use the rest,
+and the older app no longer has a guaranteed share (it had at least $15
+under § 8). When the key's limit is reached, everyone on both apps stops
+until it resets, and Ten's members see E16. The owner's two options, both
+in § 20.12:
+
+- **Raise the shared key's daily limit.** One setting; the two apps still
+  share it, so the older app's share stays unguaranteed.
+- **Give Ten its own key** (recommended by the architect): a new
+  OpenRouter key with its own daily limit, set as `TEN_OPENROUTER_API_KEY`.
+  The older app keeps its whole $20; Ten's costs stop mixing with the
+  older app's in OpenRouter's usage view (§ 8); "rotating the key means
+  updating both apps" (§ 8) no longer applies.
+
+### 20.7 Before opening
+
+**The DeepSeek measurement is not a step here:** the owner waived it
+(§ 13.6, amended 2026-10-02). It stays available. If the owner runs it
+later (issue #33's driver, `tests/always-on/run_headless_voice.sh`
+`deepseek/deepseek-v4.1-flash <tag>`, one trial, then `TRIALS=3` for the
+cases with a HARD hit or a FAILED trial), this is the bar, so the result
+means something:
+
+- **Voice** (`design-plain-replies.md` § 4's bar, with `scan_voice.py`
+  standing in for the voice judge under the owner's cost rule): each of
+  the nine cases has no HARD hit in trial 1, or none in at least 2 of 3
+  trials after the re-run. A hit on "To Review" alone does not count (C8
+  in `design-web-ui.md` § 5.3.1; the scanner still lists it as HARD).
+- **Finished turns** (§ 13.4's tool-call watch): a trial the driver shows
+  as FAILED (an error, a step-cap stop, an empty reply) is re-run, never
+  counted; a case with 2 or more FAILED trials out of 3 fails.
+- **Honesty** (§ 4: a `made_false` fact blocks; § 13.4: claims never
+  stated stronger than the facts). The driver runs no judge, and
+  `judge_voice.sh` reads another results layout (flat `<case>-….md`
+  files, where the driver writes `hv-<tag>/<case>/<trial>/reply.md`). So
+  one independent reviewer gets trial 1 of `t21-plain-report`,
+  `t8-honesty-thresholds`, `t10-over-budget` and `t13-ceiling` (each
+  trial's `reply.md`, `planted/`, `ws/`, `stderr.txt`, and the case's
+  `expected.md`) and returns one row per MUST fact, `carried`, `dropped`
+  or `made_false`, with the quoted words. Any `made_false` fails; a
+  `dropped` fact re-runs that case's three trials, which pass on 2 of 3.
+
+The result, as numbers only, goes in an issue comment and
+`docs/evals/eval-deepseek-open-signup.md`; a failing result reopens § 13.6
+answer 2.
+
+**What must be done before the owner sets `cap` above 0:**
+
+1. **The terms page, reviewed by the owner.** Free credit comes with
+   conditions a stranger should be able to read before signing up. One
+   new page, `apps/web/public/terms.html`, served at `/terms.html`, linked
+   from the sign-in page (O7) and the `⋯` menu beside Privacy (O8). **The
+   owner reviews this text before sign-ups open** (§ 20.12 step 1). It is
+   plain language, not legal advice. The page's text, word for word (this
+   section is the one copy to take it from, as § 13.6 is for the host
+   list):
+
+   > **Terms**
+   >
+   > **Ten is a beta.** It is an early version, and it can change, pause
+   > or stop at any time.
+   >
+   > **Free credit.** A new account with a confirmed email address can get
+   > free credit to try Ten, while places last. There is one free credit
+   > per person and per email inbox. Free credit has no cash value: it
+   > can't be paid out, refunded or moved to another account. We can stop
+   > offering it to new accounts at any time, and we can remove it from
+   > accounts made to get it more than once. Free use has a shared daily
+   > limit, so it can pause until the next day.
+   >
+   > **Paid credit.** You buy credit in PayPal's own window, as a one-time
+   > payment; nothing renews. Paid credit stays if you delete your beta
+   > data. For a refund, email support@10xjobs.co.
+   >
+   > **Fair use.** Use one account. Don't try to get around Ten's limits,
+   > reach anyone else's data, or overload the service. Don't use Ten to
+   > send spam or to deceive anyone.
+   >
+   > **What Ten does, and what you do.** Ten drafts and prepares; you
+   > send, submit and decide. Ten is built not to give legal, tax or
+   > financial advice and not to make up a pay figure. Check anything
+   > important before you rely on it.
+   >
+   > **Your data.** The privacy page says what leaves your browser and
+   > what Ten keeps. You can export your workspace at any time, and
+   > "Delete my beta data" in the menu deletes it; your sign-in, your
+   > credit and your usage amounts are kept, as that page explains.
+   >
+   > **Contact.** support@10xjobs.co
+
+   *Checked against:* rule 8 (no promise the product can't keep: "built
+   not to", where rule 10 is a design aim, not a guarantee); rule 10;
+   § 17.2 (buying is the person's own act in PayPal's window); § 17.4
+   (what a delete keeps).
+2. **`/privacy.html`, corrected,** in the same site deploy:
+   - In the DeepSeek host heading, "(testing only — see below)" goes
+     (§ 13.6, amended 2026-10-02, answer 4).
+   - The paragraph "DeepSeek is offered only for internal testing, to a
+     small group who know it's running — never to the general beta — and
+     always through the same no-data-kept hosts above, never DeepSeek's
+     own API." is false from opening day. It becomes, word for word:
+     "Ten runs on DeepSeek V4.1 Flash for everyone, always through the
+     no-data-kept hosts above, never DeepSeek's own API."
+   - A new section, word for word: heading "Your account", then: "Your
+     sign-in (your email address, and your password if you set one) is
+     shared with the older CareerCoach app. To give free credit only once
+     per email inbox, Ten keeps a one-way fingerprint of your email
+     address, not the address itself. The fingerprint stays after you
+     delete your beta data or your account, so the same inbox can't get
+     free credit twice. Someone who already had your address and this
+     record could check whether they match. Your credit and the amounts
+     you've spent are kept too, with no content."
+   - The host lists are read again from `GET /api/v1/endpoints/zdr`, with
+     the new date, since the page changes anyway (§ 13.6's refresh rule).
+
+### 20.8 Abuse and cost bounds
+
+As numbers the code enforces, with the defaults:
+
+- **Free credit, ever:** at most `cap` × `usd` = 100 × $1.00 = **$100**,
+  until the owner raises either, plus $5 per person the owner invites.
+  Deleted accounts still count (§ 20.3).
+- **What free use costs the owner per UTC day:** at most the **$10**
+  free ceiling, plus the free calls already in flight when it is crossed
+  (each at most one call's ceiling: $0.043288 on DeepSeek, $0.273112 on
+  Claude, § 13.1), plus the same-day spend of anyone who buys that day:
+  once they are paid, their earlier calls leave the free sum. That last
+  part is at most each such person's free credit.
+- **One free account:** at most its free credit, plus its own calls in
+  flight when its balance crosses zero. There is no per-user rate limit
+  (owner, 2026-09-23, § 8): a script calling the proxy directly can start
+  many calls at once while the balance is above 0. Each is capped at one
+  call's ceiling, and all free accounts together by the $10.
+- **One paid account:** no daily ceiling of Ten's own; at most its own
+  balance, plus its own calls in flight when it crosses zero. Paid credit
+  is what PayPal delivered after its fee (§ 17.3), so the owner's own
+  loss here is only that overshoot.
+- **Everyone, both apps:** the OpenRouter key's daily limit ($20 today,
+  shared with the older app) stops every call when reached (§ 20.6).
+
+**One person with many addresses.** Normalisation stops the cheap tricks:
+a `+tag` on any domain, and dots or `googlemail.com` on gmail. It doesn't
+stop separate real mailboxes, a custom domain that accepts every address,
+disposable-mail services, or a provider's own alias scheme. Each confirmed
+inbox gets $1.00 until the cap; the worst case is one person taking every
+remaining grant, $100 of credit, spent at most $10 a day. With the split,
+that pauses only free use: paying members are not held to the free
+ceiling, though they still share the key's limit. The owner sees it with
+read-only queries (grants per day, free spend today, all spend today):
+
+```sql
+select date_trunc('day', claimed_at) as day, count(*) from public.ten_welcome_claims group by 1 order by 1;
+select public.ten_free_spend_today(), public.ten_beta_spend_today();
+```
+
+and stops new grants with `update public.ten_welcome_settings set cap = 0;`.
+
+**The next protection: a captcha (Cloudflare Turnstile),** not built now.
+Supabase offers Turnstile on sign-up, sign-in and password reset ("Enable
+CAPTCHA Protection", read 2026-10-02). It stops scripted sign-ups, not a
+person with many inboxes. The owner's steps when it's needed: create a
+Turnstile widget for the Ten domain in Cloudflare; put its secret key in
+Supabase (Auth → Bot and Abuse Protection → Enable CAPTCHA protection →
+Turnstile); give its site key to the build as a new `VITE_` setting. Ten's
+sign-in, sign-up, email-link and reset calls then pass `captchaToken`.
+**The catch:** if the setting covers the whole project, the older app's
+forms must send a token too, or its sign-ins fail (Supabase's page
+doesn't say: UNVERIFIED). When to do it: the grants-per-day query shows a
+burst the owner doesn't recognise, or the cap fills faster than expected.
+
+### 20.9 Not taken
+
+- **A trigger on `auth.users`:** the project is shared, so it would grant
+  every older-app sign-up (`20260923000000_ten_beta_init.sql:14-22`).
+- **An Edge Function for the grant:** a deploy, the service-role key on
+  one more path, and two writes that must agree, where one SQL
+  transaction does it.
+- **Keeping the email, or any reversible form of it** (rule 12, privacy).
+- **A secret key on the hash (HMAC):** the key would sit in the database
+  whose `auth.users` already holds every live address in plain text, and
+  it is one more secret to manage.
+- **A blocklist of disposable-mail domains:** a list to keep current, and
+  a catch-all custom domain walks past it. The captcha comes first.
+- **A payer column on each `call` row,** which would keep a buyer's
+  earlier free calls in the free sum: a change to the ledger and its
+  writer for an overshoot capped by that person's free credit (§ 20.8).
+- **Pointing to Buy credit from E14:** § 17.2 keeps `over_balance` as the
+  one fixed pointer to buying, so the coach can't be read as upselling.
+- **A signed-out "are grants open?" call,** so the sign-in page could hide
+  O5 at the cap: a function anyone on the internet could call. O5 says
+  "while places last" instead, which stays true.
+- **A lower gate threshold for small balances** (§ 20.5).
+
+### 20.10 Build list (one PR; coder builds, an independent tester tests)
+
+1. **Migration** `20261002000000_ten_welcome_credit.sql`: both tables,
+   `ten_welcome_hash`, `ten_claim_welcome`, `ten_is_paid`,
+   `ten_free_spend_today`, grants and revokes as § 20.1–§ 20.2 and § 20.6,
+   a 3 s lock timeout, an order guard (refuses unless the ledger has
+   `gross_usd`, that is, the PayPal migration is applied, and refuses if
+   any of its own objects exist), and the owner queries of § 20.8 and
+   § 20.12 in its header. The teardown drops the six objects, and its
+   header lists the file.
+2. **SQL tests:** `tests/sql/r9-welcome.mjs` (§ 20.11), on `stub.sql`
+   with `auth.users` gaining nullable `email` and `email_confirmed_at`
+   (the existing tests insert ids only, so they are unaffected); a README
+   line.
+3. **Client:** `claimWelcome` in `auth.ts`; `RealApp`'s flow (§ 20.4);
+   `NotAMember` takes a reason; O1 in the notice place; `NON_MEMBER_MESSAGE`
+   removed and `upload-errors.ts` moved to O6.
+4. **Copy:** O1–O8, E14, E16 and B7 word for word; O5 and O7 on the
+   sign-in page in both modes; the `⋯` menu's Terms link (O8).
+5. **Proxy:** `FREE_DAILY_CEILING_USD = 10` replaces `BETA_CEILING_USD`;
+   `ProxyDeps` gains `isPaid(uid)` and `freeSpendToday()` (in
+   `_shared/supabase.ts`, beside `betaSpendToday`); the free-only check;
+   E14 as `MESSAGES.ceiling`, E16 for an upstream 402, O6 as `notMember`
+   (also in `ten-paypal/handler.ts`). Tests that pin 5, the old ceiling
+   text or the old 403 text move with them (`handler.test.ts`,
+   `tests/functions/proxy_auth_paths_cors.test.ts`, the e2e constants,
+   § 13.5 (vi)).
+6. **Static pages:** `privacy.html` and the new `terms.html`, both as
+   § 20.7 gives them; the menu label drops "(testing)" (§ 13.6, amended
+   2026-10-02; `coach-model.ts`, § 13.5 (ix)).
+7. **Stand-in:** `tests/e2e-real/stand-in.ts` applies the new migration
+   and creates users with an email and a confirmed date, with a way to
+   make one unconfirmed.
+8. **When built,** `docs/ARCHITECTURE.md` (who writes credit rows; the
+   split ceiling, where it says "$5") and `supabase/functions/README.md`
+   follow, as § 17.4 did.
+
+### 20.11 Test plan (independent tester)
+
+**SQL** (`r9-welcome.mjs`, PGlite, all five migrations in order):
+
+1. Hash: local part `A.B+x` at `GoogleMail.com` and local part `ab` at
+   `gmail.com` give the same hash; `a.b+x` at `example.com` equals `a.b`
+   at `example.com` but not `ab` at `example.com` (dots count outside
+   gmail); a padded upper-case address equals its trimmed lower-case
+   form; the hash equals sha256 of `ten-welcome-v1:` plus the normalised
+   address, computed separately in the test with Node's `crypto`.
+2. Grant: a confirmed user with `cap` 100 → `granted`, `usd` 1.00; one
+   ledger row (`credit`, 1.00, `welcome:<uid>`, `gross_usd` and `fee_usd`
+   null); as that user, `ten_is_member()` is true and `ten_balance()` is
+   1.00; one claims row; the claims table's columns are exactly
+   `email_hash` and `claimed_at`.
+3. Calling again → `already_member`, still one row of each. An invited
+   user (a $5 row, null `request_id`) → `already_member`, no claims row.
+4. A null `email_confirmed_at` → `unconfirmed`; a null email →
+   `unconfirmed`; no rows either way.
+5. A second account on a `+tag` or dotted gmail form of a claimed address
+   → `already_claimed`, no rows.
+6. Deleting the first user from `auth.users` removes their ledger rows and
+   keeps the claims row; a new account on the same address →
+   `already_claimed`, and the old claim still counts toward the cap.
+7. Cap: as applied, `cap` is 0 → `paused`; at `cap` 2, two grants, then a
+   third address → `paused` with no rows; raised to 3 → `granted`.
+8. Amount: `usd` 2.50 → the row and the reply carry 2.50; `usd` 6, 0 or
+   -1, and `cap` -1, are refused by the checks.
+9. Access: `anon` can't execute `ten_claim_welcome`; `authenticated`
+   can't execute `ten_welcome_hash`, `ten_is_paid` or
+   `ten_free_spend_today`, or select, insert, update or delete either
+   table (42501); an `authenticated` call with no `sub` → `PT401`.
+10. Money checks: a `welcome:` row with `gross_usd` set is refused (the
+    PayPal check); a second `welcome:<uid>` row is refused (unique).
+11. Paid and free: a welcome user and an invited user are not paid; a user
+    with a `paypal:` credit row is, and stays paid after a `refund` row.
+    With today's calls of $4 by a free user, $3 by an invited user and $50
+    by a paid user, `ten_free_spend_today()` is 7.00; a call row dated
+    yesterday counts in neither function.
+12. The settings row is locked `for update` before the count: checked by
+    review of the file, since PGlite runs one connection (the README's
+    stated limit).
+13. The teardown leaves no object this migration added.
+
+**Proxy** (stubbed upstream, `handler.test.ts`):
+
+1. Free member, free spend today $9.99 plus a $0.02 call → the next call
+   gets 503 with E14; at $9.98 → forwarded.
+2. Paid member, free spend today $50 and all spend today $80 → forwarded
+   (no daily check); `freeSpendToday` is not even called for them.
+3. A paid member with balance 0 → 402, as before.
+4. Upstream 402 → 503 `model_error` with E16; upstream 500 → the general
+   message, as before.
+5. A non-member → 403 with O6.
+
+**App** (`tests/e2e-real/e2e.ts` on the stand-in running the real
+migrations, with its request log as the spy):
+
+1. A confirmed non-member at `cap` 100: one `ten_claim_welcome` call; the
+   chat mounts; the chip reads `$1.00`; O1 shows and is gone after the
+   first send; a reload shows no O1 and makes no claim call.
+2. `cap` 0 → the not-a-member screen with O2 and Sign out only; zero
+   `ten_ws_write`, Storage, `ten_balance` and conversation calls.
+3. A second account on a `+tag` of a claimed address → O4. An unconfirmed
+   stand-in user → O3.
+4. The claim answering 500 → Q1 and Retry; Retry after the stand-in
+   recovers → granted.
+5. An invited member → no claim call.
+6. Strings: the bundle has O1–O8, E14, E16 and B7's new words;
+   "invite-only", "The beta has reached today's limit" and "The beta has
+   a shared daily limit" are in no rendered page and not in the bundle
+   (§ 5.3.1's Removed list); the build output has `/terms.html` with the
+   § 20.7 text, and `/privacy.html` no longer says "never to the general
+   beta" or "testing only" and has the fingerprint sentence.
+
+### 20.12 Owner checklist (production is owner-only, § 15)
+
+In this order. Agents prepare the commands and the checks; the owner runs
+each step. Email confirmation is already on (§ 20.1) and stays on. The
+DeepSeek measurement is not a step (§ 13.6, amended 2026-10-02).
+
+1. **Review the terms** (§ 20.7 item 1) and approve or edit the text
+   **before sign-ups open**. The build PR carries the approved words.
+2. **Choose the key's limit** (§ 20.6), one of:
+   - *Raise the shared key's daily limit:* OpenRouter → Keys → the key
+     both apps use → its limit (today $20, daily reset) → a higher
+     amount. Nothing else changes.
+   - *Give Ten its own key* (recommended): OpenRouter → Keys → create a
+     key for Ten with a daily limit you choose; then `supabase secrets set
+     TEN_OPENROUTER_API_KEY=<the new key> --project-ref
+     ivunfotoggdxbjouumdk`, and redeploy the proxy (step 4) so it is
+     surely used. The older app keeps the old key untouched.
+   (The OpenRouter menu paths are UNVERIFIED against today's site.)
+3. **Apply the migration** in the SQL editor as `postgres` at a quiet
+   time, then `NOTIFY pgrst, 'reload schema';`. Check, read-only:
+   `select cap, usd from public.ten_welcome_settings;` gives 0 and 1.00.
+4. **Deploy the proxy:** `supabase functions deploy ten-model-proxy
+   --no-verify-jwt --project-ref ivunfotoggdxbjouumdk`. `ten-paypal`'s new
+   403 text can wait for its next deploy: only members reach Buy credit,
+   and its screens show their own fixed lines (`design-web-ui.md` § 1.11).
+5. **Deploy the site:** `apps/web/scripts/deploy-prod.sh`.
+6. **Live run** (PROCESS step 6), with `cap` still 0, on a fresh account
+   with an inbox you control: the not-a-member screen shows O2. Then
+   `update public.ten_welcome_settings set cap = 1;` and reload: the chip
+   reads `$1.00`, O1 shows, and the ledger has one `welcome:` row. A second
+   account on a `+tag` of the same inbox shows O4. (That test grant counts
+   toward the 100.)
+7. **Open:** `update public.ten_welcome_settings set cap = 100;`.
+
+### 20.13 Open questions for the owner
+
+1. **Rule 9 and the kept fingerprint** (§ 20.3). The exception lives in
+   this design, below `PRINCIPLES.md` in the precedence chain, and rule 9
+   doesn't name it. Amend rule 9 to name it, or rule that rule 9 covers
+   career data only (the reading § 8 already uses for kept cost rows)?
+   The chain needs one of the two; this section doesn't pick.
+2. **Which key option** (§ 20.6, § 20.12 step 2), and, for Ten's own key,
+   its daily limit.
+
+### 20.14 UNVERIFIED
+
+- Whether Supabase's captcha setting covers the whole project, so the
+  older app must send tokens too.
+- The Supabase and OpenRouter menu paths (menus move), and whether a new
+  secret reaches a running function without a redeploy (§ 20.12 redeploys
+  anyway).
+- Whether `GET /api/v1/endpoints/zdr` still lists the same hosts.
+- DeepSeek's real per-reply cost (derived, § 13.3), which is why no copy
+  names a count of replies.
+- DeepSeek's conduct on the skills: not measured (§ 13.6, amended
+  2026-10-02).
+
+---
+
 ## Step-1 spikes
 
 The pass criteria are the plan's (step 1), except spike 4, which the proxy
@@ -2875,3 +3514,13 @@ spike replaced (owner, 2026-09-23).
   (rule 7); delete keeps every ledger row. Only Ten's own orders are
   credited: a signed `invoice_id` and Ten's own payee (`TEN_PAYPAL_MERCHANT_ID`)
   checked before any credit (§ 17.10, lead rulings on F1, 09-25).
+- Open sign-up with a welcome credit (§ 20; owner, 2026-10-02, with the
+  lead's defaults; draft): a confirmed new account claims one credit row
+  itself through `ten_claim_welcome()`, once per account and once per
+  normalised inbox (a hash kept in a table that outlives the account, a
+  deliberate exception to rule 9), up to a cap in a settings row that
+  ships at 0 and opens at 100. Membership, the starter and PayPal's
+  members-only rule are unchanged. The daily ceiling is split by payer:
+  $10 shared by free members, none of Ten's own for members who paid; the
+  shared OpenRouter key's limit still caps everyone. DeepSeek for everyone,
+  the measurement waived (§ 13.6, amended 2026-10-02).

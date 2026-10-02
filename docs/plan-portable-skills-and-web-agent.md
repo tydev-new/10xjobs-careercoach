@@ -382,6 +382,9 @@ models you plan to offer, and through step A on each host's own model.
 - [ ] every model we ship to passes the conduct subset. A failure restores the
       rule with a receipt naming that model, or drops the model. There are no
       per-model skill copies (rule 12)
+- DeepSeek, 2026-10-02: this condition is waived by the owner, not met
+  (`design-web-agent.md` § 13.6, amended 2026-10-02). No conduct
+  measurement of DeepSeek exists; issue #33's driver stays available.
 
 **Step M - Migrate the existing WebUI users** (after step 6).
 

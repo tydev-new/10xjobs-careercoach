@@ -2900,9 +2900,10 @@ anyone anything before § 20.7's items are done. Opening is one owner
 `update`.
 
 **`public.ten_welcome_claims`**: `email_hash text primary key` (checked:
-exactly 64 lowercase hex characters) and `claimed_at timestamptz not null
-default now()`. Nothing else: no email, and no user id (the `welcome:<uid>`
-ledger row already says which account got it, rule 12).
+exactly 64 lowercase hex characters), and nothing else: no email, no
+user id and no date. The `welcome:<uid>` ledger row already says which
+account got it and when (rule 12), and rule 9 allows nothing more to
+outlive the account (§ 20.3).
 
 **The hash** comes from one helper, `public.ten_welcome_hash(p_email
 text)`, immutable, which neither `anon` nor `authenticated` may execute:
@@ -2940,14 +2941,13 @@ The teardown drops both tables and every function this migration adds.
   claims row has no link to the account, so it **stays**. A new account
   on the same inbox gets `already_claimed`, and the cap still counts the
   old grant.
-- **A deliberate exception to rule 9** ("it's gone when you delete it"),
-  approved with the lead's defaults (owner, 2026-10-02). *What stays:* a
-  fingerprint of a sign-in address and a date, with no career content.
+- **Rule 9 names this keep** (amended, owner, 2026-10-02): deleting an
+  account keeps only a one-way fingerprint of the email address, used
+  solely to stop the same inbox claiming free credit twice, with no
+  address, no name and nothing else. That is the claims row, exactly.
   *Why:* without it, deleting an account and signing up again would claim
-  again, and the cap would stop being a bound on free credit. It is the
-  same kind of keep as § 8's `call` rows (amounts, no content), and the
-  privacy page says that it stays (§ 20.7). `PRINCIPLES.md` rule 9 does
-  not name this exception yet (owner question 1).
+  again, and the cap would stop being a bound on free credit. The privacy
+  page says the same (§ 20.7).
 - Tearing down the whole beta drops the claims table too.
 
 ### 20.4 The app's flow (`RealApp`)
@@ -3033,21 +3033,16 @@ Ten's own. This replaces § 8's single `BETA_CEILING_USD` check.
   carries O6 and E16.
 
 **The shared key still caps everyone, paid members included.** The proxy
-uses the owner's OpenRouter key that the older app also uses, with a $20
-daily limit (§ 8). Free use can take at most $10 of it, but paid use has
-no ceiling of Ten's own, so on a busy day paid members can use the rest,
-and the older app no longer has a guaranteed share (it had at least $15
-under § 8). When the key's limit is reached, everyone on both apps stops
-until it resets, and Ten's members see E16. The owner's two options, both
-in § 20.12:
-
-- **Raise the shared key's daily limit.** One setting; the two apps still
-  share it, so the older app's share stays unguaranteed.
-- **Give Ten its own key** (recommended by the architect): a new
-  OpenRouter key with its own daily limit, set as `TEN_OPENROUTER_API_KEY`.
-  The older app keeps its whole $20; Ten's costs stop mixing with the
-  older app's in OpenRouter's usage view (§ 8); "rotating the key means
-  updating both apps" (§ 8) no longer applies.
+uses one OpenRouter key, `TEN_OPENROUTER_API_KEY`, shared with the older
+app; it stays one shared key (owner, 2026-10-02). Its daily limit, $20
+today, is the owner's own setting in OpenRouter: no code here sets or
+reads it. Free use can take at most $10 of it, so free use alone always
+leaves the older app at least $10 a day. Paid use has no ceiling of Ten's
+own, so on a day of heavy paid use the older app's share can fall below
+that (under § 8 it was at least $15). When the key's limit is reached,
+every call on both apps stops until it resets, and Ten's members see E16.
+If paid use grows, the owner raises the key's limit in OpenRouter
+(§ 20.12, optional): no code change and no deploy.
 
 ### 20.7 Before opening
 
@@ -3143,10 +3138,12 @@ answer 2.
      shared with the older CareerCoach app. To give free credit only once
      per email inbox, Ten keeps a one-way fingerprint of your email
      address, not the address itself. The fingerprint stays after you
-     delete your beta data or your account, so the same inbox can't get
-     free credit twice. Someone who already had your address and this
-     record could check whether they match. Your credit and the amounts
-     you've spent are kept too, with no content."
+     delete your beta data or your account. It is used only to stop the
+     same inbox getting free credit twice, and nothing else about you is
+     kept with it: no address, no name. Someone who already had your
+     address and this record could check whether they match. If you
+     delete your beta data, your credit and the amounts you've spent are
+     kept too, with no content."
    - The host lists are read again from `GET /api/v1/endpoints/zdr`, with
      the new date, since the page changes anyway (§ 13.6's refresh rule).
 
@@ -3183,10 +3180,11 @@ inbox gets $1.00 until the cap; the worst case is one person taking every
 remaining grant, $100 of credit, spent at most $10 a day. With the split,
 that pauses only free use: paying members are not held to the free
 ceiling, though they still share the key's limit. The owner sees it with
-read-only queries (grants per day, free spend today, all spend today):
+read-only queries (grants per day, from the ledger, so a deleted
+account's grant drops out of it; free spend today; all spend today):
 
 ```sql
-select date_trunc('day', claimed_at) as day, count(*) from public.ten_welcome_claims group by 1 order by 1;
+select date_trunc('day', created_at) as day, count(*) from public.ten_usage_ledger where request_id like 'welcome:%' group by 1 order by 1;
 select public.ten_free_spend_today(), public.ten_beta_spend_today();
 ```
 
@@ -3278,8 +3276,8 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
 2. Grant: a confirmed user with `cap` 100 → `granted`, `usd` 1.00; one
    ledger row (`credit`, 1.00, `welcome:<uid>`, `gross_usd` and `fee_usd`
    null); as that user, `ten_is_member()` is true and `ten_balance()` is
-   1.00; one claims row; the claims table's columns are exactly
-   `email_hash` and `claimed_at`.
+   1.00; one claims row; the claims table's only column is
+   `email_hash`.
 3. Calling again → `already_member`, still one row of each. An invited
    user (a $5 row, null `request_id`) → `already_member`, no claims row.
 4. A null `email_confirmed_at` → `unconfirmed`; a null email →
@@ -3348,49 +3346,42 @@ DeepSeek measurement is not a step (§ 13.6, amended 2026-10-02).
 
 1. **Review the terms** (§ 20.7 item 1) and approve or edit the text
    **before sign-ups open**. The build PR carries the approved words.
-2. **Choose the key's limit** (§ 20.6), one of:
-   - *Raise the shared key's daily limit:* OpenRouter → Keys → the key
-     both apps use → its limit (today $20, daily reset) → a higher
-     amount. Nothing else changes.
-   - *Give Ten its own key* (recommended): OpenRouter → Keys → create a
-     key for Ten with a daily limit you choose; then `supabase secrets set
-     TEN_OPENROUTER_API_KEY=<the new key> --project-ref
-     ivunfotoggdxbjouumdk`, and redeploy the proxy (step 4) so it is
-     surely used. The older app keeps the old key untouched.
-   (The OpenRouter menu paths are UNVERIFIED against today's site.)
-3. **Apply the migration** in the SQL editor as `postgres` at a quiet
+2. **Apply the migration** in the SQL editor as `postgres` at a quiet
    time, then `NOTIFY pgrst, 'reload schema';`. Check, read-only:
    `select cap, usd from public.ten_welcome_settings;` gives 0 and 1.00.
-4. **Deploy the proxy:** `supabase functions deploy ten-model-proxy
+3. **Deploy the proxy:** `supabase functions deploy ten-model-proxy
    --no-verify-jwt --project-ref ivunfotoggdxbjouumdk`. `ten-paypal`'s new
    403 text can wait for its next deploy: only members reach Buy credit,
    and its screens show their own fixed lines (`design-web-ui.md` § 1.11).
-5. **Deploy the site:** `apps/web/scripts/deploy-prod.sh`.
-6. **Live run** (PROCESS step 6), with `cap` still 0, on a fresh account
+4. **Deploy the site:** `apps/web/scripts/deploy-prod.sh`.
+5. **Live run** (PROCESS step 6), with `cap` still 0, on a fresh account
    with an inbox you control: the not-a-member screen shows O2. Then
    `update public.ten_welcome_settings set cap = 1;` and reload: the chip
    reads `$1.00`, O1 shows, and the ledger has one `welcome:` row. A second
    account on a `+tag` of the same inbox shows O4. (That test grant counts
    toward the 100.)
-7. **Open:** `update public.ten_welcome_settings set cap = 100;`.
+6. **Open:** `update public.ten_welcome_settings set cap = 100;`.
 
-### 20.13 Open questions for the owner
+**Optional, at any time:** if paid use grows, raise the shared key's
+daily limit in OpenRouter (the key both apps use; today $20 a day). No
+code change and no deploy (§ 20.6). The OpenRouter menu path is
+UNVERIFIED against today's site.
 
-1. **Rule 9 and the kept fingerprint** (§ 20.3). The exception lives in
-   this design, below `PRINCIPLES.md` in the precedence chain, and rule 9
-   doesn't name it. Amend rule 9 to name it, or rule that rule 9 covers
-   career data only (the reading § 8 already uses for kept cost rows)?
-   The chain needs one of the two; this section doesn't pick.
-2. **Which key option** (§ 20.6, § 20.12 step 2), and, for Ten's own key,
-   its daily limit.
+### 20.13 Owner answers (2026-10-02, given to the lead in session)
+
+1. **Rule 9** is amended to name the kept fingerprint (§ 20.3), rather
+   than read as covering career data only.
+2. **One shared OpenRouter key stays,** with its daily limit as the
+   owner's own setting; raising it is an optional owner step (§ 20.6,
+   § 20.12).
+
+No question is open in this section.
 
 ### 20.14 UNVERIFIED
 
 - Whether Supabase's captcha setting covers the whole project, so the
   older app must send tokens too.
-- The Supabase and OpenRouter menu paths (menus move), and whether a new
-  secret reaches a running function without a redeploy (§ 20.12 redeploys
-  anyway).
+- The Supabase and OpenRouter menu paths (menus move).
 - Whether `GET /api/v1/endpoints/zdr` still lists the same hosts.
 - DeepSeek's real per-reply cost (derived, § 13.3), which is why no copy
   names a count of replies.
@@ -3517,10 +3508,11 @@ spike replaced (owner, 2026-09-23).
 - Open sign-up with a welcome credit (§ 20; owner, 2026-10-02, with the
   lead's defaults; draft): a confirmed new account claims one credit row
   itself through `ten_claim_welcome()`, once per account and once per
-  normalised inbox (a hash kept in a table that outlives the account, a
-  deliberate exception to rule 9), up to a cap in a settings row that
+  normalised inbox (a hash kept in a table that outlives the account, as
+  rule 9 now names, owner, 2026-10-02), up to a cap in a settings row that
   ships at 0 and opens at 100. Membership, the starter and PayPal's
   members-only rule are unchanged. The daily ceiling is split by payer:
   $10 shared by free members, none of Ten's own for members who paid; the
-  shared OpenRouter key's limit still caps everyone. DeepSeek for everyone,
+  one shared OpenRouter key's limit, the owner's setting, still caps
+  everyone. DeepSeek for everyone,
   the measurement waived (§ 13.6, amended 2026-10-02).

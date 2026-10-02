@@ -1840,6 +1840,22 @@ The owner approved § 13 as written, with these four answers.
 3. **The privacy terms name the processors**, as described below.
 4. **The menu label keeps "(testing)"**, word for word as in § 13.3.
 
+**Amended (owner, 2026-10-02), for open sign-up (§ 20).** Answers 2 and 4
+change; 1 and 3 stand.
+
+- **2 → DeepSeek is the model for everyone, outside members included.**
+  The owner, in session: "keep deepseek and use $1 credit for people to
+  try", and on the gate before opening: "let's skip 1, as Deepseek is the
+  default". So the switch back to Claude does not happen, and the conduct
+  measurement is **waived** as a precondition for opening. Plan step B2's
+  condition is waived for this model by the owner, not met: no conduct
+  measurement of DeepSeek exists. The measurement driver (issue #33,
+  `tests/always-on/run_headless_voice.sh`) stays available, and the owner
+  may run it at any time; a failing result reopens this answer.
+- **4 → the "(testing)" suffix is dropped** from DeepSeek's menu label
+  (owner, 2026-10-02): it is the default for everyone, and the word would
+  mislead a new member.
+
 **Where the processor list lives.** The product has no privacy terms yet.
 This starts them, and they **ship with § 13**, in the same site deploy.
 

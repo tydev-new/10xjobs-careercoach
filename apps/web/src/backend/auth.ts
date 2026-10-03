@@ -137,8 +137,11 @@ export function accessTokenFrom(client: AuthClientLike): () => Promise<string> {
   };
 }
 
-/** design-web-ui § 1.6 (canonical; contract § 8 quotes it) — word for word. */
-export const NON_MEMBER_MESSAGE = "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.";
+/** design-web-ui.md § 5.3.1 O6 — word for word: "this account has no credit
+ *  row", outside the sign-in flow (an upload refused for membership). The
+ *  model proxy's 403 carries the same words (C § 20.4). Replaces
+ *  the retired "invite-only" line. */
+export const NOT_SET_UP_MESSAGE = "This account isn't set up to use Ten yet. Sign out, then sign in again to check.";
 
 /** Membership = has a credit row, per `ten_is_member()` (the migration's
  *  one definition — § 8, § 2). Throws on any RPC error (network, 401 for a
@@ -149,6 +152,39 @@ export async function checkMembership(client: AuthClientLike): Promise<boolean> 
   const { data, error } = await client.rpc("ten_is_member");
   if (error) throw new Error(`ten_is_member() failed: ${error.message}`);
   return data === true;
+}
+
+/** C § 20.1: what `ten_claim_welcome()` answers. `granted` carries the
+ *  amount the settings row set, so the screen never states a number the
+ *  server didn't send (O1, rule 12). */
+export type ClaimWelcomeResult =
+  | { status: "granted"; usd: number }
+  | { status: "already_member" | "paused" | "unconfirmed" | "already_claimed" };
+
+/** C § 20.4: a non-member's one claim, `rpc("ten_claim_welcome")`. Throws on
+ *  an RPC error, on a reply that isn't an object with a status from the list
+ *  above, and on `granted` with no usable amount — never maps an unknown
+ *  answer to a screen that says something untrue (the caller shows the setup
+ *  error, Q1, with Retry, and the claim is safe to repeat). */
+export async function claimWelcome(client: AuthClientLike): Promise<ClaimWelcomeResult> {
+  const { data, error } = await client.rpc("ten_claim_welcome");
+  if (error) throw new Error(`ten_claim_welcome() failed: ${error.message}`);
+  const status = typeof data === "object" && data !== null ? (data as { status?: unknown }).status : undefined;
+  switch (status) {
+    case "already_member":
+    case "paused":
+    case "unconfirmed":
+    case "already_claimed":
+      return { status };
+    case "granted": {
+      const raw = (data as { usd?: unknown }).usd;
+      const usd = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+      if (!Number.isFinite(usd) || usd <= 0) throw new Error("ten_claim_welcome() granted with no usable amount");
+      return { status: "granted", usd };
+    }
+    default:
+      throw new Error(`ten_claim_welcome() answered an unexpected status: ${String(status)}`);
+  }
 }
 
 // ---------------------------------------------------------------------

@@ -219,7 +219,7 @@ real key):
 
 - `coach-model.ts` (§ 13.2) — the ONE list, NO imports: the two allowed
   model ids and their candidate-facing names (`"Claude Sonnet 5"` /
-  `"DeepSeek V4.1 Flash (testing)"`). `coach-model.test.ts` checks these
+  `"DeepSeek V4.1 Flash"`; the "(testing)" suffix was dropped 2026-10-02, § 13.6 amended). `coach-model.test.ts` checks these
   ids against the proxy's own `MODEL_IDS`
   (`supabase/functions/ten-model-proxy/core.ts`) directly — a repo test,
   not a live check, and it fails if the two ever disagree.
@@ -374,7 +374,7 @@ abortSignal })` already returns the exact `ReadableStream<UIMessageChunk>`
 | `VITE_SITE_URL` | yes (read by `auth.ts`'s `siteRedirectUrl()`) | — |
 | `VITE_MODEL_PROXY_URL` | no | `<VITE_SUPABASE_URL>/functions/v1/ten-model-proxy` |
 | `VITE_SHOW_MOCK_CONTROLS` | no (Vercel Preview environment only) | unset (production) |
-| `VITE_COACH_MODEL` (§ 13.2) | no | unset/blank -> `anthropic/claude-sonnet-5` (Claude, the measured model). `deepseek/deepseek-v4.1-flash` switches to DeepSeek (testing only, § 13.6 (2)). Any other value fails the build-time config check the same way a missing required var does. |
+| `VITE_COACH_MODEL` (§ 13.2) | no | unset/blank -> `anthropic/claude-sonnet-5` (Claude, the measured model). `deepseek/deepseek-v4.1-flash` switches to DeepSeek, the model for everyone since 2026-10-02 (§ 13.6 amended, C § 20): the production site keeps this set. Any other value fails the build-time config check the same way a missing required var does. |
 | `VITE_PAYPAL_CLIENT_ID` (§ 17.1) | no (but see below) | `""` — the Buy-credit dialog shows "Couldn't start a payment. No money moved." instead of loading the PayPal JS SDK when blank |
 
 Nothing here is secret — the anon key AND `VITE_PAYPAL_CLIENT_ID` are both

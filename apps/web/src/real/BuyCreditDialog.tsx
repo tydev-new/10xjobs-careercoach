@@ -245,10 +245,10 @@ export function BuyCreditDialog({
               )
             ) : null}
             {phase.kind === "processing" ? <p>Confirming your payment…</p> : null}
+            {/* § 5.3.1 B7 (changed by C27, C § 20.6): paid credit has no daily
+                limit of Ten's own; the model service's own limit still can pause Ten. */}
             <p className="buy-credit-footer">
-              Paid credit stays if you delete your beta data. The beta has a shared daily limit,
-              so on a busy day Ten can pause until tomorrow even with credit. For a refund, email
-              support@10xjobs.co.
+              {"Paid credit stays if you delete your beta data, and it has no daily limit of Ten's own. Ten's model service does have a spending limit, so on a busy day Ten can pause until tomorrow even with credit. For a refund, email support@10xjobs.co."}
             </p>
           </>
         )}

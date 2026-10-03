@@ -293,6 +293,12 @@ export function Header(props: HeaderProps): ReactElement {
                 <Icon name="logOut" size={16} />
                 Sign out
               </button>
+              {/* § 5.3.1 O8 (C § 20.7): the Terms link, beside Privacy (just
+                  before it, so Privacy stays just above the model line). */}
+              <a className="menu-item-link" role="menuitem" href="/terms.html" target="_blank" rel="noreferrer">
+                <Icon name="externalLink" size={16} />
+                Terms
+              </a>
               {/* § 13.6 (3): the Privacy link, just above the model line,
                   in real AND mock mode — plain, honest copy in the house
                   voice lives at the page itself, never restated here. */}

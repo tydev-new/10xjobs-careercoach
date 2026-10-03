@@ -18,6 +18,7 @@ node r4-own.mjs      # the round-3 review's own cases
 node r5-finish-reason.mjs  # § 9.6: 20260924000000_ten_ledger_finish_reason.sql applied AFTER the init file
 node r6-conversations.mjs  # § 11: 20260924100000_ten_conversations.sql applied AFTER the first two migrations
 node r8-paypal.mjs         # § 17.3/17.8(7): 20260925000000_ten_paypal_credit.sql after the three applied ones; checks, refunds, teardown (tester)
+node r9-welcome.mjs        # § 20.11: 20261002000000_ten_welcome_credit.sql after the four applied ones; every claim path, the cap, normalisation, deletion, teardown (no ceiling function: the owner dropped the daily limit)
 ```
 
 Each prints `[PASS]` / `[FAIL]` / `[OBSERVED]` lines and a failure count.
@@ -30,5 +31,5 @@ Storage API; `run-r2.mjs` simulates that step and passes).
 
 Limits: one connection, so parallel writes are reasoned, not run; Postgres 18.3
 (PGlite) rather than Supabase's 17; the Storage API step is simulated with
-`storage.allow_delete_query`. Not wired into `tests/run.py` yet (it needs
+`storage.allow_delete_query`. `stub.sql`'s `auth.users` has nullable `email` and `email_confirmed_at` (§ 20.10 (2); the older tests insert ids only). One limit specific to `r9-welcome.mjs`: the race (two claims waiting on the settings row's `for update`) can't run on one connection, so it is checked by reading the function's body (§ 20.11 SQL 12). Not wired into `tests/run.py` yet (it needs
 `npm install` first).

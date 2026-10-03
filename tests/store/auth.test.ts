@@ -2,14 +2,14 @@
 //  - every auth link passes redirectTo, taken from VITE_SITE_URL (the
 //    production URL in Auth's Redirect URLs), never the project's Site URL;
 //  - membership = ten_is_member() called with the USER's session;
-//  - the non-member message is the contract's, word for word.
+//  - the "no credit row" message is O6 in design-web-ui.md § 5.3.1, word for word (C § 20.4).
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import test from "node:test";
 import {
-  NON_MEMBER_MESSAGE,
+  NOT_SET_UP_MESSAGE,
   checkMembership,
   signInWithMagicLink,
   signUpWithPassword,
@@ -20,11 +20,13 @@ import { ANON, REPO, SUPABASE_URL, createBackend } from "./pglite-backend.ts";
 const WEB = path.join(REPO, "apps/web");
 const req = createRequire(path.join(WEB, "package.json"));
 
-test("U1 the non-member message is the contract's sentence, word for word", () => {
-  const doc = readFileSync(path.join(REPO, "docs/design-web-agent.md"), "utf8");
-  const m = /The app says: "([^"]+)"/.exec(doc);
-  assert.ok(m, "contract sentence not found in § 8");
-  assert.equal(NON_MEMBER_MESSAGE, m[1].replace(/\s+/g, " "));
+test("U1 the \"no credit row\" message is O6 in design-web-ui.md § 5.3.1, word for word (C § 20.4)", () => {
+  const doc = readFileSync(path.join(REPO, "docs/design-web-ui.md"), "utf8");
+  const line = doc.split("\n").find((l) => l.startsWith("| O6 |"));
+  assert.ok(line, "row O6 not found in § 5.3.1");
+  const cell = line.replace(/^\| /, "").replace(/ \|$/, "").split(" | ")[3];
+  assert.equal(NOT_SET_UP_MESSAGE, cell.slice(1, -1));
+  assert.doesNotMatch(NOT_SET_UP_MESSAGE, /invite/i);
 });
 
 async function loadAuthWithEnv(env: Record<string, string | undefined>) {

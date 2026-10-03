@@ -15,7 +15,7 @@ export interface CoachModel {
   id: string;
   /** The ⋯ menu's line (§ 13.3), word for word, WITHOUT the "Model: "
    *  prefix (Header.tsx adds that once, so the sentence lives in one
-   *  place): "Claude Sonnet 5" / "DeepSeek V4.1 Flash (testing)". Also
+   *  place): "Claude Sonnet 5" / "DeepSeek V4.1 Flash". Also
    *  the name privacy.html (§ 13.6) uses for each model's host list. */
   name: string;
 }
@@ -25,10 +25,11 @@ export const CLAUDE_COACH_MODEL: CoachModel = {
   name: "Claude Sonnet 5",
 };
 
-// § 13.6 (4): the owner kept "(testing)" in the label, word for word.
+// § 13.6 (4), amended 2026-10-02 (C § 20): the "(testing)" suffix is dropped
+// (owner): DeepSeek is the default for everyone, so the word would mislead.
 export const DEEPSEEK_COACH_MODEL: CoachModel = {
   id: "deepseek/deepseek-v4.1-flash",
-  name: "DeepSeek V4.1 Flash (testing)",
+  name: "DeepSeek V4.1 Flash",
 };
 
 /** Claude is always first — it's "the measured model; the fallback"

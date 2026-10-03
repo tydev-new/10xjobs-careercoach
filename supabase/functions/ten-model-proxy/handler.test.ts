@@ -6,11 +6,11 @@
 // checkable without a live upstream.
 
 import { assert, assertAlmostEquals, assertEquals, assertFalse } from "jsr:@std/assert@1";
+import * as core from "./core.ts";
 import { CEILING_USD, CEILING_USD_BY_MODEL, CLAUDE_MODEL_ID, DEEPSEEK_MODEL_ID, MODEL } from "./core.ts";
-import { handleRequest, type ProxyDeps } from "./handler.ts";
+import { handleRequest, MESSAGES, type ProxyDeps } from "./handler.ts";
 import {
   balanceFor,
-  betaSpendToday,
   insertLedgerCall,
   isMember,
   verifyUser,
@@ -96,7 +96,6 @@ async function harness(): Promise<Harness> {
     verifyUser: (token) => verifyUser(env, token),
     isMember: (token) => isMember(env, token),
     balanceFor: (uid) => balanceFor(env, uid),
-    betaSpendToday: () => betaSpendToday(env),
     insertLedgerCall: (row) => insertLedgerCall(env, row),
     fetchUpstream: (body) =>
       fetch(openrouter.url, {
@@ -185,7 +184,9 @@ dt("403 for a signed-in non-member", async () => {
     assertEquals(res.status, 403);
     const body = await res.json();
     assertEquals(body.error.code, "not_a_member");
-    assert(body.error.message.includes("invite-only"));
+    // design-web-ui.md § 5.3.1 O6 (C § 20.4), word for word; the old line is gone.
+    assertEquals(body.error.message, "This account isn't set up to use Ten yet. Sign out, then sign in again to check.");
+    assertFalse(body.error.message.includes("invite-only"));
   } finally {
     await h.stop();
   }
@@ -221,45 +222,42 @@ dt("402 over_balance at a negative balance too", async () => {
   }
 });
 
-dt("503 model_error at the $5/day beta-wide ceiling, not over_balance", async () => {
-  const h = await harness();
-  try {
-    h.state.users["tok-1"] = { id: "u1" };
-    h.state.members.add("u1");
-    h.state.balances["u1"] = 5;
-    h.state.betaSpendToday = 5; // at the ceiling
-    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
-    assertEquals(res.status, 503);
-    const body = await res.json();
-    assertEquals(body.error.code, "model_error");
-    assertEquals(body.error.message, "The beta has reached today's limit. Try again tomorrow.");
-  } finally {
-    await h.stop();
-  }
+// Owner, 2026-10-02: the OpenRouter key is a prepaid balance with no daily limit,
+// so the proxy has no daily spending ceiling of its own, free or paid.
+dt("there is no daily ceiling: no constant, no message, no spend-today read", async () => {
+  assertFalse("BETA_CEILING_USD" in core);
+  assertFalse("FREE_DAILY_CEILING_USD" in core);
+  assertEquals(Object.keys(MESSAGES).sort(), ["modelError", "modelServiceLimit", "notMember", "overBalance"]);
+  for (const text of Object.values(MESSAGES)) assertFalse(/today's limit|daily|tomorrow/i.test(text), text);
 });
 
-dt("503 ceiling fires above $5 too", async () => {
+dt("no daily check: with $80 of spend today across everyone, a member with a balance is forwarded and nothing reads the day's spend", async () => {
   const h = await harness();
   try {
     h.state.users["tok-1"] = { id: "u1" };
     h.state.members.add("u1");
     h.state.balances["u1"] = 5;
-    h.state.betaSpendToday = 5.42;
-    const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
-    assertEquals(res.status, 503);
-  } finally {
-    await h.stop();
-  }
-});
-
-dt("under the ceiling and with balance, the call proceeds", async () => {
-  const h = await harness();
-  try {
-    h.state.users["tok-1"] = { id: "u1" };
-    h.state.members.add("u1");
-    h.state.balances["u1"] = 5;
-    h.state.betaSpendToday = 4.99;
+    h.state.betaSpendToday = 80; // all of Ten's spend today: the proxy must not look
     h.orOptions.chunks = sseChunks({ cost: 0.02 });
+    const res = await handleRequest(req({ messages: [{ role: "user", content: "hi" }] }, { token: "tok-1" }), h.deps, BASE_ENV);
+    assertEquals(res.status, 200);
+    await res.body?.cancel();
+    await h.drain();
+    assertEquals(h.state.betaSpendCalls, 0, "ten_beta_spend_today is never called");
+    assertEquals(h.state.ledgerInserts.length, 1, "the call is metered as usual");
+  } finally {
+    await h.stop();
+  }
+});
+
+dt("a member with a balance and a request that passes the per-call caps is always forwarded, however much was spent today", async () => {
+  const h = await harness();
+  try {
+    h.state.users["tok-1"] = { id: "u1" };
+    h.state.members.add("u1");
+    h.state.balances["u1"] = 0.01;
+    h.state.betaSpendToday = 10_000;
+    h.orOptions.chunks = sseChunks({ cost: 0.005 });
     const res = await handleRequest(req({ messages: [{ role: "user", content: "hi" }] }, { token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(res.status, 200);
     await res.body?.cancel();
@@ -1178,7 +1176,7 @@ dt("S1: a ledger insert that fails once then succeeds on retry writes exactly on
   }
 });
 
-dt("upstream 402 (shared key exhausted) maps to 503 model_error, not over_balance", async () => {
+dt("upstream 402 (shared key out of credit) maps to 503 model_error with E16, not over_balance and not the general line", async () => {
   const h = await harness();
   try {
     h.state.users["tok-1"] = { id: "u1" };
@@ -1189,12 +1187,14 @@ dt("upstream 402 (shared key exhausted) maps to 503 model_error, not over_balanc
     assertEquals(res.status, 503);
     const body = await res.json();
     assertEquals(body.error.code, "model_error");
+    // design-web-ui.md § 5.3.1 E16, word for word.
+    assertEquals(body.error.message, "Ten's model service has reached its spending limit. Try again later.");
   } finally {
     await h.stop();
   }
 });
 
-dt("upstream 5xx maps to 503 model_error", async () => {
+dt("upstream 5xx maps to 503 model_error with the general line", async () => {
   const h = await harness();
   try {
     h.state.users["tok-1"] = { id: "u1" };
@@ -1203,6 +1203,7 @@ dt("upstream 5xx maps to 503 model_error", async () => {
     h.orOptions.status = 500;
     const res = await handleRequest(req({ messages: [] }, { token: "tok-1" }), h.deps, BASE_ENV);
     assertEquals(res.status, 503);
+    assertEquals((await res.json()).error.message, "The model is temporarily unavailable. Try again.");
   } finally {
     await h.stop();
   }

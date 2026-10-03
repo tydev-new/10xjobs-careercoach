@@ -22,7 +22,8 @@ const PAID_NOT_CONFIRMED_TEXT =
   "within minutes. If not by tomorrow, email support@10xjobs.co with PayPal's receipt.";
 
 export const MESSAGES = {
-  notMember: "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.",
+  // design-web-ui.md § 5.3.1 O6 (design-web-agent.md § 20.4).
+  notMember: "This account isn't set up to use Ten yet. Sign out, then sign in again to check.",
   paypalError: "Couldn't start a payment. No money moved.",
   notTenOrder: "Ten didn't create that payment.",
   unconfirmed: PAID_NOT_CONFIRMED_TEXT,

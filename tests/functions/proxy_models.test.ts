@@ -133,7 +133,6 @@ t("§ 13.5 (iv): a DeepSeek call that passes the meter deadline records $0.04328
     verifyUser: (x: string) => sb.verifyUser(env, x),
     isMember: (x: string) => sb.isMember(env, x),
     balanceFor: (u: string) => sb.balanceFor(env, u),
-    betaSpendToday: () => sb.betaSpendToday(env),
     insertLedgerCall: (row: any) => sb.insertLedgerCall(env, row),
     fetchUpstream: async () => sse([`data: ${JSON.stringify({ id: "gen-dl-ds", choices: [{ delta: { content: "x" } }] })}`], { hangAfter: true }),
     waitUntil: (p: Promise<unknown>) => void pending.push(p),
@@ -178,19 +177,20 @@ t("§ 13.5 (v): the ledger row's model is the id the proxy SENT, even when the s
 
 // ------------------------------------------------------------------ (vi) daily ceiling
 
-t("§ 13.5 (vi): $4.99 of Claude rows plus $0.02 of DeepSeek rows -> 503, the same message (the $5/day ceiling sums every model)", async () => {
+t("§ 13.5 (vi), retired (owner, 2026-10-02): the day's spend, on any model, never refuses a call — Claude $4.99 + DeepSeek $0.02 and far more still forward", async () => {
   const h = await harness();
   h.reset();
-  const [a] = await member(h);
+  const [a] = await member(h, 100);
   const [, tok] = await member(h);
   const now = h.st.now();
   h.st.ledger.push({ id: crypto.randomUUID(), user_id: a, kind: "call", request_id: "c1", model: CLAUDE, tokens_in: 0, tokens_out: 0, tokens_cached: 0, usd: 4.99, finish_reason: null, created_at: now });
   h.st.ledger.push({ id: crypto.randomUUID(), user_id: a, kind: "call", request_id: "d1", model: DEEPSEEK, tokens_in: 0, tokens_out: 0, tokens_cached: 0, usd: 0.02, finish_reason: null, created_at: now });
+  h.st.ledger.push({ id: crypto.randomUUID(), user_id: a, kind: "call", request_id: "d2", model: DEEPSEEK, tokens_in: 0, tokens_out: 0, tokens_cached: 0, usd: 60, finish_reason: null, created_at: now });
   const res = await h.proxy(preq({ ...baseBody(), model: DEEPSEEK }, { token: tok }));
   const txt = await res.text();
-  assertEquals(res.status, 503, txt);
-  assert(txt.includes("The beta has reached today's limit. Try again tomorrow."), txt);
-  assertEquals(h.upstreamHits.length, 0);
+  await h.drain();
+  assertEquals(res.status, 200, txt);
+  assertEquals(h.upstreamHits.length, 1);
 });
 
 // ------------------------------------------------------------------ (x) agreement (proxy half)

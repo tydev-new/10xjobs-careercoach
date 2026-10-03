@@ -10,6 +10,7 @@
 // renders above whichever form is showing.
 import { useState, type FormEvent, type ReactElement } from "react";
 import { Wordmark } from "../components/BrandMark";
+import { SIGN_IN_INVITATION } from "./welcome-copy.ts";
 import type { AuthClientLike } from "../backend/auth.ts";
 import {
   MIN_PASSWORD_LENGTH,
@@ -210,6 +211,22 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
             ) : null}
           </form>
         )}
+
+        {/* § 5.3.1 O5 and O7 (C § 20.7): under the form, in both modes (the
+            sent state included, since it is the same card). O7's "terms" and
+            "privacy notice" are the two static pages. */}
+        <p className="sign-in-invite">{SIGN_IN_INVITATION}</p>
+        <p className="sign-in-terms">
+          Using Ten means you agree to its{" "}
+          <a href="/terms.html" target="_blank" rel="noreferrer">
+            terms
+          </a>
+          . See also the{" "}
+          <a href="/privacy.html" target="_blank" rel="noreferrer">
+            privacy notice
+          </a>
+          .
+        </p>
 
         {/* PRINCIPLES.md rule 9: local-first stays a supported exit. No
             specific URL is named by the contract — this repo's own

@@ -403,21 +403,24 @@ t("§ 17.6 secrets never logged or returned: client secret, basic auth, access t
 });
 
 // ------------------------------------------------ rule 7: ceilings unchanged
-t("§ 17.2/§ 17.5 after a $40 purchase the $5/day beta ceiling still stops the proxy (503, not forwarded)", async () => {
+t("§ 17.2/§ 17.5, amended (owner, 2026-10-02): there is no daily ceiling to buy past — a member is forwarded with $500 of spend today, before and after a $40 purchase", async () => {
   const h = await harness();
   h.reset();
-  const [x] = await member(h);
-  const [a, ta] = await member(h);
-  call(h.st, x, 5.0);
+  const [x] = await member(h, 1000);
+  const [, ta] = await member(h);
+  call(h.st, x, 500.0);
+  const before = await h.proxy(preq(baseBody(), { token: ta }));
+  await before.text();
+  await h.drain();
+  assertEquals(before.status, 200);
   const orderId = await createApproved(h, ta, "40");
   assertEquals((await pay(h, "/capture-order", { orderId }, ta)).j.status, "credited");
-  const res = await h.proxy(preq(baseBody(), { token: ta }));
-  const txt = await res.text();
+  const after = await h.proxy(preq(baseBody(), { token: ta }));
+  await after.text();
   await h.drain();
-  assertEquals(res.status, 503, txt);
-  assert(txt.includes("The beta has reached today's limit. Try again tomorrow."), txt);
-  assertEquals(h.upstreamHits.length, 0);
-  void a;
+  assertEquals(after.status, 200);
+  assertEquals(h.upstreamHits.length, 2);
+  assertEquals(h.st.requests.filter((r) => /ten_beta_spend_today|ten_is_paid|ten_free_spend_today/.test(r.path)).length, 0, "the proxy never asks about the day's spend");
 });
 
 t("§ 17.2 over_balance points to buying; a purchase makes the next call go through (and nothing else changes)", async () => {

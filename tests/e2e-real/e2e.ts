@@ -72,7 +72,20 @@ const em = (local: string) => `${local}.${BROWSER}@example.com`;
 // response, or a request the browser makes, the key leaked.
 const OPENROUTER_CANARY = "sk-or-v1-E2E-CANARY-0a1b2c3d4e5f60718293a4b5c6d7e8f9";
 const PASSWORD = "correct horse battery";
-const NON_MEMBER = "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.";
+// § 5.3.1 O6 (C § 20.4): "this account has no credit row", outside the sign-in
+// flow: the proxy's 403 and a refused upload. Replaces the "invite-only" line.
+const NON_MEMBER = "This account isn't set up to use Ten yet. Sign out, then sign in again to check.";
+// Every § 20 string below is READ from design-web-ui.md § 5.3.1 (the one table,
+// rule 12), so a drift on either side fails here.
+const UI_DOC = readFileSync(path.join(REPO, "docs/design-web-ui.md"), "utf8");
+function uiRow(id: string): string {
+  const line = UI_DOC.split("\n").find((l) => l.startsWith(`| ${id} |`));
+  if (!line) throw new Error(`no § 5.3.1 row ${id}`);
+  const cell = line.replace(/^\| /, "").replace(/ \|$/, "").split(" | ")[3];
+  return cell.slice(1, -1);
+}
+const O1 = (usd: string) => uiRow("O1").replace("<amount>", usd);
+const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 
 // ------------------------------------------------------------------ results
 const results: { ok: boolean; name: string; detail: string }[] = [];
@@ -892,24 +905,26 @@ await section("balance", async () => {
   await p3.context().close();
 });
 
-// ================================================================ BETA CEILING
+// ================================================================ NO DAILY LIMIT (owner, 2026-10-02)
+// The OpenRouter key is a prepaid balance with no daily limit, so the proxy has no
+// daily ceiling of its own (the old $5 beta-wide one and the interim $10 free one are gone).
 await section("ceiling", async () => {
   const other = await standIn.createUser({ email: em("ceiling.other") });
   const uid = await standIn.createUser({ email: em("ceiling.user") });
-  await db.addCall(other, 5.0, 0); // today: the beta-wide $5 is spent
+  await db.addCall(other, 50.0, 0); // today: far past both retired ceilings
   try {
   const { page } = await newPage();
   await signIn(page, em("ceiling.user"));
   await page.locator(".composer-input").waitFor({ timeout: 20000 });
   const h0 = stub.hits.length;
   const p0 = proxyCalls().length;
-  await say(page, "hello, ceiling?");
+  await say(page, "hello, no limit?");
   const pc = proxyCalls().slice(p0);
-  rec(pc.length === 1, "ceiling: one proxy call for one refused step (a 503 ceiling refusal is not retried)", `${pc.length} call(s), statuses ${pc.map((l) => l.status).join(",")}`);
-  const errText = (await page.locator(".card--error").last().textContent().catch(() => "")) ?? "";
-  rec(errText.includes("model_error") && errText.includes("The beta has reached today's limit. Try again tomorrow."), "ceiling: 503 shown as model_error with the proxy's own sentence", errText);
-  rec(!errText.includes("over_balance"), "ceiling: NOT shown as over_balance");
-  rec(stub.hits.length === h0, "ceiling: nothing reached the model");
+  rec(pc.length === 1 && pc[0].status === 200, "no daily limit: with $50 spent today by someone else, the call is forwarded (200)", `${pc.length} call(s), statuses ${pc.map((l) => l.status).join(",")}`);
+  rec((await page.locator(".card--error").count()) === 0 && (await lastAssistant(page).textContent())?.includes("Hi — I'm here."), "no daily limit: the reply arrives, no error card");
+  rec(stub.hits.length === h0 + 1, "no daily limit: the call reached the model", String(stub.hits.length - h0));
+  const spendRpcs = standIn.log.filter((l) => /ten_beta_spend_today|ten_is_paid|ten_free_spend_today/.test(l.path));
+  rec(spendRpcs.length === 0, "no daily limit: the proxy never asked the database for the day's spend", spendRpcs.map((l) => l.path).join(", "));
   void uid;
   await page.context().close();
   } finally {
@@ -924,7 +939,7 @@ await section("member", async () => {
   await signIn(page, em("not.member"));
   await page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
   const t = (await page.locator(".not-a-member-screen").textContent()) ?? "";
-  rec(t.includes(NON_MEMBER), "not-a-member: the contract's sentence (§ 8, design-web-ui § 1.6; lead ruling 5dab77d)", t);
+  rec(norm(t).includes(uiRow("O2")), "not-a-member: at cap 0 the claim answers paused and the screen shows O2 (§ 1.6, C § 20.1)", t);
   rec(!(await page.locator(".composer-input").count()) && !(await page.locator(".balance-chip").count()) && !(await page.locator(".avatar").count()), "not-a-member: no composer, no chip, no avatar (§ 1.6)");
   // the proxy refuses a non-member directly (403) even with a valid session
   const status = await page.evaluate(async (u: string) => {
@@ -933,11 +948,163 @@ await section("member", async () => {
     const r = await fetch(`${u}/functions/v1/ten-model-proxy/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "hi" }] }) });
     return [r.status, await r.text()];
   }, standIn.url);
-  rec(status[0] === 403 && String(status[1]).includes(NON_MEMBER), "not-a-member: the proxy answers 403 with the same sentence", JSON.stringify(status));
+  rec(status[0] === 403 && String(status[1]).includes(NON_MEMBER), "not-a-member: the proxy answers 403 with O6 (C § 20.4)", JSON.stringify(status));
   await page.locator(".not-a-member-screen button", { hasText: "Sign out" }).click();
   await page.locator(".sign-in-screen").waitFor({ timeout: 10000 });
   rec(true, "not-a-member: sign out returns to sign-in");
   await page.context().close();
+});
+
+
+// ================================================================ OPEN SIGN-UP (C § 20)
+// § 20.11 "App", on the stand-in running the REAL migrations (all five) and the
+// REAL proxy: the welcome claim, each answer's screen, the failed call, an
+// invited member, and the strings.
+await section("welcome", async () => {
+  const claimCalls = () => standIn.log.filter((l) => l.path === "/rest/v1/rpc/ten_claim_welcome" && l.method === "POST");
+  const setCap = (n: number) => standIn.sql("update public.ten_welcome_settings set cap = " + Math.trunc(n));
+  const firstEmail = em("welcome.new");
+  try {
+    // ---- 1. a confirmed non-member at cap 100: one claim, the chat mounts, $1.00, O1, gone at the first send
+    await setCap(100);
+    const uid = await standIn.createUser({ email: firstEmail, member: false });
+    const { page } = await newPage();
+    const c0 = claimCalls().length;
+    await signIn(page, firstEmail);
+    await page.locator(".composer-input").waitFor({ timeout: 20000 });
+    const chip1 = await until(async () => ((await chip(page)) !== "—" ? await chip(page) : false), 8000);
+    rec(claimCalls().length - c0 === 1, "welcome: a confirmed non-member at cap 100 -> exactly one ten_claim_welcome call", String(claimCalls().length - c0));
+    rec(chip1 === "$1.00", "welcome: the chat mounts and the chip reads $1.00", String(chip1));
+    const o1 = norm((await page.locator(".welcome-notice").first().textContent().catch(() => "")) ?? "");
+    rec(o1 === O1("1.00"), "welcome: O1 shows, word for word (§ 5.3.1), with the claim's amount", o1);
+    const led = await db.ledger(uid);
+    rec(led.length === 1 && led[0].kind === "credit" && led[0].request_id === `welcome:${uid}` && Number(led[0].usd) === 1, "welcome: the ledger has the one welcome:<uid> credit row, $1.00", JSON.stringify(led));
+    await say(page, "hello, welcome");
+    rec((await page.locator(".welcome-notice").count()) === 0, "welcome: O1 is gone after the first send");
+    await page.reload();
+    // a saved conversation exists now, so the app opens on Home (§ 5.1): wait for the chip, not the composer
+    await page.locator(".balance-chip").waitFor({ timeout: 20000 });
+    await until(async () => ((await chip(page)) !== "—" ? true : false), 8000);
+    const calls1 = claimCalls().length;
+    rec((await page.locator(".welcome-notice").count()) === 0, "welcome: a reload shows no O1 (never stored)");
+    rec(calls1 - c0 === 1, "welcome: ...and the reload makes no claim call (a member now)", String(calls1 - c0));
+    // the menu: Terms (O8) just before Privacy, Privacy just above the model line
+    await page.locator(".menu-trigger").click();
+    const menu = await page.evaluate(() => [...document.querySelectorAll(".menu-panel > a")].map((a) => [a.textContent?.trim(), a.getAttribute("href")]));
+    await page.locator(".menu-trigger").click();
+    rec(JSON.stringify(menu) === JSON.stringify([[uiRow("O8"), "/terms.html"], ["Privacy", "/privacy.html"]]), "welcome: the menu links Terms (O8) beside Privacy", JSON.stringify(menu));
+    await page.context().close();
+
+    // ---- 2. cap 0 -> the not-a-member screen with O2 and Sign out only; nothing else is called
+    await setCap(0);
+    await standIn.createUser({ email: em("welcome.paused"), member: false });
+    const p2 = await newPage();
+    const l0 = standIn.log.length;
+    await signIn(p2.page, em("welcome.paused"));
+    await p2.page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+    const t2 = norm((await p2.page.locator(".not-a-member-message").textContent()) ?? "");
+    rec(t2 === uiRow("O2") && JSON.stringify(await p2.page.locator(".not-a-member-screen button").allTextContents()) === '["Sign out"]', "welcome: cap 0 -> O2 and Sign out only (§ 1.6)", t2);
+    rec((await p2.page.locator(".not-a-member-screen button").count()) === 1 && !(await p2.page.locator(".composer-input, .balance-chip, .avatar, .menu-trigger").count()), "welcome: no composer, chip, avatar or menu; one button");
+    await p2.page.waitForTimeout(800);
+    const after = standIn.log.slice(l0).map((l) => l.path);
+    const bad = after.filter((x) => x === "/rest/v1/rpc/ten_ws_write" || x.startsWith("/storage/") || x === "/rest/v1/rpc/ten_balance" || x.startsWith("/rest/v1/ten_conversations") || x.startsWith("/rest/v1/ten_ws_files") || x.startsWith("/functions/"));
+    rec(bad.length === 0, "welcome: a refused account makes zero ten_ws_write, Storage, ten_balance, conversation or function calls", bad.join(", "));
+    rec(after.filter((x) => x === "/rest/v1/rpc/ten_claim_welcome").length === 1, "welcome: ...and exactly one claim call");
+    await p2.page.context().close();
+
+    // ---- 3. a +tag of a claimed address -> O4; an unconfirmed account -> O3
+    await setCap(100);
+    const tagged = firstEmail.replace("@", "+promo@");
+    await standIn.createUser({ email: tagged, member: false });
+    const p3 = await newPage();
+    await signIn(p3.page, tagged);
+    await p3.page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+    const t3 = norm((await p3.page.locator(".not-a-member-message").textContent()) ?? "");
+    rec(t3 === uiRow("O4"), "welcome: a second account on a +tag of the claimed address -> O4", t3);
+    await p3.page.context().close();
+    await standIn.createUser({ email: em("welcome.unconfirmed"), member: false, confirmed: false });
+    const p3b = await newPage();
+    await signIn(p3b.page, em("welcome.unconfirmed"));
+    await p3b.page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+    const t3b = norm((await p3b.page.locator(".not-a-member-message").textContent()) ?? "");
+    rec(t3b === uiRow("O3"), "welcome: an unconfirmed account -> O3", t3b);
+    await p3b.page.context().close();
+
+    // ---- 4. the claim answering 500 -> Q1 and Retry; Retry after it recovers -> granted
+    const uid4 = await standIn.createUser({ email: em("welcome.retry"), member: false });
+    standIn.failClaimWelcome(1);
+    const p4 = await newPage();
+    await signIn(p4.page, em("welcome.retry"));
+    await p4.page.locator(".app-shell--config-error").waitFor({ timeout: 15000 });
+    const t4 = norm((await p4.page.locator(".app-shell--config-error p").allTextContents()).join(" "));
+    const b4 = await p4.page.locator(".app-shell--config-error button").allTextContents();
+    rec(t4 === uiRow("Q1") && b4.includes("Retry") && b4.includes("Sign out"), "welcome: the claim answering 500 -> Q1 with Retry and Sign out", `${t4} | ${b4.join(",")}`);
+    rec((await db.ledger(uid4)).length === 0, "welcome: ...and nothing was granted");
+    await p4.page.locator(".app-shell--config-error button", { hasText: "Retry" }).click();
+    await p4.page.locator(".composer-input").waitFor({ timeout: 20000 });
+    rec(((await db.ledger(uid4))[0]?.request_id ?? "") === `welcome:${uid4}`, "welcome: Retry after the stand-in recovers -> granted");
+    rec(norm((await p4.page.locator(".welcome-notice").first().textContent().catch(() => "")) ?? "") === O1("1.00"), "welcome: ...and O1 shows");
+    await p4.page.context().close();
+
+    // ---- 5. an invited member -> no claim call
+    await standIn.createUser({ email: em("welcome.invited") });
+    const p5 = await newPage();
+    const n5 = claimCalls().length;
+    await signIn(p5.page, em("welcome.invited"));
+    await p5.page.locator(".composer-input").waitFor({ timeout: 20000 });
+    await p5.page.waitForTimeout(500);
+    rec(claimCalls().length === n5 && (await p5.page.locator(".welcome-notice").count()) === 0, "welcome: an invited member makes no claim call and sees no O1");
+    await p5.page.context().close();
+
+    // ---- 6. strings: sign-in (O5, O7, both modes), the bundle, the static pages
+    const p6 = await newPage();
+    for (const mode of ["Email link", "Email + password"]) {
+      await p6.page.locator(".sign-in-mode-toggle button", { hasText: mode }).click();
+      const o5 = norm((await p6.page.locator(".sign-in-invite").textContent()) ?? "");
+      const o7 = norm((await p6.page.locator(".sign-in-terms").textContent()) ?? "");
+      const hrefs = await p6.page.locator(".sign-in-terms a").evaluateAll((as: any[]) => as.map((a) => [a.textContent, a.getAttribute("href")]));
+      rec(o5 === uiRow("O5"), `welcome: the sign-in page shows O5 in "${mode}" mode`, o5);
+      rec(o7 === uiRow("O7") && JSON.stringify(hrefs) === JSON.stringify([["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]), `welcome: ...and O7 with its two links in "${mode}" mode`, `${o7} ${JSON.stringify(hrefs)}`);
+    }
+    await p6.page.context().close();
+
+    const txt = bundleText(prodDir);
+    for (const [id, needle] of [
+      ["O1", "of free credit to try Ten. Each reply uses some of it, and your balance at the top shows what's left."],
+      ["O2", uiRow("O2")], ["O3", uiRow("O3")], ["O4", uiRow("O4")], ["O5", uiRow("O5")], ["O6", uiRow("O6")],
+      ["O7 (start)", "Using Ten means you agree to its"], ["O7 (end)", "See also the"], ["O8", "/terms.html"],
+      ["B7", uiRow("B7")],
+    ] as [string, string][]) rec(txt.includes(needle), `welcome: the bundle has ${id}`);
+    // E16 is the proxy's own sentence (the app shows the server's `message`): the proxy tests check it
+    // against the doc. E14 is gone (owner, 2026-10-02: no daily limit); the "no daily limit" section above proves it.
+    for (const gone of ["invite-only", "The beta has reached today's limit", "The beta has a shared daily limit", "DeepSeek V4.1 Flash (testing)"])
+      rec(!txt.includes(gone), `welcome: the bundle does not hold "${gone}" (§ 5.3.1 Removed list)`);
+
+    const staticPage = async (name: string) => {
+      const pg = await (await browsers[BROWSER].newContext()).newPage();
+      const resp = await pg.goto(`${ORIGIN}/${name}`);
+      const text = norm((await pg.locator("body").innerText()) ?? "");
+      const html = await pg.content();
+      await pg.context().close();
+      return { status: resp?.status(), text, html };
+    };
+    const terms = await staticPage("terms.html");
+    rec(terms.status === 200, "welcome: /terms.html is served from the build");
+    // § 20.7's quoted text, word for word, read from the design doc
+    const AGENT = readFileSync(path.join(REPO, "docs/design-web-agent.md"), "utf8");
+    const q = AGENT.slice(AGENT.indexOf("   > **Terms**"), AGENT.indexOf("   *Checked against:*")).split("\n").map((l) => l.replace(/^\s*>\s?/, "")).join(" ").replace(/\*\*/g, "");
+    const want = norm(q).replace(/^Terms /, "");
+    const gotTerms = terms.text.replace(/^← Back /, "").replace(/^Terms /, "");
+    rec(gotTerms === want && want.length > 800, "welcome: /terms.html has the § 20.7 text, word for word", gotTerms === want ? "" : `got ${gotTerms.slice(0, 200)} ... want ${want.slice(0, 200)}`);
+    rec(/owner reviews this text before sign-ups open/i.test(terms.html), "welcome: /terms.html carries the 'owner reviews before sign-ups open' comment");
+    const priv = await staticPage("privacy.html");
+    rec(!/never to the general beta|testing only|internal testing/i.test(priv.text), "welcome: /privacy.html no longer says 'never to the general beta' or 'testing only'");
+    rec(priv.text.includes("Ten runs on DeepSeek V4.1 Flash for everyone, always through the no-data-kept hosts above, never DeepSeek's own API."), "welcome: /privacy.html has the replacement DeepSeek sentence");
+    rec(priv.text.includes("Your account Your sign-in (your email address, and your password if you set one) is shared with the older CareerCoach app. To give free credit only once per email inbox, Ten keeps a one-way fingerprint of your email address, not the address itself."), "welcome: /privacy.html has the 'Your account' fingerprint paragraph");
+    rec(priv.text.includes("If you delete your beta data, your credit and the amounts you've spent are kept too, with no content."), "welcome: ...through its last sentence");
+  } finally {
+    await setCap(0); // later sections expect the migration's shipped state
+  }
 });
 
 // ================================================================ DELETE BETA DATA
@@ -1422,7 +1589,8 @@ await section("model", async () => {
   const DEEPSEEK = "deepseek/deepseek-v4.1-flash";
   const HOSTS: Record<string, string[]> = {
     [CLAUDE]: ["Amazon Bedrock", "Google Vertex AI"],
-    [DEEPSEEK]: ["BaseTen", "CoreWeave", "DeepInfra", "DekaLLM", "DigitalOcean", "Fireworks", "Krea", "Makora", "Modal", "Morph", "NextBit", "Novita", "OpenInference", "Parasail", "Phala", "Relace", "Sail Research", "SiliconFlow", "Together", "Venice", "Wafer"],
+    // Read again from GET /api/v1/endpoints/zdr on 2026-10-02 (C § 20.7 item 2): Krea is gone; Decart, InferenceNet and Ionstream are new.
+    [DEEPSEEK]: ["BaseTen", "CoreWeave", "Decart", "DeepInfra", "DekaLLM", "DigitalOcean", "Fireworks", "InferenceNet", "Ionstream", "Makora", "Modal", "Morph", "NextBit", "Novita", "OpenInference", "Parasail", "Phala", "Relace", "Sail Research", "SiliconFlow", "Together", "Venice", "Wafer"],
   };
   const clientBodies = (p: any) => {
     const out: any[] = [];
@@ -1458,7 +1626,7 @@ await section("model", async () => {
     const resp = await pp.goto(ORIGIN + "/privacy.html");
     rec(resp?.status() === 200, `model: ${label} — /privacy.html is served from the build`);
     const txt = ((await pp.locator("body").innerText()) ?? "").replace(/\s+/g, " ");
-    const missing = ["OpenRouter", "Exa", "2026-09-24", ...HOSTS[CLAUDE], ...HOSTS[DEEPSEEK]].filter((w) => !txt.includes(w));
+    const missing = ["OpenRouter", "Exa", "2026-10-02", ...HOSTS[CLAUDE], ...HOSTS[DEEPSEEK]].filter((w) => !txt.includes(w));
     rec(missing.length === 0, `model: ${label} — privacy.html names OpenRouter, Exa, the date and every § 13.6 host for both models`, missing.join(", "));
     rec(/DeepSeek's own API/i.test(txt) && /never/i.test(txt), `model: ${label} — privacy.html says DeepSeek's own API is never used`);
     const bg = await pp.evaluate(() => getComputedStyle(document.body).backgroundColor);
@@ -1505,7 +1673,7 @@ await section("model", async () => {
       await signIn(page, em("model.deepseek"));
       await page.locator(".composer-input").waitFor({ timeout: 20000 });
       const m = await menuShape(page);
-      rec(m.lastText === "Model: DeepSeek V4.1 Flash (testing)", "model: DeepSeek -> 'Model: DeepSeek V4.1 Flash (testing)', word for word, last", m.lastText);
+      rec(m.lastText === "Model: DeepSeek V4.1 Flash", "model: DeepSeek -> 'Model: DeepSeek V4.1 Flash' ('(testing)' dropped, § 13.6 amended 2026-10-02), word for word, last", m.lastText);
       rec(m.beforeText === "Privacy", "model: Privacy just above it");
       const h0 = stub.hits.length;
       await say(page, "search acme funding");

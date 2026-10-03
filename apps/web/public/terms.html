@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Ten — Terms</title>
+<!--
+  DRAFT: the owner reviews this text before sign-ups open
+  (docs/design-web-agent.md § 20.7 item 1 and § 20.12 step 1). It is plain
+  language, not legal advice. The words are § 20.7's, word for word; edit
+  them there and here together (rule 12), never here alone.
+-->
+<style>
+  /* Plain, static copy of the v2 light-theme tokens, the same ones
+     privacy.html uses — this page is served as-is from apps/web/public/,
+     outside Vite's module graph, so the values are copied rather than
+     imported. Light theme only. */
+  :root {
+    --bg: #f7f2ea;
+    --bg-panel: #ffffff;
+    --fg: #161821;
+    --fg-muted: #585c6c;
+    --border: #e4dbc9;
+    --accent: #155eef;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  h1 {
+    font-size: 28px;
+    margin-bottom: 24px;
+  }
+  p {
+    font-size: 15px;
+    margin: 0 0 16px;
+  }
+  a {
+    color: var(--accent);
+  }
+  .back {
+    display: inline-block;
+    margin-bottom: 24px;
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <a class="back" href="javascript:history.back()">&larr; Back</a>
+  <h1>Terms</h1>
+
+  <p><strong>Ten is a beta.</strong> It is an early version, and it can change, pause or stop at any time.</p>
+
+  <p><strong>Free credit.</strong> A new account with a confirmed email address can get free credit to try Ten, while places last. There is one free credit per person and per email inbox. Free credit has no cash value: it can't be paid out, refunded or moved to another account. We can stop offering it to new accounts at any time, and we can remove it from accounts made to get it more than once. Free use has a shared daily limit, so it can pause until the next day.</p>
+
+  <p><strong>Paid credit.</strong> You buy credit in PayPal's own window, as a one-time payment; nothing renews. Paid credit stays if you delete your beta data. For a refund, email <a href="mailto:support@10xjobs.co">support@10xjobs.co</a>.</p>
+
+  <p><strong>Fair use.</strong> Use one account. Don't try to get around Ten's limits, reach anyone else's data, or overload the service. Don't use Ten to send spam or to deceive anyone.</p>
+
+  <p><strong>What Ten does, and what you do.</strong> Ten drafts and prepares; you send, submit and decide. Ten is built not to give legal, tax or financial advice and not to make up a pay figure. Check anything important before you rely on it.</p>
+
+  <p><strong>Your data.</strong> The <a href="/privacy.html">privacy page</a> says what leaves your browser and what Ten keeps. You can export your workspace at any time, and "Delete my beta data" in the menu deletes it; your sign-in, your credit and your usage amounts are kept, as that page explains.</p>
+
+  <p><strong>Contact.</strong> <a href="mailto:support@10xjobs.co">support@10xjobs.co</a></p>
+</main>
+</body>
+</html>

@@ -10,6 +10,7 @@ import {
   accessTokenFrom,
   authRedirectFromUrl,
   checkMembership,
+  claimWelcome,
   createTenAuthClient,
   siteRedirectUrl,
   signOut,
@@ -24,7 +25,7 @@ import { readGateStatus } from "../backend/gate.ts";
 import { buildRealDeps } from "./deps.ts";
 import { reconcileGateStatuses } from "./reconcile-gates.ts";
 import { SignIn } from "./SignIn";
-import { NotAMember } from "./NotAMember";
+import { NotAMember, type NotAMemberReason } from "./NotAMember";
 import { RealChatShell } from "./RealChatShell";
 import { RecoveryScreen } from "./RecoveryScreen";
 import { nextAuthScreen } from "./recovery-auth-event.ts";
@@ -42,7 +43,8 @@ type Screen =
   | { kind: "loading" }
   | { kind: "signed-out" }
   | { kind: "checking-membership" }
-  | { kind: "not-a-member" }
+  // C § 20.4: the welcome claim's refusal, with the reason it answered.
+  | { kind: "not-a-member"; reason: NotAMemberReason }
   // Fix round 1, item 4: every setup failure (membership, the root
   // CLAUDE.md create, the first balance() call) lands here — a plain
   // message, Retry, and Sign out — never a blank page.
@@ -133,6 +135,10 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   const [coach, setCoach] = useState<Coach | undefined>(undefined);
   const [workspace, setWorkspace] = useState<ReturnType<typeof buildRealDeps>["workspace"] | undefined>(undefined);
   const [balanceFn, setBalanceFn] = useState<(() => Promise<number>) | undefined>(undefined);
+  // O1's amount (C § 20.4): set only on the page load where `granted` came
+  // back, never stored anywhere (rule 12); RealChatShell drops it at the
+  // first send.
+  const [welcomeUsd, setWelcomeUsd] = useState<number | undefined>(undefined);
 
   const accessToken = useMemo(() => accessTokenFrom(authClient), [authClient]);
 
@@ -174,8 +180,29 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         return;
       }
       if (!isMember) {
-        setScreenUnlessRecovering({ kind: "not-a-member" });
-        return;
+        // C § 20.4: a non-member makes ONE claim, here, before any workspace,
+        // balance or conversation call (a refused account makes none).
+        // `claimWelcome` throws on a failed call or an unknown answer: that is
+        // Q1 with Retry, and the claim is safe to repeat.
+        let claim: Awaited<ReturnType<typeof claimWelcome>>;
+        try {
+          claim = await claimWelcome(authClient);
+        } catch (err) {
+          logSetupError("claiming the welcome credit", err);
+          checkedUserIdRef.current = undefined;
+          setScreenUnlessRecovering({ kind: "error", message: "Couldn't check your membership. Try again in a moment." });
+          return;
+        }
+        if (claim.status === "granted") {
+          // O1: kept in memory for this page load only (rule 12), so a Retry
+          // after a later setup step fails still shows it.
+          setWelcomeUsd(claim.usd);
+        } else if (claim.status !== "already_member") {
+          // paused, unconfirmed, already_claimed -> O2, O3, O4.
+          setScreenUnlessRecovering({ kind: "not-a-member", reason: claim.status });
+          return;
+        }
+        // granted, or already_member (another tab won): carry on as a member.
       }
 
       // § 7: "The app creates the workspace CLAUDE.md (create-only) at
@@ -287,6 +314,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
           return;
         case "signed-out":
           checkedUserIdRef.current = undefined;
+          setWelcomeUsd(undefined);
           setScreen({ kind: "signed-out" });
           return;
         case "ignore":
@@ -311,6 +339,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
     await signOut(authClient);
     isRecoveryRef.current = false;
     checkedUserIdRef.current = undefined;
+    setWelcomeUsd(undefined);
     setScreen({ kind: "signed-out" });
   }, [authClient]);
 
@@ -339,6 +368,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   const handleDeleted = useCallback(async () => {
     await signOut(authClient);
     checkedUserIdRef.current = undefined;
+    setWelcomeUsd(undefined);
     setScreen({
       kind: "deleted",
       message: "Deleted. You're signed out of Ten — your sign-in for the older app is untouched.",
@@ -377,7 +407,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   if (screen.kind === "not-a-member") {
     return (
       <div className="app-root" data-theme={theme}>
-        <NotAMember onSignOut={handleSignOut} />
+        <NotAMember reason={screen.reason} onSignOut={handleSignOut} />
       </div>
     );
   }
@@ -458,6 +488,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
         theme={theme}
         onThemeToggle={onThemeToggle}
         coachModel={env.coachModel}
+        welcomeUsd={welcomeUsd}
       />
     </div>
   );

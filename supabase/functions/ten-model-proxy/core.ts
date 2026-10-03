@@ -129,7 +129,10 @@ export function ceilingUsdFor(model: string | undefined): number {
 export const CEILING_USD = CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID];
 
 export const MAX_BODY_BYTES = 256 * 1024;
-export const BETA_CEILING_USD = 5;
+// There is NO daily spending ceiling (owner, 2026-10-02): the old $5/day
+// `BETA_CEILING_USD` is gone and nothing replaces it. The shared OpenRouter
+// key is a prepaid balance the owner tops up by hand; when it runs out
+// OpenRouter answers 402 and the handler shows its own message (E16).
 export const UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions";
 export const INT4_MAX = 2147483647;
 

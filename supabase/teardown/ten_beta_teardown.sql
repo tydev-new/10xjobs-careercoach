@@ -2,12 +2,18 @@
 -- supabase/migrations/20260923000000_ten_beta_init.sql,
 -- supabase/migrations/20260924000000_ten_ledger_finish_reason.sql,
 -- supabase/migrations/20260924100000_ten_conversations.sql, and
--- supabase/migrations/20260925000000_ten_paypal_credit.sql created, and
+-- supabase/migrations/20260925000000_ten_paypal_credit.sql, and
+-- supabase/migrations/20261002000000_ten_welcome_credit.sql created, and
 -- nothing else. The second and fourth files add no object of their own to
 -- drop — ten_usage_ledger.gross_usd/fee_usd and the wider kind/paypal-
 -- breakdown checks are on a table this file already drops, so they go with
 -- the table; no new statement here for either. The third file DOES add its
--- own statements below (a new table and function it owns).
+-- own statements below (a new table and function it owns), and so does the
+-- fifth (§ 20.10 (1)): the four objects ten_welcome_settings,
+-- ten_welcome_claims, ten_welcome_hash and ten_claim_welcome. Dropping
+-- ten_welcome_claims drops the email
+-- fingerprints too (§ 20.3: "tearing down the whole beta drops the claims
+-- table too").
 -- Applied by the OWNER, never by an agent. DESTROYS all beta data (workspace
 -- files, ledger, gate log, saved conversation). The shared auth users are
 -- NOT touched.
@@ -64,8 +70,12 @@ drop table if exists public.ten_ws_files;
 drop table if exists public.ten_gate_log;
 drop table if exists public.ten_conversations;
 drop table if exists public.ten_usage_ledger;
+drop table if exists public.ten_welcome_claims;
+drop table if exists public.ten_welcome_settings;
 
 -- Functions last: the tables' policies call ten_is_member().
+drop function if exists public.ten_claim_welcome();
+drop function if exists public.ten_welcome_hash(text);
 drop function if exists public.ten_conversation_save(text, jsonb, boolean, text);
 drop function if exists public.ten_gate_expire_other_chats(text);
 drop function if exists public.ten_gate_decide(uuid, text, text);

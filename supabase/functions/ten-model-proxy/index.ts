@@ -9,7 +9,6 @@ import { UPSTREAM_URL } from "./core.ts";
 import { handleRequest, type ProxyDeps } from "./handler.ts";
 import {
   balanceFor,
-  betaSpendToday,
   envFromDeno,
   insertLedgerCall,
   isMember,
@@ -27,7 +26,6 @@ const deps: ProxyDeps = {
   verifyUser: (token) => verifyUser(env, token),
   isMember: (token) => isMember(env, token),
   balanceFor: (uid) => balanceFor(env, uid),
-  betaSpendToday: () => betaSpendToday(env),
   insertLedgerCall: (row) => insertLedgerCall(env, row),
   fetchUpstream: (body) =>
     fetch(UPSTREAM_URL, {

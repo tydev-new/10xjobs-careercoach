@@ -69,6 +69,13 @@ const LINE = {
   other: TABLE["anything else"],
 };
 const withEmail = (s: string, email: string) => s.replace("{email}", email);
+// C § 20.1: a non-member's claim answers `paused` in the fake (FakeCfg.claim's default); the
+// screen is § 5.3.1 O2, read from the table (the old "invite-only" line is retired, C § 20.4).
+const O2_PAUSED = (() => {
+  const line = UI.split("\n").find((l) => l.startsWith("| O2 |"));
+  if (!line) throw new Error("row O2 not found in § 5.3.1");
+  return line.replace(/^\| /, "").replace(/ \|$/, "").split(" | ")[3].slice(1, -1);
+})();
 
 test("S0 the § 1.10 copy this suite checks against was found in the spec", () => {
   for (const [k, v] of Object.entries({ ...COPY, ...LINE })) assert.ok(v && v.length > 10, `copy ${k} missing`);
@@ -543,7 +550,7 @@ for (const c of ORDERS) {
       assert.equal(await memberChecks(o.page), 0, "no check before Continue, USER_UPDATED included");
       assert.ok((await bodyText(o.page)).includes(COPY.success));
       await o.page.getByRole("button", { name: "Continue" }).click();
-      await o.page.getByText("invite-only").waitFor();
+      await o.page.getByText(O2_PAUSED).waitFor();
       await settle(o.page, 300);
       assert.equal(await memberChecks(o.page), 1, "ten_is_member exactly once after Continue");
     } finally {
@@ -573,7 +580,7 @@ test("P6b a PASSWORD_RECOVERY event that follows INITIAL_SESSION (no URL) still 
       assert.equal(await memberChecks(o.page), 2, "the in-flight check, then exactly one after Continue");
       const after = await bodyText(o.page);
       assert.ok(!after.includes(COPY.recoveryTitle), `Continue leaves recovery: ${after.slice(0, 200)}`);
-      if (!member) assert.ok(after.includes("invite-only"), after.slice(0, 200));
+      if (!member) assert.ok(after.includes(O2_PAUSED), after.slice(0, 200));
     } finally {
       await o.close();
     }
@@ -631,7 +638,7 @@ test("P6e the expired line belongs to the link that came back: after a sign-in a
     await o.page.getByLabel("Email").fill(EMAIL);
     await o.page.getByLabel("Password").fill("correct horse battery");
     await o.page.getByRole("button", { name: "Sign in" }).click();
-    await o.page.getByText("invite-only").waitFor();
+    await o.page.getByText(O2_PAUSED).waitFor();
     await o.page.getByRole("button", { name: "Sign out" }).click();
     await o.page.getByRole("button", { name: "Email link" }).waitFor();
     await settle(o.page);
@@ -722,7 +729,7 @@ test("P7b no leak, Cancel and sign-out clear the form; the recovery screen's sav
     await r.page.getByLabel("Code").fill(SENTINEL_CODE);
     await save(r.page);
     await r.page.getByRole("button", { name: "Continue" }).click();
-    await r.page.getByText("invite-only").waitFor();
+    await r.page.getByText(O2_PAUSED).waitFor();
     const all = await calls(r.page);
     assert.deepEqual(onlyInAuthCalls(all, SENTINEL), []);
     const dump = await leakDump(r);
@@ -905,7 +912,7 @@ test("P9 the member ⋯ menu has 'Set a new password', enabled, directly above S
 test("P9b a signed-in non-member (and a signed-out visitor) never sees 'Set a new password'", async () => {
   const n = await open({ signedIn: true, member: false, events: [{ event: "INITIAL_SESSION" }] });
   try {
-    await n.page.getByText("invite-only").waitFor();
+    await n.page.getByText(O2_PAUSED).waitFor();
     assert.ok(!(await bodyText(n.page)).includes("Set a new password"));
     assert.equal(await n.page.getByRole("button", { name: "Menu" }).count(), 0, "§ 1.6's screen is unchanged");
   } finally {

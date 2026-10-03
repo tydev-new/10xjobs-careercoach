@@ -16,7 +16,8 @@ import { uploadWithClashRenumber } from "../../apps/web/src/backend/upload-error
 import { ANON, SUPABASE_URL, createBackend, type Backend } from "../store/pglite-backend.ts";
 
 const PDF = new TextEncoder().encode("%PDF-1.4 tester fixture\n%%EOF");
-const NON_MEMBER = "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.";
+// design-web-ui.md § 5.3.1 O6 (C § 20.4)
+const NON_MEMBER = "This account isn't set up to use Ten yet. Sign out, then sign in again to check.";
 
 let shared: Backend | undefined;
 async function be(): Promise<Backend> {

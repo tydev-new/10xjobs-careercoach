@@ -95,7 +95,10 @@ export async function balanceFor(
   return Number.isFinite(n) ? n : 0;
 }
 
-/** The beta-wide $/day ceiling sum, service-role only (`ten_beta_spend_today`, § 8). */
+/** All of Ten's spend today, service-role only (`ten_beta_spend_today`, § 8).
+ * UNUSED: the proxy has no daily ceiling any more (owner, 2026-10-02), so
+ * nothing in these functions calls it. The SQL function stays (it is in an
+ * applied migration) as the owner's read-only view of the day's spend. */
 export async function betaSpendToday(
   env: SupabaseEnv,
   fetchImpl: typeof fetch = fetch,

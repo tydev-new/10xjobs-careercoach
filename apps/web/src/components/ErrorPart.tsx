@@ -15,9 +15,9 @@ import type { DataErrorData, ErrorCode } from "../types";
 // design-web-agent.md § 8), and it already says what to do — repeating it
 // would be the boilerplate rule 8 rules out. It also can't be one static
 // line: `model_error` alone covers at least two different real messages
-// ("The beta has reached today's limit. Try again tomorrow." vs. "The
-// model is temporarily unavailable. Try again.", handler.ts's own
-// MESSAGES) — a fixed `nextStep` would contradict whichever one didn't
+// ("Ten's model service has reached its spending limit. Try again later."
+// (E16) vs. "The model is temporarily unavailable. Try again.", handler.ts's
+// own MESSAGES) — a fixed `nextStep` would contradict whichever one didn't
 // apply. There is no "add funds" step in the beta (one shared app key,
 // no per-candidate spend), so the old over_balance line is gone outright,
 // not reworded. `cut_off` (§ 9.3, amended 2026-09-24) is its own code,

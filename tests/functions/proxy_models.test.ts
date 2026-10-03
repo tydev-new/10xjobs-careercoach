@@ -12,7 +12,7 @@ const DEEPSEEK = "deepseek/deepseek-v4.1-flash";
 // § 13.1's table, by § 8's formula (64,000 in × dearest input + 8,192 out × dearest output + one $0.007 search)
 const CEILING: Record<string, number> = {
   [CLAUDE]: 64_000 * 2.75e-6 + 8_192 * 11e-6 + 0.007, // 0.273112
-  [DEEPSEEK]: 64_000 * 0.375e-6 + 8_192 * 1.5e-6 + 0.007, // 0.043288
+  [DEEPSEEK]: 64_000 * 0.45e-6 + 8_192 * 1.8e-6 + 0.007, // 0.0505456
 };
 // a static JSON import needs no --allow-read (run.py grants only --allow-net=127.0.0.1)
 import GOLDEN from "./fixtures/claude-golden-body.json" with { type: "json" };
@@ -104,13 +104,13 @@ const withCost = (id: string, cost: number) => [
   "data: [DONE]",
 ];
 
-t("§ 13.5 (iv): the table's ceilings are 0.273112 and 0.043288 (1e-9)", async () => {
+t("§ 13.5 (iv): the table's ceilings are 0.273112 and 0.0505456 (1e-9)", async () => {
   const core = await import("../../supabase/functions/ten-model-proxy/core.ts");
   const table = (core as any).CEILING_USD_BY_MODEL ?? {};
   assertAlmostEquals(table[CLAUDE], 0.273112, 1e-9);
-  assertAlmostEquals(table[DEEPSEEK], 0.043288, 1e-9);
+  assertAlmostEquals(table[DEEPSEEK], 0.0505456, 1e-9);
   assertAlmostEquals(CEILING[CLAUDE], 0.273112, 1e-12);
-  assertAlmostEquals(CEILING[DEEPSEEK], 0.043288, 1e-12);
+  assertAlmostEquals(CEILING[DEEPSEEK], 0.0505456, 1e-12);
 });
 
 t("§ 13.5 (iv): a call with no usage.cost records ITS model's ceiling", async () => {
@@ -121,7 +121,7 @@ t("§ 13.5 (iv): a call with no usage.cost records ITS model's ceiling", async (
   }
 });
 
-t("§ 13.5 (iv): a DeepSeek call that passes the meter deadline records $0.043288", async () => {
+t("§ 13.5 (iv): a DeepSeek call that passes the meter deadline records $0.0505456", async () => {
   const h = await harness();
   h.reset();
   const { handleRequest } = await import("../../supabase/functions/ten-model-proxy/handler.ts");
@@ -158,11 +158,11 @@ t("§ 13.5 (iv): a $0.60 cost is DeepSeek's ceiling on DeepSeek (beyond 10×), b
   assert(cl.logs.some((l) => /anomal/i.test(l)), "Claude: 0.60 > 0.273112 logs an anomaly");
 });
 
-t("§ 13.1: DeepSeek's 10× bound is 0.43288 — a cost just under it is recorded as reported (anomaly), just over it records the ceiling", async () => {
-  const under = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-u10", 0.4328) });
-  assertAlmostEquals(under.rows[0].usd, 0.4328, 1e-6);
+t("§ 13.1: DeepSeek's 10× bound is 0.505456 — a cost just under it is recorded as reported (anomaly), just over it records the ceiling", async () => {
+  const under = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-u10", 0.5054) });
+  assertAlmostEquals(under.rows[0].usd, 0.5054, 1e-6);
   assert(under.logs.some((l) => /anomal/i.test(l)));
-  const over = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-o10", 0.4329) });
+  const over = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-o10", 0.5057) });
   assertAlmostEquals(over.rows[0].usd, CEILING[DEEPSEEK], 1e-6);
 });
 

@@ -512,11 +512,11 @@ dt("N3/§ 9.5/§ 13.1 (amended 2026-09-24): Claude's ceiling is computed from th
   assertAlmostEquals(CEILING_USD, 0.273112, 1e-9);
 });
 
-dt("§ 13.1: DeepSeek's ceiling is $0.043288 (64k × $0.375/M + 8,192 × $1.50/M + one search)", async () => {
+dt("§ 13.1: DeepSeek's ceiling is $0.0505456 (64k × $0.45/M + 8,192 × $1.80/M + one search)", async () => {
   await Promise.resolve();
-  const formula = (64_000 * 0.375) / 1e6 + (8_192 * 1.5) / 1e6 + 0.007;
+  const formula = (64_000 * 0.45) / 1e6 + (8_192 * 1.8) / 1e6 + 0.007;
   assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], formula, 1e-9);
-  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 0.043288, 1e-9);
+  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 0.0505456, 1e-9);
 });
 
 dt("§ 9.6 (amended 2026-09-24): the ledger row carries finish_reason off the metered stream's own last chunk", async () => {
@@ -717,7 +717,7 @@ dt("§ 13.1/§ 13.5 (v): the ledger's model column is the id the proxy SENT, for
   }
 });
 
-dt("§ 13.5 (iv): a DeepSeek call records DeepSeek's own ceiling ($0.043288) when the cost can't be read", async () => {
+dt("§ 13.5 (iv): a DeepSeek call records DeepSeek's own ceiling ($0.0505456) when the cost can't be read", async () => {
   const h = await harness();
   try {
     h.state.users["tok-1"] = { id: "u1" };

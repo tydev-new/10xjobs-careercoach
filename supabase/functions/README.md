@@ -371,7 +371,7 @@ client while metering a `tee()`'d copy in the background (`waitUntil`, a
 `ten_usage_ledger` `'call'` row keyed by the response id, with `model` =
 the id THIS proxy sent (never the stream's own, possibly dated-suffixed,
 `model` string): a finite reported cost from $0 to 10× that request's
-OWN model's ceiling ($0.273112 Claude, $0.043288 DeepSeek — § 13.1's price
+OWN model's ceiling ($0.273112 Claude, $0.0505456 DeepSeek — § 13.1's price
 table, the dearest no-data-kept tool-capable host per model) is recorded
 **as reported** (a cost above the ceiling also logs an anomaly line — no
 key or content in it); a missing, non-finite, negative, or

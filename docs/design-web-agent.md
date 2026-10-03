@@ -1654,16 +1654,20 @@ ceiling constants. Everything else in § 8 is unchanged.
   | model | input $/M | output $/M | ceiling |
   |---|---|---|---|
   | Claude Sonnet 5 | 2.75 (regional cache write) | 11.00 | 0.176 + 0.090112 + 0.007 = **$0.273112, about $0.27** |
-  | DeepSeek V4.1 Flash | 0.375 | 1.50 | 0.024 + 0.012288 + 0.007 = **$0.043288, about $0.04** |
+  | DeepSeek V4.1 Flash | 0.45 (Fireworks US) | 1.80 | 0.0288 + 0.0147456 + 0.007 = **$0.0505456, about $0.05** |
 
   **This raises Claude's ceiling** from § 9.5's $0.21692, which used the
   global $2/$10 and no cache write. A regional host plus a cache write can
   cost up to $0.273 per call today, so § 8's "each ≤ the ceiling" was not
   true. **Approved** (owner, 2026-09-24; § 13.6 (1)): Claude's ceiling is
-  $0.273112, so § 8's bound holds again.
+  $0.273112, so § 8's bound holds again. **DeepSeek raised** (owner,
+  2026-10-02): the 2026-09-24 table used $0.375/$1.50 ($0.043288); the
+  dearest no-data-kept DeepSeek host is now Fireworks's US endpoint at
+  $0.45/$1.80 (§ 13.6's 2026-10-02 list), so DeepSeek's ceiling is
+  $0.0505456 and § 8's bound holds again for it too.
 - **Ceiling uses:** the meter's fallback charge (missing cost, deadline)
   and the 10× sanity bound both use the **request's** model's ceiling.
-  A DeepSeek cost above $0.43288 is recorded as that model's ceiling.
+  A DeepSeek cost above $0.505456 is recorded as that model's ceiling.
   Prices drift. The table is dated, and a cost above the ceiling is
   still recorded as reported, up to 10×, so drift never undercounts.
 - **The $5/day beta ceiling** was unchanged here; it was removed on 2026-10-02 (§ 20.6). There is no daily ceiling.
@@ -1797,10 +1801,10 @@ What to watch in DeepSeek runs (ledger and chat, numbers only):
   `max_tokens` 8,192 for a client 20,000 and 100 for 100; `stream: true`;
   the web plugin rewrite is the same as Claude's.
 - **(iv) Ceiling per model:** the table's values are 0.273112 and
-  0.043288 (1e-9). A DeepSeek call with no
-  `usage.cost` and one that passes the deadline both record $0.043288; a
+  0.0505456 (1e-9). A DeepSeek call with no
+  `usage.cost` and one that passes the deadline both record $0.0505456; a
   Claude call records Claude's ceiling. A DeepSeek cost of $0.60 is
-  recorded as $0.043288; the same $0.60 on Claude is recorded as $0.60
+  recorded as $0.0505456; the same $0.60 on Claude is recorded as $0.60
   with the anomaly log.
 - **(v) Ledger model:** the row's `model` is the request's id, even when
   the stream's `model` is `deepseek/deepseek-v4.1-flash-20260910`.
@@ -1985,7 +1989,8 @@ about five times.
   and the 10× bound. § 13's separate finding (a cache write on a regional
   host puts Claude's real worst case above this ceiling) was approved
   by the owner (§ 13.6 (1)). Once § 13 is built, with this search term,
-  the ceiling is $0.273112 for Claude and $0.043288 for DeepSeek.
+  the ceiling is $0.273112 for Claude and $0.043288 for DeepSeek (raised
+  to $0.0505456 on 2026-10-02, § 13.1).
 - `MAX_WEB_RESULTS` stays 5. Past 10 results, each extra one costs $0.001
   and the search term becomes $0.007 + (n − 10) × $0.001. A comment at
   the constant says so.
@@ -3182,14 +3187,13 @@ bound below is per day.
   limit (owner, 2026-09-23, § 8): a script calling the proxy directly can
   start many calls at once while the balance is above 0. Each call is held
   by the per-call caps (256 KB in, 8,192 output tokens, 5 search results);
-  § 13.1 prices one call at most at $0.043288 on DeepSeek and $0.273112 on
-  Claude, from 2026-09-24 prices. **Drift, found 2026-10-02:** the
-  no-data-kept list (§ 13.6) now has a DeepSeek host, Fireworks's US
-  endpoint, at $0.45 in and $1.80 out per million tokens, so DeepSeek's
-  worst case by § 8's formula is about $0.0505 a call, above its table
-  value. A cost above the ceiling is still recorded as reported (§ 13.1),
-  so nothing is undercounted, but each call in flight can cost up to its
-  real cost, not the table's. Paid credit is what PayPal delivered after
+  § 13.1 prices one call at most at $0.0505456 on DeepSeek and $0.273112 on
+  Claude. DeepSeek's value was raised on 2026-10-02 (owner) from
+  $0.043288, after the no-data-kept list (§ 13.6) gained a dearer
+  DeepSeek host, Fireworks's US endpoint at $0.45 in and $1.80 out per
+  million tokens. Prices drift again: a cost above the ceiling is still
+  recorded as reported (§ 13.1), so nothing is undercounted, but each
+  call in flight can cost up to its real cost, not the table's. Paid credit is what PayPal delivered after
   its fee (§ 17.3), so the owner's own loss on a paid account is only that
   overshoot.
 - **Everyone together, both apps:** at most the prepaid balance left on
@@ -3369,7 +3373,9 @@ migrations, with its request log as the spy):
 4. The claim answering 500 → Q1 and Retry; Retry after the stand-in
    recovers → granted.
 5. An invited member → no claim call.
-6. Strings: the bundle has O1–O8, E16 and B7's new words;
+6. Strings: the bundle has O1–O6, O8 and B7's new words; O7 is checked
+   as rendered text, since it is built around its two links; E16 is the
+   proxy's own line, checked in the proxy tests, not the bundle;
    "invite-only", "today's limit" (the old beta line and E14), "shared
    daily limit", "no daily limit of Ten's own" and "until tomorrow" are in
    no rendered page and not in the bundle (§ 5.3.1's Removed list); the build output has `/terms.html` with the

@@ -418,7 +418,7 @@ function nodeHash(email) {
   expect("no policy, no trigger, nothing on auth.users is created or altered", !/create\s+policy|create\s+trigger|alter\s+table\s+auth\./i.test(code));
   expect("the header carries the owner queries of § 20.8 and § 20.12 (grants per day, all spend today, open, pause)",
     MIG5.includes("where request_id like 'welcome:%'") && MIG5.includes("select public.ten_beta_spend_today();") &&
-    MIG5.includes("set cap = 100") && MIG5.includes("set cap = 0") && MIG5.includes("NOTIFY pgrst, 'reload schema'"));
+    MIG5.includes("set cap = <N>") && !MIG5.includes("set cap = 100") && MIG5.includes("set cap = 0") && MIG5.includes("NOTIFY pgrst, 'reload schema'"));
   expect("the claims table has no email, user id or date column", !/create table public\.ten_welcome_claims \([^)]*(user_id|created_at|email\b)/i.test(code.replace(/\s+/g, " ")));
   expect("it ships closed: cap 0 and usd 1.00 are the inserted values", /insert into public\.ten_welcome_settings \(id, cap, usd\) values \(true, 0, 1\.00\)/.test(code));
 }

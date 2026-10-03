@@ -1077,7 +1077,7 @@ await section("welcome", async () => {
     ] as [string, string][]) rec(txt.includes(needle), `welcome: the bundle has ${id}`);
     // E16 is the proxy's own sentence (the app shows the server's `message`): the proxy tests check it
     // against the doc. E14 is gone (owner, 2026-10-02: no daily limit); the "no daily limit" section above proves it.
-    for (const gone of ["invite-only", "The beta has reached today's limit", "The beta has a shared daily limit", "DeepSeek V4.1 Flash (testing)"])
+    for (const gone of ["invite-only", "today's limit", "shared daily limit", "no daily limit of Ten's own", "until tomorrow", "DeepSeek V4.1 Flash (testing)"])
       rec(!txt.includes(gone), `welcome: the bundle does not hold "${gone}" (§ 5.3.1 Removed list)`);
 
     const staticPage = async (name: string) => {

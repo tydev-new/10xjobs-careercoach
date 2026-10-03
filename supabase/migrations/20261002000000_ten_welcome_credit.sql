@@ -38,8 +38,9 @@
 --   3. Deploy ten-model-proxy, deploy the site (§ 20.12 steps 3-4).
 --   4. Live check at cap 0 (O2 shows), then:
 --        update public.ten_welcome_settings set cap = 1;      -- one test grant
---      then a +tag of the same inbox shows O4. Then open:
---        update public.ten_welcome_settings set cap = 100;
+--      then a +tag of the same inbox shows O4. Then open at the chosen cap
+--      (§ 20.8 recommends 15 to 20 without auto top-up):
+--        update public.ten_welcome_settings set cap = <N>;
 --   Pause at once with:        update public.ten_welcome_settings set cap = 0;
 --   Raise the cap or change the amount (each grant: > 0 and <= 5 dollars):
 --        update public.ten_welcome_settings set cap = 150;
@@ -223,4 +224,4 @@ commit;
 --   NOTIFY pgrst, 'reload schema';
 --   supabase functions deploy ten-model-proxy --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
 --   apps/web/scripts/deploy-prod.sh
---   update public.ten_welcome_settings set cap = 1;   -- then 100, to open
+--   update public.ten_welcome_settings set cap = 1;   -- then the chosen cap, to open

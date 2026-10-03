@@ -293,24 +293,36 @@ runs any of this):
 ## Owner checklist for § 20 — open sign-up with a welcome credit
 
 From `docs/design-web-agent.md` § 20.12 (an agent never runs any of this).
-It ships closed (`cap` = 0), so the order of 2-4 does not grant anyone
-anything.
+It ships closed (`cap` = 0), so the order of steps 2 to 5 does not grant
+anyone anything. Email confirmation is already on and stays on.
 
-1. Review `apps/web/public/terms.html` (§ 20.7 item 1); approve or edit it.
-2. Apply `20261002000000_ten_welcome_credit.sql` in the SQL editor as
-   `postgres`; then `NOTIFY pgrst, 'reload schema';`. Check:
-   `select cap, usd from public.ten_welcome_settings;` gives 0 and 1.00.
-3. `supabase functions deploy ten-model-proxy --no-verify-jwt --project-ref ivunfotoggdxbjouumdk`
-   (no daily ceiling any more, E16, O6; `ten-paypal`'s O6 can wait for its next deploy).
-4. `apps/web/scripts/deploy-prod.sh` (Vercel keeps `VITE_COACH_MODEL=deepseek/deepseek-v4.1-flash`).
-5. Live run with `cap` still 0 (O2), then `update public.ten_welcome_settings set cap = 1;`
-   (chip `$1.00`, O1, one `welcome:` ledger row), then a `+tag` of the same inbox (O4).
-6. Open: `update public.ten_welcome_settings set cap = 100;`. Pause at once: `set cap = 0;`.
+1. **Review `apps/web/public/terms.html`** (the § 20.7 item 1 text) and
+   approve or edit it **before sign-ups open**.
+2. **Apply the migration** `20261002000000_ten_welcome_credit.sql` in the
+   SQL editor as `postgres` at a quiet time, then
+   `NOTIFY pgrst, 'reload schema';`.
+3. **Check the settings row,** read-only:
+   `select cap, usd from public.ten_welcome_settings;` shows cap 0 and usd 1.00.
+4. **Deploy the proxy:**
+   `supabase functions deploy ten-model-proxy --no-verify-jwt --project-ref ivunfotoggdxbjouumdk`.
+   `ten-paypal`'s new 403 text (O6) can wait for its next deploy.
+5. **Deploy the site:** `apps/web/scripts/deploy-prod.sh`, with Vercel's
+   `VITE_COACH_MODEL=deepseek/deepseek-v4.1-flash` still set.
+6. **Live checks at cap 0,** on a fresh account with an inbox you control:
+   the not-a-member screen shows O2.
+7. **Live checks at cap 1:** `update public.ten_welcome_settings set cap = 1;`
+   and reload: the chip reads `$1.00`, O1 shows, and the ledger has one
+   `welcome:` row. (That test grant counts toward the cap.)
+8. **The same inbox with a `+tag`** shows O4.
+9. **Open sign-up at the chosen cap:**
+   `update public.ten_welcome_settings set cap = <N>;`. Without auto top-up,
+   § 20.8 recommends 15 to 20 for a first cap. Pause at once with `set cap = 0`.
+10. **Keep the prepaid key topped up, or turn on auto top-up** in OpenRouter
+    (§ 20.8). No code change and no deploy. When the balance runs out,
+    Ten's members see E16 and the older app stops too, until a top-up. The
+    OpenRouter menu path is UNVERIFIED against today's site.
 
-Read-only queries: grants per day, and all spend today, are in the
-migration's header. The OpenRouter key is a prepaid balance you top up by
-hand (no daily limit; no code reads or sets it): when it runs out, members
-see E16 until you top it up.
+Read-only queries (grants per day, all spend today) are in the migration's header.
 
 ## Rollback
 

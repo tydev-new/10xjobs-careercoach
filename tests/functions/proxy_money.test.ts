@@ -9,6 +9,7 @@
 
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
 import {
+  balanceIn,
   baseBody,
   call,
   callRows,
@@ -88,6 +89,21 @@ t("no daily check: the old edges are gone — $5.00 and $10.00 spent today forwa
   assertEquals((await run(tok)).res.status, 200, "$5.00 (the old ceiling)");
   call(h.st, a, 5);
   assertEquals((await run(tok)).res.status, 200, "$10.00 (the interim free ceiling)");
+});
+
+t("upstream 402 writes NO ledger row, so none of the member's credit is used while Ten is paused (B7's promise); the balance is unchanged", async () => {
+  const h = await harness();
+  h.reset();
+  const [uid, tok] = await member(h);
+  const before = balanceIn(h.st, uid);
+  const rowsBefore = h.st.ledger.length;
+  h.setUpstream(() => new Response(JSON.stringify({ error: { code: 402, message: "Insufficient credits" } }), { status: 402, headers: { "content-type": "application/json" } }));
+  const r = await run(tok);
+  await h.drain();
+  assertEquals(r.res.status, 503);
+  assertEquals(callRows(h.st).length, 0, "no call row");
+  assertEquals(h.st.ledger.length, rowsBefore, "no ledger row of any kind");
+  assertEquals(balanceIn(h.st, uid), before, "balance unchanged");
 });
 
 t("upstream 402 -> 503 model_error with E16 (not the general line); upstream 500 -> the general line", async () => {

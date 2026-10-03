@@ -35,7 +35,7 @@ three:
 | 4 | **State in Supabase**: auth, workspace text files as versioned rows and binaries in Storage (design § 2), plus the usage ledger and the gate log | already in the stack; per-user access rules; no DB copies of career facts (rule 12) |
 | 5 | **New app, replaces the existing WebUI later**; beta users migrate after phase 6 | owner's call; Phase 5 of the earlier plan (OpenClaw integration) is superseded |
 | 6 | Checkers: **JavaScript only** (amended 2026-09-26, owner: "switch to js completely"). Each script is one `.mjs` file under `skills/`, run with `node` locally and through the web's dispatch. The Python copies and the parity test are deleted; Python's last output is kept as expected-output tests (`docs/design-js-only.md`). Pyodide is dropped | one runtime for the browser, a later server, the MCP server and the local plugin. A duplicate cost every change twice and proved "identical" for one Python version only |
-| 7 | **Model proxy (2026-09-23):** the owner's existing OpenRouter key (shared with the live CareerCoach app; $20 limit, daily reset), only in the Edge Function `ten-model-proxy`; a derived ledger balance; the owner's existing production Supabase project with `ten_`-named objects; Vercel hosting | the owner won't create a management key; no key in the browser; one money table; the shared $20/day limit bounds every loss path |
+| 7 | **Model proxy (2026-09-23):** the owner's existing OpenRouter key (shared with the live CareerCoach app; a prepaid balance the owner tops up by hand, no daily limit: owner, 2026-10-02, correcting "$20 limit, daily reset"), only in the Edge Function `ten-model-proxy`; a derived ledger balance; the owner's existing production Supabase project with `ten_`-named objects; Vercel hosting | the owner won't create a management key; no key in the browser; one money table; the shared prepaid balance bounds every loss path (not a $20/day limit, corrected 2026-10-02) |
 
 ---
 
@@ -452,13 +452,17 @@ including the fixes → Ar closing review → O dogfoods → merge.
   through.
 - **One key shared with the live app, behind one proxy.** The proxy is a
   single point of failure, and a member calling it directly can run parallel
-  calls past their balance. The key's $20 limit resets daily and is shared
-  with the live CareerCoach app: a busy beta day can cut off the live app (and
-  vice versa), the bound is $20 per day, the two apps' costs mix in
-  OpenRouter's usage view (the beta ledger is the only beta cost record), and
-  rotating the key means updating both apps. A $5/day beta-wide ceiling in the
-  proxy (owner, 2026-09-23) keeps at least $15/day for the live app, less
-  in-flight calls.
+  calls past their balance. The key draws on the owner's prepaid OpenRouter
+  balance, shared with the live CareerCoach app, with no daily limit; the
+  owner tops it up by hand (owner, 2026-10-02, correcting the earlier "$20
+  limit, daily reset"). A busy stretch on either app can use it up and stop
+  both until a top-up (Ten shows E16, `design-web-ui.md` § 5.3.1); the bound
+  is the balance left, the two apps' costs mix in OpenRouter's usage view
+  (the beta ledger is the only beta cost record), and rotating the key means
+  updating both apps. The proxy has no daily ceiling: the $5/day beta-wide
+  one (owner, 2026-09-23) was removed on 2026-10-02
+  (`design-web-agent.md` § 20.6). Auto top-up, or a welcome-credit cap sized
+  to one top-up, is the owner's choice (§ 20.8 there).
 - **A shared production project.** The beta's objects are `ten_`-named, created
   and dropped by reviewed SQL the owner applies at a quiet time; its guard is a
   tripwire, so the owner's read-only policy query and the spike 3 re-run pass

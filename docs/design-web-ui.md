@@ -416,10 +416,12 @@ dialog; Close or Esc shuts it. The refund contact is
   Ten adds what arrives after PayPal's fee, a few percent plus a fixed
   amount. This is a one-time payment: nothing renews, and Ten never
   charges you on its own." Then `$10`, `$20`, `$40` and PayPal's buttons.
-- Under them (amended 2026-10-02, C § 20.6): "Paid credit stays if you
-  delete your beta data, and it has no daily limit of Ten's own. Ten's
-  model service does have a spending limit, so on a busy day Ten can pause
-  until tomorrow even with credit. For a refund, email
+- Under them (amended 2026-10-02, C § 20.6: there is no daily limit;
+  C28): "Paid credit stays if you delete your beta data, and there's no
+  daily limit on using it. Ten pays its model service in advance, and if
+  that prepaid money runs out, Ten pauses for everyone until it's topped
+  up, even if you have credit left. None of your credit is used while Ten
+  is paused, so you can try again later. For a refund, email
   support@10xjobs.co."
 - Credited (numbers from the reply): "Added $9.16 of credit. PayPal
   charged $10.00; its fee was $0.84." The chip refreshes.
@@ -569,9 +571,10 @@ Rendered exactly as the envelope carries it — `{ code, message,
 retryable }` (C § 6.1 names the `code` values). `message` is
 never a UI invention: it's the literal sentence the server sent, and
 under `model_error` that sentence differs by cause even though the
-`code` doesn't — the free-use ceiling ("Free use of Ten has reached
-today's limit. Try again tomorrow.", C § 20.6, amended 2026-10-02) and an
-upstream failure are both
+`code` doesn't — Ten's shared prepaid model money running out (an
+upstream 402, E16: "Ten's model service has reached its spending limit.
+Try again later.", C § 20.6, amended 2026-10-02) and any other upstream
+failure are both
 `model_error`, told apart only by their own `message` text (C § 8),
 never by a separate code. A reply cut off at the output limit is its
 own code, `cut_off` (C § 9.3, amended 2026-09-24): a fixed message
@@ -581,7 +584,7 @@ C16), so the old `nextStep` lookup entry for it is gone: the message
 already says what to do, and repeating it would be the kind of
 boilerplate rule 8 rules out. `model_error` carries no `nextStep` line
 either, for the same reason — one static line can't fit both "try
-again in a moment" and "try again tomorrow" without contradicting
+again" (an upstream failure) and "try again later" (E16) without contradicting
 whichever one is actually true. The remaining `nextStep` entries
 (`tool_error`, `offline`) are unchanged. The UI never
 computes a number into `message` that the part didn't carry (e.g. "2
@@ -1496,7 +1499,7 @@ commit. The coder copies each string word for word.
   `apps/web/src`: `packages/agent`'s error messages
   (`packages/agent/src/coach.ts:42-60`) and decline line
   ("Declined — nothing started.", `:537`), and the proxy's messages
-  (C § 8). The messages this doc quotes have rows (E12–E16); the rest
+  (C § 8). The messages this doc quotes have rows (E12, E13, E15, E16; E14 is retired, C28); the rest
   are a named follow-up for the lead, against the same rules.
 - **How to read a row.** Placeholders are in angle brackets (`<N>`,
   `<path>`); everything else is literal, the final period included.
@@ -1786,9 +1789,8 @@ commit. The coder copies each string word for word.
 | E11 | Talk to Ten | error card, when the error can be retried | `Send your message again to retry.` | this table; follow-up 7; was `This can be retried.` | Changed (C25) |
 | E12 | Talk to Ten | error card message, `step_cap` | `This turn ran out of steps before finishing.` | § 2.7 :581 | Given |
 | E13 | Talk to Ten | error card message, `too_large` | `This turn got too big to send, so it stopped partway.` | § 2.7 :594 | Given |
-| E14 | Talk to Ten | error card message, the free-use daily limit (`model_error`; free members only, C § 20.6) | `Free use of Ten has reached today's limit. Try again tomorrow.` | § 2.7; C § 20.6 | Changed (C27) |
 | E15 | Talk to Ten | error card message, `over_balance` | `Your credit is used up. You can buy more from your balance at the top.` | § 1.11 :413; C16 | Given |
-| E16 | Talk to Ten | error card message, the model service's own spending limit (an upstream 402, `model_error`) | `Ten's model service has reached its spending limit. Try again later.` | C § 20.6 | NEW |
+| E16 | Talk to Ten | error card message, Ten's shared prepaid model money used up (an upstream 402, `model_error`; Ten pauses for everyone until the owner tops up) | `Ten's model service has reached its spending limit. Try again later.` | C § 20.6 | NEW |
 | U1 | Talk to Ten, under the composer | an upload that failed | `<name> isn't a file type Ten can use yet — only .pdf and .docx.` | this table | Kept |
 | U2 | Talk to Ten, under the composer | an upload that failed | `<name> is over the 10 MB upload limit.` | this table | Kept |
 | U3 | Talk to Ten, under the composer | an upload that failed | `<name> is over the size limit.` | this table | Kept |
@@ -1842,7 +1844,7 @@ commit. The coder copies each string word for word.
 | B4 | Buy credit dialog | a credit pack | `$20` | § 1.11 :396 | Given |
 | B5 | Buy credit dialog | a credit pack | `$40` | § 1.11 :396 | Given |
 | B6 | Buy credit dialog | accessible name of the packs | `Choose a credit pack` | this table | Kept |
-| B7 | Buy credit dialog | under the packs | `Paid credit stays if you delete your beta data, and it has no daily limit of Ten's own. Ten's model service does have a spending limit, so on a busy day Ten can pause until tomorrow even with credit. For a refund, email support@10xjobs.co.` | § 1.11; C § 20.6 | Changed (C27) |
+| B7 | Buy credit dialog | under the packs | `Paid credit stays if you delete your beta data, and there's no daily limit on using it. Ten pays its model service in advance, and if that prepaid money runs out, Ten pauses for everyone until it's topped up, even if you have credit left. None of your credit is used while Ten is paused, so you can try again later. For a refund, email support@10xjobs.co.` | § 1.11; C § 20.6 | Changed (C28) |
 | B8 | Buy credit dialog | while PayPal confirms | `Confirming your payment…` | this table | Kept |
 | B9 | Buy credit dialog; the toast | credited | `Added $<credited> of credit. PayPal charged $<charged>; its fee was $<fee>.` | § 1.11 :400 | Given |
 | B10 | Buy credit dialog | pending | `PayPal is still clearing this payment. The credit is added when it clears.` | § 1.11 :402 | Given |
@@ -2110,12 +2112,22 @@ on it.
   **Pick:** "… of <N> active applications" (H10); § 5.3, § 5.7 and
   § 5.9 are edited.
 - **C27. The daily limit is no longer one limit** (owner, 2026-10-02;
-  C § 20.6). E14 said "The beta has reached today's limit", and B7 told
+  C § 20.6; superseded the same day by C28, kept as history). E14
+  said "The beta has reached today's limit", and B7 told
   buyers "The beta has a shared daily limit". Members who paid now have
   no ceiling of Ten's own; free use has one; the model service's own
   limit stops everyone. **Pick:** E14 names free use; B7 says paid credit
   has no daily limit of Ten's own but the model service has one; E16 is
   the model service's line. § 1.11 and § 2.7 are edited.
+- **C28. No daily limit at all** (owner, 2026-10-02; C § 20.6). The model
+  key is a prepaid balance with no daily limit, which the owner tops up by
+  hand, so Ten has no daily ceiling for anyone. C27's E14 and B7 were
+  untrue: nothing resets tomorrow. **Pick:** E14 goes (Removed list); B7
+  says there's no daily limit, that Ten pauses for everyone only if its
+  prepaid model money runs out, until it's topped up, and what the
+  candidate can do (try again later; none of their credit is used
+  meanwhile); E16 stays as the line shown during that pause. C § 20.7's
+  terms say the same. § 1.11 and § 2.7 are edited.
 
 **Decisions where the doc had a slot but no words** (the NEW rows):
 
@@ -2161,7 +2173,10 @@ on it.
 
 **Removed from the screen** (proof 4 checks none of these shows):
 "this beta is invite-only" (the old Q7, retired by C § 20); "The beta has
-reached today's limit"; "The beta has a shared daily limit";
+reached today's limit"; "The beta has a shared daily limit"; "Free use of
+Ten has reached today's limit. Try again tomorrow." (E14, retired by C28);
+"no daily limit of Ten's own" and "pause until tomorrow" (C27's B7);
+"Free use has a shared daily limit" (the first draft of C § 20.7's terms);
 "Error — <code>"; "Needs your word"; "Status: <status>";
 "warning(s)"; "Binary file — no preview."; "Download PDF"; "/skills";
 "Checker · "; "Unknown card"; "Import refused"; "Ten isn't configured";

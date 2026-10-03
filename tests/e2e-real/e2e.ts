@@ -1266,16 +1266,20 @@ await section("welcome-review", async () => {
       const o7 = norm((await s1.page.locator(".sign-in-terms").innerText()) ?? "");
       const links = await s1.page.locator(".sign-in-terms a").evaluateAll((as: any[]) => as.map((a) => [a.innerText.trim(), a.getAttribute("href")]));
       rec(o5 === uiRow("O5") && o7 === uiRow("O7") && JSON.stringify(links) === JSON.stringify([["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]), `review R7: 375px sign-in ("${mode}"): O5 and O7 read word for word (innerText), "terms" and "privacy notice" link the two pages`, `${o5} | ${o7} | ${JSON.stringify(links)}`);
-      // How O7 looks: the 44px tap-target box around "terms" leaves a visible gap before its period.
+      // How O7 looks: the link hugs its text, so no gap shows before its period (the 44px tap box is padded
+      // invisibly, with matching negative margins). Measured: the text's right edge to the period's left edge.
       const gap = await s1.page.evaluate(() => {
         const a = document.querySelector(".sign-in-terms a") as HTMLElement;
         const r = document.createRange();
         r.selectNodeContents(a);
         const text = r.getBoundingClientRect();
-        const box = a.getBoundingClientRect();
-        return { textWidth: Math.round(text.width), boxWidth: Math.round(box.width) };
+        const next = a.nextSibling as Text;
+        const r2 = document.createRange();
+        r2.setStart(next, 0);
+        r2.setEnd(next, 1);
+        return { period: next.data.slice(0, 1), gapPx: Math.round((r2.getBoundingClientRect().left - text.right) * 10) / 10 };
       });
-      console.log(`OBSERVED  [${BROWSER}] review R7: O7's "terms" link: text ${gap.textWidth}px wide in a ${gap.boxWidth}px box (the slack shows as space around the word, before its period)`);
+      rec(gap.period === "." && gap.gapPx < 2, `review R7: 375px sign-in ("${mode}"): O7's "terms" link hugs its text: no visible gap before the period`, JSON.stringify(gap));
       if (shots) await s1.page.screenshot({ path: path.join(shots, `375-sign-in-${mode.replace(/\W+/g, "-")}.png`), fullPage: true });
     }
     await s1.page.context().close();

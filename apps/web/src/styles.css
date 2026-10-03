@@ -3274,16 +3274,16 @@ summary.job-group-head {
 }
 
 /* The two links in O7 are tap targets (§ 5.6, 44px) and have a hover look
-   (and the global a:active press): their box is 44px tall, and the negative
-   margins hand the extra height back so the sentence keeps its own line
-   spacing. */
+   (and the global a:active press). Their box is 44px tall and at least 44px
+   wide, but the extra size is invisible: the negative margins hand the height
+   and the side padding back, so the sentence keeps its own line spacing and
+   the link hugs its text (no gap before the period). */
 .sign-in-terms a {
   display: inline-block;
-  min-width: 44px;
+  padding: 0 6px;
   min-height: 44px;
   line-height: 44px;
-  text-align: center;
-  margin: -14px 0;
+  margin: -14px -6px;
   color: var(--primary);
   text-decoration: underline;
 }

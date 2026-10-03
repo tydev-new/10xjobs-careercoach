@@ -19,6 +19,8 @@ node r5-finish-reason.mjs  # § 9.6: 20260924000000_ten_ledger_finish_reason.sql
 node r6-conversations.mjs  # § 11: 20260924100000_ten_conversations.sql applied AFTER the first two migrations
 node r8-paypal.mjs         # § 17.3/17.8(7): 20260925000000_ten_paypal_credit.sql after the three applied ones; checks, refunds, teardown (tester)
 node r9-welcome.mjs        # § 20.11: 20261002000000_ten_welcome_credit.sql after the four applied ones; every claim path, the cap, normalisation, deletion, teardown (no ceiling function: the owner dropped the daily limit)
+node r10-welcome-tester.mjs  # § 20 independent tester: adversarial normalisation (quotes, multiple @, lookalikes, dots, empty local; edges the rule doesn't name print [OBSERVED]), cap 0/1/N, usd bounds, grants, search_path hijack, deletion, money checks, teardown
+(cd race && npm ci && node r10-race.mjs)  # § 20.1 step 4 for real: embedded Postgres 17 on 127.0.0.1 in a temp dir; two accounts racing for the last place, two tabs, one inbox twice, 40 at once at cap 7. Not in npm test (it downloads Postgres binaries)
 ```
 
 Each prints `[PASS]` / `[FAIL]` / `[OBSERVED]` lines and a failure count.

@@ -1107,6 +1107,208 @@ await section("welcome", async () => {
   }
 });
 
+// ================================================================ OPEN SIGN-UP, INDEPENDENT REVIEW
+// Tester's own cases (open sign-up review, 2026-10-02), from design-web-agent.md
+// § 20.4 and design-web-ui.md § 1.4-§ 1.6, § 5.3.1 O1-O8 and Q1; the builder's
+// "welcome" section above is not re-used for any verdict here. Run alone with
+//   E2E_BROWSERS=chromium E2E_ONLY=welcome-review node tests/e2e-real/e2e.ts
+// SHOTS_375=<dir> also saves the 375px screenshots for a look by eye.
+await section("welcome-review", async () => {
+  const claims = (uid?: string) =>
+    standIn.log.filter((l) => l.path === "/rest/v1/rpc/ten_claim_welcome" && l.method === "POST" && (!uid || verifyJwt(/^Bearer (.+)$/.exec(l.auth)?.[1] ?? "")?.sub === uid));
+  const setCap = (n: number) => standIn.sql("update public.ten_welcome_settings set cap = " + Math.trunc(n));
+  const setUsd = (v: string) => standIn.sql("update public.ten_welcome_settings set usd = " + Number(v).toFixed(2));
+  const msg = async (page: any) => norm((await page.locator(".not-a-member-message").textContent().catch(() => "")) ?? "");
+  const shots = process.env.SHOTS_375;
+  try {
+    // ---- R1. the grant's amount comes from the reply: usd 2.50 -> O1 says $2.50, the chip $2.50
+    await setCap(100);
+    await setUsd("2.50");
+    const u1 = await standIn.createUser({ email: em("rv.amount"), member: false });
+    const p1 = await newPage();
+    await signIn(p1.page, em("rv.amount"));
+    await p1.page.locator(".composer-input").waitFor({ timeout: 20000 });
+    const chip1 = await until(async () => ((await chip(p1.page)) !== "—" ? await chip(p1.page) : false), 8000);
+    const o1 = norm((await p1.page.locator(".welcome-notice").first().textContent().catch(() => "")) ?? "");
+    rec(o1 === uiRow("O1").replace("<amount>", "2.50") && chip1 === "$2.50", "review R1: owner sets usd 2.50 -> O1 and the chip both say $2.50 (the amount is the server's)", `${o1} | ${chip1}`);
+    rec(claims(u1).length === 1, "review R1: exactly one claim for one sign-in", String(claims(u1).length));
+    // O1 is never stored (rule 12): not in any browser storage, not in the saved conversation
+    const stored = await p1.page.evaluate(async () => {
+      const dump: string[] = [];
+      for (const s of [localStorage, sessionStorage]) for (let i = 0; i < s.length; i++) dump.push(s.key(i) + "=" + s.getItem(s.key(i)!));
+      const dbs = (await (indexedDB as any).databases?.()) ?? [];
+      return { dump: dump.join("\n"), dbs: dbs.map((d: any) => d.name), cookie: document.cookie };
+    });
+    rec(!/free credit|welcome/i.test(stored.dump + stored.cookie), "review R1: O1 is in no browser storage (local, session, cookie; IndexedDB names listed)", JSON.stringify({ keys: stored.dump.split("\n").map((l) => l.split("=")[0]), dbs: stored.dbs }));
+    await say(p1.page, "hello, review");
+    const conv = await standIn.sql<{ m: string }>("select messages::text as m from public.ten_conversations where user_id = $1", [u1]);
+    rec(conv.length === 1 && !/free credit to try Ten/.test(conv[0].m), "review R1: the saved conversation does not carry O1", conv.length ? conv[0].m.slice(0, 200) : "no row");
+    // the menu: Terms opens the static page; Privacy stays just above the model line (§ 13.6)
+    await p1.page.locator(".menu-trigger").click();
+    const menuItems = await p1.page.evaluate(() => [...document.querySelectorAll(".menu-panel > *")].map((e) => (e.textContent ?? "").trim()));
+    const termsLink = await p1.page.locator(".menu-panel a", { hasText: "Terms" }).evaluate((a: any) => ({ href: a.getAttribute("href"), target: a.getAttribute("target") }));
+    await p1.page.locator(".menu-trigger").click();
+    const iTerms = menuItems.indexOf("Terms");
+    const iPriv = menuItems.indexOf("Privacy");
+    rec(iTerms >= 0 && iPriv === iTerms + 1 && /^Model: /.test(menuItems[iPriv + 1] ?? "") && termsLink.href === "/terms.html", "review R1: O8 'Terms' sits beside Privacy, Privacy stays just above the model line, and Terms links /terms.html", JSON.stringify({ menuItems, termsLink }));
+    await p1.page.context().close();
+    await setUsd("1.00");
+
+    // ---- R2. one account, two tabs signing in at once: two claims, one grant, one O1, both tabs in
+    const u2 = await standIn.createUser({ email: em("rv.twotabs"), member: false });
+    const [ta, tb] = [await newPage(), await newPage()];
+    await Promise.all([signIn(ta.page, em("rv.twotabs")), signIn(tb.page, em("rv.twotabs"))]);
+    await Promise.all([ta.page.locator(".composer-input").waitFor({ timeout: 25000 }), tb.page.locator(".composer-input").waitFor({ timeout: 25000 })]);
+    const notices = (await ta.page.locator(".welcome-notice").count()) + (await tb.page.locator(".welcome-notice").count());
+    const led2 = await db.ledger(u2);
+    rec(led2.length === 1 && led2[0].request_id === `welcome:${u2}`, "review R2: two tabs at once -> one welcome row", JSON.stringify(led2));
+    // Two claims if both tabs passed the membership check before either granted, else one: either is right.
+    rec(claims(u2).length >= 1 && claims(u2).length <= 2 && notices === 1, "review R2: ...at most one claim per tab; exactly one tab shows O1 (the other got already_member, or was a member by then)", `claims ${claims(u2).length}, notices ${notices}`);
+    await ta.page.context().close();
+    await tb.page.context().close();
+
+    // ---- R3. an answer off the list, or a granted with no amount -> Q1 with Retry, never a member screen
+    for (const [label, body] of [["status 'weird'", { status: "weird" }], ["granted with no usd", { status: "granted" }], ["a bare string", "granted"]] as [string, unknown][]) {
+      const u3 = await standIn.createUser({ email: em(`rv.bad.${label.replace(/\W+/g, "")}`), member: false });
+      const p3 = await newPage({ noGoto: true });
+      await p3.page.route("**/rest/v1/rpc/ten_claim_welcome", (route: any) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }));
+      await p3.page.goto(ORIGIN + "/");
+      await signIn(p3.page, em(`rv.bad.${label.replace(/\W+/g, "")}`));
+      await p3.page.locator(".app-shell--config-error").waitFor({ timeout: 15000 });
+      const t3 = norm((await p3.page.locator(".app-shell--config-error p").allTextContents()).join(" "));
+      const b3 = await p3.page.locator(".app-shell--config-error button").allTextContents();
+      rec(t3 === uiRow("Q1") && b3.includes("Retry"), `review R3: the claim answering ${label} -> Q1 with Retry`, `${t3} | ${b3.join(",")}`);
+      rec((await p3.page.locator(".not-a-member-screen, .composer-input, .welcome-notice").count()) === 0, `review R3: ...and no not-a-member line, composer or O1 (${label})`);
+      const after = standIn.log.filter((l) => verifyJwt(/^Bearer (.+)$/.exec(l.auth)?.[1] ?? "")?.sub === u3).map((l) => l.path);
+      rec(!after.some((x) => x === "/rest/v1/rpc/ten_ws_write" || x.startsWith("/storage/") || x === "/rest/v1/rpc/ten_balance" || x.startsWith("/rest/v1/ten_conversations")), `review R3: ...and no workspace, balance or conversation call (${label})`, after.join(", "));
+      await p3.page.context().close();
+    }
+
+    // ---- R4. two failures in a row: Retry is one claim each; the third attempt grants
+    const u4 = await standIn.createUser({ email: em("rv.retry2"), member: false });
+    standIn.failClaimWelcome(2);
+    const p4 = await newPage();
+    await signIn(p4.page, em("rv.retry2"));
+    await p4.page.locator(".app-shell--config-error").waitFor({ timeout: 15000 });
+    await p4.page.locator(".app-shell--config-error button", { hasText: "Retry" }).click();
+    await p4.page.waitForTimeout(1200);
+    const stillQ1 = (await p4.page.locator(".app-shell--config-error").count()) === 1;
+    rec(stillQ1 && claims(u4).length === 2, "review R4: a second failure stays on Q1; Retry made exactly one more claim", `claims ${claims(u4).length}`);
+    await p4.page.locator(".app-shell--config-error button", { hasText: "Retry" }).click();
+    await p4.page.locator(".composer-input").waitFor({ timeout: 20000 });
+    rec(claims(u4).length === 3 && (await db.ledger(u4)).length === 1, "review R4: the third attempt grants, one row", `claims ${claims(u4).length}`);
+    await p4.page.context().close();
+
+    // ---- R5. a refused account: sign out and in again in the same tab = one claim per sign-in; a reload re-checks
+    await setCap(0);
+    const u5 = await standIn.createUser({ email: em("rv.signinagain"), member: false });
+    const p5 = await newPage();
+    await signIn(p5.page, em("rv.signinagain"));
+    await p5.page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+    rec((await msg(p5.page)) === uiRow("O2") && claims(u5).length === 1, "review R5: cap 0 -> O2, one claim", String(claims(u5).length));
+    await p5.page.locator(".not-a-member-screen button", { hasText: "Sign out" }).click();
+    await p5.page.locator(".sign-in-screen").waitFor({ timeout: 10000 });
+    await setCap(100);
+    await signIn(p5.page, em("rv.signinagain"));
+    await p5.page.locator(".composer-input").waitFor({ timeout: 20000 });
+    rec(claims(u5).length === 2 && (await p5.page.locator(".welcome-notice").count()) === 1, "review R5: after the owner opens, signing in again claims once more and grants (O1 shows)", String(claims(u5).length));
+    await p5.page.context().close();
+    await setCap(0);
+    const u5b = await standIn.createUser({ email: em("rv.reload"), member: false });
+    const p5b = await newPage();
+    await signIn(p5b.page, em("rv.reload"));
+    await p5b.page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+    await p5b.page.reload();
+    await p5b.page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+    await p5b.page.waitForTimeout(500);
+    rec(claims(u5b).length === 2, "review R5: a reload of the refused screen runs the check again (one claim per page load)", String(claims(u5b).length));
+    await p5b.page.context().close();
+
+    // ---- R6. a paid member (a paypal: row only) never claims; neither does a member at a $0 balance
+    const u6 = await standIn.createUser({ email: em("rv.paid"), member: false });
+    await standIn.sql("insert into public.ten_usage_ledger (user_id, kind, usd, request_id, gross_usd, fee_usd) values ($1, 'credit', 9.16, $2, 10.00, 0.84)", [u6, `paypal:RV${Date.now()}`]);
+    await db.addCall(u6, 9.16, 0);
+    const p6 = await newPage();
+    await signIn(p6.page, em("rv.paid"));
+    await p6.page.locator(".balance-chip").waitFor({ timeout: 20000 });
+    await p6.page.waitForTimeout(600);
+    rec(claims(u6).length === 0 && (await p6.page.locator(".welcome-notice").count()) === 0, "review R6: a paid member at $0 balance makes no claim and sees no O1", String(claims(u6).length));
+    await p6.page.context().close();
+
+    // ---- R7. 375 px: the sign-in page and the three not-a-member screens fit, with every line readable
+    const fits = async (page: any, sel: string[]) =>
+      page.evaluate((sels: string[]) => {
+        const W = window.innerWidth;
+        const over = document.documentElement.scrollWidth > W;
+        const bad: string[] = [];
+        for (const s of sels) {
+          const el = document.querySelector(s) as HTMLElement | null;
+          if (!el) { bad.push(`${s}: missing`); continue; }
+          const r = el.getBoundingClientRect();
+          const cs = getComputedStyle(el);
+          if (r.left < 0 || r.right > W + 0.5) bad.push(`${s}: x ${Math.round(r.left)}..${Math.round(r.right)} of ${W}`);
+          if (el.scrollWidth > el.clientWidth + 1 && cs.overflowX !== "visible") bad.push(`${s}: clipped`);
+          if (r.height === 0 || cs.visibility === "hidden" || cs.display === "none") bad.push(`${s}: hidden`);
+          if (parseFloat(cs.fontSize) < 12) bad.push(`${s}: font ${cs.fontSize}`);
+        }
+        return { over, bad, sw: document.documentElement.scrollWidth, W };
+      }, sel);
+    const phone = { width: 375, height: 812 };
+    const s1 = await newPage({ viewport: phone });
+    for (const mode of ["Email link", "Email + password"]) {
+      await s1.page.locator(".sign-in-mode-toggle button", { hasText: mode }).click();
+      const f = await fits(s1.page, [".sign-in-invite", ".sign-in-terms", ".sign-in-form button[type=submit]"]);
+      rec(!f.over && f.bad.length === 0, `review R7: 375px sign-in ("${mode}"): no sideways scroll; O5, O7 and the submit button sit inside the screen`, JSON.stringify(f));
+      // reading order on the phone: the form, then O5, then O7 (§ 1.4: "the sign-in form comes first")
+      const order = await s1.page.evaluate(() => ["form", ".sign-in-invite", ".sign-in-terms"].map((s) => (document.querySelector(s) as HTMLElement | null)?.getBoundingClientRect().top ?? -1));
+      rec(order[0] >= 0 && order[0] < order[1] && order[1] < order[2], `review R7: 375px sign-in ("${mode}"): the form comes first, then O5, then O7`, JSON.stringify(order));
+      const o5 = norm((await s1.page.locator(".sign-in-invite").innerText()) ?? "");
+      const o7 = norm((await s1.page.locator(".sign-in-terms").innerText()) ?? "");
+      const links = await s1.page.locator(".sign-in-terms a").evaluateAll((as: any[]) => as.map((a) => [a.innerText.trim(), a.getAttribute("href")]));
+      rec(o5 === uiRow("O5") && o7 === uiRow("O7") && JSON.stringify(links) === JSON.stringify([["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]), `review R7: 375px sign-in ("${mode}"): O5 and O7 read word for word (innerText), "terms" and "privacy notice" link the two pages`, `${o5} | ${o7} | ${JSON.stringify(links)}`);
+      // How O7 looks: the 44px tap-target box around "terms" leaves a visible gap before its period.
+      const gap = await s1.page.evaluate(() => {
+        const a = document.querySelector(".sign-in-terms a") as HTMLElement;
+        const r = document.createRange();
+        r.selectNodeContents(a);
+        const text = r.getBoundingClientRect();
+        const box = a.getBoundingClientRect();
+        return { textWidth: Math.round(text.width), boxWidth: Math.round(box.width) };
+      });
+      console.log(`OBSERVED  [${BROWSER}] review R7: O7's "terms" link: text ${gap.textWidth}px wide in a ${gap.boxWidth}px box (the slack shows as space around the word, before its period)`);
+      if (shots) await s1.page.screenshot({ path: path.join(shots, `375-sign-in-${mode.replace(/\W+/g, "-")}.png`), fullPage: true });
+    }
+    await s1.page.context().close();
+    await setCap(100);
+    const claimed = em("rv.phone.claimed");
+    await standIn.createUser({ email: claimed, member: false });
+    const pc = await newPage();
+    await signIn(pc.page, claimed);
+    await pc.page.locator(".composer-input").waitFor({ timeout: 20000 });
+    await pc.page.context().close();
+    const cases: [string, () => Promise<string>, string][] = [
+      ["O2", async () => { await setCap(0); const e = em("rv.phone.paused"); await standIn.createUser({ email: e, member: false }); return e; }, "paused"],
+      ["O3", async () => { await setCap(100); const e = em("rv.phone.unconfirmed"); await standIn.createUser({ email: e, member: false, confirmed: false }); return e; }, "unconfirmed"],
+      ["O4", async () => { await setCap(100); const e = claimed.replace("@", "+again@"); await standIn.createUser({ email: e, member: false }); return e; }, "already-claimed"],
+    ];
+    for (const [id, mk, name] of cases) {
+      const e = await mk();
+      const sp = await newPage({ viewport: phone });
+      await signIn(sp.page, e);
+      await sp.page.locator(".not-a-member-screen").waitFor({ timeout: 20000 });
+      const f = await fits(sp.page, [".not-a-member-message", ".not-a-member-screen button"]);
+      const line = await msg(sp.page);
+      const btn = await sp.page.locator(".not-a-member-screen button").boundingBox();
+      rec(line === uiRow(id) && !f.over && f.bad.length === 0 && (btn?.height ?? 0) >= 24, `review R7: 375px not-a-member (${name}): ${id} whole, no sideways scroll, Sign out inside the screen and tappable`, JSON.stringify({ f, btn, line: line.slice(0, 60) }));
+      if (shots) await sp.page.screenshot({ path: path.join(shots, `375-not-a-member-${name}.png`), fullPage: true });
+      await sp.page.context().close();
+    }
+  } finally {
+    await setUsd("1.00").catch(() => {});
+    await setCap(0);
+  }
+});
+
 // ================================================================ DELETE BETA DATA
 await section("delete", async () => {
   const uid = await standIn.createUser({ email: em("delete.user") });

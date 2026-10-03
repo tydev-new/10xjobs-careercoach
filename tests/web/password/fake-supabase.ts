@@ -26,6 +26,8 @@ export interface FakeCfg {
   /** auth events delivered to each listener, in order, each after `delay` ms (from subscribe) */
   events?: { event: string; delay?: number }[];
   member?: boolean;
+  /** What ten_claim_welcome answers for a non-member (C § 20.1); default "paused". "fail" is an RPC error. */
+  claim?: "paused" | "unconfirmed" | "already_claimed" | "already_member" | "fail";
   rpcDelay?: number;
   /** "ok" (secure change off / fresh session), "reauth" (secure change on, older session), or a fixed error */
   updateUser?: "ok" | "reauth" | { error: FakeError };
@@ -133,6 +135,10 @@ export function createClient(_url: string, _key: string, _opts?: unknown): any {
       const d = cfg().rpcDelay ?? 0;
       if (d) await new Promise((r) => setTimeout(r, d));
       if (fn === "ten_is_member") return { data: cfg().member === true, error: null };
+      if (fn === "ten_claim_welcome") {
+        const c = cfg().claim ?? "paused";
+        return c === "fail" ? { data: null, error: { message: "fake: claim failed" } } : { data: { status: c }, error: null };
+      }
       return { data: null, error: { message: "fake: no rpc " + fn } };
     },
   };

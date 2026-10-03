@@ -5,11 +5,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   MIN_PASSWORD_LENGTH,
-  NON_MEMBER_MESSAGE,
+  NOT_SET_UP_MESSAGE,
   type AuthClientLike,
   accessTokenFrom,
   authRedirectFromUrl,
   checkMembership,
+  claimWelcome,
   createTenAuthClient,
   passwordErrorMessage,
   requestPasswordReset,
@@ -128,7 +129,7 @@ test("accessTokenFrom: throws on a getSession error", async () => {
 });
 
 // ---------------------------------------------------------------------
-// checkMembership / NON_MEMBER_MESSAGE — § 8
+// checkMembership / NOT_SET_UP_MESSAGE — § 8, C § 20.4
 // ---------------------------------------------------------------------
 
 test("checkMembership: true when ten_is_member() returns true", async () => {
@@ -149,8 +150,59 @@ test("checkMembership: throws (does not silently say non-member) on an RPC error
   await assert.rejects(checkMembership(client), /network down/);
 });
 
-test("NON_MEMBER_MESSAGE is the exact § 8 wording", () => {
-  assert.equal(NON_MEMBER_MESSAGE, "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.");
+// design-web-ui.md § 5.3.1 O6, word for word (C § 20.4); the old "invite-only"
+// line is retired and must not come back.
+test("NOT_SET_UP_MESSAGE is O6, word for word, and says nothing of invitations", () => {
+  assert.equal(NOT_SET_UP_MESSAGE, "This account isn't set up to use Ten yet. Sign out, then sign in again to check.");
+  assert.doesNotMatch(NOT_SET_UP_MESSAGE, /invite/i);
+});
+
+// ---------------------------------------------------------------------
+// claimWelcome — C § 20.4: one rpc("ten_claim_welcome"), each status mapped
+// ---------------------------------------------------------------------
+
+test("claimWelcome: calls rpc('ten_claim_welcome') with no argument; granted carries the amount", async () => {
+  const calls: Array<[string, unknown]> = [];
+  const client = fakeClient({}, async (fn, args) => {
+    calls.push([fn, args]);
+    return { data: { status: "granted", usd: 1 }, error: null };
+  });
+  assert.deepEqual(await claimWelcome(client), { status: "granted", usd: 1 });
+  assert.deepEqual(calls, [["ten_claim_welcome", undefined]]);
+});
+
+test("claimWelcome: the amount is the reply's own (2.5 stays 2.5; a numeric string is read as a number)", async () => {
+  assert.deepEqual(await claimWelcome(fakeClient({}, async () => ({ data: { status: "granted", usd: 2.5 }, error: null }))), { status: "granted", usd: 2.5 });
+  assert.deepEqual(await claimWelcome(fakeClient({}, async () => ({ data: { status: "granted", usd: "2.50" }, error: null }))), { status: "granted", usd: 2.5 });
+});
+
+test("claimWelcome: already_member, paused, unconfirmed and already_claimed come back as themselves", async () => {
+  for (const status of ["already_member", "paused", "unconfirmed", "already_claimed"] as const) {
+    const client = fakeClient({}, async () => ({ data: { status }, error: null }));
+    assert.deepEqual(await claimWelcome(client), { status });
+  }
+});
+
+test("claimWelcome: an RPC error throws (the caller shows Q1 and Retry), never a refusal", async () => {
+  const client = fakeClient({}, async () => ({ data: null, error: { message: "network down" } }));
+  await assert.rejects(claimWelcome(client), /network down/);
+});
+
+test("claimWelcome: a status not on the list, no reply, or a non-object reply throws (Q1), never guesses a screen", async () => {
+  for (const data of [{ status: "banana" }, { status: 7 }, {}, null, "granted", true, [], { status: "granted" }, { status: "granted", usd: 0 }, { status: "granted", usd: -1 }, { status: "granted", usd: "abc" }, { status: "granted", usd: null }]) {
+    const client = fakeClient({}, async () => ({ data, error: null }));
+    await assert.rejects(claimWelcome(client), /ten_claim_welcome/, JSON.stringify(data));
+  }
+});
+
+test("claimWelcome: makes exactly one call per invocation (a retry runs the whole check again, so the caller repeats it)", async () => {
+  let n = 0;
+  const client = fakeClient({}, async () => {
+    n++;
+    return { data: { status: "paused" }, error: null };
+  });
+  await claimWelcome(client);
+  assert.equal(n, 1);
 });
 
 // ---------------------------------------------------------------------

@@ -20,7 +20,7 @@ test("coach-model.ts holds exactly the two § 13 ids, Claude first", () => {
 
 test("the menu names, word for word (§ 13.3)", () => {
   assert.equal(CLAUDE_COACH_MODEL.name, "Claude Sonnet 5");
-  assert.equal(DEEPSEEK_COACH_MODEL.name, "DeepSeek V4.1 Flash (testing)");
+  assert.equal(DEEPSEEK_COACH_MODEL.name, "DeepSeek V4.1 Flash");
 });
 
 test("coachModelFor: exact id match only, no suffix/case tolerance", () => {

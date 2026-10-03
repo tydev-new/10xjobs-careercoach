@@ -106,6 +106,9 @@ export interface MockSupabaseState {
   members: Set<string>; // user ids
   balances: Record<string, number>; // user id -> balance
   betaSpendToday: number;
+  /** How many times `ten_beta_spend_today` was called. The proxy has no daily
+   *  ceiling any more (owner, 2026-10-02), so a test proves it makes none. */
+  betaSpendCalls: number;
   ledgerRequestIds: Set<string>;
   ledgerInserts: Array<Record<string, unknown>>;
   /** kind -> user id -> row count, so tests can plant both 'credit' and
@@ -132,6 +135,7 @@ export function freshState(overrides: Partial<MockSupabaseState> = {}): MockSupa
     members: new Set(),
     balances: {},
     betaSpendToday: 0,
+    betaSpendCalls: 0,
     ledgerRequestIds: new Set(),
     ledgerInserts: [],
     ledgerRowsByKind: {},
@@ -190,6 +194,7 @@ export async function startMockSupabase(state: MockSupabaseState): Promise<MockS
     // RPC: ten_beta_spend_today — service role only.
     if (url.pathname === "/rest/v1/rpc/ten_beta_spend_today" && req.method === "POST") {
       if (token !== state.serviceRoleKey) return new Response("forbidden", { status: 403 });
+      state.betaSpendCalls++;
       return new Response(JSON.stringify(state.betaSpendToday), { status: 200 });
     }
 

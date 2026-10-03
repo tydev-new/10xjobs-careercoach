@@ -74,12 +74,13 @@ t("auth: alg=none JWT with a member's sub -> 401", async () => {
   await expectRefused(401, preq(baseBody(), { token: tok }));
 });
 
-t("auth: a signed-in NON-member -> 403 not_a_member with the § 8 text", async () => {
+t("auth: a signed-in NON-member -> 403 not_a_member with O6 (design-web-ui.md § 5.3.1, C § 20.4)", async () => {
   const h = await harness();
   h.reset();
   const [, tok] = await nonMember(h);
   const txt = await expectRefused(403, preq(baseBody(), { token: tok }));
-  assert(txt.includes("You're signed in, but this beta is invite-only. Ask the person who invited you to add you."), txt);
+  assert(txt.includes("This account isn't set up to use Ten yet. Sign out, then sign in again to check."), txt);
+  assert(!txt.includes("invite-only"), txt);
 });
 
 t("auth: the service-role key sent by a client grants nothing (401, no upstream, no row)", async () => {

@@ -225,8 +225,8 @@ an agent never runs these either):
    then `NOTIFY pgrst, 'reload schema';` so the API sees the new column.
    This MUST precede deploying a `ten-model-proxy` that writes
    `finish_reason`: otherwise every ledger insert fails, the meter logs the
-   row as lost, and every call goes unbilled (balance and the $5/day
-   ceiling stop being enforced). Rolling the proxy back with the column in
+   row as lost, and every call goes unbilled (the balance stops being
+   enforced). Rolling the proxy back with the column in
    place is safe.
 3. `supabase/migrations/20260925000000_ten_paypal_credit.sql` applied (adds
    `ten_usage_ledger.gross_usd`/`fee_usd`, the paypal-breakdown check, and
@@ -241,7 +241,7 @@ an agent never runs these either):
 5. The first `credit` row inserted only after spike 3's isolation re-run
    passes on the real project (see the init migration's checklist) — until
    then `ten_ws_write`/the bucket policies refuse every write, but the
-   proxy itself only needs `ten_balance_for`/`ten_beta_spend_today`/the
+   proxy itself only needs `ten_balance_for`/the
    ledger insert, which work with zero members (every call 402s/403s
    correctly).
 6. The older CareerCoach app's patch
@@ -290,6 +290,40 @@ runs any of this):
 **Refund contact:** `support@10xjobs.co` (owner, 2026-09-25; shown in
 `design-web-ui.md` § 1.11).
 
+## Owner checklist for § 20 — open sign-up with a welcome credit
+
+From `docs/design-web-agent.md` § 20.12 (an agent never runs any of this).
+It ships closed (`cap` = 0), so the order of steps 2 to 5 does not grant
+anyone anything. Email confirmation is already on and stays on.
+
+1. **Review `apps/web/public/terms.html`** (the § 20.7 item 1 text) and
+   approve or edit it **before sign-ups open**.
+2. **Apply the migration** `20261002000000_ten_welcome_credit.sql` in the
+   SQL editor as `postgres` at a quiet time, then
+   `NOTIFY pgrst, 'reload schema';`.
+3. **Check the settings row,** read-only:
+   `select cap, usd from public.ten_welcome_settings;` shows cap 0 and usd 1.00.
+4. **Deploy the proxy:**
+   `supabase functions deploy ten-model-proxy --no-verify-jwt --project-ref ivunfotoggdxbjouumdk`.
+   `ten-paypal`'s new 403 text (O6) can wait for its next deploy.
+5. **Deploy the site:** `apps/web/scripts/deploy-prod.sh`, with Vercel's
+   `VITE_COACH_MODEL=deepseek/deepseek-v4.1-flash` still set.
+6. **Live checks at cap 0,** on a fresh account with an inbox you control:
+   the not-a-member screen shows O2.
+7. **Live checks at cap 1:** `update public.ten_welcome_settings set cap = 1;`
+   and reload: the chip reads `$1.00`, O1 shows, and the ledger has one
+   `welcome:` row. (That test grant counts toward the cap.)
+8. **The same inbox with a `+tag`** shows O4.
+9. **Open sign-up at the chosen cap:**
+   `update public.ten_welcome_settings set cap = <N>;`. Without auto top-up,
+   § 20.8 recommends 15 to 20 for a first cap. Pause at once with `set cap = 0`.
+10. **Keep the prepaid key topped up, or turn on auto top-up** in OpenRouter
+    (§ 20.8). No code change and no deploy. When the balance runs out,
+    Ten's members see E16 and the older app stops too, until a top-up. The
+    OpenRouter menu path is UNVERIFIED against today's site.
+
+Read-only queries (grants per day, all spend today) are in the migration's header.
+
 ## Rollback
 
 ```sh
@@ -313,8 +347,11 @@ remove Ten's webhook URL from the shared PayPal app in developer.paypal.com
 `OPTIONS` preflight); anything else 404s. In order: verifies the caller's
 Supabase session (401 otherwise, including the anon/publishable key alone);
 checks the 256 KB body cap and beta membership (403); checks the caller's
-balance (402 `over_balance`) and the $5/day beta-wide ceiling
-(`ten_beta_spend_today()`, 503, shown as `model_error`); rebuilds the
+balance (402 `over_balance`). There is **no daily spending ceiling** (owner,
+2026-10-02: the old $5/day beta-wide check is gone and nothing replaced it;
+the OpenRouter key is a prepaid balance, and `ten_beta_spend_today()` stays
+in the database only as the owner's read-only view, unused by the proxy);
+rebuilds the
 upstream body from an explicit allowlist. **§ 13:** the request's `model`
 must be exactly `anthropic/claude-sonnet-5` or `deepseek/deepseek-v4.1-flash`
 — anything else, including a missing `model` (the proxy no longer fills
@@ -334,13 +371,18 @@ client while metering a `tee()`'d copy in the background (`waitUntil`, a
 `ten_usage_ledger` `'call'` row keyed by the response id, with `model` =
 the id THIS proxy sent (never the stream's own, possibly dated-suffixed,
 `model` string): a finite reported cost from $0 to 10× that request's
-OWN model's ceiling ($0.273112 Claude, $0.043288 DeepSeek — § 13.1's price
+OWN model's ceiling ($0.273112 Claude, $0.0505456 DeepSeek — § 13.1's price
 table, the dearest no-data-kept tool-capable host per model) is recorded
 **as reported** (a cost above the ceiling also logs an anomaly line — no
 key or content in it); a missing, non-finite, negative, or
 >10×-the-ceiling cost, or the meter deadline, records that model's own
-ceiling instead. An upstream 402/5xx maps to 503 `model_error` (the
-shared key's own limit, not this user's balance). CORS is restricted to
+ceiling instead. An upstream 402 (OpenRouter: the shared key is out of
+credit: the prepaid balance is used up) maps to 503 `model_error` with its
+own message (§ 5.3.1 E16:
+"Ten's model service has reached its spending limit. Try again later."); an
+upstream 5xx maps to 503 `model_error` with the general line. Neither is
+this user's balance. A non-member's 403 carries § 5.3.1 O6 (as does
+`ten-paypal`'s). CORS is restricted to
 the production Vercel origin (`TEN_APP_ORIGIN`) and
 `http://localhost:5173`.
 

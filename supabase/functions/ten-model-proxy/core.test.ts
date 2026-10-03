@@ -383,14 +383,14 @@ Deno.test("sanitizeUsageForLedger: token sanitizing is independent of the cost o
 
 // -------------------------------------------------- § 13.5 (iv): per-model ceiling ----
 
-Deno.test("§ 13.1: CEILING_USD_BY_MODEL is $0.273112 (Claude) and $0.043288 (DeepSeek), 1e-9", () => {
+Deno.test("§ 13.1: CEILING_USD_BY_MODEL is $0.273112 (Claude) and $0.0505456 (DeepSeek), 1e-9", () => {
   assertAlmostEquals(CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], 0.273112, 1e-9);
-  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 0.043288, 1e-9);
+  assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], 0.0505456, 1e-9);
 });
 
 Deno.test("§ 13.1: the formula per model — 64,000 × input$/M + 8,192 × output$/M + $0.007", () => {
   const claude = (64_000 * 2.75) / 1e6 + (8_192 * 11.0) / 1e6 + 0.007;
-  const deepseek = (64_000 * 0.375) / 1e6 + (8_192 * 1.5) / 1e6 + 0.007;
+  const deepseek = (64_000 * 0.45) / 1e6 + (8_192 * 1.8) / 1e6 + 0.007;
   assertAlmostEquals(CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID], claude, 1e-12);
   assertAlmostEquals(CEILING_USD_BY_MODEL[DEEPSEEK_MODEL_ID], deepseek, 1e-12);
 });
@@ -413,7 +413,7 @@ Deno.test("sanitizeUsageForLedger: a per-model ceiling (DeepSeek) is honored whe
   const r = sanitizeUsageForLedger({ cost: 0.6 }, deepseekCeiling);
   // 0.6 is well beyond 10x DeepSeek's ceiling (~0.43), so it's replaced —
   // exactly § 13.5 (iv)'s "a DeepSeek cost of $0.60 is recorded as
-  // $0.043288" case.
+  // $0.0505456" case.
   assertAlmostEquals(r.usd, deepseekCeiling, 1e-9);
   assertEquals(r.costAboveCeiling, false);
 

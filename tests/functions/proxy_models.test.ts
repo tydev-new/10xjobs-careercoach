@@ -12,7 +12,7 @@ const DEEPSEEK = "deepseek/deepseek-v4.1-flash";
 // § 13.1's table, by § 8's formula (64,000 in × dearest input + 8,192 out × dearest output + one $0.007 search)
 const CEILING: Record<string, number> = {
   [CLAUDE]: 64_000 * 2.75e-6 + 8_192 * 11e-6 + 0.007, // 0.273112
-  [DEEPSEEK]: 64_000 * 0.375e-6 + 8_192 * 1.5e-6 + 0.007, // 0.043288
+  [DEEPSEEK]: 64_000 * 0.45e-6 + 8_192 * 1.8e-6 + 0.007, // 0.0505456
 };
 // a static JSON import needs no --allow-read (run.py grants only --allow-net=127.0.0.1)
 import GOLDEN from "./fixtures/claude-golden-body.json" with { type: "json" };
@@ -104,13 +104,13 @@ const withCost = (id: string, cost: number) => [
   "data: [DONE]",
 ];
 
-t("§ 13.5 (iv): the table's ceilings are 0.273112 and 0.043288 (1e-9)", async () => {
+t("§ 13.5 (iv): the table's ceilings are 0.273112 and 0.0505456 (1e-9)", async () => {
   const core = await import("../../supabase/functions/ten-model-proxy/core.ts");
   const table = (core as any).CEILING_USD_BY_MODEL ?? {};
   assertAlmostEquals(table[CLAUDE], 0.273112, 1e-9);
-  assertAlmostEquals(table[DEEPSEEK], 0.043288, 1e-9);
+  assertAlmostEquals(table[DEEPSEEK], 0.0505456, 1e-9);
   assertAlmostEquals(CEILING[CLAUDE], 0.273112, 1e-12);
-  assertAlmostEquals(CEILING[DEEPSEEK], 0.043288, 1e-12);
+  assertAlmostEquals(CEILING[DEEPSEEK], 0.0505456, 1e-12);
 });
 
 t("§ 13.5 (iv): a call with no usage.cost records ITS model's ceiling", async () => {
@@ -121,7 +121,7 @@ t("§ 13.5 (iv): a call with no usage.cost records ITS model's ceiling", async (
   }
 });
 
-t("§ 13.5 (iv): a DeepSeek call that passes the meter deadline records $0.043288", async () => {
+t("§ 13.5 (iv): a DeepSeek call that passes the meter deadline records $0.0505456", async () => {
   const h = await harness();
   h.reset();
   const { handleRequest } = await import("../../supabase/functions/ten-model-proxy/handler.ts");
@@ -133,7 +133,6 @@ t("§ 13.5 (iv): a DeepSeek call that passes the meter deadline records $0.04328
     verifyUser: (x: string) => sb.verifyUser(env, x),
     isMember: (x: string) => sb.isMember(env, x),
     balanceFor: (u: string) => sb.balanceFor(env, u),
-    betaSpendToday: () => sb.betaSpendToday(env),
     insertLedgerCall: (row: any) => sb.insertLedgerCall(env, row),
     fetchUpstream: async () => sse([`data: ${JSON.stringify({ id: "gen-dl-ds", choices: [{ delta: { content: "x" } }] })}`], { hangAfter: true }),
     waitUntil: (p: Promise<unknown>) => void pending.push(p),
@@ -159,11 +158,11 @@ t("§ 13.5 (iv): a $0.60 cost is DeepSeek's ceiling on DeepSeek (beyond 10×), b
   assert(cl.logs.some((l) => /anomal/i.test(l)), "Claude: 0.60 > 0.273112 logs an anomaly");
 });
 
-t("§ 13.1: DeepSeek's 10× bound is 0.43288 — a cost just under it is recorded as reported (anomaly), just over it records the ceiling", async () => {
-  const under = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-u10", 0.4328) });
-  assertAlmostEquals(under.rows[0].usd, 0.4328, 1e-6);
+t("§ 13.1: DeepSeek's 10× bound is 0.505456 — a cost just under it is recorded as reported (anomaly), just over it records the ceiling", async () => {
+  const under = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-u10", 0.5054) });
+  assertAlmostEquals(under.rows[0].usd, 0.5054, 1e-6);
   assert(under.logs.some((l) => /anomal/i.test(l)));
-  const over = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-o10", 0.4329) });
+  const over = await call({ ...baseBody(), model: DEEPSEEK }, { chunks: withCost("gen-o10", 0.5057) });
   assertAlmostEquals(over.rows[0].usd, CEILING[DEEPSEEK], 1e-6);
 });
 
@@ -178,19 +177,20 @@ t("§ 13.5 (v): the ledger row's model is the id the proxy SENT, even when the s
 
 // ------------------------------------------------------------------ (vi) daily ceiling
 
-t("§ 13.5 (vi): $4.99 of Claude rows plus $0.02 of DeepSeek rows -> 503, the same message (the $5/day ceiling sums every model)", async () => {
+t("§ 13.5 (vi), retired (owner, 2026-10-02): the day's spend, on any model, never refuses a call — Claude $4.99 + DeepSeek $0.02 and far more still forward", async () => {
   const h = await harness();
   h.reset();
-  const [a] = await member(h);
+  const [a] = await member(h, 100);
   const [, tok] = await member(h);
   const now = h.st.now();
   h.st.ledger.push({ id: crypto.randomUUID(), user_id: a, kind: "call", request_id: "c1", model: CLAUDE, tokens_in: 0, tokens_out: 0, tokens_cached: 0, usd: 4.99, finish_reason: null, created_at: now });
   h.st.ledger.push({ id: crypto.randomUUID(), user_id: a, kind: "call", request_id: "d1", model: DEEPSEEK, tokens_in: 0, tokens_out: 0, tokens_cached: 0, usd: 0.02, finish_reason: null, created_at: now });
+  h.st.ledger.push({ id: crypto.randomUUID(), user_id: a, kind: "call", request_id: "d2", model: DEEPSEEK, tokens_in: 0, tokens_out: 0, tokens_cached: 0, usd: 60, finish_reason: null, created_at: now });
   const res = await h.proxy(preq({ ...baseBody(), model: DEEPSEEK }, { token: tok }));
   const txt = await res.text();
-  assertEquals(res.status, 503, txt);
-  assert(txt.includes("The beta has reached today's limit. Try again tomorrow."), txt);
-  assertEquals(h.upstreamHits.length, 0);
+  await h.drain();
+  assertEquals(res.status, 200, txt);
+  assertEquals(h.upstreamHits.length, 1);
 });
 
 // ------------------------------------------------------------------ (x) agreement (proxy half)

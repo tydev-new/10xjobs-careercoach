@@ -6,7 +6,6 @@
 
 import { allowedOrigins, corsHeaders } from "../_shared/cors.ts";
 import {
-  BETA_CEILING_USD,
   MAX_BODY_BYTES,
   buildUpstreamBody,
   ceilingUsdFor,
@@ -22,9 +21,14 @@ export const MESSAGES = {
   // Ask the person who invited you for more." — buying credit, § 17,
   // replaces "ask the person who invited you" as the next step).
   overBalance: "Your credit is used up. You can buy more from your balance at the top.",
-  ceiling: "The beta has reached today's limit. Try again tomorrow.",
-  notMember: "You're signed in, but this beta is invite-only. Ask the person who invited you to add you.",
+  // § 5.3.1 O6 (§ 20.4): "this account has no credit row", outside the
+  // sign-in flow. Replaces the old "invite-only" line.
+  notMember: "This account isn't set up to use Ten yet. Sign out, then sign in again to check.",
   modelError: "The model is temporarily unavailable. Try again.",
+  // § 5.3.1 E16: an upstream 402, the shared OpenRouter key's prepaid
+  // balance used up. With no daily ceiling of Ten's own (owner, 2026-10-02)
+  // this is the one shared stop.
+  modelServiceLimit: "Ten's model service has reached its spending limit. Try again later.",
 } as const;
 
 // S4 (fix round 1): the meter must not wait past this even if the upstream
@@ -39,7 +43,6 @@ export interface ProxyDeps {
   verifyUser(token: string): Promise<{ id: string } | null>;
   isMember(token: string): Promise<boolean>;
   balanceFor(uid: string): Promise<number>;
-  betaSpendToday(): Promise<number>;
   insertLedgerCall(row: {
     user_id: string;
     kind: "call";
@@ -279,16 +282,13 @@ export async function handleRequest(
       return jsonError(403, "not_a_member", MESSAGES.notMember, cors);
     }
 
-    // 3. Balance and the beta-wide ceiling (§ 8, point 3).
+    // 3. Balance (§ 8, point 3). There is no daily ceiling of Ten's own any
+    // more (owner, 2026-10-02): the old beta-wide check is gone, and the
+    // per-call caps below (body size, max_tokens, web results, the model
+    // allowlist) are the only limits besides the balance.
     const balance = await deps.balanceFor(user.id);
     if (!(balance > 0)) {
       return jsonError(402, "over_balance", MESSAGES.overBalance, cors);
-    }
-    const spendToday = await deps.betaSpendToday();
-    if (spendToday >= BETA_CEILING_USD) {
-      // Shown to the app as model_error, not over_balance (§ 8): this isn't
-      // this user's balance, it's the shared daily ceiling.
-      return jsonError(503, "model_error", MESSAGES.ceiling, cors);
     }
 
     // 4. Build the upstream body from the allowlist (§ 8, point 4). N5: an
@@ -307,8 +307,9 @@ export async function handleRequest(
       return jsonError(built.status, built.code, built.message, cors);
     }
 
-    // 5. Call upstream; an upstream 402/5xx is the shared key's own limit, not
-    // this user's balance, so it maps to 503 model_error (§ 8, point 6).
+    // 5. Call upstream. An upstream 402 is the shared key's prepaid balance
+    // used up (E16), not this user's balance: 503 model_error with its own
+    // message. A 5xx is the general message (§ 8, point 6).
     let upstream: Response;
     try {
       upstream = await deps.fetchUpstream(built.body);
@@ -316,7 +317,11 @@ export async function handleRequest(
       deps.log?.warn({ msg: "ten-model-proxy: upstream fetch threw", err: String(e) });
       return jsonError(503, "model_error", MESSAGES.modelError, cors);
     }
-    if (upstream.status === 402 || upstream.status >= 500) {
+    if (upstream.status === 402) {
+      await upstream.body?.cancel().catch(() => {});
+      return jsonError(503, "model_error", MESSAGES.modelServiceLimit, cors);
+    }
+    if (upstream.status >= 500) {
       // Drain the body so the connection can be reused/closed cleanly.
       await upstream.body?.cancel().catch(() => {});
       return jsonError(503, "model_error", MESSAGES.modelError, cors);

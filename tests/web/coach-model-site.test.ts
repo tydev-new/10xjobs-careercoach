@@ -25,11 +25,11 @@ test("§ 13.5 (vii): VITE_COACH_MODEL unset, empty or blank -> Claude (a missing
   }
 });
 
-test("§ 13.5 (vii): each id, with spaces around it, gives that id; DeepSeek's name carries '(testing)'", () => {
+test("§ 13.5 (vii): each id, with spaces around it, gives that id; DeepSeek's name has no '(testing)' suffix (§ 13.6, amended 2026-10-02)", () => {
   assert.equal(readEnv({ ...BASE, VITE_COACH_MODEL: `  ${CLAUDE}  ` }).coachModel.id, CLAUDE);
   const ds = readEnv({ ...BASE, VITE_COACH_MODEL: ` ${DEEPSEEK}\n` }).coachModel;
   assert.equal(ds.id, DEEPSEEK);
-  assert.equal(ds.name, "DeepSeek V4.1 Flash (testing)");
+  assert.equal(ds.name, "DeepSeek V4.1 Flash");
 });
 
 test("§ 13.5 (vii): a typo, a suffix, another case or another model -> the config error naming VITE_COACH_MODEL (never a silent fallback)", () => {
@@ -43,7 +43,7 @@ test("§ 13.5 (vii): a typo, a suffix, another case or another model -> the conf
 });
 
 test("§ 13.2: the site's list is exactly the two ids with the § 13.3 names, Claude first", () => {
-  assert.deepEqual(COACH_MODELS.map((m) => [m.id, m.name]), [[CLAUDE, "Claude Sonnet 5"], [DEEPSEEK, "DeepSeek V4.1 Flash (testing)"]]);
+  assert.deepEqual(COACH_MODELS.map((m) => [m.id, m.name]), [[CLAUDE, "Claude Sonnet 5"], [DEEPSEEK, "DeepSeek V4.1 Flash"]]);
 });
 
 // ------------------------------------------------------------------ what the browser sends

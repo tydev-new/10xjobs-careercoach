@@ -7,7 +7,7 @@
 // reaches a non-member.
 //
 // Drives the PRODUCTION build of apps/web in headless Chromium against local
-// stand-ins only: stand-in.ts (GoTrue + PostgREST over PGlite with all FOUR
+// stand-ins only: stand-in.ts (GoTrue + PostgREST over PGlite with all FIVE
 // migrations), paypal-host.ts (the REAL ten-* index.ts files over a loopback
 // PayPal stub). PayPal's JS SDK is replaced by a fake that exposes the
 // Buttons callbacks; every other non-loopback request is aborted and recorded.
@@ -35,8 +35,12 @@ const OPENROUTER_CANARY = "sk-or-v1-E2E-CANARY-0a1b2c3d4e5f60718293a4b5c6d7e8f9"
 // ---- § 1.11 copy, word for word (from docs/design-web-ui.md)
 const INTRO =
   "Credit pays for Ten's work. You pay in PayPal's window; Ten adds what arrives after PayPal's fee, a few percent plus a fixed amount. This is a one-time payment: nothing renews, and Ten never charges you on its own.";
-const FOOTER =
-  "Paid credit stays if you delete your beta data. The beta has a shared daily limit, so on a busy day Ten can pause until tomorrow even with credit. For a refund, email support@10xjobs.co.";
+// § 5.3.1 B7 (C28), read from the table (the one source, rule 12).
+const FOOTER = (() => {
+  const line = readFileSync(path.join(REPO, "docs/design-web-ui.md"), "utf8").split("\n").find((l) => l.startsWith("| B7 |"));
+  if (!line) throw new Error("row B7 not found in § 5.3.1");
+  return line.replace(/^\| /, "").replace(/ \|$/, "").split(" | ")[3].slice(1, -1);
+})();
 const CREDITED_10 = "Added $9.16 of credit. PayPal charged $10.00; its fee was $0.84.";
 const PENDING = "PayPal is still clearing this payment. The credit is added when it clears.";
 const DECLINED = "PayPal declined this payment. No money moved.";
@@ -67,7 +71,7 @@ const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 const tmpRoot = mkdtempSync(path.join(os.tmpdir(), "ten-e2e-paypal-"));
 const standIn: StandIn = await startStandIn();
 const db = standIn.backend.db;
-await db.exec(readFileSync(path.join(REPO, "supabase/migrations/20260925000000_ten_paypal_credit.sql"), "utf8"));
+// stand-in.ts applies every migration, the PayPal one (and § 20's) included.
 
 // The PostgREST insert § 17's functions make (service role), on the same PGlite.
 let bridgePlan: string[] = [];

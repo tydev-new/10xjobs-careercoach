@@ -23,7 +23,12 @@ are in [`design-web-ui.md`](design-web-ui.md). Everything answers to
 
 - **Candidate:** the person searching for a job. On the web, a
   **member** is a signed-in candidate with a credit row; only members
-  can use Ten.
+  can use Ten. A credit row comes from the owner (a hand-inserted $5
+  starter), from the person's own PayPal purchase (`paypal:<id>`, written
+  by `ten-paypal`), or from the welcome claim: the first time an account
+  with a confirmed email opens Ten, `ten_claim_welcome()` writes one
+  `welcome:<uid>` row of $1.00, once per email inbox, until the owner's
+  cap runs out (C § 20).
 - **Skill:** a folder of instructions for the model
   (`skills/<name>/SKILL.md`, plus references and checker scripts).
 - **Workspace:** the candidate's files: profile, jobs list, résumés, plan.
@@ -154,7 +159,7 @@ sequenceDiagram
 - **In the tab:** code matches any gate reply (C § 3), then trims older
   history to about 4,000 words (C § 7).
 - **At the proxy:** checks run in order: sign-in, a 256 KB size cap,
-  membership, balance, the daily limit. Then it builds a fresh request
+  membership, balance. Then it builds a fresh request
   from an allowlist, streams the reply back, and meters a copy into a
   ledger row (C § 8, § 9.6).
 - **Tools run in the tab** (C § 4). Cards are built by code from files
@@ -197,10 +202,13 @@ flowchart TD
   (rule 7; C § 3). If a run would pass its allowance mid-turn, the loop
   stops before that step and opens a "Continue this run" gate.
 - **The proxy checks before each call:** a balance at or below zero gets
-  402; at $5 of beta-wide spend today (UTC), every call gets 503 (C § 8).
+  402. There is no daily spending ceiling of Ten's own (owner,
+  2026-10-02; it replaced § 8's $5 beta-wide one). The shared OpenRouter
+  key is a prepaid balance the owner tops up by hand; when it runs out,
+  OpenRouter's 402 reaches everyone as its own message.
 - **The limits can be overshot by calls already running.** The checks
   happen before a call, and the cost is known only after it. Calls that
-  start together all pass the check, so a balance or the $5 day can go
+  start together all pass the check, so a balance can go
   over by whatever those calls cost (C § 8, "the honest bound"). The
   output cap and the size cap keep each call small, but that is an
   expected size, not a bound on the charge (next point).
@@ -245,6 +253,7 @@ flowchart TD
   Proxy -->|call rows| Ledger
   Pay -->|paid credit rows| Ledger
   Owner -->|starter credit, refund rows| Ledger
+  Browser -->|first open, welcome claim| Ledger
 ```
 
 | What | Holds | Written by |
@@ -353,7 +362,7 @@ settings: [`apps/web/README.md`](../apps/web/README.md).
 - **Money.** No model key ever reaches the browser. Every call is
   metered into one ledger row; if that insert fails twice, the row is
   lost and the proxy logs an alert (`handler.ts`). The balance is derived
-  from the ledger, never stored. The proxy's checks (balance, $5/day,
+  from the ledger, never stored. The proxy's checks (balance,
   output cap, size cap, model allowlist) are the real spending stops, and
   calls already running can overshoot them by their own cost.
   Source: [C § 8](design-web-agent.md#8-model-proxy-balance-and-the-production-project), rule 5.

@@ -245,10 +245,10 @@ export function BuyCreditDialog({
               )
             ) : null}
             {phase.kind === "processing" ? <p>Confirming your payment…</p> : null}
+            {/* § 5.3.1 B7 (changed by C28): no daily limit; if Ten's prepaid model
+                money runs out Ten pauses for everyone and no credit is used meanwhile. */}
             <p className="buy-credit-footer">
-              Paid credit stays if you delete your beta data. The beta has a shared daily limit,
-              so on a busy day Ten can pause until tomorrow even with credit. For a refund, email
-              support@10xjobs.co.
+              {"Paid credit stays if you delete your beta data, and there's no daily limit on using it. Ten pays its model service in advance, and if that prepaid money runs out, Ten pauses for everyone until it's topped up, even if you have credit left. None of your credit is used while Ten is paused, so you can try again later. For a refund, email support@10xjobs.co."}
             </p>
           </>
         )}

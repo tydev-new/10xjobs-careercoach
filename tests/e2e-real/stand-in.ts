@@ -7,7 +7,7 @@
 //                     GET /reauthenticate. Tokens are HS256 JWTs (like
 //                     GoTrue), so supabase-js decodes and refreshes them for real.
 //   /rest/v1/*        PostgREST over PGlite running the REAL applied
-//                     migration (supabase/migrations/20260923000000_ten_beta_init.sql)
+//                     migrations (supabase/migrations/*, all five, in order)
 //                     on tests/sql/stub.sql — the role comes from the JWT
 //                     (anon / authenticated / service_role) exactly as
 //                     PostgREST does it, so RLS, grants and the definer
@@ -88,7 +88,13 @@ export interface StandIn {
   log: LoggedRequest[];
   /** tokens issued per uid, oldest first */
   issued: Map<string, string[]>;
-  createUser(opts: { email: string; member?: boolean; expiresIn?: number }): Promise<string>;
+  /** `member: false` makes a non-member (no credit row). Every account has the
+   *  email and a confirmed date in `auth.users` (what ten_claim_welcome reads,
+   *  § 20.1), unless `confirmed: false` leaves `email_confirmed_at` null. */
+  createUser(opts: { email: string; member?: boolean; expiresIn?: number; confirmed?: boolean }): Promise<string>;
+  /** § 20.11 App 4: the next `claimWelcome` calls answer HTTP 500 (the stand-in
+   *  "recovers" once the count runs out). */
+  failClaimWelcome(times: number): void;
   /** C § 16.4: the password routes (POST /recover, PUT /user, GET /reauthenticate). */
   pw: PasswordAuth;
   sql<T = any>(query: string, params?: unknown[]): Promise<T[]>;
@@ -101,6 +107,7 @@ interface AuthUser {
   email: string;
   expiresIn: number;
   password: string;
+  confirmed: boolean;
 }
 
 /** The GoTrue password routes C § 16.4 asks the stand-in to gain, modelled
@@ -130,9 +137,16 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 export async function startStandIn(): Promise<StandIn> {
   const backend = await createBackend({});
   const db = backend.db;
-  // § 9.6 and § 11.2 (amended 2026-09-24): the applied files, in order, after
-  // the init file the reused backend already ran.
-  for (const f of ["20260924000000_ten_ledger_finish_reason.sql", "20260924100000_ten_conversations.sql"]) {
+  // § 9.6, § 11.2, § 17.3 and § 20.1: the applied files, in order, after the
+  // init file the reused backend already ran. The welcome migration refuses
+  // unless the PayPal one is in (its order guard), so all four follow. It
+  // ships with cap 0 (§ 20.2): a test sets `ten_welcome_settings` itself.
+  for (const f of [
+    "20260924000000_ten_ledger_finish_reason.sql",
+    "20260924100000_ten_conversations.sql",
+    "20260925000000_ten_paypal_credit.sql",
+    "20261002000000_ten_welcome_credit.sql",
+  ]) {
     await db.exec(readFileSync(path.join(REPO_ROOT, "supabase/migrations", f), "utf8"));
   }
   const log: LoggedRequest[] = [];
@@ -141,6 +155,7 @@ export async function startStandIn(): Promise<StandIn> {
   const refresh = new Map<string, string>(); // refresh token -> uid
   const issued = new Map<string, string[]>();
   let functionsTarget = "";
+  let claimFailures = 0;
   const pw: PasswordAuth = {
     secureChange: false,
     staleSessions: new Set(),
@@ -210,7 +225,7 @@ export async function startStandIn(): Promise<StandIn> {
       aud: "authenticated",
       role: "authenticated",
       email: u.email,
-      email_confirmed_at: "2026-09-01T00:00:00Z",
+      email_confirmed_at: u.confirmed ? "2026-09-01T00:00:00Z" : null,
       app_metadata: { provider: "email", providers: ["email"] },
       user_metadata: {},
       identities: [],
@@ -403,6 +418,8 @@ export async function startStandIn(): Promise<StandIn> {
           ten_balance: { sql: "select public.ten_balance() as v", args: [] },
           ten_balance_for: { sql: "select public.ten_balance_for($1) as v", args: [a.p_user] },
           ten_beta_spend_today: { sql: "select public.ten_beta_spend_today() as v", args: [] },
+          // § 20.1: the claim, run as the user.
+          ten_claim_welcome: { sql: "select public.ten_claim_welcome() as v", args: [] },
           ten_gate_open: {
             sql: "select public.ten_gate_open($1,$2,$3,$4,$5,$6) as v",
             args: [a.p_id, a.p_chat, a.p_label, a.p_text_hash, a.p_gate_line, a.p_amount],
@@ -425,6 +442,10 @@ export async function startStandIn(): Promise<StandIn> {
         }
         const call = calls[fn];
         if (!call) return send(404, { code: "PGRST202", message: `stand-in: no rpc ${fn}` });
+        if (fn === "ten_claim_welcome" && claimFailures > 0) {
+          claimFailures--;
+          return send(500, { code: "XX000", message: "stand-in: injected failure", details: null, hint: null });
+        }
         try {
           const rows = await locked(() => asRole(c.role, c.sub, () => db.query<{ v: unknown }>(call.sql, call.args)));
           if (call.void) return send(204, null);
@@ -574,10 +595,18 @@ export async function startStandIn(): Promise<StandIn> {
     log,
     issued,
     pw,
-    async createUser({ email, member = true, expiresIn = 3600 }) {
+    failClaimWelcome(times: number) {
+      claimFailures = times;
+    },
+    async createUser({ email, member = true, expiresIn = 3600, confirmed = true }) {
       const id = await locked(() => backend.newUser({ member }));
+      // § 20.1 reads the email and its confirmation from auth.users, not the token
+      await locked(async () => {
+        await db.exec("reset role");
+        await db.query("update auth.users set email = $2, email_confirmed_at = $3 where id = $1", [id, email.toLowerCase(), confirmed ? "2026-09-01T00:00:00Z" : null]);
+      });
       // every account starts with the password the e2e signs in with
-      const u = { id, email: email.toLowerCase(), expiresIn, password: "correct horse battery" };
+      const u = { id, email: email.toLowerCase(), expiresIn, password: "correct horse battery", confirmed };
       users.set(u.email, u);
       byId.set(id, u);
       return id;

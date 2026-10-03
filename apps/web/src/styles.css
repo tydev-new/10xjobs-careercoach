@@ -3265,6 +3265,33 @@ summary.job-group-head {
   color: var(--fg-muted);
 }
 
+/* § 5.3.1 O5 and O7: the sign-in page's invitation and terms line. */
+.sign-in-invite,
+.sign-in-terms {
+  margin-top: var(--space-2);
+  font: var(--type-small);
+  color: var(--fg-muted);
+}
+
+/* The two links in O7 are tap targets (§ 5.6, 44px) and have a hover look
+   (and the global a:active press). Their box is 44px tall and at least 44px
+   wide, but the extra size is invisible: the negative margins hand the height
+   and the side padding back, so the sentence keeps its own line spacing and
+   the link hugs its text (no gap before the period). */
+.sign-in-terms a {
+  display: inline-block;
+  padding: 0 6px;
+  min-height: 44px;
+  line-height: 44px;
+  margin: -14px -6px;
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.sign-in-terms a:hover {
+  color: var(--primary-hover);
+}
+
 .not-a-member-message {
   max-width: 420px;
   text-align: center;
@@ -3557,6 +3584,23 @@ summary.job-group-head {
   background: var(--primary-hover);
 }
 /* ---- END new-version notice ---- */
+
+/* ---- BEGIN welcome-credit notice (design-web-ui.md § 1.5, § 5.3.1 O1).
+   Mechanism: src/real/WelcomeNotice.tsx. Neutral styling, the same tokens as
+   .version-notice (rule 8); no button, it just goes at the first send. ---- */
+.welcome-notice {
+  background: var(--bg-sunken);
+  border-top: 1px solid var(--border);
+  padding: var(--space-2) var(--space-4);
+  font: var(--type-body-sm);
+  color: var(--fg);
+}
+
+.welcome-notice-text {
+  margin: 0;
+  line-height: 1.4;
+}
+/* ---- END welcome-credit notice ---- */
 
 /* ---- BEGIN saved-conversation notices (design-web-agent.md § 11, ui
    § 1.9). Mechanism: src/real/ConversationNotice.tsx. Neutral styling

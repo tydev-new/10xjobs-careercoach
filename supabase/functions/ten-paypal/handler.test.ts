@@ -137,6 +137,8 @@ Deno.test("create-order: 403 signed in but not a member", async () => {
     assertEquals(res.status, 403);
     const body = await res.json();
     assertEquals(body.error.code, "not_a_member");
+    // design-web-ui.md § 5.3.1 O6 (design-web-agent.md § 20.4), word for word.
+    assertEquals(body.error.message, "This account isn't set up to use Ten yet. Sign out, then sign in again to check.");
   } finally {
     await h.stop();
   }

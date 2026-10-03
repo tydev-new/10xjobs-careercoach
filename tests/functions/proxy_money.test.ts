@@ -1,5 +1,5 @@
-// § 8 points 3, 5, 6 and the ledger: 402 at zero/negative balance; the $5/day
-// beta-wide ceiling (UTC day, across users) -> 503 model_error; one ledger row
+// § 8 points 3, 5, 6 and the ledger: 402 at zero/negative balance; NO daily
+// spending ceiling (owner, 2026-10-02: the key is a prepaid balance); one ledger row
 // per call with the right cost; the ceiling cost (~$0.22: § 9.5 amended
 // 2026-09-24, MAX_TOKENS_CAP 8,192; § 14, one search at $0.007 per request)
 // when no cost can be read; a client
@@ -9,6 +9,7 @@
 
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
 import {
+  balanceIn,
   baseBody,
   call,
   callRows,
@@ -26,7 +27,8 @@ import {
 
 // design-web-ui.md § 1.11 (replaced after C § 17.4), word for word.
 const OVER_BALANCE = "Your credit is used up. You can buy more from your balance at the top.";
-const CEILING_MSG = "The beta has reached today's limit. Try again tomorrow.";
+// design-web-ui.md § 5.3.1 E16, word for word.
+const E16 = "Ten's model service has reached its spending limit. Try again later.";
 
 async function run(tok: string, body: unknown = baseBody()) {
   const h = await harness();
@@ -52,7 +54,7 @@ t("balance: exactly 0 -> 402 over_balance with the § 8 text; never forwarded; n
 t("balance: negative -> 402; a hair above zero -> forwards", async () => {
   const h = await harness();
   h.reset();
-  const yesterday = new Date(Date.now() - 2 * 86400_000); // keep the beta ceiling out of this test
+  const yesterday = new Date(Date.now() - 2 * 86400_000);
   const [uid, tok] = await member(h, 5);
   call(h.st, uid, 5.2, yesterday);
   assertEquals((await run(tok)).res.status, 402);
@@ -61,34 +63,63 @@ t("balance: negative -> 402; a hair above zero -> forwards", async () => {
   assertEquals((await run(tok2)).res.status, 200);
 });
 
-// ------------------------------------------------------------- ceiling ----
-t("ceiling: $5.00 spent today across OTHER users blocks a fresh member with 503 model_error (not over_balance)", async () => {
+// ------------------------------------------------------------- no daily check ----
+const SPEND_RPCS = /ten_beta_spend_today|ten_is_paid|ten_free_spend_today/;
+
+t("no daily check: with $500 spent today by everyone, a member with a balance is forwarded, and the proxy asks nothing about the day's spend", async () => {
   const h = await harness();
   h.reset();
-  const [a] = await member(h);
-  const [b] = await member(h);
-  call(h.st, a, 3.0);
-  call(h.st, b, 2.0);
+  const [a] = await member(h, 1000);
+  call(h.st, a, 300);
+  call(h.st, a, 200);
   const [, tok] = await member(h);
   const { res, txt } = await run(tok);
-  assertEquals(res.status, 503);
-  assert(txt.includes("model_error") && txt.includes(CEILING_MSG), txt);
-  assert(!txt.includes("over_balance"));
-  assertEquals(h.upstreamHits.length, 0);
+  assertEquals(res.status, 200, txt);
+  assertEquals(h.upstreamHits.length, 1);
+  assertEquals(h.st.requests.filter((r) => SPEND_RPCS.test(r.path)).length, 0, "no spend-today RPC of any kind");
+  assert(!txt.includes("today's limit"), txt);
 });
 
-t("ceiling: $4.999999 today forwards; yesterday's (UTC) spend does not count", async () => {
+t("no daily check: the old edges are gone — $5.00 and $10.00 spent today forward as well", async () => {
   const h = await harness();
   h.reset();
   const [a] = await member(h, 100);
-  const now = new Date();
-  const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  call(h.st, a, 50, new Date(midnight.getTime() - 1000)); // 23:59:59 yesterday UTC
-  call(h.st, a, 4.999999, midnight); // 00:00:00 today UTC
+  call(h.st, a, 5);
   const [, tok] = await member(h);
-  assertEquals((await run(tok)).res.status, 200);
-  call(h.st, a, 0.000001);
-  assertEquals((await run(tok)).res.status, 503);
+  assertEquals((await run(tok)).res.status, 200, "$5.00 (the old ceiling)");
+  call(h.st, a, 5);
+  assertEquals((await run(tok)).res.status, 200, "$10.00 (the interim free ceiling)");
+});
+
+t("upstream 402 writes NO ledger row, so none of the member's credit is used while Ten is paused (B7's promise); the balance is unchanged", async () => {
+  const h = await harness();
+  h.reset();
+  const [uid, tok] = await member(h);
+  const before = balanceIn(h.st, uid);
+  const rowsBefore = h.st.ledger.length;
+  h.setUpstream(() => new Response(JSON.stringify({ error: { code: 402, message: "Insufficient credits" } }), { status: 402, headers: { "content-type": "application/json" } }));
+  const r = await run(tok);
+  await h.drain();
+  assertEquals(r.res.status, 503);
+  assertEquals(callRows(h.st).length, 0, "no call row");
+  assertEquals(h.st.ledger.length, rowsBefore, "no ledger row of any kind");
+  assertEquals(balanceIn(h.st, uid), before, "balance unchanged");
+});
+
+t("upstream 402 -> 503 model_error with E16 (not the general line); upstream 500 -> the general line", async () => {
+  const h = await harness();
+  h.reset();
+  const [, tok] = await member(h);
+  h.setUpstream(() => new Response(JSON.stringify({ error: { code: 402, message: "Insufficient credits" } }), { status: 402, headers: { "content-type": "application/json" } }));
+  const r402 = await run(tok);
+  assertEquals(r402.res.status, 503);
+  assert(r402.txt.includes("model_error") && r402.txt.includes(E16), r402.txt);
+  assert(!r402.txt.includes("temporarily unavailable"), r402.txt);
+  h.setUpstream(() => new Response("boom", { status: 500 }));
+  const r500 = await run(tok);
+  assertEquals(r500.res.status, 503);
+  assert(r500.txt.includes("The model is temporarily unavailable. Try again."), r500.txt);
+  assert(!r500.txt.includes(E16), r500.txt);
 });
 
 // ------------------------------------------------------------- metering ----
@@ -447,7 +478,7 @@ t("upstream unreachable (fetch throws) -> 503 model_error, no row", async () => 
   assertEquals(callRows(h.st).length, 0);
 });
 
-t("no ledger row and no upstream hit on every refusal path (401/403/402/503 ceiling/400/413/404)", async () => {
+t("no ledger row and no upstream hit on every refusal path (401/403/402/400/413/404)", async () => {
   const h = await harness();
   h.reset();
   const [, memberTok] = await member(h);
@@ -470,16 +501,9 @@ t("no ledger row and no upstream hit on every refusal path (401/403/402/503 ceil
     await res.body?.cancel();
     assertEquals(res.status, want);
   }
-  const before = callRows(h.st).length;
-  h.st.ledger.push(...[]);
-  const [a] = await member(h);
-  call(h.st, a, 10);
-  const res = await h.proxy(preq(baseBody(), { token: memberTok }));
-  await res.body?.cancel();
-  assertEquals(res.status, 503);
   await h.drain();
   assertEquals(h.upstreamHits.length, 0);
-  assertEquals(callRows(h.st).length, before + 1, "only the planted spend row");
+  assertEquals(callRows(h.st).length, 1, "only the planted row of the 402 member");
 });
 
 t("duplicate request_id: the second insert is rejected, no crash, one row, both clients got their stream", async () => {
@@ -496,12 +520,12 @@ t("duplicate request_id: the second insert is rejected, no crash, one row, both 
   assert(h.logs.some((l) => l.includes("ledger insert failed")), "the rejection is logged");
 });
 
-t("Supabase failures (balance, spend today, membership) -> 503 model_error with CORS, never forwarded, never thrown", async () => {
+t("Supabase failures (balance, membership) -> 503 model_error with CORS, never forwarded, never thrown", async () => {
   const h = await harness();
   h.reset();
   const [, tok] = await member(h);
   const out: string[] = [];
-  for (const k of ["ten_balance_for", "ten_beta_spend_today", "ten_is_member"]) {
+  for (const k of ["ten_balance_for", "ten_is_member"]) {
     h.st.fail = { [k]: 503 };
     let status: string;
     try {
@@ -518,7 +542,6 @@ t("Supabase failures (balance, spend today, membership) -> 503 model_error with 
   assertEquals(h.upstreamHits.length, 0, "fails closed");
   assertEquals(out, [
     "ten_balance_for down -> 503 acao=https://ten.example.com",
-    "ten_beta_spend_today down -> 503 acao=https://ten.example.com",
     "ten_is_member down -> 503 acao=https://ten.example.com",
   ]);
   // GoTrue down: § 8 point 1 makes that a 401 (no user resolved); record it.

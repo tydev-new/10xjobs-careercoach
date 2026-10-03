@@ -22,9 +22,10 @@ shape; the reader choice is a lead ruling, fix round 1), and § 10.2
 (the version check runs on every member page).
 Again 2026-10-02: § 13.6 amended (owner: DeepSeek for everyone, the
 measurement waived, "(testing)" dropped) and § 20 (open sign-up with a
-welcome credit, and the daily ceiling split by payer; draft for owner
-approval). § 20 wins over § 8's who-is-in text, its $5/day ceiling and its
-non-member line, and over § 17.5's unchanged $5/day.
+welcome credit; draft for owner approval). The same day the owner removed
+every daily spending ceiling: the OpenRouter key is a prepaid balance with
+no daily limit (§ 20.6). § 20 wins over § 8's who-is-in text, its $5/day
+ceiling and its non-member line, and over § 17.5's old $5/day.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -571,21 +572,24 @@ changing the guardrails for every later chat.
 
 ## 8. Model proxy, balance, and the production project
 
-**Setup (owner, 2026-09-23).** The proxy uses the owner's **existing**
-OpenRouter key, which the live CareerCoach app also uses, stored as the secret
-`TEN_OPENROUTER_API_KEY` in `ten-model-proxy` only. Its limit is **$20 with a
-daily reset**, shared by both apps. A **beta-wide daily ceiling of $5**
-(owner, 2026-09-23) keeps the live app's share: before forwarding, the proxy
-sums today's (UTC) beta calls with the service-only `ten_beta_spend_today()`
-and, at $5 or more, answers **503** "The beta has reached today's limit. Try
-again tomorrow." (shown as `model_error`, not `over_balance`). So the live app
-keeps at least $15/day, less only the beta calls already in flight when the
-ceiling is crossed (each ≤ the ceiling below). Beta and live costs mix in
-OpenRouter's usage view, so the ledger is the only beta cost record; rotating
-the key means updating both apps. **Amended 2026-10-02 (§ 20.6):** the
-single $5 ceiling is replaced by a $10 ceiling on free use only; members
-who paid have none of Ten's own, so the live app's share of the key is no
-longer guaranteed.
+**Setup (owner, 2026-09-23; corrected by the owner, 2026-10-02).** The
+proxy uses the owner's **existing** OpenRouter key, which the older
+CareerCoach app also uses, stored as the secret `TEN_OPENROUTER_API_KEY` in
+`ten-model-proxy` only. The key draws on the owner's **prepaid** OpenRouter
+balance, shared by both apps. It has **no daily limit** and nothing resets
+it: the owner tops it up by hand (owner, 2026-10-02: "It's a $20 prepaid
+account, everytime $20 is used up I need to pay manually"). When the
+balance is used up, OpenRouter refuses every call from both apps with a 402
+until the owner tops up, and Ten shows E16 (§ 20.6). No code here reads or
+sets the balance. The proxy has **no daily spending ceiling** of its own
+(§ 20.6). Beta and older-app costs mix in OpenRouter's usage view, so the
+ledger is the only beta cost record; rotating the key means updating both
+apps. *History:* from 2026-09-23 to 2026-10-02 this section read the key as
+a $20 limit with a daily reset, and set a beta-wide daily ceiling of $5: the
+proxy summed today's (UTC) beta calls with `ten_beta_spend_today()` and, at
+$5 or more, answered 503 "The beta has reached today's limit. Try again
+tomorrow." The owner removed that ceiling and its 503 on 2026-10-02
+(§ 20.6); `ten_beta_spend_today()` stays as the owner's read-only view.
 Every model call goes through the proxy; the price list is fetched directly.
 
 The beta shares the owner's **existing production Supabase project**,
@@ -629,9 +633,10 @@ so that line is retired; § 20.4 and UI § 1.6 hold the new screen.
 2. **Size and membership:** a body over 256 KB gets 413, counted while the
    request body streams in (no trusting `Content-Length`). A non-member gets
    403.
-3. **Balance and ceiling:** if the user's balance is not above 0, 402, shown
+3. **Balance:** if the user's balance is not above 0, 402, shown
    as `over_balance`: "Your beta credit is used up. Ask the person who invited
-   you for more." If the beta's spend today is $5 or more, 503 (above).
+   you for more." There is no daily check (the $5/day one was removed
+   2026-10-02, § 20.6).
 4. **Builds** the upstream body from an allowlist. It copies `messages`,
    `tools` (function tools only; server tools are dropped, so web search
    exists only as the fixed plugin below), `tool_choice` and `temperature`.
@@ -662,7 +667,7 @@ so that line is retired; § 20.4 and UI § 1.6 hold the new screen.
    and § 14;
    per model, § 13).
    One metering path only; the same pass records `finish_reason` (§ 9.6).
-6. **Failures:** an upstream 402 (the shared key's daily $20 is out) or 5xx,
+6. **Failures:** an upstream 402 (the shared prepaid balance is used up; E16 since § 20.6) or 5xx,
    a Supabase error, or anything unexpected becomes a 503 with the CORS
    headers, shown as `model_error`, not `over_balance`.
 
@@ -679,16 +684,17 @@ so that line is retired; § 20.4 and UI § 1.6 hold the new screen.
 - **The honest bound** (owner, 2026-09-23: no server lock or rate limit): a
   member calling the proxy directly can run calls in parallel, each starting
   only while the balance is above 0. A user's loss is the calls in flight when
-  it crosses zero (each ≤ the ceiling); the beta's total by the $5/day
-  ceiling plus in-flight calls, and everything by the key's shared $20/day. The one-tab lock had no other use and is removed.
+  it crosses zero (each ≤ the ceiling); everything, both apps, by the
+  prepaid balance left on the shared key (§ 20.8; the $5/day ceiling and the
+  "$20/day" reading were removed 2026-10-02). The one-tab lock had no other use and is removed.
 - **`ten-delete-account`** runs with the service role, needs only a
   signed-in user (not membership; anon/publishable key → 401), acts only on
   that user, and is idempotent. It removes `users/{uid}/` objects through the
   **Storage API** (listed and removed page by page; SQL deletes are refused
   and would orphan the files), then the `ten_ws_files`, `ten_conversations`
   (§ 11.7), `ten_gate_log` and `credit` ledger rows. It keeps the shared sign-in and the `call` ledger rows:
-  cost records (tokens and USD, no career content), so the daily ceiling and
-  the cost history stay intact. Rule 9 holds: career data is gone; cost
+  cost records (tokens and USD, no career content), so the cost history stays
+  intact. Rule 9 holds: career data is gone; cost
   metadata is not career data. The UI says: "This deletes your Ten beta data.
   Your sign-in stays because it's shared with the older app. Unused credit is
   forfeited. Your usage records, which show only amounts spent and no
@@ -710,8 +716,7 @@ with no finish reason at all is a separate, open case (§ 9.8).
 **Prevents:** a model key in the browser; any client field reaching around
 the model, output, search, or path limits; spending a zero balance; a
 non-member spending or storing; a free call from a disconnect; a balance
-stored twice; deleting a shared sign-in; the beta starving the live app of
-more than $5/day (plus in-flight calls); a later old-app storage policy
+stored twice; deleting a shared sign-in; a later old-app storage policy
 opening beta files.
 **Proved by:** stubbed-upstream tests of the **outgoing** body (no `models`,
 `max_completion_tokens`, `web_search_options`; `stream: true`; forced
@@ -983,7 +988,7 @@ This lets a cut-off show in the data without anyone reading a chat.
   - The owner applies it, never an agent, **before** deploying the proxy
     that writes the column. Otherwise every insert would name an unknown
     column and fail: the meter retries once, then logs the row as lost,
-    so the call is never charged to the balance or the $5 daily ceiling.
+    so the call is never charged to the balance (nor, until 2026-10-02, the $5 daily ceiling).
   - Then reload PostgREST's schema cache (`NOTIFY pgrst, 'reload
     schema';` in the SQL editor) before the proxy deploy. Supabase's DDL
     trigger normally does this, but open Supabase issues report new
@@ -1649,19 +1654,23 @@ ceiling constants. Everything else in § 8 is unchanged.
   | model | input $/M | output $/M | ceiling |
   |---|---|---|---|
   | Claude Sonnet 5 | 2.75 (regional cache write) | 11.00 | 0.176 + 0.090112 + 0.007 = **$0.273112, about $0.27** |
-  | DeepSeek V4.1 Flash | 0.375 | 1.50 | 0.024 + 0.012288 + 0.007 = **$0.043288, about $0.04** |
+  | DeepSeek V4.1 Flash | 0.45 (Fireworks US) | 1.80 | 0.0288 + 0.0147456 + 0.007 = **$0.0505456, about $0.05** |
 
   **This raises Claude's ceiling** from § 9.5's $0.21692, which used the
   global $2/$10 and no cache write. A regional host plus a cache write can
   cost up to $0.273 per call today, so § 8's "each ≤ the ceiling" was not
   true. **Approved** (owner, 2026-09-24; § 13.6 (1)): Claude's ceiling is
-  $0.273112, so § 8's bound holds again.
+  $0.273112, so § 8's bound holds again. **DeepSeek raised** (owner,
+  2026-10-02): the 2026-09-24 table used $0.375/$1.50 ($0.043288); the
+  dearest no-data-kept DeepSeek host is now Fireworks's US endpoint at
+  $0.45/$1.80 (§ 13.6's 2026-10-02 list), so DeepSeek's ceiling is
+  $0.0505456 and § 8's bound holds again for it too.
 - **Ceiling uses:** the meter's fallback charge (missing cost, deadline)
   and the 10× sanity bound both use the **request's** model's ceiling.
-  A DeepSeek cost above $0.43288 is recorded as that model's ceiling.
+  A DeepSeek cost above $0.505456 is recorded as that model's ceiling.
   Prices drift. The table is dated, and a cost above the ceiling is
   still recorded as reported, up to 10×, so drift never undercounts.
-- **The $5/day beta ceiling** is unchanged. It sums all models.
+- **The $5/day beta ceiling** was unchanged here; it was removed on 2026-10-02 (§ 20.6). There is no daily ceiling.
 - **Ledger `model`** records the id the proxy sent: the validated request
   id, not the stream's `model` string. The upstream may add a dated suffix
   (the listing names `deepseek/deepseek-v4.1-flash-20260910`). No
@@ -1792,15 +1801,16 @@ What to watch in DeepSeek runs (ledger and chat, numbers only):
   `max_tokens` 8,192 for a client 20,000 and 100 for 100; `stream: true`;
   the web plugin rewrite is the same as Claude's.
 - **(iv) Ceiling per model:** the table's values are 0.273112 and
-  0.043288 (1e-9). A DeepSeek call with no
-  `usage.cost` and one that passes the deadline both record $0.043288; a
+  0.0505456 (1e-9). A DeepSeek call with no
+  `usage.cost` and one that passes the deadline both record $0.0505456; a
   Claude call records Claude's ceiling. A DeepSeek cost of $0.60 is
-  recorded as $0.043288; the same $0.60 on Claude is recorded as $0.60
+  recorded as $0.0505456; the same $0.60 on Claude is recorded as $0.60
   with the anomaly log.
 - **(v) Ledger model:** the row's `model` is the request's id, even when
   the stream's `model` is `deepseek/deepseek-v4.1-flash-20260910`.
-- **(vi) Daily ceiling:** $4.99 of Claude rows plus $0.02 of DeepSeek
-  rows → 503, the same message.
+- **(vi) Daily ceiling:** retired 2026-10-02 (§ 20.6). It was: $4.99 of
+  Claude rows plus $0.02 of DeepSeek rows → 503. Now § 20.11's proxy test 1
+  proves no day's spend stops a call.
 - **(vii) Setting:** `readEnv` with the setting unset, `""` or `"  "` gives
   Claude; each id (with spaces around it) gives that id;
   `deepseek/deepseek-v4.1-flsh` and `anthropic/claude-sonnet-5:online`
@@ -1879,14 +1889,20 @@ This starts them, and they **ship with § 13**, in the same site deploy.
     keep no data and don't collect it for training;
   - that web searches go to Exa through OpenRouter;
   - the hosts for each model, as read from `GET /api/v1/endpoints/zdr`
-    on 2026-09-24, with that date:
-    - **Claude Sonnet 5:** Amazon Bedrock, Google Vertex AI.
-    - **DeepSeek V4.1 Flash:** BaseTen, CoreWeave, DeepInfra, DekaLLM
-      (web-search calls only: it lists no tool support, so § 13.1's
-      `require_parameters` keeps tool calls off it), DigitalOcean,
-      Fireworks, Krea, Makora, Modal, Morph, NextBit, Novita,
-      OpenInference, Parasail, Phala, Relace, Sail Research, SiliconFlow,
-      Together, Venice, Wafer.
+    on 2026-10-02 (re-read for § 20.7 by the build and again by the
+    architect, 01:31 UTC on 10-03; first read 2026-09-24), with that date:
+    - **Claude Sonnet 5:** Amazon Bedrock, Google Vertex AI (unchanged).
+    - **DeepSeek V4.1 Flash:** BaseTen, CoreWeave, Decart, DeepInfra,
+      DekaLLM, DigitalOcean, Fireworks, InferenceNet, Ionstream, Makora,
+      Modal, Morph, NextBit, Novita, OpenInference, Parasail, Phala,
+      Relace, Sail Research, SiliconFlow, Together, Venice, Wafer. Every
+      one lists tool support.
+    - *Changed since 2026-09-24:* Krea is gone; Decart, InferenceNet and
+      Ionstream are new; DekaLLM now lists tools (on 2026-09-24 it listed
+      none, so § 13.1's `require_parameters` kept tool calls off it). The
+      dearest DeepSeek host is now Fireworks's US endpoint, $0.45 in and
+      $1.80 out per million tokens, above the prices § 13.1's ceiling
+      uses (§ 20.8).
   - that OpenRouter picks among the hosts that keep no data at the time of
     each call, so the list can change, and that DeepSeek's own API is
     never used.
@@ -1973,7 +1989,8 @@ about five times.
   and the 10× bound. § 13's separate finding (a cache write on a regional
   host puts Claude's real worst case above this ceiling) was approved
   by the owner (§ 13.6 (1)). Once § 13 is built, with this search term,
-  the ceiling is $0.273112 for Claude and $0.043288 for DeepSeek.
+  the ceiling is $0.273112 for Claude and $0.043288 for DeepSeek (raised
+  to $0.0505456 on 2026-10-02, § 13.1).
 - `MAX_WEB_RESULTS` stays 5. Past 10 results, each extra one costs $0.001
   and the search term becomes $0.007 + (n − 10) × $0.001. A comment at
   the constant says so.
@@ -2289,8 +2306,8 @@ content). Deploy it before `ten-paypal`, the new copy after it. When built,
 
 ### 17.5 Limits and refunds
 
-Unchanged: the $5/day beta ceiling (split by payer since § 20.6), per-call ceilings, gate and allowance
-(§ 3, 4, 8, 13, 14). **Refunds, by hand:** the owner refunds in PayPal, at
+Unchanged: per-call ceilings, gate and allowance (§ 3, 4, 8, 13, 14).
+There is no daily ceiling (the $5/day one was removed 2026-10-02, § 20.6). **Refunds, by hand:** the owner refunds in PayPal, at
 most the current balance, then inserts `kind 'refund'`, `request_id
 'paypal-refund:<refundId>'`, `usd` = the amount. Disputes likewise.
 **When the beta ends,** unused paid credit stays usable; refunds on
@@ -2775,33 +2792,34 @@ with no `out` row (`cuts` is `[]`); a row with the wrong cell count (in
 **Draft for owner approval.** Owner decisions (2026-10-02): keep DeepSeek
 (`deepseek/deepseek-v4.1-flash`) as the model for everyone (§ 13.6,
 amended 2026-10-02), and give each new account a $1 welcome credit. The
-owner's answers the same day, given to the lead in session: the daily
-ceiling is split by payer (§ 20.6); O4's contact is support@10xjobs.co;
+owner's answers the same day, given to the lead in session: no daily
+ceiling at all, since the key is a prepaid balance with no daily limit
+(§ 20.6, which first split the ceiling by payer); O4's contact is
+support@10xjobs.co;
 simple terms, which the owner reviews before sign-ups open (§ 20.7). The
 lead's defaults, each a named value the owner can change: a $1.00 grant;
-grants pause after 100 accounts; credit only for a confirmed email; one
+grants pause at a cap the owner sets (first 100; § 20.8 now recommends
+sizing the first cap to one top-up); credit only for a confirmed email; one
 grant per normalised email; no captcha yet. Where this section and an
 earlier one disagree, this one wins: § 8 (who is in, the $5/day ceiling,
 the non-member line), § 13.1 and § 13.5 (vi) (the $5/day ceiling),
-§ 17.5's "Unchanged: the $5/day beta ceiling", and `design-web-ui.md`
+§ 17.5's old "Unchanged: the $5/day beta ceiling", and `design-web-ui.md`
 § 1.4–§ 1.6, § 1.11 and § 2.7. Screens and copy: `design-web-ui.md` § 1.6
-and § 5.3.1 (rows O1–O8, E14, E16, B7).
+and § 5.3.1 (rows O1–O8, E16, B7; E14 is removed).
 
 **What changes.** Today a stranger can make an account but can't use Ten
 until the owner adds a credit row by hand. After this, a new account with
 a confirmed email gets one $1.00 credit row the first time it opens Ten.
 That row makes it a member by the same rule as before (`ten_is_member()`,
 unchanged). Each email inbox gets the credit once, and the grants stop
-after the first 100. Members who never paid share a $10 daily ceiling;
-members who paid have none of Ten's own.
+at the cap the owner sets. Nobody has a daily spending ceiling (§ 20.6).
 
 **Prevents:** a stranger waiting on the owner for a hand-inserted row; a
 grant to every sign-up of the older app (it shares the sign-in); credit
 for an email nobody proved they own; one inbox claiming twice through a
 `+tag`, gmail's dots, a second account or a deleted one; more free credit
 than the owner set; a race that grants past the cap, or twice; an email
-address kept after the account is gone; free use pausing members who
-paid; a screen that still says "invite-only" when it isn't. **Not
+address kept after the account is gone; a screen that still says "invite-only" when it isn't. **Not
 prevented, by the owner's waiver (§ 13.6, amended 2026-10-02):** outside
 members coach on a model whose conduct on these skills is not measured
 (§ 13.4's caveat travels).
@@ -2810,8 +2828,8 @@ members coach on a model whose conduct on these skills is not measured
 
 A new migration, `supabase/migrations/20261002000000_ten_welcome_credit.sql`
 (the four applied files are never edited). It adds the grant function, a
-hash helper, two tables only the grant touches, and the two service-only
-functions of § 20.6.
+hash helper and two tables only the grant touches. (The two service-only
+functions § 20.6 first proposed were dropped before the build, 2026-10-02.)
 
 **`public.ten_claim_welcome()`**: `security definer`, `set search_path =
 ''`, every name schema-qualified, owned by `postgres` (the SQL editor's
@@ -2855,8 +2873,7 @@ A refusal writes nothing; only a grant leaves a claims row.
   on `paypal:` rows and forbids them on every other row, so a `welcome:`
   row carries neither. The kind check allows `credit`. `ten_balance_for`
   adds every `credit` row, so the balance rises by `usd` with no change to
-  it. A `welcome:` row never makes anyone "paid" (§ 20.6 reads only
-  `paypal:` rows).
+  it.
 - **Unchanged:** `ten_is_member()`, every policy and function that reads
   it, the proxy's 403, and `ten-paypal`'s members-only rule. A welcome
   member is a member, so they can buy; a refused account still can't. The
@@ -2883,11 +2900,11 @@ key default true check (id)`):
 
 | column | value | check | meaning |
 |---|---|---|---|
-| `cap` | **0** when the migration is applied; the owner sets **100** to open (§ 20.12) | `>= 0` | how many grants may exist in total, counted from the claims table |
+| `cap` | **0** when the migration is applied; the owner sets the chosen cap to open (§ 20.8, § 20.12) | `>= 0` | how many grants may exist in total, counted from the claims table |
 | `usd` | **1.00** | `> 0 and <= 5` | each grant's amount; at most the $5 invited starter, so a typo can't grant $100 |
 
 The owner changes either with one `update` in the SQL editor, with no
-deploy: `update public.ten_welcome_settings set cap = 100;` opens, `set
+deploy: `update public.ten_welcome_settings set cap = 20;` opens 20 places, `set
 cap = 0` pauses at once, `set cap = 150` raises. The row is the one home of
 both values (rule 12): the docs name the defaults; the row is what runs.
 
@@ -2982,7 +2999,7 @@ After sign-in, the existing membership check runs first (`RealApp.tsx`'s
 ### 20.5 Copy, and the spend gate at $1
 
 Every new or changed string is a row in `design-web-ui.md` § 5.3.1 (O1–O8,
-E14, E16, B7), checked there against rule 8, rule 18, § 2.7's rule and the
+E16, B7), checked there against rule 8, rule 18, § 2.7's rule and the
 plain-voice ruling. This section quotes none of them, so each lives in one
 place (rule 12). What the copy may say about money: the grant's amount,
 taken from the claim's reply, and nothing per reply. DeepSeek's per-reply
@@ -2997,52 +3014,59 @@ the proxy's 402 is the stop (§ 8). So no copy may promise a gate to a
 welcome account: O1 names the balance chip, not a gate. `estimate_cost`'s
 cost card still shows when the model calls it (rule 5).
 
-### 20.6 The daily ceiling, split by payer
+### 20.6 No daily ceiling (owner, 2026-10-02)
 
-Owner answer (2026-10-02): free use shares a ceiling; paid use has none of
-Ten's own. This replaces § 8's single `BETA_CEILING_USD` check.
+**The owner's correction, in the owner's words** (given to the lead,
+2026-10-02): "I checked my openrouter key, there's no $20 per day limit.
+It's a $20 prepaid account, everytime $20 is used up I need to pay
+manually. So let's remove any added limit in this code."
 
-- **Paid** means a member with at least one `paypal:` credit row (§ 17.3).
-  **Free** means every other member: welcome grants and invited $5
-  starters. A member who pays becomes paid from that moment; a refund
-  (`kind = 'refund'`) leaves their `paypal:` credit row in place, so they
-  stay paid, and their own balance still limits them.
-- **Two service-only functions** in the same migration, both `security
-  invoker`, `set search_path = ''`, execute granted to `service_role` only
-  (like `ten_balance_for`):
-  - `public.ten_is_paid(p_user uuid) returns boolean`: a `credit` row for
-    that user whose `request_id` starts with `paypal:`.
-  - `public.ten_free_spend_today() returns numeric`: the sum of today's
-    (UTC) `call` rows whose user has no such row. It uses the existing
-    call-day index (init file).
-- **The proxy** (`ten-model-proxy`, § 8 point 3), after the 402 balance
-  check:
-  - paid → no daily check at all;
-  - free → if `ten_free_spend_today()` is at or above
-    `FREE_DAILY_CEILING_USD` = **10** (in `core.ts`, replacing
-    `BETA_CEILING_USD`), answer 503, shown as `model_error`, with E14.
-  - `ten_beta_spend_today()` stays, unused by the proxy, as the owner's
-    read-only view of all of Ten's spend today (§ 20.8).
-- **An upstream 402** gets its own message, E16, instead of the general
-  "The model is temporarily unavailable. Try again." OpenRouter's errors
-  page (read 2026-10-02): 402 means "Your account or API key has
-  insufficient credits". Now that paid members have no ceiling of Ten's
-  own, this is what stops them on a busy day, so it must say so (rule 8).
-- `FREE_DAILY_CEILING_USD` is a code constant: changing it is an Edge
-  Function deploy, which only the owner runs (§ 15). The same deploy
-  carries O6 and E16.
+So Ten has **no daily spending ceiling** of its own, for anyone:
 
-**The shared key still caps everyone, paid members included.** The proxy
-uses one OpenRouter key, `TEN_OPENROUTER_API_KEY`, shared with the older
-app; it stays one shared key (owner, 2026-10-02). Its daily limit, $20
-today, is the owner's own setting in OpenRouter: no code here sets or
-reads it. Free use can take at most $10 of it, so free use alone always
-leaves the older app at least $10 a day. Paid use has no ceiling of Ten's
-own, so on a day of heavy paid use the older app's share can fall below
-that (under § 8 it was at least $15). When the key's limit is reached,
-every call on both apps stops until it resets, and Ten's members see E16.
-If paid use grows, the owner raises the key's limit in OpenRouter
-(§ 20.12, optional): no code change and no deploy.
+- **Removed:** § 8's $5/day beta-wide ceiling (`BETA_CEILING_USD`) and its
+  503 "The beta has reached today's limit. Try again tomorrow."
+- **Never built:** the split this section first proposed the same day: a
+  $10 daily ceiling on free use only (`FREE_DAILY_CEILING_USD`), the
+  service-only `ten_is_paid()` and `ten_free_spend_today()`, and the
+  free-use line E14 ("Free use of Ten has reached today's limit. Try again
+  tomorrow."). It was a limit sized for a daily reset the key doesn't
+  have.
+- **Kept, unchanged:** the 403 for a non-member; the 402 `over_balance`
+  when the caller's own balance is not above 0 (§ 8 point 3); the per-call
+  caps (256 KB in, 8,192 output tokens, 5 search results, the two-model
+  allowlist; § 8, § 13); and `ten_beta_spend_today()`, applied in the init
+  file and unused by the proxy, as the owner's read-only view of all of
+  Ten's spend today (§ 20.8).
+- **The shared stop is the prepaid balance.** The proxy uses one
+  OpenRouter key, `TEN_OPENROUTER_API_KEY`, shared with the older app; it
+  stays one shared key (owner, 2026-10-02). It draws on the owner's prepaid
+  OpenRouter balance, which the owner tops up by hand; nothing resets it,
+  and no code here reads or sets it. When it is used up, OpenRouter answers
+  every call from both apps with a 402 (its errors page, read 2026-10-02:
+  "Your account or API key has insufficient credits"), and both apps stop
+  until the owner tops up. The proxy turns that 402 into a 503
+  `model_error` with its own line, E16, instead of the general "The model
+  is temporarily unavailable. Try again.", and writes no ledger row, so the
+  member's credit is not touched.
+
+**Prevents:** a limit in code that the key itself doesn't have (a daily
+ceiling stopping members while the prepaid balance still had money); a
+message promising "tomorrow" when nothing resets tomorrow; a member who
+paid being stopped by Ten while their credit and the shared balance both
+remain. **Not prevented:** one busy stretch can use up the whole prepaid
+balance and stop both apps until the owner tops up. § 20.8 gives the
+bounds and the owner's two ways to keep that from surprising anyone.
+
+**Proved by** (the build's tests): `tests/functions/proxy_money.test.ts`
+"no daily check" (with $500 spent today by everyone, a member with a
+balance is forwarded and the proxy asks nothing about the day's spend;
+$5.00 and $10.00 spent today forward as well) and "upstream 402 → 503
+model_error with E16"; the e2e "no daily limit" section of
+`tests/e2e-real/e2e.ts` ($50 spent today by someone else, the call is
+forwarded, and no spend function is called); `tests/sql/r9-welcome.mjs`
+(`ten_is_paid` and `ten_free_spend_today` do not exist). **To add:** a
+proxy test that an upstream 402 writes no ledger row, since B7 promises
+that no credit is used while Ten is paused.
 
 ### 20.7 Before opening
 
@@ -3090,15 +3114,17 @@ answer 2.
    > **Terms**
    >
    > **Ten is a beta.** It is an early version, and it can change, pause
-   > or stop at any time.
+   > or stop at any time. Ten pays its model service in advance, and if
+   > that prepaid money runs out, Ten pauses for everyone until it's
+   > topped up.
    >
    > **Free credit.** A new account with a confirmed email address can get
-   > free credit to try Ten, while places last. There is one free credit
-   > per person and per email inbox. Free credit has no cash value: it
+   > free credit to try Ten. There is one free credit per person and per
+   > email inbox, and only a set number of places: when they run out, free
+   > credit for new accounts pauses. Free credit has no cash value: it
    > can't be paid out, refunded or moved to another account. We can stop
    > offering it to new accounts at any time, and we can remove it from
-   > accounts made to get it more than once. Free use has a shared daily
-   > limit, so it can pause until the next day.
+   > accounts made to get it more than once.
    >
    > **Paid credit.** You buy credit in PayPal's own window, as a one-time
    > payment; nothing renews. Paid credit stays if you delete your beta
@@ -3123,7 +3149,8 @@ answer 2.
    *Checked against:* rule 8 (no promise the product can't keep: "built
    not to", where rule 10 is a design aim, not a guarantee); rule 10;
    § 17.2 (buying is the person's own act in PayPal's window); § 17.4
-   (what a delete keeps).
+   (what a delete keeps); § 20.6 (no daily limit is claimed, since there is
+   none; the one shared pause is said plainly, in B7's words).
 2. **`/privacy.html`, corrected,** in the same site deploy:
    - In the DeepSeek host heading, "(testing only — see below)" goes
      (§ 13.6, amended 2026-10-02, answer 4).
@@ -3147,45 +3174,64 @@ answer 2.
    - The host lists are read again from `GET /api/v1/endpoints/zdr`, with
      the new date, since the page changes anyway (§ 13.6's refresh rule).
 
-### 20.8 Abuse and cost bounds
+### 20.8 Abuse and cost bounds (recomputed 2026-10-02: no daily ceiling)
 
-As numbers the code enforces, with the defaults:
+As numbers the code enforces. There is no daily ceiling (§ 20.6), so no
+bound below is per day.
 
-- **Free credit, ever:** at most `cap` × `usd` = 100 × $1.00 = **$100**,
+- **Free credit, ever:** at most `cap` × `usd`, that is `cap` × $1.00,
   until the owner raises either, plus $5 per person the owner invites.
-  Deleted accounts still count (§ 20.3).
-- **What free use costs the owner per UTC day:** at most the **$10**
-  free ceiling, plus the free calls already in flight when it is crossed
-  (each at most one call's ceiling: $0.043288 on DeepSeek, $0.273112 on
-  Claude, § 13.1), plus the same-day spend of anyone who buys that day:
-  once they are paid, their earlier calls leave the free sum. That last
-  part is at most each such person's free credit.
-- **One free account:** at most its free credit, plus its own calls in
-  flight when its balance crosses zero. There is no per-user rate limit
-  (owner, 2026-09-23, § 8): a script calling the proxy directly can start
-  many calls at once while the balance is above 0. Each is capped at one
-  call's ceiling, and all free accounts together by the $10.
-- **One paid account:** no daily ceiling of Ten's own; at most its own
-  balance, plus its own calls in flight when it crosses zero. Paid credit
-  is what PayPal delivered after its fee (§ 17.3), so the owner's own
-  loss here is only that overshoot.
-- **Everyone, both apps:** the OpenRouter key's daily limit ($20 today,
-  shared with the older app) stops every call when reached (§ 20.6).
+  Deleted accounts still count (§ 20.3). `cap` ships at 0.
+- **Each account, free or paid:** at most its own balance, plus its own
+  calls in flight when the balance crosses zero. There is no per-user rate
+  limit (owner, 2026-09-23, § 8): a script calling the proxy directly can
+  start many calls at once while the balance is above 0. Each call is held
+  by the per-call caps (256 KB in, 8,192 output tokens, 5 search results);
+  § 13.1 prices one call at most at $0.0505456 on DeepSeek and $0.273112 on
+  Claude. DeepSeek's value was raised on 2026-10-02 (owner) from
+  $0.043288, after the no-data-kept list (§ 13.6) gained a dearer
+  DeepSeek host, Fireworks's US endpoint at $0.45 in and $1.80 out per
+  million tokens. Prices drift again: a cost above the ceiling is still
+  recorded as reported (§ 13.1), so nothing is undercounted, but each
+  call in flight can cost up to its real cost, not the table's. Paid credit is what PayPal delivered after
+  its fee (§ 17.3), so the owner's own loss on a paid account is only that
+  overshoot.
+- **Everyone together, both apps:** at most the prepaid balance left on
+  the shared OpenRouter key. When it reaches 0, OpenRouter refuses every
+  call (402): Ten's members see E16 and the older app stops too, until the
+  owner tops up. Nothing in Ten divides that balance between free use, paid
+  use and the older app, so a busy stretch of any of them can use all of
+  it. Paid members' use draws on it too, but their payments arrive in
+  PayPal, not in OpenRouter, so the owner moves that money across.
+
+**The owner's choice (recommended; nothing to build).** One of two, so the
+balance running out doesn't surprise anyone:
+
+1. **Turn on OpenRouter's auto top-up.** OpenRouter's FAQ (read
+   2026-10-02): users can "set up auto top up so that the balance is
+   replenished when it gets below the set threshold", from the Credits
+   page (`https://openrouter.ai/settings/credits`; the exact controls are
+   UNVERIFIED). Both apps then keep running without a manual top-up.
+2. **Size the first cap to one top-up.** With a $20 top-up and $1.00
+   grants, a first cap of **15 to 20** keeps all free credit ever granted
+   within one top-up; 15 leaves about $5 for paid members and the older
+   app. Raise the cap later with one `update`, once real use has been
+   watched.
 
 **One person with many addresses.** Normalisation stops the cheap tricks:
 a `+tag` on any domain, and dots or `googlemail.com` on gmail. It doesn't
 stop separate real mailboxes, a custom domain that accepts every address,
 disposable-mail services, or a provider's own alias scheme. Each confirmed
 inbox gets $1.00 until the cap; the worst case is one person taking every
-remaining grant, $100 of credit, spent at most $10 a day. With the split,
-that pauses only free use: paying members are not held to the free
-ceiling, though they still share the key's limit. The owner sees it with
-read-only queries (grants per day, from the ledger, so a deleted
-account's grant drops out of it; free spend today; all spend today):
+remaining grant, `cap` × $1.00 of credit, spent as fast as they like. With
+no daily ceiling, that can use up the prepaid balance and stop both apps
+until a top-up, which is why the cap's size matters (above). The owner
+sees it with read-only queries (grants per day, from the ledger, so a
+deleted account's grant drops out of it; all of Ten's spend today):
 
 ```sql
 select date_trunc('day', created_at) as day, count(*) from public.ten_usage_ledger where request_id like 'welcome:%' group by 1 order by 1;
-select public.ten_free_spend_today(), public.ten_beta_spend_today();
+select public.ten_beta_spend_today();
 ```
 
 and stops new grants with `update public.ten_welcome_settings set cap = 0;`.
@@ -3216,11 +3262,10 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
   it is one more secret to manage.
 - **A blocklist of disposable-mail domains:** a list to keep current, and
   a catch-all custom domain walks past it. The captcha comes first.
-- **A payer column on each `call` row,** which would keep a buyer's
-  earlier free calls in the free sum: a change to the ledger and its
-  writer for an overshoot capped by that person's free credit (§ 20.8).
-- **Pointing to Buy credit from E14:** § 17.2 keeps `over_balance` as the
-  one fixed pointer to buying, so the coach can't be read as upselling.
+- **Any daily ceiling** (owner, 2026-10-02, § 20.6): the key has no daily
+  limit, so a ceiling in code would stop members while money remained. The
+  first draft's split ceiling went with it, and so did its two follow-ons:
+  a payer column on each `call` row, and a pointer to Buy credit from E14.
 - **A signed-out "are grants open?" call,** so the sign-in page could hide
   O5 at the cap: a function anyone on the internet could call. O5 says
   "while places last" instead, which stays true.
@@ -3229,12 +3274,12 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
 ### 20.10 Build list (one PR; coder builds, an independent tester tests)
 
 1. **Migration** `20261002000000_ten_welcome_credit.sql`: both tables,
-   `ten_welcome_hash`, `ten_claim_welcome`, `ten_is_paid`,
-   `ten_free_spend_today`, grants and revokes as § 20.1–§ 20.2 and § 20.6,
+   `ten_welcome_hash`, `ten_claim_welcome`, grants and revokes as
+   § 20.1–§ 20.2 (no `ten_is_paid` or `ten_free_spend_today`, § 20.6),
    a 3 s lock timeout, an order guard (refuses unless the ledger has
    `gross_usd`, that is, the PayPal migration is applied, and refuses if
    any of its own objects exist), and the owner queries of § 20.8 and
-   § 20.12 in its header. The teardown drops the six objects, and its
+   § 20.12 in its header. The teardown drops the four objects, and its
    header lists the file.
 2. **SQL tests:** `tests/sql/r9-welcome.mjs` (§ 20.11), on `stub.sql`
    with `auth.users` gaining nullable `email` and `email_confirmed_at`
@@ -3243,13 +3288,13 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
 3. **Client:** `claimWelcome` in `auth.ts`; `RealApp`'s flow (§ 20.4);
    `NotAMember` takes a reason; O1 in the notice place; `NON_MEMBER_MESSAGE`
    removed and `upload-errors.ts` moved to O6.
-4. **Copy:** O1–O8, E14, E16 and B7 word for word; O5 and O7 on the
+4. **Copy:** O1–O8, E16 and B7 word for word; O5 and O7 on the
    sign-in page in both modes; the `⋯` menu's Terms link (O8).
-5. **Proxy:** `FREE_DAILY_CEILING_USD = 10` replaces `BETA_CEILING_USD`;
-   `ProxyDeps` gains `isPaid(uid)` and `freeSpendToday()` (in
-   `_shared/supabase.ts`, beside `betaSpendToday`); the free-only check;
-   E14 as `MESSAGES.ceiling`, E16 for an upstream 402, O6 as `notMember`
-   (also in `ten-paypal/handler.ts`). Tests that pin 5, the old ceiling
+5. **Proxy (amended 2026-10-02, § 20.6):** `BETA_CEILING_USD`, the daily
+   check and its message go, with nothing in their place; the proxy asks
+   for no day's spend (`betaSpendToday` stays in `_shared/supabase.ts`,
+   unused); E16 for an upstream 402, O6 as `notMember` (also in
+   `ten-paypal/handler.ts`). Tests that pin 5, the old ceiling
    text or the old 403 text move with them (`handler.test.ts`,
    `tests/functions/proxy_auth_paths_cors.test.ts`, the e2e constants,
    § 13.5 (vi)).
@@ -3259,8 +3304,8 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
 7. **Stand-in:** `tests/e2e-real/stand-in.ts` applies the new migration
    and creates users with an email and a confirmed date, with a way to
    make one unconfirmed.
-8. **When built,** `docs/ARCHITECTURE.md` (who writes credit rows; the
-   split ceiling, where it says "$5") and `supabase/functions/README.md`
+8. **When built,** `docs/ARCHITECTURE.md` (who writes credit rows; no
+   daily ceiling, where it says "$5") and `supabase/functions/README.md`
    follow, as § 17.4 did.
 
 ### 20.11 Test plan (independent tester)
@@ -3292,16 +3337,13 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
 8. Amount: `usd` 2.50 → the row and the reply carry 2.50; `usd` 6, 0 or
    -1, and `cap` -1, are refused by the checks.
 9. Access: `anon` can't execute `ten_claim_welcome`; `authenticated`
-   can't execute `ten_welcome_hash`, `ten_is_paid` or
-   `ten_free_spend_today`, or select, insert, update or delete either
+   can't execute `ten_welcome_hash`, or select, insert, update or delete either
    table (42501); an `authenticated` call with no `sub` → `PT401`.
 10. Money checks: a `welcome:` row with `gross_usd` set is refused (the
     PayPal check); a second `welcome:<uid>` row is refused (unique).
-11. Paid and free: a welcome user and an invited user are not paid; a user
-    with a `paypal:` credit row is, and stays paid after a `refund` row.
-    With today's calls of $4 by a free user, $3 by an invited user and $50
-    by a paid user, `ten_free_spend_today()` is 7.00; a call row dated
-    yesterday counts in neither function.
+11. No split ceiling (amended 2026-10-02, § 20.6): `ten_is_paid` and
+    `ten_free_spend_today` do not exist, and the migration's code never
+    names them.
 12. The settings row is locked `for update` before the count: checked by
     review of the file, since PGlite runs one connection (the README's
     stated limit).
@@ -3309,14 +3351,14 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
 
 **Proxy** (stubbed upstream, `handler.test.ts`):
 
-1. Free member, free spend today $9.99 plus a $0.02 call → the next call
-   gets 503 with E14; at $9.98 → forwarded.
-2. Paid member, free spend today $50 and all spend today $80 → forwarded
-   (no daily check); `freeSpendToday` is not even called for them.
-3. A paid member with balance 0 → 402, as before.
-4. Upstream 402 → 503 `model_error` with E16; upstream 500 → the general
-   message, as before.
-5. A non-member → 403 with O6.
+1. No daily check (amended 2026-10-02, § 20.6): with $500 spent today by
+   everyone, a member with a balance is forwarded, and the proxy asks the
+   database nothing about the day's spend; $5.00 and $10.00 spent today
+   (the two retired ceilings) forward as well.
+2. A member with balance 0 → 402, as before.
+3. Upstream 402 → 503 `model_error` with E16, and no ledger row; upstream
+   500 → the general message, as before.
+4. A non-member → 403 with O6.
 
 **App** (`tests/e2e-real/e2e.ts` on the stand-in running the real
 migrations, with its request log as the spy):
@@ -3331,49 +3373,58 @@ migrations, with its request log as the spy):
 4. The claim answering 500 → Q1 and Retry; Retry after the stand-in
    recovers → granted.
 5. An invited member → no claim call.
-6. Strings: the bundle has O1–O8, E14, E16 and B7's new words;
-   "invite-only", "The beta has reached today's limit" and "The beta has
-   a shared daily limit" are in no rendered page and not in the bundle
-   (§ 5.3.1's Removed list); the build output has `/terms.html` with the
+6. Strings: the bundle has O1–O6, O8 and B7's new words; O7 is checked
+   as rendered text, since it is built around its two links; E16 is the
+   proxy's own line, checked in the proxy tests, not the bundle;
+   "invite-only", "today's limit" (the old beta line and E14), "shared
+   daily limit", "no daily limit of Ten's own" and "until tomorrow" are in
+   no rendered page and not in the bundle (§ 5.3.1's Removed list); the build output has `/terms.html` with the
    § 20.7 text, and `/privacy.html` no longer says "never to the general
    beta" or "testing only" and has the fingerprint sentence.
 
 ### 20.12 Owner checklist (production is owner-only, § 15)
 
-In this order. Agents prepare the commands and the checks; the owner runs
-each step. Email confirmation is already on (§ 20.1) and stays on. The
-DeepSeek measurement is not a step (§ 13.6, amended 2026-10-02).
+In this order (amended 2026-10-02 to the build's steps). Agents prepare the
+commands and the checks; the owner runs each step. Email confirmation is
+already on (§ 20.1) and stays on. The DeepSeek measurement is not a step
+(§ 13.6, amended 2026-10-02).
 
-1. **Review the terms** (§ 20.7 item 1) and approve or edit the text
-   **before sign-ups open**. The build PR carries the approved words.
-2. **Apply the migration** in the SQL editor as `postgres` at a quiet
-   time, then `NOTIFY pgrst, 'reload schema';`. Check, read-only:
-   `select cap, usd from public.ten_welcome_settings;` gives 0 and 1.00.
-3. **Deploy the proxy:** `supabase functions deploy ten-model-proxy
+1. **Review `terms.html`** (`apps/web/public/terms.html`, the § 20.7 item 1
+   text) and approve or edit it **before sign-ups open**. The build PR
+   carries the approved words.
+2. **Apply the migration** (`20261002000000_ten_welcome_credit.sql`) in the
+   SQL editor as `postgres` at a quiet time, then
+   `NOTIFY pgrst, 'reload schema';`.
+3. **Check the settings row,** read-only: `select cap, usd from
+   public.ten_welcome_settings;` shows cap 0 and usd 1.00.
+4. **Deploy the proxy:** `supabase functions deploy ten-model-proxy
    --no-verify-jwt --project-ref ivunfotoggdxbjouumdk`. `ten-paypal`'s new
    403 text can wait for its next deploy: only members reach Buy credit,
    and its screens show their own fixed lines (`design-web-ui.md` § 1.11).
-4. **Deploy the site:** `apps/web/scripts/deploy-prod.sh`.
-5. **Live run** (PROCESS step 6), with `cap` still 0, on a fresh account
-   with an inbox you control: the not-a-member screen shows O2. Then
-   `update public.ten_welcome_settings set cap = 1;` and reload: the chip
-   reads `$1.00`, O1 shows, and the ledger has one `welcome:` row. A second
-   account on a `+tag` of the same inbox shows O4. (That test grant counts
-   toward the 100.)
-6. **Open:** `update public.ten_welcome_settings set cap = 100;`.
-
-**Optional, at any time:** if paid use grows, raise the shared key's
-daily limit in OpenRouter (the key both apps use; today $20 a day). No
-code change and no deploy (§ 20.6). The OpenRouter menu path is
-UNVERIFIED against today's site.
+5. **Deploy the site:** `apps/web/scripts/deploy-prod.sh`, with Vercel's
+   `VITE_COACH_MODEL=deepseek/deepseek-v4.1-flash` still set.
+6. **Live checks at cap 0** (PROCESS step 6), on a fresh account with an
+   inbox you control: the not-a-member screen shows O2.
+7. **Live checks at cap 1:** `update public.ten_welcome_settings set cap =
+   1;` and reload: the chip reads `$1.00`, O1 shows, and the ledger has one
+   `welcome:` row. (That test grant counts toward the cap.)
+8. **The same inbox with a `+tag`** shows O4.
+9. **Open sign-up at the chosen cap:** `update public.ten_welcome_settings
+   set cap = <N>;`. Without auto top-up, § 20.8 recommends 15 to 20 for a
+   first cap. Pause at once with `set cap = 0`.
+10. **Keep the prepaid key topped up, or turn on auto top-up** in
+    OpenRouter (§ 20.8). No code change and no deploy. When the balance
+    runs out, Ten's members see E16 and the older app stops too, until a
+    top-up. The OpenRouter menu path is UNVERIFIED against today's site.
 
 ### 20.13 Owner answers (2026-10-02, given to the lead in session)
 
 1. **Rule 9** is amended to name the kept fingerprint (§ 20.3), rather
    than read as covering career data only.
-2. **One shared OpenRouter key stays,** with its daily limit as the
-   owner's own setting; raising it is an optional owner step (§ 20.6,
-   § 20.12).
+2. **One shared OpenRouter key stays.** Corrected by the owner the same
+   day: it is a prepaid balance with no daily limit, topped up by hand, so
+   Ten has no daily ceiling either (§ 20.6). Keeping it topped up, or
+   turning on auto top-up, is owner step 10 (§ 20.12).
 
 No question is open in this section.
 
@@ -3382,7 +3433,10 @@ No question is open in this section.
 - Whether Supabase's captcha setting covers the whole project, so the
   older app must send tokens too.
 - The Supabase and OpenRouter menu paths (menus move).
-- Whether `GET /api/v1/endpoints/zdr` still lists the same hosts.
+- The no-data-kept host list after 2026-10-02 (§ 13.6's re-read); hosts
+  come and go.
+- How OpenRouter's auto top-up is set up and charged, beyond its FAQ's one
+  sentence (§ 20.8).
 - DeepSeek's real per-reply cost (derived, § 13.3), which is why no copy
   names a count of replies.
 - DeepSeek's conduct on the skills: not measured (§ 13.6, amended
@@ -3435,14 +3489,18 @@ spike replaced (owner, 2026-09-23).
 - Tier 0 from the bundle: a writable system prompt is a persistent injection.
 - `check_language` adopted (owner, 09-22): one fresh-context call per document
   set (~$0.015–$0.02, measured in step 4).
-- A proxy that builds its own body over the live app's existing key ($20/day,
-  shared; owner, 09-23), and a ledger-derived balance.
+- A proxy that builds its own body over the live app's existing key
+  (shared; owner, 09-23), and a ledger-derived balance. The key was read as
+  "$20/day"; the owner corrected it on 2026-10-02: a prepaid balance with no
+  daily limit, topped up by hand.
 - Text in `ten_ws_files` with a SQL compare-and-swap, binaries create-only in
   Storage: Storage has no conditional write (spike 3); one home per file.
 - A credit row = beta member; delete removes beta data but keeps the shared
   sign-in and the `call` cost rows (not career data, rule 9).
-- A $5/day beta-wide ceiling in the proxy (owner, 09-23): the shared key's
-  $20/day stays at least $15 for the live app.
+- ~~A $5/day beta-wide ceiling in the proxy (owner, 09-23): the shared key's
+  $20/day stays at least $15 for the live app.~~ Removed 2026-10-02 (owner):
+  the key has no daily limit to share out, so Ten has no daily ceiling
+  (§ 20.6).
 - Restrictive pins on the bucket, plus an allowlist guard at apply time: the
   pins hold against policies added later; parsing SQL text can't.
 - Cut-off replies (owner, 09-24; § 9): detected in the agent from the finish
@@ -3510,9 +3568,11 @@ spike replaced (owner, 2026-09-23).
   itself through `ten_claim_welcome()`, once per account and once per
   normalised inbox (a hash kept in a table that outlives the account, as
   rule 9 now names, owner, 2026-10-02), up to a cap in a settings row that
-  ships at 0 and opens at 100. Membership, the starter and PayPal's
-  members-only rule are unchanged. The daily ceiling is split by payer:
-  $10 shared by free members, none of Ten's own for members who paid; the
-  one shared OpenRouter key's limit, the owner's setting, still caps
-  everyone. DeepSeek for everyone,
+  ships at 0 and opens at the owner's chosen cap. Membership, the starter and PayPal's
+  members-only rule are unchanged. No daily ceiling for anyone
+  (the owner's correction, 2026-10-02: the one shared OpenRouter key is a
+  prepaid balance with no daily limit); the first draft's split ceiling was
+  never built. When the balance runs out, both apps stop (E16) until the
+  owner tops up; auto top-up or a first cap sized to one top-up is the
+  owner's choice (§ 20.8). DeepSeek for everyone,
   the measurement waived (§ 13.6, amended 2026-10-02).

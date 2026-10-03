@@ -15,7 +15,7 @@
 import { assert, assertAlmostEquals, assertEquals } from "jsr:@std/assert@1";
 import { CEILING_USD, MAX_TOKENS_CAP } from "../../supabase/functions/ten-model-proxy/core.ts";
 import { handleRequest, type ProxyDeps } from "../../supabase/functions/ten-model-proxy/handler.ts";
-import { balanceFor, betaSpendToday, envFromDeno, insertLedgerCall, isMember, verifyUser } from "../../supabase/functions/_shared/supabase.ts";
+import { balanceFor, envFromDeno, insertLedgerCall, isMember, verifyUser } from "../../supabase/functions/_shared/supabase.ts";
 import { baseBody, callRows, harness, member, preq, PROD_ORIGIN, sse, t, type Harness } from "./_harness.ts";
 
 const FORMULA = 64_000 * 2.75e-6 + 8_192 * 11e-6 + 0.007; // § 13.1 Claude (§ 9.5 cap, § 14 search, regional cache-write prices), = 0.273112
@@ -185,7 +185,6 @@ async function withShortDeadline(chunks: string[]) {
     verifyUser: (token) => verifyUser(env, token),
     isMember: (token) => isMember(env, token),
     balanceFor: (uid) => balanceFor(env, uid),
-    betaSpendToday: () => betaSpendToday(env),
     insertLedgerCall: (row) => insertLedgerCall(env, row),
     fetchUpstream: async () => sse(chunks, { hangAfter: true }), // never closes
     waitUntil: (p) => void pending.push(p),

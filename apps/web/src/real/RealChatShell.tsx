@@ -34,6 +34,7 @@ import { checkConversationStale, CONVERSATION_CHECK_TIMEOUT_MS } from "./convers
 import { useVersionMonitor } from "./version-check.ts";
 import { VersionNotice, type VersionNoticeMode } from "./VersionNotice";
 import { ConversationNotice } from "./ConversationNotice";
+import { WelcomeNotice } from "./WelcomeNotice";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -117,6 +118,10 @@ export interface RealChatShellProps {
   /** § 13.2/§ 13.3: the active model (env.coachModel) — passed straight
    *  to Header's ⋯ menu line, real mode only. */
   coachModel: CoachModel;
+  /** C § 20.4 / § 5.3.1 O1: the welcome credit's amount on the page load
+   *  where the grant happened (undefined otherwise). Shown as one notice
+   *  until the first message is sent; held in memory only (rule 12). */
+  welcomeUsd?: number;
 }
 
 export function RealChatShell({
@@ -138,6 +143,7 @@ export function RealChatShell({
   theme,
   onThemeToggle,
   coachModel,
+  welcomeUsd,
 }: RealChatShellProps): ReactElement {
   const store = useMemo(() => conversationStore ?? createNoopConversationStore(), [conversationStore]);
   const transport = useMemo(() => new AgentChatTransport(coach, chatId), [coach, chatId]);
@@ -235,6 +241,9 @@ export function RealChatShell({
   const [openAttempt, setOpenAttempt] = useState(0);
   const [panelOpenOnPhone, setPanelOpenOnPhone] = useState(false);
   const [balanceUsd, setBalanceUsd] = useState<number | undefined>(undefined);
+  // O1 shows from mount until the first message is sent (doSendMessage drops
+  // it); a reload mounts this fresh with no `welcomeUsd`, so it never returns.
+  const [welcomeShown, setWelcomeShown] = useState(welcomeUsd !== undefined);
   const [attaching, setAttaching] = useState(false);
   const [attachError, setAttachError] = useState<string | undefined>(undefined);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -374,6 +383,7 @@ export function RealChatShell({
       ? [{ type: "file" as const, mediaType: pendingAttachment.mediaType, filename: pendingAttachment.filename, url: `workspace:${pendingAttachment.path}` }]
       : undefined;
     void sendMessage({ text: t, files, metadata: { origin: "typed" } });
+    setWelcomeShown(false);
     setPendingAttachment(undefined);
   };
 
@@ -520,6 +530,7 @@ export function RealChatShell({
         onOpenRef={handleOpen}
         onFocusComposer={() => composerRef.current?.focus()}
         versionNotice={frameVersionNotice}
+        welcomeUsd={welcomeShown ? welcomeUsd : undefined}
         balanceUsd={balanceUsd}
         fixtures={EMPTY_FIXTURES}
         currentFixtureId=""
@@ -570,6 +581,9 @@ export function RealChatShell({
             {newerVersionKnown && !turnRunning ? (
               <VersionNotice mode={sendBlockedOnce ? "blocked" : "newer"} saveFailed={saveFailed || saveConflict} />
             ) : null}
+            {/* § 1.5 (amended 2026-10-02), O1: the welcome credit's one line,
+                in the same notice place, until the first message is sent. */}
+            {welcomeShown && welcomeUsd !== undefined ? <WelcomeNotice usd={welcomeUsd} /> : null}
             {/* ui § 1.9 — the conversation-specific lines, one at a time
                 (freshest first): a just-blocked stale send, else a save
                 conflict from this turn's onFinish, else a plain save failure —

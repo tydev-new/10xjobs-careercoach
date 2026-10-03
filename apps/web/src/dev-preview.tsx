@@ -87,7 +87,7 @@ export function DevScreenPreview({ kind }: { kind: DevPreviewKind }): ReactEleme
       {kind === "sign-in" ? (
         <SignIn client={stubClient} redirectTo="https://ten.example.com/" />
       ) : kind === "not-a-member" ? (
-        <NotAMember onSignOut={() => {}} />
+        <NotAMember reason="paused" onSignOut={() => {}} />
       ) : (
         <UpdateNoticePreview />
       )}

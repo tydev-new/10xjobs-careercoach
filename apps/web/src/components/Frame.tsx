@@ -19,6 +19,7 @@ import { ApplicationsPage } from "./ApplicationsPage";
 import { Home } from "./Home";
 import { JobsPage } from "./JobsPage";
 import { VersionNotice, type VersionNoticeMode } from "../real/VersionNotice";
+import { WelcomeNotice } from "../real/WelcomeNotice";
 import { landingPage } from "../workspace/landing.ts";
 import { buildAskTenDraft } from "../workspace/ask-ten.ts";
 import type { ChatRawStatus } from "../workspace/home-reader.ts";
@@ -81,6 +82,12 @@ export interface FrameProps extends Omit<HeaderProps, "pageTitle"> {
    *  same state, never a UI-only re-derivation of it. `undefined` (the
    *  mock never passes this) means no notice anywhere. */
   versionNotice?: FrameVersionNotice;
+  /** § 1.5 (amended 2026-10-02), § 5.3.1 O1: the welcome credit's amount while
+   *  its notice is up (the page load where the grant happened, until the
+   *  first send). Frame shows it above every page other than Talk to Ten,
+   *  which renders its own copy above the composer, like the version
+   *  notice. `undefined` (the mock never passes it) means none. */
+  welcomeUsd?: number;
   /** Focuses the composer once Frame switches TO Talk to Ten (§ 5.4,
    *  "Continue with Ten... composer focused"). Optional: a caller with no
    *  composer ref (none today) simply navigates without focusing. */
@@ -124,6 +131,7 @@ export function Frame(props: FrameProps): ReactElement {
     sidePanel,
     viewerOpen,
     versionNotice,
+    welcomeUsd,
     onFocusComposer,
     listDocuments,
     onOpenFile,
@@ -229,6 +237,7 @@ export function Frame(props: FrameProps): ReactElement {
           {page !== "talk" && versionNotice ? (
             <VersionNotice mode={versionNotice.mode} saveFailed={versionNotice.saveFailed} />
           ) : null}
+          {page !== "talk" && welcomeUsd !== undefined ? <WelcomeNotice usd={welcomeUsd} /> : null}
           {page === "home" ? (
             // Home's own empty state matches § 5.3.1 H17/H18 word for word
             // (design-web-ui.md § 5.3, restore ruling) — same text 3a's

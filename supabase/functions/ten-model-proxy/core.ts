@@ -87,14 +87,15 @@ const CEILING_SEARCH_USD_PER_REQUEST = 0.007;
  *    call of a turn writes the cache at that price, so it's the input
  *    term that matters for the ceiling, not the plain input price.
  *    Output $11.00/M (regional).
- *  - DeepSeek V4.1 Flash: Venice, the dearest of the 21 tool-capable
- *    no-data-kept hosts — $0.375/M in, $1.50/M out. DeepSeek gets no
+ *  - DeepSeek V4.1 Flash: Fireworks's US endpoint, the dearest
+ *    tool-capable no-data-kept host as of 2026-10-02 (owner-approved
+ *    raise from Venice's $0.375/$1.50) — $0.45/M in, $1.80/M out. DeepSeek gets no
  *    cache-write price (none of its hosts lists one; § 13.1 also never
  *    sets `cache_control` for it).
  */
 const CEILING_PRICE_USD_PER_MILLION: Record<ModelId, { input: number; output: number }> = {
   [CLAUDE_MODEL_ID]: { input: 2.75, output: 11.0 },
-  [DEEPSEEK_MODEL_ID]: { input: 0.375, output: 1.5 },
+  [DEEPSEEK_MODEL_ID]: { input: 0.45, output: 1.8 },
 };
 
 function ceilingFor(model: ModelId): number {
@@ -106,7 +107,7 @@ function ceilingFor(model: ModelId): number {
   );
 }
 
-/** § 13.1's own table: Claude $0.273112, DeepSeek $0.043288 (both "about"
+/** § 13.1's own table: Claude $0.273112, DeepSeek $0.0505456 (both "about"
  *  figures rounded in the doc; exact here, checked to 1e-9 in the tests). */
 export const CEILING_USD_BY_MODEL: Record<ModelId, number> = {
   [CLAUDE_MODEL_ID]: ceilingFor(CLAUDE_MODEL_ID),
@@ -129,7 +130,10 @@ export function ceilingUsdFor(model: string | undefined): number {
 export const CEILING_USD = CEILING_USD_BY_MODEL[CLAUDE_MODEL_ID];
 
 export const MAX_BODY_BYTES = 256 * 1024;
-export const BETA_CEILING_USD = 5;
+// There is NO daily spending ceiling (owner, 2026-10-02): the old $5/day
+// `BETA_CEILING_USD` is gone and nothing replaces it. The shared OpenRouter
+// key is a prepaid balance the owner tops up by hand; when it runs out
+// OpenRouter answers 402 and the handler shows its own message (E16).
 export const UPSTREAM_URL = "https://openrouter.ai/api/v1/chat/completions";
 export const INT4_MAX = 2147483647;
 

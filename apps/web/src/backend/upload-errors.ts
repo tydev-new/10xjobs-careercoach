@@ -21,13 +21,13 @@
 //      413, 400) and gives each a plain message rather than surfacing
 //      "upload failed: HTTP 403 {...}" to a candidate.
 //
-// NON_MEMBER_MESSAGE is imported from auth.ts (the one canonical string,
-// design-web-ui.md § 1.6) rather than duplicated here, so the two can
-// never drift.
+// NOT_SET_UP_MESSAGE (design-web-ui.md § 5.3.1 O6, C § 20.4) is imported
+// from auth.ts (the one canonical string) rather than duplicated here, so
+// the two can never drift.
 //
 // Browser-safe: no window/document/localStorage/node:*.
 import { WorkspaceError, type FileInfo, type WorkspaceStore } from "../../../../packages/agent/src/types.ts";
-import { NON_MEMBER_MESSAGE } from "./auth.ts";
+import { NOT_SET_UP_MESSAGE } from "./auth.ts";
 
 function isWorkspaceError(e: unknown): e is WorkspaceError {
   return typeof e === "object" && e !== null && "code" in e && (e as { name?: string }).name === "WorkspaceError";
@@ -42,7 +42,7 @@ const EXACT_MESSAGES: Partial<Record<WorkspaceError["code"], (name: string) => s
   path_conflict: (name) =>
     `${name} clashes with an existing file or folder (a name that only differs by capitalization counts as a clash).`,
   workspace_full: () => "Your workspace is at its file limit. Remove something before uploading more.",
-  not_a_member: () => NON_MEMBER_MESSAGE,
+  not_a_member: () => NOT_SET_UP_MESSAGE,
   already_exists: (name) => `${name} already exists.`,
   invalid_ref: (name) => `${name} isn't a valid file name.`,
   outside_workspace: () => "That upload would land outside your workspace.",
@@ -61,7 +61,7 @@ export function classifyGenericStorageError(name: string, message: string): stri
   const status = Number(m[1]);
   switch (status) {
     case 403:
-      return NON_MEMBER_MESSAGE;
+      return NOT_SET_UP_MESSAGE;
     case 413:
       return `${name} is over the 10 MB upload limit.`;
     case 400:

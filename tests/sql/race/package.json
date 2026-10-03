@@ -1,0 +1,13 @@
+{
+  "name": "ten-beta-sql-race",
+  "private": true,
+  "type": "module",
+  "description": "Real Postgres 17 (embedded, local, 127.0.0.1 only) for the races PGlite's one connection can't run: design-web-agent.md § 20.1 step 4 (tester, open sign-up review)",
+  "scripts": {
+    "test": "node r10-race.mjs"
+  },
+  "devDependencies": {
+    "embedded-postgres": "17.10.0-beta.17",
+    "pg": "8.23.1"
+  }
+}

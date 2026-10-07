@@ -31,7 +31,7 @@
 //   E2E_KEEP=1 keeps the temp dir (builds, failure screenshots);
 //   E2E_CONSOLE=1 echoes browser console errors; E2E_STACKS=1 page-error stacks.
 // Per-browser sections: journey import gate balance ceiling member delete
-// refresh password phone cors setup uploads env; then once: preview. Firefox/WebKit
+// refresh password signin phone cors setup uploads env; then once: preview. Firefox/WebKit
 // need `npx playwright install firefox webkit` in apps/web.
 // Exit code 0 = all PASS; one PASS/FAIL line per assertion.
 // Also here: upload-errors.test.ts (node --test), the upload messages over PGlite.
@@ -422,7 +422,6 @@ async function newPage(opts: { browser?: string; viewport?: { width: number; hei
 }
 
 async function signIn(page: any, email: string) {
-  await page.locator(".sign-in-mode-toggle button", { hasText: "Email + password" }).click();
   await page.locator(".sign-in-form input[type=email]").fill(email);
   await page.locator(".sign-in-form input[type=password]").fill(PASSWORD);
   await page.locator(".sign-in-form button[type=submit]").click();
@@ -1058,13 +1057,13 @@ await section("welcome", async () => {
 
     // ---- 6. strings: sign-in (O5, O7, both modes), the bundle, the static pages
     const p6 = await newPage();
-    for (const mode of ["Email link", "Email + password"]) {
-      await p6.page.locator(".sign-in-mode-toggle button", { hasText: mode }).click();
+    for (const mode of ["Sign in", "Create an account"]) {
+      if (mode === "Create an account") await p6.page.getByRole("button", { name: uiRow("Y8") }).click();
       const o5 = norm((await p6.page.locator(".sign-in-invite").textContent()) ?? "");
       const o7 = norm((await p6.page.locator(".sign-in-terms").textContent()) ?? "");
       const hrefs = await p6.page.locator(".sign-in-terms a").evaluateAll((as: any[]) => as.map((a) => [a.textContent, a.getAttribute("href")]));
-      rec(o5 === uiRow("O5"), `welcome: the sign-in page shows O5 in "${mode}" mode`, o5);
-      rec(o7 === uiRow("O7") && JSON.stringify(hrefs) === JSON.stringify([["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]), `welcome: ...and O7 with its two links in "${mode}" mode`, `${o7} ${JSON.stringify(hrefs)}`);
+      rec(o5 === uiRow("O5"), `welcome: the sign-in page shows O5 on the "${mode}" view`, o5);
+      rec(o7 === uiRow("O7") && JSON.stringify(hrefs) === JSON.stringify([["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]), `welcome: ...and O7 with its two links on the "${mode}" view`, `${o7} ${JSON.stringify(hrefs)}`);
     }
     await p6.page.context().close();
 
@@ -1255,17 +1254,18 @@ await section("welcome-review", async () => {
       }, sel);
     const phone = { width: 375, height: 812 };
     const s1 = await newPage({ viewport: phone });
-    for (const mode of ["Email link", "Email + password"]) {
-      await s1.page.locator(".sign-in-mode-toggle button", { hasText: mode }).click();
+    for (const mode of ["Sign in", "Create an account"]) {
+      if (mode === "Create an account") await s1.page.getByRole("button", { name: uiRow("Y8") }).click();
+      await s1.page.locator(".sign-in-form").waitFor();
       const f = await fits(s1.page, [".sign-in-invite", ".sign-in-terms", ".sign-in-form button[type=submit]"]);
-      rec(!f.over && f.bad.length === 0, `review R7: 375px sign-in ("${mode}"): no sideways scroll; O5, O7 and the submit button sit inside the screen`, JSON.stringify(f));
+      rec(!f.over && f.bad.length === 0, `review R7: 375px sign-in view "${mode}": no sideways scroll; O5, O7 and the submit button sit inside the screen`, JSON.stringify(f));
       // reading order on the phone: the form, then O5, then O7 (§ 1.4: "the sign-in form comes first")
       const order = await s1.page.evaluate(() => ["form", ".sign-in-invite", ".sign-in-terms"].map((s) => (document.querySelector(s) as HTMLElement | null)?.getBoundingClientRect().top ?? -1));
-      rec(order[0] >= 0 && order[0] < order[1] && order[1] < order[2], `review R7: 375px sign-in ("${mode}"): the form comes first, then O5, then O7`, JSON.stringify(order));
+      rec(order[0] >= 0 && order[0] < order[1] && order[1] < order[2], `review R7: 375px sign-in view "${mode}": the form comes first, then O5, then O7`, JSON.stringify(order));
       const o5 = norm((await s1.page.locator(".sign-in-invite").innerText()) ?? "");
       const o7 = norm((await s1.page.locator(".sign-in-terms").innerText()) ?? "");
       const links = await s1.page.locator(".sign-in-terms a").evaluateAll((as: any[]) => as.map((a) => [a.innerText.trim(), a.getAttribute("href")]));
-      rec(o5 === uiRow("O5") && o7 === uiRow("O7") && JSON.stringify(links) === JSON.stringify([["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]), `review R7: 375px sign-in ("${mode}"): O5 and O7 read word for word (innerText), "terms" and "privacy notice" link the two pages`, `${o5} | ${o7} | ${JSON.stringify(links)}`);
+      rec(o5 === uiRow("O5") && o7 === uiRow("O7") && JSON.stringify(links) === JSON.stringify([["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]), `review R7: 375px sign-in view "${mode}": O5 and O7 read word for word (innerText), "terms" and "privacy notice" link the two pages`, `${o5} | ${o7} | ${JSON.stringify(links)}`);
       // How O7 looks: the link hugs its text, so no gap shows before its period (the 44px tap box is padded
       // invisibly, with matching negative margins). Measured: the text's right edge to the period's left edge.
       const gap = await s1.page.evaluate(() => {
@@ -1279,7 +1279,12 @@ await section("welcome-review", async () => {
         r2.setEnd(next, 1);
         return { period: next.data.slice(0, 1), gapPx: Math.round((r2.getBoundingClientRect().left - text.right) * 10) / 10 };
       });
-      rec(gap.period === "." && gap.gapPx < 2, `review R7: 375px sign-in ("${mode}"): O7's "terms" link hugs its text: no visible gap before the period`, JSON.stringify(gap));
+      rec(gap.period === "." && gap.gapPx < 2, `review R7: 375px sign-in view "${mode}": O7's "terms" link hugs its text: no visible gap before the period`, JSON.stringify(gap));
+      // every field, button and link on the card is at least 44px tall to tap (§ 1.4 proof 11): Y20, Y8, Y9, O7's links included
+      const small = await s1.page.evaluate(() =>
+        [...document.querySelectorAll(".sign-in-card button, .sign-in-card input, .sign-in-card a")].map((e) => [(e.textContent || (e as HTMLInputElement).type).trim().slice(0, 30), Math.round(e.getBoundingClientRect().height)] as [string, number]).filter(([, h]) => h < 44),
+      );
+      rec(small.length === 0, `review R7: 375px sign-in view "${mode}": every field, button and link is at least 44px tall`, JSON.stringify(small));
       if (shots) await s1.page.screenshot({ path: path.join(shots, `375-sign-in-${mode.replace(/\W+/g, "-")}.png`), fullPage: true });
     }
     await s1.page.context().close();
@@ -1969,7 +1974,6 @@ await section("password", async () => {
   };
   const snap = async (page: any) => snapshots.push(await page.evaluate(() => JSON.stringify({ ls: { ...localStorage }, ss: { ...sessionStorage }, href: location.href, cookie: document.cookie })));
   const signInWith = async (page: any, email: string, password: string) => {
-    await page.locator(".sign-in-mode-toggle button", { hasText: "Email + password" }).click();
     await page.locator(".sign-in-form input[type=email]").fill(email);
     await page.locator(".sign-in-form input[type=password]").fill(password);
     await page.locator(".sign-in-form button[type=submit]").click();
@@ -1986,7 +1990,6 @@ await section("password", async () => {
 
   // ---- forgot: POST /recover with redirect_to = VITE_SITE_URL; success, no account and 429 read the same
   let page = await open(ORIGIN + "/");
-  await page.locator(".sign-in-mode-toggle button", { hasText: "Email + password" }).click();
   const cardAfterReset = async (addr: string) => {
     await page.getByRole("button", { name: "Forgot or never set a password?" }).click();
     await page.getByLabel("Email").fill(addr);
@@ -2123,11 +2126,19 @@ await section("password", async () => {
 
   // ---- an expired / used link: the line, then the URL is cleaned
   page = await open(ORIGIN + "/#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired");
-  const EXPIRED = "That email link has expired or was already used. Ask for a new one below.";
+  const EXPIRED = uiRow("Y27");
   const expShown = await page.getByText(EXPIRED).waitFor({ timeout: 15000 }).then(() => true, () => false);
   await page.waitForTimeout(500);
   const expHref = await page.evaluate(() => location.href);
-  rec(expShown && !/error_code|otp_expired/.test(expHref), "password: an otp_expired link shows the expired line and the URL loses the error", expHref);
+  rec(expShown && !/error_code|otp_expired/.test(expHref), "password: an otp_expired link shows the expired line (Y27) and the URL loses the error", expHref);
+  // Y27 belongs to the Sign in view only: not on Create an account, not on the reset card
+  await page.getByRole("button", { name: uiRow("Y8") }).click();
+  const onCreate = await page.getByText(EXPIRED).count();
+  await page.getByRole("button", { name: uiRow("Y9") }).click();
+  await page.getByRole("button", { name: "Forgot or never set a password?" }).click();
+  await page.getByRole("heading", { name: "Reset your password" }).waitFor();
+  const onReset = await page.getByText(EXPIRED).count();
+  rec(onCreate === 0 && onReset === 0, "password: Y27 is absent on Create an account and on the reset card", `create=${onCreate} reset=${onReset}`);
   await page.reload();
   await page.locator(".sign-in-screen").waitFor({ timeout: 15000 });
   await page.waitForTimeout(800);
@@ -2157,6 +2168,157 @@ await section("password", async () => {
   }
   const positive = reqs.filter((r) => authBody(r) && sentinels.some((s) => r.body.includes(s))).length;
   rec(positive >= 4 && leaks.length === 0, "password: no leak — the passwords and the code appear only in Supabase Auth request bodies (PUT /user, the password grant); never a URL, the console or storage (C § 16.2)", `auth bodies with a sentinel: ${positive}; leaks: ${[...new Set(leaks)].slice(0, 6).join(" | ")}`);
+});
+
+// ================================================================ ONE WAY TO SIGN IN (ui § 1.4, 2026-10-07; C § 16.5)
+// The "Proved by" list's items 3, 4, 6, 7 (e2e half), 10 and 11 on the production build and the
+// stand-in. SHOTS_375=<dir> saves the 375px screenshots (Sign in, Create, confirmation, reset card).
+await section("signin", async () => {
+  const phone = { width: 375, height: 812 };
+  const shots = process.env.SHOTS_375;
+  const Y = Object.fromEntries(["Y4", "Y5", "Y6", "Y7", "Y8", "Y9", "Y11", "Y12", "Y13", "Y20", "Y24", "Y27", "S9", "O5", "O7"].map((id) => [id, uiRow(id)]));
+  // proof 6's ten strings, read from the amendment itself
+  const six = UI_DOC.slice(UI_DOC.indexOf("6. **Not in the bundle, and not on any rendered sign-in state**"), UI_DOC.indexOf("The check ignores"));
+  const retired = [...six.matchAll(/"([^"]+)"/g)].map((m) => m[1].replace(/\s+/g, " ")).filter((x) => x.length > 3);
+  rec(retired.length === 10, "signin: proof 6's list was read from the doc (ten strings)", String(retired.length));
+  const shown = (page: any): Promise<string> =>
+    page.evaluate(() => {
+      const attrs = [...document.querySelectorAll("[aria-label],[title],[placeholder],[alt]")].map((e) => ["aria-label", "title", "placeholder", "alt"].map((a) => e.getAttribute(a) ?? "").join(" "));
+      return (document.body.innerText + " " + attrs.join(" ")).replace(/\s+/g, " ").toLowerCase();
+    });
+  const noRetired = async (page: any, where: string) => {
+    const t = await shown(page);
+    const hit = retired.filter((x) => t.includes(x.toLowerCase()));
+    rec(hit.length === 0, `signin: ${where}: none of the retired strings shows (ignoring case)`, hit.join(" | "));
+  };
+  const fitsPhone = async (page: any, where: string, shot: string) => {
+    const r = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      W: window.innerWidth,
+      theme: document.querySelector("[data-theme]")?.getAttribute("data-theme"),
+      small: [...document.querySelectorAll(".sign-in-card button, .sign-in-card input, .sign-in-card a")]
+        .map((e) => [(e.textContent || (e as HTMLInputElement).type).trim().slice(0, 30), Math.round(e.getBoundingClientRect().height), Math.round(e.getBoundingClientRect().width)] as [string, number, number])
+        .filter(([, h, w]) => h < 44 || w < 44),
+    }));
+    rec(r.scrollW <= r.W && r.small.length === 0 && r.theme === "light", `signin: 375px ${where}: no horizontal scroll, every field, button and link at least 44px, light palette`, JSON.stringify(r));
+    if (shots) await page.screenshot({ path: path.join(shots, shot), fullPage: true });
+  };
+  const fresh = async (hash = "", viewport = phone) => {
+    const np = await newPage({ viewport, noGoto: true });
+    await np.page.goto(ORIGIN + "/" + hash);
+    await np.page.locator(".sign-in-screen").waitFor({ timeout: 15000 });
+    return np;
+  };
+  const textOf = async (page: any, sel: string) => norm((await page.locator(sel).textContent().catch(() => "")) ?? "");
+  const submit = (page: any) => page.locator(".sign-in-form button[type=submit]").click();
+
+  // ---- the Sign in view (proof 1) at 375px
+  const a = await fresh();
+  const view1 = await a.page.evaluate(() => ({
+    labels: [...document.querySelectorAll(".sign-in-form label")].map((l) => (l.firstChild?.textContent ?? "").trim()),
+    links: [...document.querySelectorAll(".sign-in-form .sign-in-link-button")].map((b) => (b.textContent ?? "").trim()),
+    submits: [...document.querySelectorAll("button[type=submit]")].map((b) => (b.textContent ?? "").trim()),
+    toggles: document.querySelectorAll(".sign-in-mode-toggle, [aria-pressed]").length,
+  }));
+  eq(view1, { labels: [Y.Y4, Y.Y5], links: [Y.Y20, Y.Y8], submits: [Y.Y6], toggles: 0 }, "signin: the Sign in view: Email, Password, Y20, Y8, one `Sign in` button, no toggle and no aria-pressed");
+  rec((await textOf(a.page, ".sign-in-invite")) === Y.O5 && (await textOf(a.page, ".sign-in-terms")) === Y.O7 && (await textOf(a.page, ".sign-in-local")) === Y.S9, "signin: ...and O5, O7 and S9 word for word");
+  await noRetired(a.page, "Sign in view");
+  await fitsPhone(a.page, "Sign in view", "375-signin-view.png");
+
+  // ---- the Create an account view (proof 2)
+  await a.page.locator(".sign-in-form input[type=email]").fill("kept.address@example.com");
+  await a.page.getByRole("button", { name: Y.Y8 }).click();
+  const view2 = await a.page.evaluate(() => ({
+    submits: [...document.querySelectorAll("button[type=submit]")].map((b) => (b.textContent ?? "").trim()),
+    links: [...document.querySelectorAll(".sign-in-form .sign-in-link-button")].map((b) => (b.textContent ?? "").trim()),
+    email: (document.querySelector(".sign-in-form input[type=email]") as HTMLInputElement).value,
+  }));
+  eq(view2, { submits: [Y.Y7], links: [Y.Y9], email: "kept.address@example.com" }, "signin: the Create an account view: `Create account`, Y9 only (no Y20), the typed email kept");
+  rec((await textOf(a.page, ".sign-in-invite")) === Y.O5 && (await textOf(a.page, ".sign-in-terms")) === Y.O7, "signin: ...O5 and O7 under it");
+  await noRetired(a.page, "Create an account view");
+  await fitsPhone(a.page, "Create an account view", "375-signin-create.png");
+
+  // ---- Create account against the stand-in (proof 3)
+  const signupsBefore = standIn.pw.signups.length;
+  await a.page.locator(".sign-in-form input[type=password]").fill("Correct-Horse-9");
+  await submit(a.page);
+  await a.page.getByRole("button", { name: Y.Y24 }).waitFor({ timeout: 15000 });
+  const sup = standIn.pw.signups.slice(signupsBefore);
+  eq(sup, [{ email: "kept.address@example.com", redirectTo: ORIGIN }], "signin: Create account made one POST /signup, carrying the site address as redirect_to");
+  rec((await textOf(a.page, ".sign-in-sent")) === Y.Y11.replace("<email>", "kept.address@example.com"), "signin: the confirmation line is Y11 with the typed address filled in");
+  rec((await a.page.locator("form").count()) === 0 && (await textOf(a.page, ".sign-in-invite")) === Y.O5 && (await textOf(a.page, ".sign-in-terms")) === Y.O7, "signin: ...in place of the form, with O5 and O7 below");
+  await noRetired(a.page, "confirmation line");
+  await fitsPhone(a.page, "confirmation line", "375-signin-confirmation.png");
+  await a.page.getByRole("button", { name: Y.Y24 }).click();
+  await a.page.getByRole("button", { name: Y.Y8 }).waitFor();
+  rec((await a.page.locator(".sign-in-form input[type=email]").inputValue()) === "kept.address@example.com", "signin: Y24 returns to the Sign in view with the email kept");
+
+  // ---- the reset card (proof 8's card, 375px)
+  await a.page.getByRole("button", { name: Y.Y20 }).click();
+  await a.page.getByRole("heading", { name: "Reset your password" }).waitFor();
+  await noRetired(a.page, "reset card");
+  await fitsPhone(a.page, "reset card", "375-signin-reset-card.png");
+  await a.page.getByRole("button", { name: Y.Y24 }).click();
+  rec((await a.page.getByRole("button", { name: Y.Y8 }).count()) === 1, "signin: the reset card's Back to sign in returns to the Sign in view");
+  await a.page.context().close();
+
+  // ---- the errors, against the stand-in's real answers (proof 4, Y12 and Y13 only: the minimum map)
+  const wrong = em("signin.wrong");
+  await standIn.createUser({ email: wrong });
+  const b = await fresh("", { width: 1280, height: 860 });
+  await b.page.locator(".sign-in-form input[type=email]").fill(wrong);
+  await b.page.locator(".sign-in-form input[type=password]").fill("not the password");
+  await submit(b.page);
+  await b.page.locator(".sign-in-error").waitFor({ timeout: 15000 });
+  const y12 = await textOf(b.page, ".sign-in-error");
+  rec(y12 === Y.Y12 && !/invalid login credentials/i.test(y12), "signin: a wrong password shows Y12, never Supabase's own text", y12);
+  await noRetired(b.page, "Y12 error state");
+  standIn.pw.unconfirmedSignIn.add(wrong.toLowerCase());
+  await b.page.locator(".sign-in-form input[type=password]").fill(PASSWORD);
+  await submit(b.page);
+  await until(async () => {
+    const t = await textOf(b.page, ".sign-in-error");
+    return t !== "" && t !== y12 ? true : undefined;
+  }, 15000);
+  const y13 = await textOf(b.page, ".sign-in-error");
+  standIn.pw.unconfirmedSignIn.delete(wrong.toLowerCase());
+  rec(y13 === Y.Y13 && !/email not confirmed/i.test(y13), "signin: an unconfirmed address shows Y13, never Supabase's own text", y13);
+  await noRetired(b.page, "Y13 error state");
+  await b.page.context().close();
+
+  // ---- the expired-link state (proof 9, with the retired strings)
+  const c = await fresh("#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired", { width: 1280, height: 860 });
+  rec((await textOf(c.page, ".sign-in-link-error")) === Y.Y27, "signin: the expired-link state shows Y27 above the Sign in view");
+  await noRetired(c.page, "expired-link state");
+  await c.page.context().close();
+
+  // ---- an old sign-in link still signs in (proof 10): type=magiclink goes on to the membership check
+  const old = em("signin.oldlink");
+  await standIn.createUser({ email: old });
+  const hash = standIn.pw.recoveryHash(old).replace("type=recovery", "type=magiclink");
+  const t0 = Date.now();
+  const d = await newPage({ noGoto: true });
+  await d.page.goto(ORIGIN + "/" + hash);
+  const inChat = await d.page.locator(".composer-input").waitFor({ timeout: 20000 }).then(() => true, () => false);
+  const checks = standIn.log.filter((l) => l.at >= t0 && l.method === "POST" && l.path === "/rest/v1/rpc/ten_is_member").length;
+  rec(inChat && checks >= 1 && (await d.page.getByRole("heading", { name: "Choose a new password" }).count()) === 0, "signin: a valid #access_token=…&type=magiclink signs in and runs the membership check; no recovery screen", `chat=${inChat} checks=${checks}`);
+  await d.page.context().close();
+
+  // ---- the bundle: proof 5 (whole literals) and proof 6 (the retired strings), JS and HTML only (no source maps)
+  let code = "";
+  const walkBundle = (dir: string) => {
+    for (const f of readdirSync(dir)) {
+      const pth = path.join(dir, f);
+      if (statSync(pth).isDirectory()) walkBundle(pth);
+      else if (/\.(js|html)$/.test(f)) code += readFileSync(pth, "utf8") + "\n";
+    }
+  };
+  walkBundle(prodDir);
+  const lit = (x: string) => [x, x.replace(/'/g, "\\'"), JSON.stringify(x).slice(1, -1)].some((v) => code.includes(v));
+  for (const id of ["Y12", "Y13", "Y27", "Y20", "Y8", "Y9", "O5"]) rec(lit(Y[id]), `signin: the bundle has ${id} as one whole literal`);
+  const low = code.toLowerCase();
+  const inBundle = retired.filter((x) => [x.toLowerCase(), x.toLowerCase().replace(/'/g, "\\'")].some((v) => low.includes(v)));
+  rec(inBundle.length === 0, "signin: none of the retired sign-in strings is in the bundle (ignoring case)", inBundle.join(" | "));
 });
 
 // ================================================================ PHONE (375px)
@@ -2327,6 +2489,12 @@ await section("preview", async () => {
 });
 
 // ------------------------------------------------------------------ wrap up
+// design-web-ui.md § 1.4 proof 7 (C § 16.5): no sign-in link is ever asked for. The stand-in has no
+// /otp route on purpose, so any request for the one-time-link address is in the log, and none may be.
+{
+  const otp = standIn.log.filter((l) => l.path === "/auth/v1/otp" || /\/otp$/.test(l.path));
+  rec(otp.length === 0, `signin: over the whole run the stand-in's one-time-link address (POST /otp) got zero requests (the log holds ${standIn.log.length} requests)`, otp.map((l) => `${l.method} ${l.path}`).join(" | "));
+}
 rec(external.length === 0, "network: no browser request left 127.0.0.1 except the stubbed ATS API", external.slice(0, 5).join(" "));
 rec(!denoLog.join("").includes("E2E-EXTERNAL-FETCH-REFUSED"), "network: the functions never tried a non-loopback fetch");
 const responsesWithKey = standIn.log.filter((l) => l.auth.includes(OPENROUTER_CANARY) || l.apikey.includes(OPENROUTER_CANARY));

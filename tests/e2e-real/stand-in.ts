@@ -4,7 +4,10 @@
 //
 //   /auth/v1/*        GoTrue: password grant, refresh_token grant, /user,
 //                     /logout, and (C § 16.4) POST /recover, PUT /user and
-//                     GET /reauthenticate. Tokens are HS256 JWTs (like
+//                     GET /reauthenticate; (C § 16.5) POST /signup, recorded,
+//                     creating nothing. There is NO /otp route on purpose: the
+//                     sign-in card never asks for a sign-in link, and the e2e
+//                     counts the requests the log holds for that path (zero). Tokens are HS256 JWTs (like
 //                     GoTrue), so supabase-js decodes and refreshes them for real.
 //   /rest/v1/*        PostgREST over PGlite running the REAL applied
 //                     migrations (supabase/migrations/*, all five, in order)
@@ -127,6 +130,11 @@ export interface PasswordAuth {
   recovers: { email: string; redirectTo: string | null; exists: boolean }[];
   /** codes "emailed" by /reauthenticate, per uid, newest last */
   codes: Map<string, string[]>;
+  /** every POST /signup (C § 16.5): the email and the redirect_to it carried. The stand-in
+   *  creates no account and answers like a project with Confirm email on: a user, no session. */
+  signups: { email: string; redirectTo: string | null }[];
+  /** emails whose password grant answers `email_not_confirmed` (Y13), whatever the password */
+  unconfirmedSignIn: Set<string>;
   /** the link Supabase would email: `#access_token=…&type=recovery` for this account */
   recoveryHash(email: string): string;
   passwordOf(email: string): string | undefined;
@@ -162,6 +170,8 @@ export async function startStandIn(): Promise<StandIn> {
     recoverRateLimited: false,
     minLength: 8,
     recovers: [],
+    signups: [],
+    unconfirmedSignIn: new Set(),
     codes: new Map(),
     recoveryHash(email: string) {
       const u = users.get(email.toLowerCase());
@@ -321,7 +331,11 @@ export async function startStandIn(): Promise<StandIn> {
         const b = jsonBody();
         if (grant === "password") {
           const u = users.get(String(b.email ?? "").toLowerCase());
-          if (!u || b.password !== u.password) return send(400, { error: "invalid_grant", error_description: "Invalid login credentials", code: "invalid_credentials", msg: "Invalid login credentials" });
+          // Like GoTrue on API version 2024-01-01 (what supabase-js asks for): the header, and the
+          // machine-readable `code` in the body, which is what the sign-in card's Y12/Y13 map reads.
+          const v2024 = { "x-supabase-api-version": "2024-01-01" };
+          if (pw.unconfirmedSignIn.has(String(b.email ?? "").toLowerCase())) return send(400, { code: "email_not_confirmed", message: "Email not confirmed" }, v2024);
+          if (!u || b.password !== u.password) return send(400, { code: "invalid_credentials", message: "Invalid login credentials" }, v2024);
           return send(200, issueSession(u));
         }
         if (grant === "refresh_token") {
@@ -341,6 +355,13 @@ export async function startStandIn(): Promise<StandIn> {
       // version 2024-01-01: the header, and { code, message } in the body.
       const authErr = (status: number, code: string, message: string, extra: Record<string, unknown> = {}) =>
         send(status, { code, message, ...extra }, { "x-supabase-api-version": "2024-01-01" });
+      if (url.pathname === "/auth/v1/signup" && req.method === "POST") {
+        const b = jsonBody();
+        const email = String(b.email ?? "").toLowerCase();
+        pw.signups.push({ email, redirectTo: url.searchParams.get("redirect_to") });
+        // Confirm email on: a user and no session, the same for a new and an existing address (C § 16.5)
+        return send(200, { id: randomUUID(), aud: "authenticated", role: "", email, phone: "", created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z", app_metadata: { provider: "email", providers: ["email"] }, user_metadata: {}, identities: [] });
+      }
       if (url.pathname === "/auth/v1/recover" && req.method === "POST") {
         const email = String(jsonBody().email ?? "").toLowerCase();
         pw.recovers.push({ email, redirectTo: url.searchParams.get("redirect_to"), exists: users.has(email) });

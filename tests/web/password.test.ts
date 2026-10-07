@@ -445,7 +445,6 @@ test("P4b reauthentication_not_valid and a 429 from reauthenticate() itself give
 
 async function openForgot(cfg: FakeCfg, viewport?: { width: number; height: number }, pathSuffix = "") {
   const o = await open({ events: [{ event: "INITIAL_SESSION" }], ...cfg }, { viewport, path: pathSuffix });
-  await o.page.getByRole("button", { name: "Email + password" }).click();
   await o.page.getByRole("button", { name: COPY.forgotLink }).click();
   await o.page.getByRole("heading", { name: COPY.resetTitle }).waitFor();
   return o;
@@ -456,19 +455,23 @@ async function sendReset(page: Page, email: string) {
   await settle(page, 300);
 }
 
-test("P5 forgot: the link is in Email + password mode only; the card's title, line and buttons are § 1.10's", async () => {
+// The Sign in view's own submit button: the sign-in screen is showing.
+const signInShowing = (page: Page) => page.getByRole("button", { name: "Sign in", exact: true });
+
+test("P5 forgot: Y20 is on the Sign in view with no mode click and not on Create an account; the card's title, line and buttons are § 1.10's", async () => {
   const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
   try {
-    await o.page.getByRole("button", { name: "Email link" }).waitFor();
-    assert.equal(await o.page.getByRole("button", { name: COPY.forgotLink }).count(), 0, "not in Email link mode");
-    await o.page.getByRole("button", { name: "Email + password" }).click();
-    assert.equal(await o.page.getByRole("button", { name: COPY.forgotLink }).count(), 1, "in Email + password mode");
+    await signInShowing(o.page).waitFor();
+    assert.equal(await o.page.getByRole("button", { name: COPY.forgotLink }).count(), 1, "on the Sign in view");
+    await o.page.getByRole("button", { name: "New here? Create an account" }).click();
+    assert.equal(await o.page.getByRole("button", { name: COPY.forgotLink }).count(), 0, "not on Create an account");
+    await o.page.getByRole("button", { name: "Already have an account? Sign in" }).click();
     await o.page.getByRole("button", { name: COPY.forgotLink }).click();
     const t = await bodyText(o.page);
     assert.ok(t.includes(COPY.resetTitle) && t.includes(COPY.resetLine), t.slice(0, 300));
     assert.equal(await o.page.getByRole("button", { name: "Send reset link" }).count(), 1);
     await o.page.getByRole("button", { name: "Back to sign in" }).click();
-    assert.equal(await o.page.getByRole("button", { name: "Email + password" }).count(), 1, "Back to sign in returns");
+    assert.equal(await signInShowing(o.page).count(), 1, "Back to sign in returns to the Sign in view");
   } finally {
     await o.close();
   }
@@ -592,7 +595,7 @@ test("P6c Sign out from the recovery screen signs out and shows sign-in, with no
   try {
     await fill(o.page, "Correct-Horse-9");
     await o.page.getByRole("button", { name: "Sign out" }).click();
-    await o.page.getByRole("button", { name: "Email + password" }).waitFor();
+    await signInShowing(o.page).waitFor();
     assert.equal((await callsOf(o.page, "signOut")).length, 1);
     assert.equal(await memberChecks(o.page), 0);
     assert.equal((await callsOf(o.page, "updateUser")).length, 0);
@@ -602,7 +605,7 @@ test("P6c Sign out from the recovery screen signs out and shows sign-in, with no
 });
 
 for (const where of ["hash", "query"] as const) {
-  test(`P6d an otp_expired link (error in the ${where}) shows the expired line on sign-in and on the reset card; the URL is cleaned so a reload doesn't repeat it`, async () => {
+  test(`P6d an otp_expired link (error in the ${where}) shows Y27 above the Sign in view only: not on Create an account, not on the reset card; the URL is cleaned so a reload doesn't repeat it`, async () => {
     const err = "error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired";
     const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: where === "hash" ? `#${err}` : `?${err}` });
     try {
@@ -610,8 +613,6 @@ for (const where of ["hash", "query"] as const) {
       await settle(o.page);
       const href = await o.page.evaluate(() => location.href);
       assert.ok(!/error_code|otp_expired|error_description/.test(href), `URL still carries the error: ${href}`);
-      await o.page.getByRole("button", { name: "Email + password" }).click();
-      await o.page.getByRole("button", { name: COPY.forgotLink }).click();
       // "above the form"
       const order = await o.page.evaluate((expired) => {
         const all = [...document.querySelectorAll("p, form")];
@@ -619,9 +620,18 @@ for (const where of ["hash", "query"] as const) {
         const f = all.findIndex((e) => e.tagName === "FORM");
         return { i, f };
       }, COPY.expired);
-      assert.ok(order.i >= 0 && order.i < order.f, `expired line above the reset form: ${JSON.stringify(order)}`);
+      assert.ok(order.i >= 0 && order.i < order.f, `expired line above the Sign in form: ${JSON.stringify(order)}`);
+      // not on Create an account, back on Sign in again
+      await o.page.getByRole("button", { name: "New here? Create an account" }).click();
+      assert.ok(!(await bodyText(o.page)).includes(COPY.expired), "Y27 on Create an account");
+      await o.page.getByRole("button", { name: "Already have an account? Sign in" }).click();
+      assert.ok((await bodyText(o.page)).includes(COPY.expired), "Y27 back on the Sign in view");
+      // not on the reset card (it points to a link that is not on that card)
+      await o.page.getByRole("button", { name: COPY.forgotLink }).click();
+      await o.page.getByRole("heading", { name: COPY.resetTitle }).waitFor();
+      assert.ok(!(await bodyText(o.page)).includes(COPY.expired), "Y27 on the reset card");
       await o.page.reload();
-      await o.page.getByRole("button", { name: "Email link" }).waitFor();
+      await signInShowing(o.page).waitFor();
       await settle(o.page);
       assert.ok(!(await bodyText(o.page)).includes(COPY.expired), "reload repeats the expired line");
     } finally {
@@ -634,13 +644,12 @@ test("P6e the expired line belongs to the link that came back: after a sign-in a
   const o = await open({ events: [{ event: "INITIAL_SESSION" }], member: false }, { path: "#error=access_denied&error_code=otp_expired&error_description=x" });
   try {
     await o.page.getByText(COPY.expired).waitFor();
-    await o.page.getByRole("button", { name: "Email + password" }).click();
     await o.page.getByLabel("Email").fill(EMAIL);
     await o.page.getByLabel("Password").fill("correct horse battery");
     await o.page.getByRole("button", { name: "Sign in" }).click();
     await o.page.getByText(O2_PAUSED).waitFor();
     await o.page.getByRole("button", { name: "Sign out" }).click();
-    await o.page.getByRole("button", { name: "Email link" }).waitFor();
+    await signInShowing(o.page).waitFor();
     await settle(o.page);
     assert.ok(!(await bodyText(o.page)).includes(COPY.expired), "the expired line shows again after sign-out, with no link involved");
   } finally {
@@ -742,7 +751,7 @@ test("P7b no leak, Cancel and sign-out clear the form; the recovery screen's sav
   try {
     await fill(s.page, SENTINEL);
     await s.page.getByRole("button", { name: "Sign out" }).click();
-    await s.page.getByRole("button", { name: "Email + password" }).waitFor();
+    await signInShowing(s.page).waitFor();
     assert.ok(!(await leakDump(s)).includes(SENTINEL));
     assert.ok(!(await s.page.evaluate(() => [...document.querySelectorAll("input")].map((i) => i.value).join("|"))).includes(SENTINEL));
   } finally {
@@ -840,10 +849,26 @@ test("P8 375px: the dialog, the reset card and the recovery screen (form and cod
   try {
     await x.page.getByText(COPY.expired).waitFor();
     reports.push(await phoneCheck(x.page, ".sign-in-card", "sign-in / expired line + forgot link"));
-    await x.page.getByRole("button", { name: "Email + password" }).click();
-    reports.push(await phoneCheck(x.page, ".sign-in-card", "sign-in / password mode with the forgot link"));
+    await x.page.getByRole("button", { name: "New here? Create an account" }).click();
+    reports.push(await phoneCheck(x.page, ".sign-in-card", "create an account"));
   } finally {
     await x.close();
+  }
+  // § 1.4 proof 11: the Sign in view, the Create an account view and the confirmation line
+  // (a long address must not scroll the page), each field, button and link at least 44px
+  const v = await open({ events: [{ event: "INITIAL_SESSION" }] }, { viewport: PHONE });
+  try {
+    await signInShowing(v.page).waitFor();
+    reports.push(await phoneCheck(v.page, ".sign-in-card", "sign-in view"));
+    await v.page.getByRole("button", { name: "New here? Create an account" }).click();
+    reports.push(await phoneCheck(v.page, ".sign-in-card", "create an account view"));
+    await v.page.getByLabel("Email").fill("someone-with-a-very-long-address-indeed@a-long-domain-name.example.com");
+    await v.page.getByLabel("Password").fill("Correct-Horse-9");
+    await v.page.getByRole("button", { name: "Create account", exact: true }).click();
+    await v.page.getByRole("button", { name: "Back to sign in" }).waitFor();
+    reports.push(await phoneCheck(v.page, ".sign-in-card", "confirmation line"));
+  } finally {
+    await v.close();
   }
   const r = await openRecovery({ updateUser: "reauth" }, PHONE);
   try {
@@ -920,9 +945,178 @@ test("P9b a signed-in non-member (and a signed-out visitor) never sees 'Set a ne
   }
   const s = await open({ events: [{ event: "INITIAL_SESSION" }] });
   try {
-    await s.page.getByRole("button", { name: "Email link" }).waitFor();
+    await signInShowing(s.page).waitFor();
     assert.ok(!(await bodyText(s.page)).includes("Set a new password"));
   } finally {
     await s.close();
+  }
+});
+
+// ================================================================ 10. one way to sign in (ui § 1.4, 2026-10-07, C29)
+//
+// Proved-by items 1-4, 6, 9 and 10 against the fake, from the § 5.3.1 rows themselves.
+// (Items 5 and 7's source search are tests/web/one-way-sign-in.test.ts; item 3's stand-in half and the
+// zero-`POST /otp` count are tests/e2e-real/e2e.ts.)
+
+/** The `String` cell of a § 5.3.1 row, without its backticks. */
+function uiRow(id: string): string {
+  const line = UI.split("\n").find((l) => l.startsWith(`| ${id} |`));
+  if (!line) throw new Error(`row ${id} not found in § 5.3.1`);
+  const cell = line.replace(/^\| /, "").replace(/ \|$/, "").split(" | ")[3];
+  return cell.slice(1, -1);
+}
+const Y = Object.fromEntries(["Y4", "Y5", "Y6", "Y7", "Y8", "Y9", "Y11", "Y12", "Y13", "Y20", "Y24", "Y27", "S9", "O5", "O7"].map((id) => [id, uiRow(id)]));
+const norm = (x: string) => x.replace(/\s+/g, " ").trim();
+// every string that must not show on any sign-in state (proof 6); the check ignores case
+const NOT_ON_SCREEN = [
+  "Email link", "Email + password", "Send me a link", "Email me a sign-in link", "Use a password instead",
+  "Use an email link instead", "for a link to sign in", "Couldn't send the link", "or use an email link instead",
+  "Ask for a new one below",
+];
+/** the text a person could read or hear: visible text plus accessible-name attributes */
+const everythingShown = (page: Page) =>
+  page.evaluate(() => {
+    const attrs = [...document.querySelectorAll("[aria-label],[title],[placeholder],[alt]")].map((e) => ["aria-label", "title", "placeholder", "alt"].map((a) => e.getAttribute(a) ?? "").join(" "));
+    return (document.body.innerText + " " + attrs.join(" ")).replace(/\s+/g, " ");
+  });
+async function noRetiredStrings(page: Page, where: string) {
+  const t = (await everythingShown(page)).toLowerCase();
+  for (const bad of NOT_ON_SCREEN) assert.ok(!t.includes(bad.toLowerCase()), `${where}: shows "${bad}"`);
+}
+
+test("Y-1 Sign in view on load: Email, Password, Y20, `Sign in`, Y8, O5, O7 with its two links, S9; one submit; no toggle, no aria-pressed", async () => {
+  const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
+  try {
+    await signInShowing(o.page).waitFor();
+    const shape = await o.page.evaluate(() => ({
+      labels: [...document.querySelectorAll(".sign-in-form label")].map((l) => (l.firstChild?.textContent ?? "").trim()),
+      types: [...document.querySelectorAll(".sign-in-form input")].map((i) => i.getAttribute("type")),
+      submits: [...document.querySelectorAll("button[type=submit]")].map((b) => (b.textContent ?? "").trim()),
+      linkButtons: [...document.querySelectorAll(".sign-in-form .sign-in-link-button")].map((b) => (b.textContent ?? "").trim()),
+      toggles: document.querySelectorAll(".sign-in-mode-toggle").length,
+      pressed: document.querySelectorAll("[aria-pressed]").length,
+      o5: document.querySelector(".sign-in-invite")?.textContent ?? "",
+      o7: document.querySelector(".sign-in-terms")?.textContent ?? "",
+      links: [...document.querySelectorAll(".sign-in-terms a")].map((a) => [a.textContent, a.getAttribute("href")]),
+      s9: document.querySelector(".sign-in-local")?.textContent ?? "",
+      order: [...document.querySelectorAll(".sign-in-form input, .sign-in-form button")].map((e) => (e.textContent || e.getAttribute("type") || "").trim()),
+    }));
+    assert.deepEqual(shape.labels, [Y.Y4, Y.Y5]);
+    assert.deepEqual(shape.types, ["email", "password"]);
+    assert.deepEqual(shape.submits, [Y.Y6]);
+    assert.deepEqual(shape.linkButtons, [Y.Y20, Y.Y8]);
+    assert.deepEqual(shape.order, ["email", "password", Y.Y20, Y.Y6, Y.Y8], "Email, Password, Y20, Sign in, Y8");
+    assert.equal(shape.toggles, 0);
+    assert.equal(shape.pressed, 0);
+    assert.equal(norm(shape.o5), Y.O5);
+    assert.equal(norm(shape.o7), Y.O7);
+    assert.deepEqual(shape.links, [["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]);
+    assert.equal(norm(shape.s9), Y.S9);
+    await noRetiredStrings(o.page, "Sign in view");
+  } finally {
+    await o.close();
+  }
+});
+
+test("Y-2 Create an account view (after Y8): `Create account`, Y9, O5, O7; no Y20; the typed email is kept; Y9 returns", async () => {
+  const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
+  try {
+    await o.page.getByLabel("Email").fill("kept@example.com");
+    await o.page.getByLabel("Password").fill("typed-on-sign-in");
+    await o.page.getByRole("button", { name: Y.Y8 }).click();
+    await o.page.getByRole("button", { name: Y.Y7, exact: true }).waitFor();
+    assert.deepEqual(await o.page.evaluate(() => [...document.querySelectorAll("button[type=submit]")].map((b) => b.textContent)), [Y.Y7]);
+    assert.equal(await o.page.getByRole("button", { name: Y.Y9 }).count(), 1);
+    assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 0, "Y20 absent");
+    assert.equal(await o.page.getByRole("button", { name: Y.Y8 }).count(), 0);
+    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com");
+    const t = norm(await o.page.evaluate(() => document.body.innerText));
+    assert.ok(t.includes(Y.O5) && t.includes(Y.O7) && t.includes(Y.S9), t.slice(0, 400));
+    assert.equal(await o.page.locator(".sign-in-mode-toggle, [aria-pressed]").count(), 0);
+    await noRetiredStrings(o.page, "Create an account view");
+    await o.page.getByRole("button", { name: Y.Y9 }).click();
+    await signInShowing(o.page).waitFor();
+    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com", "email kept going back");
+    assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 1, "Y20 back on Sign in");
+  } finally {
+    await o.close();
+  }
+});
+
+test("Y-3 `Create account`: Y11 with the address filled in, Y24 under it, O5 and O7 below; one signUp carrying the site address; Y24 returns with the email kept", async () => {
+  const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
+  try {
+    await o.page.getByRole("button", { name: Y.Y8 }).click();
+    await o.page.getByLabel("Email").fill("new@example.com");
+    await o.page.getByLabel("Password").fill("Correct-Horse-9");
+    await o.page.getByRole("button", { name: Y.Y7, exact: true }).click();
+    await o.page.getByRole("button", { name: Y.Y24 }).waitFor();
+    const signUps = await callsOf(o.page, "signUp");
+    assert.deepEqual(signUps.map((c) => c.args), [[{ email: "new@example.com", password: "Correct-Horse-9", options: { emailRedirectTo: SITE_URL } }]]);
+    assert.equal((await calls(o.page)).filter((c) => /^signIn/.test(c.fn)).length, 0, "no sign-in call of any kind");
+    const sent = norm((await o.page.locator(".sign-in-sent").textContent()) ?? "");
+    assert.equal(sent, Y.Y11.replace("<email>", "new@example.com"));
+    const order = await o.page.evaluate(() => ["sign-in-sent", "sign-in-link-button", "sign-in-invite", "sign-in-terms"].map((c) => document.querySelector(`.${c}`)?.getBoundingClientRect().top ?? -1));
+    assert.ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), `Y11, then Y24, then O5, then O7: ${JSON.stringify(order)}`);
+    assert.equal(await o.page.locator("form").count(), 0, "in place of the form");
+    const t = norm(await o.page.evaluate(() => document.body.innerText));
+    assert.ok(t.includes(Y.O5) && t.includes(Y.O7), "O5 and O7 below");
+    await noRetiredStrings(o.page, "confirmation state");
+    await o.page.getByRole("button", { name: Y.Y24 }).click();
+    await signInShowing(o.page).waitFor();
+    assert.equal(await o.page.getByLabel("Email").inputValue(), "new@example.com", "email kept");
+  } finally {
+    await o.close();
+  }
+});
+
+test("Y-4 errors: invalid_credentials is Y12 and email_not_confirmed is Y13; the shown text never contains the fake's error.message", async () => {
+  for (const [code, line] of [["invalid_credentials", Y.Y12], ["email_not_confirmed", Y.Y13]] as const) {
+    const o = await open({ events: [{ event: "INITIAL_SESSION" }], signIn: { error: { code, status: 400, message: `RAW-SUPABASE-TEXT for ${code}: do not show me` } } });
+    try {
+      await o.page.getByLabel("Email").fill(EMAIL);
+      await o.page.getByLabel("Password").fill("wrong-password");
+      await signInShowing(o.page).click();
+      await o.page.locator(".sign-in-error").waitFor();
+      assert.equal(norm((await o.page.locator(".sign-in-error").textContent()) ?? ""), line, code);
+      const t = await everythingShown(o.page);
+      assert.ok(!t.includes("RAW-SUPABASE"), `${code}: Supabase's own text shown`);
+      await noRetiredStrings(o.page, `error ${code}`);
+    } finally {
+      await o.close();
+    }
+  }
+});
+
+test("Y-5 the reset card shows no Y27, no O5, O7 or S9, and none of the retired strings; nor does the expired-link state", async () => {
+  const o = await openForgot({}, undefined, "#error=access_denied&error_code=otp_expired&error_description=x");
+  try {
+    const t = norm(await o.page.evaluate(() => document.body.innerText));
+    assert.ok(!t.includes(Y.Y27) && !t.includes(Y.O5) && !t.includes(Y.S9), t.slice(0, 300));
+    await noRetiredStrings(o.page, "reset card");
+    await sendReset(o.page, EMAIL);
+    await noRetiredStrings(o.page, "reset card, sent");
+  } finally {
+    await o.close();
+  }
+  // the expired-link state (Sign in view)
+  const x = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: "#error=access_denied&error_code=otp_expired&error_description=x" });
+  try {
+    await x.page.getByText(Y.Y27).waitFor();
+    await noRetiredStrings(x.page, "expired-link state");
+  } finally {
+    await x.close();
+  }
+});
+
+test("Y-6 an old sign-in link still signs in: a valid #access_token=...&type=magiclink goes on to the membership check, no recovery screen, authRedirectFromUrl answers none", async () => {
+  assert.equal(authRedirectFromUrl("https://ten.example.app/#access_token=a&refresh_token=b&expires_in=3600&token_type=bearer&type=magiclink"), "none");
+  const o = await open({ signedIn: true, member: false, events: [{ event: "INITIAL_SESSION" }] }, { path: "#access_token=fake-access-token&expires_in=3600&refresh_token=fake-refresh&token_type=bearer&type=magiclink" });
+  try {
+    await o.page.getByText(O2_PAUSED).waitFor();
+    assert.equal(await memberChecks(o.page), 1, "the membership check ran");
+    assert.equal(await o.page.getByRole("heading", { name: COPY.recoveryTitle }).count(), 0, "no recovery screen");
+  } finally {
+    await o.close();
   }
 });

@@ -212,7 +212,6 @@ async function newPage() {
   return { ctx, page, tenPaypal };
 }
 async function signIn(page: any, email: string) {
-  await page.locator(".sign-in-mode-toggle button", { hasText: "Email + password" }).click();
   await page.locator(".sign-in-form input[type=email]").fill(email);
   await page.locator(".sign-in-form input[type=password]").fill(PASSWORD);
   await page.locator(".sign-in-form button[type=submit]").click();

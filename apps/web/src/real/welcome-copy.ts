@@ -24,5 +24,6 @@ export const NOT_A_MEMBER_LINES: Record<NotAMemberReason, string> = {
     "Ten gives free credit once per email inbox, and this inbox has already had it. To ask to join, email support@10xjobs.co.",
 };
 
-/** O5: on the sign-in page, under the form, in both modes. */
+/** O5: on the sign-in page, under the form, on both views (Sign in and Create
+ *  an account) and under the confirmation line (§ 1.4, 2026-10-07). */
 export const SIGN_IN_INVITATION = "New accounts get free credit to try Ten, while places last.";

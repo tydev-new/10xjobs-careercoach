@@ -32,7 +32,6 @@ const NEVER_CALLED = "dev-preview: unreachable without a real session";
 
 const stubClient: AuthClientLike = {
   auth: {
-    signInWithOtp: () => Promise.reject(new Error(NEVER_CALLED)),
     signInWithPassword: () => Promise.reject(new Error(NEVER_CALLED)),
     signUp: () => Promise.reject(new Error(NEVER_CALLED)),
     signOut: () => Promise.reject(new Error(NEVER_CALLED)),

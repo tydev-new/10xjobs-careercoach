@@ -35,6 +35,10 @@ export interface FakeCfg {
   code?: string;
   /** reauthenticate()'s answers, in order (last one repeats); default ok */
   reauthenticate?: ({ error: FakeError } | "ok")[];
+  /** signInWithPassword's answer; default ok (a session, then SIGNED_IN) */
+  signIn?: "ok" | { error: FakeError };
+  /** signUp's answer; default ok */
+  signUp?: "ok" | { error: FakeError };
   /** resetPasswordForEmail's answer; default ok */
   reset?: "ok" | { error: FakeError };
 }
@@ -85,19 +89,18 @@ export function createClient(_url: string, _key: string, _opts?: unknown): any {
         rec("getSession");
         return { data: { session }, error: null };
       },
-      async signInWithOtp(a: unknown) {
-        rec("signInWithOtp", a);
-        return { data: {}, error: null };
-      },
       async signInWithPassword(a: unknown) {
         rec("signInWithPassword", a);
+        const r = cfg().signIn ?? "ok";
+        if (r !== "ok") return { data: { session: null }, error: err(r.error) };
         session = makeSession();
         setTimeout(() => emit("SIGNED_IN"), 0);
         return { data: { session }, error: null };
       },
       async signUp(a: unknown) {
         rec("signUp", a);
-        return { data: {}, error: null };
+        const r = cfg().signUp ?? "ok";
+        return r === "ok" ? { data: {}, error: null } : { data: {}, error: err(r.error) };
       },
       async signOut() {
         rec("signOut");

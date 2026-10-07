@@ -271,9 +271,11 @@ calls and the Supabase settings: C § 16.5. This wins over C14's pick and
   link under the password field" would be untrue.
 - **Errors on this card come from § 5.3.1, never Supabase's own text**
   (§ 1.10's rule; C14). Y12 and Y13 are how a locked-out person finds
-  the way in, so this build brings the card's whole error map forward
-  from Stage 4: Y12–Y16, with Y44–Y46 on sign-up and Y48 for a rate
-  limit.
+  the way in, so this build maps those two (`invalid_credentials` to
+  Y12, `email_not_confirmed` to Y13). The rest of the card's error map
+  (Y14–Y16, Y44–Y46 on sign-up, Y48 for a rate limit) stays with the
+  Stage 4 build, and until then those errors show as they do today
+  (lead, 2026-10-07: smallest build that keeps nobody locked out).
 - **Retired:** Y1, Y2, Y3, Y10 and Y17, the toggle, and the old words of
   Y12 and Y27 (§ 5.3.1, "Removed from the screen").
 - *Prevents:* a sign-in page that offers a way in the owner removed; a
@@ -295,9 +297,9 @@ calls and the Supabase settings: C § 16.5. This wins over C14's pick and
      address as the place to return to. Y24 returns to the Sign in view
      with the email kept.
   4. **Errors.** A fake answering each code gives its row: Y12
-     (`invalid_credentials`), Y13 (`email_not_confirmed`), Y14, Y15, Y16,
-     Y44–Y46 on sign-up, Y48. The shown text never contains the fake's
-     `error.message`.
+     (`invalid_credentials`) and Y13 (`email_not_confirmed`). For those
+     two the shown text never contains the fake's `error.message`. Y14,
+     Y15, Y16, Y44–Y46 on sign-up and Y48 are proved with Stage 4.
   5. **In the bundle,** each as one whole literal: Y12, Y13, Y27, Y20,
      Y8, Y9 and O5. Y11 has a placeholder, so it is checked as rendered
      text (item 3).
@@ -2348,8 +2350,8 @@ Home's empty button); `SidePanel.tsx` (F44); `Header.tsx` and
 `RealChatShell.tsx` (I1–I15, K10; `tests/e2e-real/e2e.ts:545`);
 `upload-errors.ts` (U6); `main.tsx` (Q6); `DeleteBetaDataConfirm.tsx`
 (X3, X8, X9; `tests/e2e-real/e2e.ts:957`, `:1006`); `SignIn.tsx` and
-`auth.ts` (S1, S9, S12–S13, Y4–Y16; the card's form and its error map
-are built with § 1.4's 2026-10-07 amendment); `SidePanel.tsx`, `ChatShell.tsx`
+`auth.ts` (S1, S9, S12–S13, Y4–Y16; the card's form and Y12–Y13 are
+built with § 1.4's 2026-10-07 amendment, Y14–Y16 are not); `SidePanel.tsx`, `ChatShell.tsx`
 and `RealChatShell.tsx` (J13 in the viewer, § 5.2 rule 6;
 `tests/web/stage3a-review.test.ts:804`, and § 4's fixture exception in
 `tests/web/fixtures-cards.test.ts:42-47`).

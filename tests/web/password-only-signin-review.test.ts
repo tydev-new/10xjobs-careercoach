@@ -539,6 +539,25 @@ test("R12 proof 12 (voice): scan_voice.py --reply over Y11, Y12, Y13 and Y27, as
   }
 });
 
+// C § 16.2 names the 8-character floor for SIGN-UP's field ("`SignIn.tsx`'s sign-up `minLength={8}`"). On
+// the Sign in view an existing password is whatever the account already has (the sign-in is shared with the
+// older app, C § 8). With the email link gone, a member whose password is shorter than 8 has only Y20 left.
+test("R13 the Sign in view sends an existing 7-character password to the server (the 8-character floor is sign-up's)", { todo: "OBSERVED (tester, 2026-10-07; the same on origin/main): the Sign in view's password field carries minLength=8, so the browser blocks the submit with its own bubble and no request is made" }, async () => {
+  const { ctx, page } = await open();
+  try {
+    const before = auth.log.length;
+    await emailBox(page).fill("older.member@example.com");
+    await passBox(page).fill("seven77");
+    await submit(page).click();
+    await page.waitForTimeout(1200);
+    const sent = auth.log.slice(before).map((l) => `${l.method} ${l.path}`);
+    const bubble = await passBox(page).evaluate((e) => (e as HTMLInputElement).validationMessage);
+    assert.deepEqual(sent, ["POST /auth/v1/token"], `no sign-in request was made; the browser said: ${JSON.stringify(bubble)}`);
+  } finally {
+    await ctx.close();
+  }
+});
+
 test("R7b proof 7 (requests), last: over this whole file's run the auth server got no request for a sign-in link; the paths used are the card's three calls and nothing else; no request left 127.0.0.1", () => {
   const paths = [...new Set(auth.log.map((l) => `${l.method} ${l.path}`))].sort();
   console.log(`  [R7b] ${auth.log.length} auth requests: ${paths.join(", ")}`);

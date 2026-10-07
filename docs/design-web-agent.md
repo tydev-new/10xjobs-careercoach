@@ -26,6 +26,9 @@ welcome credit; draft for owner approval). The same day the owner removed
 every daily spending ceiling: the OpenRouter key is a prepaid balance with
 no daily limit (§ 20.6). § 20 wins over § 8's who-is-in text, its $5/day
 ceiling and its non-member line, and over § 17.5's old $5/day.
+Again 2026-10-07: § 16.5 (one way to sign in, email and password; owner
+ruling; the reworded lines in `design-web-ui.md` § 1.4 are a draft for
+owner approval).
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc
@@ -2196,6 +2199,76 @@ A fake `AuthClientLike` for units. For e2e, the GoTrue stand-in in
    horizontal scroll, tap targets of at least 44px, `data-theme="light"`,
    and new CSS uses only `styles.css` custom properties.
 
+### 16.5 One way to sign in (amendment, 2026-10-07; owner ruling)
+
+The owner, in their own words: "on the sign in page, remove the email link
+option, just email and password". The screen, the copy and the test list:
+`design-web-ui.md` § 1.4 (its last amendment). This section holds the
+calls and the settings.
+
+**Prevents:** a removed button whose call stays in the code; a builder
+deleting an emailed link the product still needs; someone turning email
+links off in Supabase and breaking reset and sign-up with them; a member
+with no password locked out.
+
+- **The sign-in card makes three calls and no others:**
+  `signInWithPassword`, `signUp` (with `emailRedirectTo`, as today) and
+  `resetPasswordForEmail` (§ 16.1). It never calls `signInWithOtp`.
+  `signInWithMagicLink` is deleted from `auth.ts` with its tests, and
+  `signInWithOtp` leaves `AuthClientLike` and every fake that implements
+  it, so a later change can't call it by accident.
+- **Nothing else in § 16.1–§ 16.2 changes.** `authRedirectFromUrl` keeps
+  its three answers. A sign-in link that is still valid lands as
+  `#access_token=…&type=magiclink`, answers `none`, and the client saves
+  the session as it does for any link: the person is signed in and the
+  membership check runs. No code blocks an old link, and none is added.
+  An expired one comes back with `error_code` and shows the expired line.
+- **What Supabase does that the copy relies on.** Read on 2026-10-07 in
+  the Auth server's source (`supabase/auth`, `master`:
+  `internal/api/signup.go`, `recover.go`, `verify.go`). UNVERIFIED: that
+  the hosted project runs the same code. The owner's live run is the
+  proof (`design-web-ui.md` § 1.4, item 13).
+  - *Sign-up on an address that already has a confirmed account,* with
+    Confirm email on: the answer looks like a success, and no email is
+    sent. So the confirmation line (Y11) tells everyone what to do if
+    nothing comes.
+  - *Sign-up on an address whose account is not yet confirmed:* the
+    confirmation email is sent again.
+  - *A reset link* is sent to any address that has an account, with or
+    without a password, confirmed or not. Opening it confirms an
+    unconfirmed account. So the reset link is the way in for a member who
+    never set a password, and for someone who lost the confirmation email
+    (Y13). A confirmed address is what the welcome claim checks (§ 20.1).
+- **Supabase settings: nothing changes.** The owner has nothing to do in
+  the dashboard for this change.
+  - Confirm email stays **on** (§ 20.1).
+  - The Email provider stays on, and email links and codes are **not**
+    turned off on the server: the reset link, the confirmation link and
+    the reauthentication code (§ 16.1) are all emails from that provider,
+    and the older app shares it (§ 8). UNVERIFIED: whether the dashboard
+    has a switch for sign-in links alone, and whether the older app's own
+    sign-in page offers one. Neither is needed here.
+  - So the server still answers a request for a sign-in link from anyone
+    who calls it directly with the site's public key. That gives nothing
+    sign-up doesn't already give: an account whose inbox was proven by a
+    click. The welcome claim's rules are the same for it (§ 20.1).
+  - A sign-in link lasts as long as the project's email link lifetime
+    (Supabase's passwordless guide, read 2026-10-07: one hour by default,
+    and "the Email OTP Expiration setting also governs the validity of
+    Magic Links and other email links"). § 16.3 item 5 already has the
+    owner note the project's value.
+- **How many members have no password** is the owner's to look up, if
+  they want to tell those members directly. A read-only query for the
+  SQL editor: `select count(*) from auth.users where
+  coalesce(encrypted_password, '') = '';` UNVERIFIED: that an account
+  made from an email link has an empty `encrypted_password`. The count
+  covers the older app's accounts too (§ 8).
+- **Tests:** `design-web-ui.md` § 1.4's list. Items 7 and 10 are this
+  section's: no `signInWithOtp` in `apps/web/src`, zero requests to the
+  stand-in's `POST /otp` over the e2e run, and a valid old sign-in link
+  still signs in. § 16.4's items stand, with the forgot link reached
+  without a mode click.
+
 ---
 
 ## 17. Buying credit with PayPal (amendment, 2026-09-25)
@@ -3243,7 +3316,8 @@ person with many inboxes. The owner's steps when it's needed: create a
 Turnstile widget for the Ten domain in Cloudflare; put its secret key in
 Supabase (Auth → Bot and Abuse Protection → Enable CAPTCHA protection →
 Turnstile); give its site key to the build as a new `VITE_` setting. Ten's
-sign-in, sign-up, email-link and reset calls then pass `captchaToken`.
+sign-in, sign-up and reset calls then pass `captchaToken` (the email-link
+call is gone, § 16.5).
 **The catch:** if the setting covers the whole project, the older app's
 forms must send a token too, or its sign-ins fail (Supabase's page
 doesn't say: UNVERIFIED). When to do it: the grants-per-day query shows a
@@ -3289,7 +3363,8 @@ burst the owner doesn't recognise, or the cap fills faster than expected.
    `NotAMember` takes a reason; O1 in the notice place; `NON_MEMBER_MESSAGE`
    removed and `upload-errors.ts` moved to O6.
 4. **Copy:** O1–O8, E16 and B7 word for word; O5 and O7 on the
-   sign-in page in both modes; the `⋯` menu's Terms link (O8).
+   sign-in page in both modes (since 2026-10-07, on both views: § 16.5);
+   the `⋯` menu's Terms link (O8).
 5. **Proxy (amended 2026-10-02, § 20.6):** `BETA_CEILING_USD`, the daily
    check and its message go, with nothing in their place; the proxy asks
    for no day's spend (`betaSpendToday` stays in `_shared/supabase.ts`,
@@ -3576,3 +3651,11 @@ spike replaced (owner, 2026-09-23).
   owner tops up; auto top-up or a first cap sized to one top-up is the
   owner's choice (§ 20.8). DeepSeek for everyone,
   the measurement waived (§ 13.6, amended 2026-10-02).
+- One way to sign in (§ 16.5; owner, 2026-10-07: "on the sign in page,
+  remove the email link option, just email and password"): the card has
+  a Sign in view and a Create an account view and never asks for a
+  sign-in link. Reset, sign-up confirmation and the expired-link line
+  keep their emails; an old sign-in link still works until it expires;
+  no Supabase setting changes. A member with no password uses the reset
+  link. The reworded lines (Y11, Y12, Y13, Y27) are a draft for owner
+  approval.

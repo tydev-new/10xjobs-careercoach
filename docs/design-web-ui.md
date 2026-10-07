@@ -111,7 +111,8 @@ gate's `label` (C § 3 — the model's own ≤6-word tag).
 
 ### 1.4 Sign-in
 
-Minimal: email/password or magic link, one line under the logo from
+Minimal: email and password (one way to sign in since 2026-10-07, the
+last amendment in this section), one line under the logo from
 `PRINCIPLES.md` rule 1 ("Help you get a job offer you actually want."),
 and a line "Prefer local? Run it from your terminal." (rule 9 —
 local-first stays a supported exit). Sign-in is **shared with the
@@ -126,7 +127,8 @@ before this check; forgot password and the expired-link line are
 § 1.10 too.
 
 **Amended 2026-10-02 (C § 20; draft for owner approval).** Sign-up is now
-an invitation: under the form, in both modes, O5 says new accounts get
+an invitation: under the form, on both views (Sign in and Create an
+account; amended 2026-10-07, below), O5 says new accounts get
 free credit while places last, and O7 points to the terms and the privacy
 notice (§ 5.3.1). After sign-in the membership check runs as above; a
 non-member then claims the welcome credit once (C § 20.4). A grant goes
@@ -202,6 +204,140 @@ sign-in and the membership check stay as written above.
   view rendered on `signin-preview.json`'s props, and those props equal
   Home's readers run over its files; a bundle test finds the three proof
   points and the lead paragraph word for word (stage 4).
+
+**Amended 2026-10-07 (owner ruling): one way to sign in.** The owner, in
+their own words: "on the sign in page, remove the email link option, just
+email and password". The ruling is the owner's. The reworded lines below
+(Y11, Y12, Y13, Y27) are the architect's and wait for the owner's yes. The
+calls and the Supabase settings: C § 16.5. This wins over C14's pick and
+§ 5.6's two sign-in-link bullets, both changed in the same commit (C29).
+
+- **The card has two views, and no toggle.**
+  - *Sign in*, the view the page opens on: Email (Y4), Password (Y5), the
+    link "Forgot or never set a password?" (Y20) under the password field,
+    the button `Sign in` (Y6), then the link "New here? Create an account"
+    (Y8).
+  - *Create an account:* Email, Password, the button `Create account`
+    (Y7), then the link "Already have an account? Sign in" (Y9). Y20 does
+    not show here.
+  - Switching views keeps what was typed in Email. O5, O7 and the local
+    line (S9) stay under the form on both views, and under the
+    confirmation line (Y11). The reset card (§ 1.10) shows none of the
+    three, as today.
+- **Everyone lands on Sign in, a first-time visitor too.** Why: the page
+  can't tell a new visitor from a returning one, and a wrong guess costs a
+  returning member more. Creating an account on an address that already
+  has one sends no email (C § 16.5), while a new visitor on Sign in has
+  Y8 on the card and O5 under it.
+- **What still uses an emailed link, and stays.** The builder removes
+  none of these:
+  1. *The sign-up confirmation.* After `Create account` the card shows
+     Y11 in place of the form, with the link `Back to sign in` (Y24)
+     under it. Y24 is new in this place: today that state has no way back
+     except a reload.
+  2. *Password reset* (§ 1.10), unchanged. It is also how a member whose
+     account was made from an email link gets a password.
+  3. *The expired-link line* (Y27), for any link that comes back with an
+     error: a reset link, a confirmation link, or an old sign-in link.
+  4. *An old sign-in link still in someone's inbox* signs them in if it
+     is still valid. Nothing is built to block it and nothing is built
+     for it: the app already treats it as an ordinary sign-in
+     (C § 16.5). These links stop working on their own when the project's
+     link lifetime runs out (Supabase's default is one hour).
+- **Members who never set a password are not stranded.** Their path is
+  the Y20 link on the Sign in view: reset email, then "Choose a new
+  password" (§ 1.10), then they are in. Y20's label stays as it is, and
+  no hint line is added. Why: the label already says "or never set", it
+  sits directly under the password field, and the two lines such a member
+  can meet first, Y12 after a guessed password and Y27 after an old link,
+  both point to it. A hint would be one more line for a group that can
+  only shrink, since no new account is made from an email link. The reset
+  card's one result line (Y25) stays the same whether or not the account
+  exists.
+- **Four lines are reworded**, each because its old words named a way in
+  that is gone, or left someone with no next step. Word for word in
+  § 5.3.1:
+
+  | Row | When | Why it changed |
+  |---|---|---|
+  | Y12 | the email and password don't match | it said "or use an email link instead" |
+  | Y27 | a link came back with an error | it said "Ask for a new one below", and the Sign in view sends no link |
+  | Y11 | after `Create account` | an address that already has an account gets no email, and the old line left that person waiting; the new line says the same thing to everyone, so it tells a stranger nothing about any address |
+  | Y13 | the email isn't confirmed yet | someone who lost the confirmation email could ask for a sign-in link before; now the reset link is their way, and it confirms the address too (C § 16.5) |
+
+- **Y27 shows on the Sign in view only,** above the form, whenever the
+  page was opened by a link that came back with an error. It does not
+  show on Create an account or on the reset card, where "below" and "the
+  link under the password field" would be untrue.
+- **Errors on this card come from § 5.3.1, never Supabase's own text**
+  (§ 1.10's rule; C14). Y12 and Y13 are how a locked-out person finds
+  the way in, so this build brings the card's whole error map forward
+  from Stage 4: Y12–Y16, with Y44–Y46 on sign-up and Y48 for a rate
+  limit.
+- **Retired:** Y1, Y2, Y3, Y10 and Y17, the toggle, and the old words of
+  Y12 and Y27 (§ 5.3.1, "Removed from the screen").
+- *Prevents:* a sign-in page that offers a way in the owner removed; a
+  line that points to a button that is gone; a member with no password
+  locked out; a person waiting for an email that will never come; a
+  builder deleting an emailed link the product still needs.
+- *Proved by* (an independent tester, from this list):
+  1. **Sign in view, on page load, signed out:** the fields Email and
+     Password, Y20, the button `Sign in`, Y8, O5, O7 with its two links,
+     and S9, each rendered word for word. One submit button. No element
+     with the class `sign-in-mode-toggle`, and no `aria-pressed` on the
+     card.
+  2. **Create an account view,** after Y8: the button `Create account`,
+     Y9, O5 and O7; Y20 is absent; the typed email is still in the field.
+     Y9 returns to the Sign in view.
+  3. **Sign-up shows the confirmation line.** `Create account` against
+     the stand-in: Y11 with the typed address filled in, Y24 under it, O5
+     and O7 below. The stand-in saw one sign-up request carrying the site
+     address as the place to return to. Y24 returns to the Sign in view
+     with the email kept.
+  4. **Errors.** A fake answering each code gives its row: Y12
+     (`invalid_credentials`), Y13 (`email_not_confirmed`), Y14, Y15, Y16,
+     Y44–Y46 on sign-up, Y48. The shown text never contains the fake's
+     `error.message`.
+  5. **In the bundle,** each as one whole literal: Y12, Y13, Y27, Y20,
+     Y8, Y9 and O5. Y11 has a placeholder, so it is checked as rendered
+     text (item 3).
+  6. **Not in the bundle, and not on any rendered sign-in state** (both
+     views, the confirmation line, the reset card, the expired-link
+     state): "Email link", "Email + password", "Send me a link", "Email
+     me a sign-in link", "Use a password instead", "Use an email link
+     instead", "for a link to sign in", "Couldn't send the link", "or use
+     an email link instead", "Ask for a new one below". The check ignores
+     case.
+  7. **No sign-in link is ever asked for.** The text `signInWithOtp` and
+     `signInWithMagicLink` appear nowhere under `apps/web/src` (a search
+     of the source; the bundle isn't searched for these, because the
+     Supabase library carries its own copy). Over the whole e2e run the
+     stand-in's one-time-link address (`POST /otp`) gets zero requests.
+  8. **Forgot flow intact.** C § 16.4 items 5 and 6 pass with one change:
+     Y20 is reached with no mode click. The has-account, no-account and
+     429 fakes still render Y25 byte for byte the same. `Back to sign in`
+     returns to the Sign in view.
+  9. **An expired link.** A page opened with `error_code=otp_expired`
+     shows Y27 above the Sign in view and the address loses the error
+     (C § 16.1). Y27 is absent on Create an account and on the reset
+     card.
+  10. **An old sign-in link.** A page opened with a valid
+      `#access_token=…&type=magiclink` goes on to the membership check;
+      no recovery screen shows (`authRedirectFromUrl` answers `none`, as
+      today).
+  11. **375px:** the Sign in view, the Create an account view, the
+      confirmation line and the reset card have no horizontal scroll;
+      each field, button and link is at least 44px tall to tap, Y20, Y8,
+      Y9, Y24 and O7's two links included; the light palette.
+  12. **Voice:** `tests/always-on/scan_voice.py --reply` over the four
+      reworded rows finds no HARD hit.
+  13. **The owner's live run** (PROCESS step 6), after the deploy, on
+      test accounts: (a) create an account, open the confirmation email,
+      land signed in with the welcome credit; (b) an account that has no
+      password: Y20, the reset email, "Choose a new password", sign out,
+      sign in with it; (c) an account whose confirmation link was never
+      opened: Y20, the reset email, and the account is then confirmed.
+      Item (c) is what proves C § 16.5's UNVERIFIED line.
 
 ### 1.5 Empty / first-run state
 
@@ -381,7 +517,8 @@ passwords don't match."
 | HTTP 429 | "Too many tries. Wait a minute, then try again." |
 | anything else | "Couldn't save your password. Try again in a moment." |
 
-**Sign-in screen additions** (§ 1.4). In "Email + password" mode, under
+**Sign-in screen additions** (§ 1.4). On the Sign in view (the one way to
+sign in since 2026-10-07, § 1.4), under
 the password field, a link button: "Forgot or never set a password?" It
 opens, on the same card:
 
@@ -394,8 +531,11 @@ opens, on the same card:
   can be sent each hour, so if nothing comes, try again later." No other
   line may depend on whether the account exists.
 - Any other failure: "Couldn't send the request. Try again in a moment."
-- A link that came back with an error (C § 16.1), above the form: "That
-  email link has expired or was already used. Ask for a new one below."
+- A link that came back with an error (C § 16.1) shows one line on the
+  Sign in view only, never on this reset card (amended 2026-10-07,
+  § 1.4), above the form: "That link has expired or was already used. Sign
+  in below, or choose a new password with the link under the password
+  field."
 
 **"Choose a new password"** — the first screen after a recovery link,
 before the membership check and before the chat (C § 16.1). Line:
@@ -1866,31 +2006,26 @@ commit. The coder copies each string word for word.
 | S11 | Sign-in | the preview's visible caption | `Sample data` | § 1.4 :185 | Given |
 | S12 | Sign-in | trust line, first item (after the `lock` icon) | `Your files stay yours` | this table; lead ruling 2 | NEW |
 | S13 | Sign-in | trust line, second item (after a dot) | `Export anytime` | this table; lead ruling 2; "Delete anytime" dropped | NEW |
-| Y1 | Sign-in | email-link mode: the submit button | `Email me a sign-in link` | § 5.6 Sign-in :3054; C14; the code says `Send me a link` | Given |
-| Y2 | Sign-in | email-link mode: switches to password mode | `Use a password instead` | § 5.6 Sign-in :3055; C14; replaces the `Email link` / `Email + password` toggle | Given |
-| Y3 | Sign-in | password mode: switches back | `Use an email link instead` | this table; C14 | NEW |
 | Y4 | Sign-in; Reset your password | field label | `Email` | this table | Kept |
-| Y5 | Sign-in | field label, password mode | `Password` | this table | Kept |
-| Y6 | Sign-in | password mode: the submit button | `Sign in` | this table | Kept |
-| Y7 | Sign-in | password mode, new account: the submit button | `Create account` | this table | Kept |
-| Y8 | Sign-in | password mode: switch to a new account | `New here? Create an account` | this table | Kept |
-| Y9 | Sign-in | new-account mode: switch back | `Already have an account? Sign in` | this table | Kept |
-| Y10 | Sign-in | after a sign-in link is sent | `Check <email> for a link to sign in.` | this table | Kept |
-| Y11 | Sign-in | after a new account is made | `Check <email> for a link to confirm your account.` | this table | Kept |
-| Y12 | Sign-in | error `invalid_credentials` | `That email and password don't match. Try again, or use an email link instead.` | this table; C14; never Supabase's own text | NEW |
-| Y13 | Sign-in | error `email_not_confirmed` | `Confirm your email first: open the link we sent, then sign in.` | this table; C14 | NEW |
+| Y5 | Sign-in | field label, both views | `Password` | this table | Kept |
+| Y6 | Sign-in | Sign in view: the submit button | `Sign in` | this table | Kept |
+| Y7 | Sign-in | Create an account view: the submit button | `Create account` | this table | Kept |
+| Y8 | Sign-in | Sign in view, under the button: switch to Create an account | `New here? Create an account` | this table | Kept |
+| Y9 | Sign-in | Create an account view, under the button: switch back | `Already have an account? Sign in` | this table | Kept |
+| Y11 | Sign-in | after `Create account`, in place of the form, with Y24 under it; the same words whether or not the address already has an account | `Check <email> for a link to confirm your account. Check spam too. If nothing comes, you may already have an account: go back to sign in, where you can also choose a new password.` | this table; C29; was `Check <email> for a link to confirm your account.` | Changed (C29) |
+| Y12 | Sign-in | error `invalid_credentials` | `That email and password don't match. Try again, or choose a new password with the link under the password field.` | this table; C29; was `… Try again, or use an email link instead.`; never Supabase's own text | Changed (C29) |
+| Y13 | Sign-in | error `email_not_confirmed` | `Confirm your email first: open the link we sent, then sign in. If you can't find it, choose a new password with the link under the password field: that confirms your email too.` | this table; C29; C § 16.5; was `Confirm your email first: open the link we sent, then sign in.` | Changed (C29) |
 | Y14 | Sign-in | error `email_address_invalid` | `That email address can't be used here. Try a different one.` | this table; C14 | NEW |
 | Y15 | Sign-in | error: signing in, anything else | `Couldn't sign you in. Try again in a moment.` | this table; C14 | NEW |
 | Y16 | Sign-in | error: making an account, anything else (never `weak_password`, which gets Y44–Y46) | `Couldn't create the account. If you already have one, sign in instead.` | this table; C14; true whether or not the account exists | NEW |
-| Y17 | Sign-in | error: sending a link, anything else | `Couldn't send the link. Try again in a moment.` | this table; C14 | NEW |
-| Y20 | Sign-in | under the password field | `Forgot or never set a password?` | § 1.10 :363 | Given |
+| Y20 | Sign-in | Sign in view only, under the password field | `Forgot or never set a password?` | § 1.10 | Given |
 | Y21 | Passwords (§ 1.10) | reset: title | `Reset your password` | § 1.10 :366 | Given |
 | Y22 | Passwords (§ 1.10) | reset: line | `Enter the email you sign in with to get a link for choosing a new password.` | § 1.10 :366 | Given |
 | Y23 | Passwords (§ 1.10) | reset: button | `Send reset link` | § 1.10 :367 | Given |
-| Y24 | Passwords (§ 1.10) | reset: link | `Back to sign in` | § 1.10 :368 | Given |
+| Y24 | Passwords (§ 1.10); Sign-in | reset: link; and under the confirmation line (Y11) | `Back to sign in` | § 1.10 :368; § 1.4 (2026-10-07) | Given |
 | Y25 | Passwords (§ 1.10) | reset: after a success or a 429 | `If an account exists for <email>, a link to choose a new password should arrive within a few minutes. Check spam too. Only a few emails can be sent each hour, so if nothing comes, try again later.` | § 1.10 :370 | Given |
 | Y26 | Passwords (§ 1.10) | reset: any other failure | `Couldn't send the request. Try again in a moment.` | § 1.10 :374 | Given |
-| Y27 | Sign-in | an email link that came back with an error | `That email link has expired or was already used. Ask for a new one below.` | § 1.10 :375 | Given |
+| Y27 | Sign-in | Sign in view only, above the form: the page was opened by a link that came back with an error | `That link has expired or was already used. Sign in below, or choose a new password with the link under the password field.` | § 1.10; C29; was `That email link has expired or was already used. Ask for a new one below.` | Changed (C29) |
 | Y28 | Passwords (§ 1.10) | dialog title (F31's words) | `Set a new password` | § 1.10 :341 | Given |
 | Y29 | Passwords (§ 1.10) | dialog line | `This password also works for the older app, which shares your sign-in.` | § 1.10 :341 | Given |
 | Y30 | Passwords (§ 1.10) | field label | `New password` | § 1.10 :336 | Given |
@@ -1920,7 +2055,7 @@ commit. The coder copies each string word for word.
 | O2 | Not a member (§ 1.6) | the claim answered `paused` | `Ten has paused free credit for new accounts, so this account can't start yet. Come back later to check again.` | C § 20.1 | NEW |
 | O3 | Not a member (§ 1.6) | the claim answered `unconfirmed` | `Ten's free credit needs a confirmed email address, and this account doesn't have one yet. If we sent you a confirmation email, open its link, then come back.` | C § 20.1 | NEW |
 | O4 | Not a member (§ 1.6) | the claim answered `already_claimed` | `Ten gives free credit once per email inbox, and this inbox has already had it. To ask to join, email support@10xjobs.co.` | C § 20.1; the contact: owner, 2026-10-02 | NEW |
-| O5 | Sign-in | under the form, in both modes | `New accounts get free credit to try Ten, while places last.` | C § 20.9 | NEW |
+| O5 | Sign-in | under the form on both views, and under the confirmation line (Y11) | `New accounts get free credit to try Ten, while places last.` | C § 20.9 | NEW |
 | O6 | Talk to Ten, under the composer (an upload); the error card (the proxy's 403) | the account has no credit row, outside the sign-in flow; replaces the old line in `upload-errors.ts`, the proxy and `ten-paypal` | `This account isn't set up to use Ten yet. Sign out, then sign in again to check.` | C § 20.4 | NEW |
 | O7 | Sign-in | under O5; "terms" links to `/terms.html`, "privacy notice" to `/privacy.html` | `Using Ten means you agree to its terms. See also the privacy notice.` | C § 20.7 | NEW |
 | O8 | Header | `⋯` menu link, beside Privacy (F33) | `Terms` | C § 20.7 | NEW |
@@ -2044,7 +2179,8 @@ on it.
   The form showed Supabase's own error text (`auth.ts:102-126` passes
   `error.message` through), which § 1.10 already rules out; Y12–Y17
   give plain lines per Supabase error code (codes checked against
-  Supabase's error-code list, 2026-09-28).
+  Supabase's error-code list, 2026-09-28). *Superseded in part,
+  2026-10-07, by C29: the email-link button and both switches are gone.*
 - **C15. "your gate log"** in § 1.7's list of what a delete removes:
   "gate" is on the plain-voice ruling's list. **Pick:** "your record of
   spending requests" (X3), which also covers declined and closed
@@ -2128,6 +2264,15 @@ on it.
   candidate can do (try again later; none of their credit is used
   meanwhile); E16 stays as the line shown during that pause. C § 20.7's
   terms say the same. § 1.11 and § 2.7 are edited.
+- **C29. One way to sign in** (owner, 2026-10-07: "on the sign in page,
+  remove the email link option, just email and password"; § 1.4;
+  C § 16.5). C14 picked § 5.6's email-link button with a switch to a
+  password. The owner's newer ruling removes the email link as a way in.
+  **Pick:** one card with two views, Sign in and Create an account, and
+  no toggle. Y1, Y2, Y3, Y10 and Y17 go (Removed list). Y12 and Y27
+  named the email link as the next step, so they now point to the link
+  under the password field; Y11 and Y13 gain the next step for someone
+  whose email never comes. § 1.4, § 1.10 and § 5.6 are edited.
 
 **Decisions where the doc had a slot but no words** (the NEW rows):
 
@@ -2181,7 +2326,11 @@ Ten has reached today's limit. Try again tomorrow." (E14, retired by C28);
 "warning(s)"; "Binary file — no preview."; "Download PDF"; "/skills";
 "Checker · "; "Unknown card"; "Import refused"; "Ten isn't configured";
 "your gate log"; "Declined — nothing was deleted."; "Send me a link";
-the "Email link" / "Email + password" toggle; "Ask Ten to look for
+the "Email link" / "Email + password" toggle; every other way to ask for
+a sign-in link, and the lines that pointed to one (C29, 2026-10-07):
+"Email me a sign-in link", "Use a password instead", "Use an email link
+instead", "for a link to sign in", "Couldn't send the link", "or use an
+email link instead", "Ask for a new one below"; "Ask Ten to look for
 roles" until S5; the "ran" prefix and raw tool names on the activity
 line; "loading a skill"; "Remove something before uploading more.";
 "A tool call failed."; "This can be retried."; the "link" pill; a
@@ -2199,7 +2348,8 @@ Home's empty button); `SidePanel.tsx` (F44); `Header.tsx` and
 `RealChatShell.tsx` (I1–I15, K10; `tests/e2e-real/e2e.ts:545`);
 `upload-errors.ts` (U6); `main.tsx` (Q6); `DeleteBetaDataConfirm.tsx`
 (X3, X8, X9; `tests/e2e-real/e2e.ts:957`, `:1006`); `SignIn.tsx` and
-`auth.ts` (S1, S9, S12–S13, Y1–Y17); `SidePanel.tsx`, `ChatShell.tsx`
+`auth.ts` (S1, S9, S12–S13, Y4–Y16; the card's form and its error map
+are built with § 1.4's 2026-10-07 amendment); `SidePanel.tsx`, `ChatShell.tsx`
 and `RealChatShell.tsx` (J13 in the viewer, § 5.2 rule 6;
 `tests/web/stage3a-review.test.ts:804`, and § 4's fixture exception in
 `tests/web/fixtures-cards.test.ts:42-47`).
@@ -3118,8 +3268,15 @@ page):
 - **Sign-in card:** 420px, radius 18px, padding 24px, `--shadow-3`.
   - Fields are 44px high, radius 10px, with a 1px `--border-input`
     edge.
-  - "Email me a sign-in link" is pri lg, full width.
-  - "Use a password instead" is a text link.
+  - Two fields, Email and Password (amended 2026-10-07, § 1.4: one way
+    to sign in).
+  - "Forgot or never set a password?" is a text link under the password
+    field, on the Sign in view only.
+  - `Sign in` is pri lg, full width; on the other view it reads
+    `Create account`.
+  - "New here? Create an account" is a text link under that button; on
+    the other view it reads "Already have an account? Sign in".
+  - Every text link here has a tap box at least 44px tall.
   - Then the trust line in `--type-small` with `lock`; its words are
     § 5.3.1's rows S12–S13.
   - Then the line "Prefer local? Run it from your terminal." (§ 1.4).

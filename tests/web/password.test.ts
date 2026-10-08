@@ -113,7 +113,9 @@ before(async () => {
   }
   const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
   server = createServer((req, res) => {
-    const p = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname);
+    // "http://x" + url, not a URL resolved against "http://x": a doubled-slash address ("//?signup") would
+    // otherwise be read as a host-less network-path reference and throw (CL-10).
+    const p = decodeURIComponent(new URL("http://x" + (req.url ?? "/")).pathname.replace(/^\/\/+/, "/"));
     let file = path.join(outDir, p === "/" ? "index.html" : p);
     if (!file.startsWith(outDir) || !existsSync(file) || lstatSync(file).isDirectory()) file = path.join(outDir, "index.html");
     res.writeHead(200, { "content-type": TYPES[path.extname(file)] ?? "application/octet-stream" }).end(readFileSync(file));
@@ -1313,5 +1315,43 @@ test("CL-9 from a create-link start: Y9 opens Sign in with the email kept and Y2
     assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com");
   } finally {
     await o.close();
+  }
+});
+
+test("CL-10 a doubled slash path never blanks the page: `//?signup` opens Create and ends at `/`; `//` opens Sign in; `//#error_code=otp_expired` shows Y27 above Sign in with a clean address; no page error", async () => {
+  const run = async (suffix: string) => {
+    const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: suffix });
+    const errors: string[] = [];
+    o.page.on("pageerror", (e) => errors.push(String(e)));
+    return { o, errors };
+  };
+  // `open` navigates to base + path, and base ends with "/", so "/?signup" is the address "//?signup"
+  const a = await run("/?signup");
+  try {
+    await createViewShowing(a.o.page).waitFor({ timeout: 8000 });
+    assert.equal(await a.o.page.evaluate(() => location.pathname + location.search + location.hash), "/", "the address ends at /");
+    assert.deepEqual(a.errors, []);
+    assert.ok(!(await a.o.page.evaluate(() => (window as any).__leak?.history ?? [])).some((h: string) => h.includes("//")), "replaceState was never given a doubled slash");
+  } finally {
+    await a.o.close();
+  }
+  const b = await run("/");
+  try {
+    await signInShowing(b.o.page).waitFor({ timeout: 8000 });
+    assert.equal(await createViewShowing(b.o.page).count(), 0);
+    assert.deepEqual(b.errors, []);
+  } finally {
+    await b.o.close();
+  }
+  const c = await run("/#error=access_denied&error_code=otp_expired&error_description=x");
+  try {
+    await c.o.page.getByText(Y.Y27).waitFor({ timeout: 8000 });
+    await signInShowing(c.o.page).waitFor();
+    await settle(c.o.page);
+    assert.equal(await c.o.page.evaluate(() => location.pathname + location.search + location.hash), "/", "the address is clean");
+    assert.equal(await createViewShowing(c.o.page).count(), 0);
+    assert.deepEqual(c.errors, []);
+  } finally {
+    await c.o.close();
   }
 });

@@ -286,8 +286,7 @@ const EDGE: { addr: string; want: "create" | "sign-in" | null; why: string }[] =
   { addr: "/?x=?signup", want: "sign-in", why: "the word inside a value" },
 ];
 for (const e of EDGE) {
-  const todo = e.addr === "//?signup" ? "FINDING (tester, 2026-10-08): the cleanup calls history.replaceState with the path \"//\", which the browser refuses; the page throws and stays blank. Without ?signup the same path opens Sign in." : false;
-  test(`L3b edge: "${e.addr}" (${e.why})`, { todo }, async (t) => {
+  test(`L3b edge: "${e.addr}" (${e.why})`, async (t) => {
     const o = await visit(e.addr);
     try {
       const shown = await o.page.locator(".sign-in-form").waitFor({ timeout: 8000 }).then(() => true, () => false);

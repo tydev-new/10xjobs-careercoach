@@ -9,6 +9,7 @@ import type { AppMessage } from "../../../../packages/agent/src/types.ts";
 import {
   accessTokenFrom,
   authRedirectFromUrl,
+  cleanPath,
   createAccountLinkFromUrl,
   checkMembership,
   claimWelcome,
@@ -111,8 +112,15 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   useEffect(() => {
     // Cleaned in the same step as the read: the whole query goes, whatever came with `signup`.
     // (A link with tags and no `signup`, or with a Supabase redirect, is left as it is today.)
-    if (createLink) window.history.replaceState(null, "", window.location.pathname);
-    if (expiredLink) window.history.replaceState(null, "", window.location.pathname);
+    if (createLink || expiredLink) {
+      // Never throws and never blanks the page: if the browser refuses, the card still renders and
+      // the query is simply left where it is.
+      try {
+        window.history.replaceState(null, "", cleanPath(window.location.pathname));
+      } catch {
+        /* leave the address as it is */
+      }
+    }
     // Runs once, at mount, regardless of `client` — stripping the URL
     // doesn't depend on the auth client existing.
     // eslint-disable-next-line react-hooks/exhaustive-deps

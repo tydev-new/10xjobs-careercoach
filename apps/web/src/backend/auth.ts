@@ -278,6 +278,16 @@ export function createAccountLinkFromUrl(href: string): boolean {
   return !REDIRECT_QUERY_KEYS.some((k) => query.has(k));
 }
 
+/**
+ * The path `history.replaceState` is given when the address is cleaned (the create link's query, an
+ * expired link's error). A run of leading slashes collapses to one: `//` read as a URL is a
+ * host-less address the browser refuses, which would throw and leave the page blank.
+ * Pure: the caller passes `window.location.pathname`.
+ */
+export function cleanPath(pathname: string): string {
+  return "/" + pathname.replace(/^\/+/, "");
+}
+
 /** The result of a password-save attempt (`updateUser`) or a
  *  reauthentication-code send/resend (`reauthenticate`) — never the raw
  *  `AuthError`, so every caller is forced through `passwordErrorMessage`

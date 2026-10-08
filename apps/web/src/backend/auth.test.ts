@@ -13,6 +13,7 @@ import {
   authRedirectFromUrl,
   checkMembership,
   claimWelcome,
+  cleanPath,
   createAccountLinkFromUrl,
   createTenAuthClient,
   passwordErrorMessage,
@@ -399,4 +400,14 @@ test("createAccountLinkFromUrl: an address that is not a URL answers no, and the
   assert.equal(createAccountLinkFromUrl(""), false);
   // the tags only ride along: the answer is the same with or without them
   assert.equal(createAccountLinkFromUrl(SITE + "/?signup&utm_source=A&utm_campaign=B&ref=C"), createAccountLinkFromUrl(SITE + "/?signup"));
+});
+
+test("cleanPath: a run of leading slashes becomes one; a normal path is untouched", () => {
+  assert.equal(cleanPath("/"), "/");
+  assert.equal(cleanPath("//"), "/");
+  assert.equal(cleanPath("///x"), "/x");
+  assert.equal(cleanPath("//index.html"), "/index.html");
+  assert.equal(cleanPath("/index.html"), "/index.html");
+  assert.equal(cleanPath("/a//b"), "/a//b");
+  assert.equal(cleanPath(""), "/");
 });

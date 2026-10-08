@@ -225,7 +225,8 @@ function staticServer(): Promise<{ port: number; setRoot(dir: string): void; clo
   let root = "";
   const types: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml", ".json": "application/json", ".wasm": "application/wasm" };
   const srv = http.createServer((req, res) => {
-    const u = new URL(req.url ?? "/", "http://x");
+    // "http://x" + url: "//?signup" resolved against a base is a host-less network-path reference and throws
+    const u = new URL("http://x" + (req.url ?? "/"));
     let p = path.join(root, decodeURIComponent(u.pathname));
     if (!p.startsWith(root) || !existsSync(p) || statSync(p).isDirectory()) p = path.join(root, "index.html");
     res.writeHead(200, { "content-type": types[path.extname(p)] ?? "application/octet-stream" });
@@ -2369,6 +2370,20 @@ await section("create-link", async () => {
     const loc = await a.page.evaluate(() => location.search + location.hash);
     rec(loc === q, `create-link: "${q || "/"}" opens Sign in and leaves the address as it was`, loc);
     await a.page.context().close();
+  }
+
+  // ---- a doubled-slash path must not blank the page (the cleanup is given "/" for "//")
+  for (const [suffix, want] of [["/?signup", "create"], ["/", "sign-in"], ["/#error_code=otp_expired&error=access_denied", "expired"]] as const) {
+    const np = await newPage({ noGoto: true });
+    const errs: string[] = [];
+    np.page.on("pageerror", (e: any) => errs.push(String(e)));
+    await np.page.goto(ORIGIN + "/" + suffix);
+    const shown = await np.page.locator(".sign-in-form").waitFor({ timeout: 15000 }).then(() => true, () => false);
+    await np.page.waitForTimeout(300);
+    const kind = !shown ? "NO CARD" : (await np.page.locator(".sign-in-link-error").count()) === 1 ? "expired" : (await np.page.locator("button[type=submit]").textContent())?.trim() === Y.Y7 ? "create" : "sign-in";
+    const at = await np.page.evaluate(() => location.pathname + location.search + location.hash);
+    rec(kind === want && errs.length === 0 && (want === "sign-in" ? at === "//" : at === "/"), `create-link: the address "//${suffix.slice(1)}" renders the card (${want}) with no page error, and ${want === "sign-in" ? "is left alone" : "ends at /"}`, `${kind} at ${at} errors ${JSON.stringify(errs)}`);
+    await np.page.context().close();
   }
 
   // ---- 9: Y9 / Y8 / Y24 from a create-link start, and 8: one sign-up, the plain site address

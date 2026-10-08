@@ -213,7 +213,8 @@ calls and the Supabase settings: C § 16.5. This wins over C14's pick and
 § 5.6's two sign-in-link bullets, both changed in the same commit (C29).
 
 - **The card has two views, and no toggle.**
-  - *Sign in*, the view the page opens on: Email (Y4), Password (Y5), the
+  - *Sign in*, the view the page opens on (one exception since
+    2026-10-08: the create link, the next amendment): Email (Y4), Password (Y5), the
     link "Forgot or never set a password?" (Y20) under the password field,
     the button `Sign in` (Y6), then the link "New here? Create an account"
     (Y8).
@@ -228,7 +229,8 @@ calls and the Supabase settings: C § 16.5. This wins over C14's pick and
   can't tell a new visitor from a returning one, and a wrong guess costs a
   returning member more. Creating an account on an address that already
   has one sends no email (C § 16.5), while a new visitor on Sign in has
-  Y8 on the card and O5 under it.
+  Y8 on the card and O5 under it. (Since 2026-10-08 a link can say
+  "new": the create link, the next amendment.)
 - **What still uses an emailed link, and stays.** The builder removes
   none of these:
   1. *The sign-up confirmation.* After `Create account` the card shows
@@ -340,6 +342,110 @@ calls and the Supabase settings: C § 16.5. This wins over C14's pick and
       sign in with it; (c) an account whose confirmation link was never
       opened: Y20, the reset email, and the account is then confirmed.
       Item (c) is what proves C § 16.5's UNVERIFIED line.
+
+**Amended 2026-10-08 (owner request): a link that opens Create an
+account.** The owner, in their own words, about the marketing site's "Get
+started" buttons: "can we have a direct link to the create account page?"
+The page can't tell a new visitor from a returning one, but a link can say
+so. The calls and the Supabase settings don't change, so C § 16.5 is not
+edited.
+
+- **The create link is the site address with `?signup`:**
+  `https://ten-coach.vercel.app/?signup`. Why this spelling: a path
+  (`/signup`) would need a rewrite rule on the host, which the app doesn't
+  have, and would answer "not found" today; the part after `#` is where
+  Supabase puts a session or an error when an emailed link comes back.
+- **What counts.** The address's query has a key spelled exactly `signup`,
+  lower case. Its value is not read, so `?signup`, `?signup=` and
+  `?signup=1` all count, in any position among other keys
+  (`?utm_source=x&signup&ref=y`). What doesn't count: another spelling or
+  case (`?Signup`, `?sign-up`, `?signup2`, `?create`), the word as a value
+  (`?view=signup`), `#signup`, and the path `/signup`.
+- **Read once, when the app first mounts,** by one small function that
+  takes the address and answers yes or no. It answers no whenever the
+  address also carries a Supabase redirect: anything after `#`, or a query
+  key `code`, `type`, `error`, `error_code`, `error_description` or
+  `access_token`. Then everything happens as it would without `signup`:
+  the session is saved, or Y27 shows above the Sign in view, or the
+  recovery screen shows.
+- **On yes, two things happen.**
+  1. *The address is cleaned in that same step:* the whole query is
+     removed, so the address bar shows the plain site address
+     (`history.replaceState` to the path, the call the expired link
+     already makes). Whatever came with `signup` goes with it: `utm_*`,
+     `ref`, anything else. A reload therefore opens the Sign in view, with
+     Y8 one tap away. Why remove it: a bookmarked or shared address should
+     be the plain one, where a returning member lands on Sign in.
+  2. *If that page load finds nobody signed in, the card opens on Create
+     an account.* It is the same view Y8 opens: Y9 switches back, and
+     everything else on the card is as the amendment above says. If
+     someone is signed in, the yes is dropped and they land where they
+     would anyway. The yes is used once: a sign-out or an account deletion
+     later in the same tab opens the Sign in view.
+- **Tags on the link are never read.** The marketing site adds `utm_source`,
+  `utm_medium`, `utm_campaign`, `utm_term`, `utm_content` and `ref` to its
+  links. Ten's code does not read, store, send or log them. Rule 1 settles
+  it: which advert sent someone does nothing for that person's search, so
+  it goes; and the privacy notice lists what Ten keeps, and this is not on
+  it. One honest limit: the browser's first request for the page carries
+  the whole address to the host (Vercel), as any web request does, before
+  Ten's code runs. A link with tags and no `signup` is left as it is
+  today: the tags stay in the address bar, unread.
+- **The confirmation email's link lands on the plain site address,** with
+  no `?signup`. `Create account` still passes the site address as the place
+  to return to (item 3 above). That is right: whoever opens that link
+  arrives signed in, so there is no card to open.
+- **No new strings.** No row is added to § 5.3.1 and none changes.
+- *Prevents:* a "Get started" button that lands a new visitor on Sign in;
+  a not-found page from a path the host doesn't serve; `signup` breaking
+  an emailed link's return; a returning member's bookmark opening on
+  Create an account; marketing tags kept anywhere by Ten.
+- *Proved by* (an independent tester, from this list; the stand-in and
+  spies of the list above):
+  1. **Accepted.** Signed out, each of `/?signup`, `/?signup=`,
+     `/?signup=1`, `/?utm_source=x&signup&ref=y` and `/?signup=0` opens
+     the card on Create an account: the button `Create account`, Y9, O5
+     and O7 show, and Y20 and Y27 are absent.
+  2. **Rejected.** Signed out, each of `/`, `/?Signup`, `/?sign-up`,
+     `/?signup2`, `/?create`, `/?view=signup` and `/#signup` opens the
+     Sign in view, and the address is unchanged. `/signup` is not served
+     by the app (the host's concern; not an e2e item).
+  3. **The pure function** answers yes for item 1's addresses, and no for
+     item 2's and for each of `/?signup#access_token=a&type=signup`,
+     `/?signup&code=a`, `/?signup&error_code=otp_expired`,
+     `/?signup#error_code=otp_expired` and `/?signup&type=recovery`.
+  4. **Signed in.** With a saved member session, `/?signup` shows the
+     workspace, never the card, and the address ends as the plain one.
+     Signing out then shows the Sign in view.
+  5. **A redirect wins.** `/?signup&error_code=otp_expired` shows Y27
+     above the Sign in view. `/?signup#access_token=…&type=recovery` shows
+     "Choose a new password". `/?signup` with a valid
+     `#access_token=…&type=signup` goes on to the membership check.
+  6. **Cleanup.** After `/?utm_source=x&signup&ref=y`, by the time the
+     card shows, `location.search` is empty and `location.pathname` is
+     unchanged. A reload opens the Sign in view.
+  7. **Tags go nowhere.** Open
+     `/?signup&utm_source=TAGMARK1&utm_campaign=TAGMARK2&ref=TAGMARK3`,
+     create an account against the stand-in, and record every request.
+     No request to another origin (the Supabase stand-in, the proxy) has
+     `TAGMARK` in its address, headers or body. `localStorage`,
+     `sessionStorage` and `document.cookie` hold no `TAGMARK`. In
+     `apps/web/src`, outside tests, the text `utm_` appears nowhere, and
+     `ref` is never asked of the address.
+  8. **The sign-up call is unchanged.** From a create-link start, the
+     stand-in saw one sign-up request, and the place to return to is the
+     site address with no query.
+  9. **Y8 and Y9 from a create-link start.** Y9 opens the Sign in view
+     with the typed email kept and Y20 showing; Y8 returns to Create an
+     account. After `Create account`, Y24 opens the Sign in view.
+  10. **375px.** The card opened by the create link is, element for
+      element, the card Y8 opens, and item 11 above holds for it: no
+      horizontal scroll, 44px targets, the light palette.
+  11. **Still not there.** Items 6 and 7 above (the must-not-appear list;
+      no sign-in link asked for) hold on a create-link start too.
+  12. **The owner's live run,** after the deploy: the marketing site's
+      "Get started" opens Create an account on Ten with a clean address.
+      The marketing site's change is its own repo's.
 
 ### 1.5 Empty / first-run state
 

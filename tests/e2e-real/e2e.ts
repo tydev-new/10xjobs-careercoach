@@ -31,7 +31,7 @@
 //   E2E_KEEP=1 keeps the temp dir (builds, failure screenshots);
 //   E2E_CONSOLE=1 echoes browser console errors; E2E_STACKS=1 page-error stacks.
 // Per-browser sections: journey import gate balance ceiling member delete
-// refresh password signin phone cors setup uploads env; then once: preview. Firefox/WebKit
+// refresh password signin create-link phone cors setup uploads env; then once: preview. Firefox/WebKit
 // need `npx playwright install firefox webkit` in apps/web.
 // Exit code 0 = all PASS; one PASS/FAIL line per assertion.
 // Also here: upload-errors.test.ts (node --test), the upload messages over PGlite.
@@ -2319,6 +2319,171 @@ await section("signin", async () => {
   const low = code.toLowerCase();
   const inBundle = retired.filter((x) => [x.toLowerCase(), x.toLowerCase().replace(/'/g, "\\'")].some((v) => low.includes(v)));
   rec(inBundle.length === 0, "signin: none of the retired sign-in strings is in the bundle (ignoring case)", inBundle.join(" | "));
+});
+
+// ================================================================ THE CREATE LINK (ui § 1.4, amended 2026-10-08)
+// Proved-by items 1, 4, 5, 6, 7, 8, 9, 10, 11 on the production build and the stand-in.
+await section("create-link", async () => {
+  const phone = { width: 375, height: 812 };
+  const shots = process.env.SHOTS_375;
+  const Y = Object.fromEntries(["Y6", "Y7", "Y8", "Y9", "Y11", "Y20", "Y24", "Y27", "O5", "O7"].map((id) => [id, uiRow(id)]));
+  const six = UI_DOC.slice(UI_DOC.indexOf("6. **Not in the bundle, and not on any rendered sign-in state**"), UI_DOC.indexOf("The check ignores"));
+  const retired = [...six.matchAll(/"([^"]+)"/g)].map((m) => m[1].replace(/\s+/g, " ")).filter((x) => x.length > 3);
+  const visit = async (suffix: string, viewport?: { width: number; height: number }) => {
+    const np = await newPage({ noGoto: true, ...(viewport ? { viewport } : {}) });
+    await np.page.goto(ORIGIN + "/" + suffix);
+    return np;
+  };
+  const onCreate = async (page: any) => {
+    await page.locator(".sign-in-form").waitFor({ timeout: 15000 });
+    return page.evaluate(() => ({
+      submits: [...document.querySelectorAll("button[type=submit]")].map((b) => (b.textContent ?? "").trim()),
+      links: [...document.querySelectorAll(".sign-in-form .sign-in-link-button")].map((b) => (b.textContent ?? "").trim()),
+      invite: (document.querySelector(".sign-in-invite")?.textContent ?? "").replace(/\s+/g, " ").trim(),
+      terms: (document.querySelector(".sign-in-terms")?.textContent ?? "").replace(/\s+/g, " ").trim(),
+      expired: document.querySelectorAll(".sign-in-link-error").length,
+      loc: { path: location.pathname, search: location.search, hash: location.hash },
+    }));
+  };
+  const CREATE = { submits: [Y.Y7], links: [Y.Y9], invite: Y.O5, terms: Y.O7, expired: 0 };
+  const view = (v: any) => ({ submits: v.submits, links: v.links, invite: v.invite, terms: v.terms, expired: v.expired });
+
+  // ---- 1 and 6: accepted addresses open Create; the address is cleaned; a reload opens Sign in
+  for (const q of ["?signup", "?signup=", "?signup=1", "?utm_source=x&signup&ref=y", "?signup=0"]) {
+    const a = await visit(q);
+    const v = await onCreate(a.page);
+    eq(view(v), CREATE, `create-link: ${q} opens Create an account: Create account, Y9, O5, O7; no Y20, no Y27`);
+    eq(v.loc, { path: "/", search: "", hash: "" }, `create-link: ${q}: by the time the card shows, the address is the plain one`);
+    const t = (await a.page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ").toLowerCase();
+    rec(!retired.some((x) => t.includes(x.toLowerCase())), `create-link: ${q}: none of the retired sign-in strings shows`);
+    await a.page.reload();
+    await a.page.getByRole("button", { name: Y.Y8 }).waitFor({ timeout: 15000 });
+    rec((await a.page.getByRole("button", { name: Y.Y20 }).count()) === 1, `create-link: ${q}: a reload opens the Sign in view, Y8 one tap away`);
+    await a.page.context().close();
+  }
+  // rejected: the Sign in view, the address as it was
+  for (const q of ["", "?Signup", "?sign-up", "?signup2", "?create", "?view=signup", "#signup", "?utm_source=x&ref=y"]) {
+    const a = await visit(q);
+    await a.page.getByRole("button", { name: Y.Y8 }).waitFor({ timeout: 15000 });
+    await a.page.waitForTimeout(300);
+    const loc = await a.page.evaluate(() => location.search + location.hash);
+    rec(loc === q, `create-link: "${q || "/"}" opens Sign in and leaves the address as it was`, loc);
+    await a.page.context().close();
+  }
+
+  // ---- 9: Y9 / Y8 / Y24 from a create-link start, and 8: one sign-up, the plain site address
+  const c = await visit("?signup&utm_source=TAGMARK1&utm_campaign=TAGMARK2&ref=TAGMARK3");
+  const seen: { url: string; headers: string; body: string }[] = [];
+  c.page.on("request", async (r: any) => {
+    const u = new URL(r.url());
+    if (u.origin === ORIGIN) return; // the host's own: the first request carries the whole address (the honest limit)
+    seen.push({ url: r.url(), headers: JSON.stringify(await r.allHeaders().catch(() => ({}))), body: r.postData() ?? "" });
+  });
+  await onCreate(c.page);
+  const tagEmail = em("createlink.tag");
+  await c.page.locator(".sign-in-form input[type=email]").fill(tagEmail);
+  await c.page.getByRole("button", { name: Y.Y9 }).click();
+  await c.page.getByRole("button", { name: Y.Y8 }).waitFor();
+  rec((await c.page.locator(".sign-in-form input[type=email]").inputValue()) === tagEmail && (await c.page.getByRole("button", { name: Y.Y20 }).count()) === 1, "create-link: Y9 opens Sign in with the email kept and Y20 showing");
+  await c.page.getByRole("button", { name: Y.Y8 }).click();
+  await c.page.getByRole("button", { name: Y.Y9 }).waitFor();
+  const signupsBefore = standIn.pw.signups.length;
+  await c.page.locator(".sign-in-form input[type=password]").fill("Correct-Horse-9");
+  await c.page.locator(".sign-in-form button[type=submit]").click();
+  await c.page.getByRole("button", { name: Y.Y24 }).waitFor({ timeout: 15000 });
+  eq(standIn.pw.signups.slice(signupsBefore), [{ email: tagEmail.toLowerCase(), redirectTo: ORIGIN }], "create-link: from a create-link start the stand-in saw one sign-up, and the place to return to is the site address with no query");
+  await c.page.getByRole("button", { name: Y.Y24 }).click();
+  await c.page.getByRole("button", { name: Y.Y8 }).waitFor();
+  rec(true, "create-link: after `Create account`, Y24 opens the Sign in view");
+  // ---- 7: the tags go nowhere
+  await c.page.waitForTimeout(500);
+  const inReqs = seen.filter((r) => `${r.url}\n${r.headers}\n${r.body}`.includes("TAGMARK"));
+  rec(inReqs.length === 0 && seen.length > 0, "create-link: no request to another origin (the Supabase stand-in) has TAGMARK in its address, headers or body", `${seen.length} requests; hits: ${inReqs.map((r) => r.url).join(" | ")}`);
+  const inLog = standIn.log.filter((l) => `${l.path}${l.search}${l.auth}${l.apikey}${l.origin}`.includes("TAGMARK"));
+  rec(inLog.length === 0, "create-link: the stand-in's own request log holds no TAGMARK", inLog.map((l) => l.path).join(" | "));
+  const store = await c.page.evaluate(() => JSON.stringify({ ls: { ...localStorage }, ss: { ...sessionStorage }, cookie: document.cookie, href: location.href }));
+  rec(!store.includes("TAGMARK"), "create-link: localStorage, sessionStorage, cookies and the address hold no TAGMARK");
+  await c.page.context().close();
+  const srcHits = (() => {
+    const hits: string[] = [];
+    const walk = (d: string) => {
+      for (const f of readdirSync(d)) {
+        const p = path.join(d, f);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.(ts|tsx)$/.test(f) && !/\.test\./.test(f) && /utm_|get\((["'])ref\1\)|has\((["'])ref\2\)/.test(readFileSync(p, "utf8"))) hits.push(p);
+      }
+    };
+    walk(path.join(WEB, "src"));
+    return hits;
+  })();
+  rec(srcHits.length === 0, "create-link: `utm_` appears nowhere in apps/web/src outside tests, and `ref` is never asked of the address", srcHits.join(" | "));
+
+  // ---- 4: signed in, `?signup` shows the workspace, the address ends plain, signing out opens Sign in
+  const member = em("createlink.member");
+  await standIn.createUser({ email: member });
+  const m = await newPage();
+  await signIn(m.page, member);
+  await m.page.locator(".composer-input").waitFor({ timeout: 20000 });
+  await m.page.goto(ORIGIN + "/?signup&utm_source=x");
+  await m.page.locator(".composer-input").waitFor({ timeout: 20000 });
+  await m.page.waitForTimeout(300);
+  rec((await m.page.locator(".sign-in-screen").count()) === 0 && (await m.page.evaluate(() => location.search)) === "", "create-link: signed in, `?signup` shows the workspace, never the card, and the address ends plain");
+  await m.page.getByRole("button", { name: "Menu" }).click();
+  await m.page.getByRole("menuitem", { name: "Sign out" }).click();
+  await m.page.getByRole("button", { name: Y.Y8 }).waitFor({ timeout: 15000 });
+  rec((await m.page.locator(".sign-in-form button[type=submit]").textContent())?.trim() === Y.Y6, "create-link: signing out afterwards shows the Sign in view");
+  await m.page.context().close();
+
+  // ---- 5: a redirect wins
+  const e = await visit("?signup&error_code=otp_expired&error_description=x");
+  await e.page.getByText(Y.Y27).waitFor({ timeout: 15000 });
+  rec((await e.page.getByRole("button", { name: Y.Y8 }).count()) === 1, "create-link: `?signup&error_code=otp_expired` shows Y27 above the Sign in view");
+  await e.page.context().close();
+  const rc = em("createlink.recover");
+  await standIn.createUser({ email: rc });
+  const r = await visit("?signup" + standIn.pw.recoveryHash(rc));
+  const recShown = await r.page.getByRole("heading", { name: "Choose a new password" }).waitFor({ timeout: 20000 }).then(() => true, () => false);
+  rec(recShown, "create-link: `?signup` with a recovery link shows 'Choose a new password'");
+  await r.page.context().close();
+  const t0 = Date.now();
+  const sg = await visit("?signup" + standIn.pw.recoveryHash(rc).replace("type=recovery", "type=signup"));
+  const inChat = await sg.page.locator(".composer-input").waitFor({ timeout: 20000 }).then(() => true, () => false);
+  const checks = standIn.log.filter((l) => l.at >= t0 && l.method === "POST" && l.path === "/rest/v1/rpc/ten_is_member").length;
+  rec(inChat && checks >= 1, "create-link: `?signup` with a valid #access_token=…&type=signup goes on to the membership check", `chat=${inChat} checks=${checks}`);
+  await sg.page.context().close();
+
+  // ---- 10: 375px: the card opened by the link is, element for element, the card Y8 opens; items 11 above hold
+  const l = await visit("?signup", phone);
+  await onCreate(l.page);
+  // the card's DOM, tags and attributes (sorted: the order React sets them in is not the card's content), text and all
+  const canon = (page: any): Promise<string> =>
+    page.evaluate(() => {
+      const walk = (n: Node): string =>
+        n.nodeType === 3
+          ? (n.textContent ?? "")
+          : n.nodeType === 1
+            ? `<${(n as Element).tagName.toLowerCase()} ${[...(n as Element).attributes].map((a) => `${a.name}=${JSON.stringify(a.value)}`).sort().join(" ")}>${[...n.childNodes].map(walk).join("")}</>`
+            : "";
+      return walk(document.querySelector(".sign-in-card")!);
+    });
+  const linkHtml = await canon(l.page);
+  const fit = await l.page.evaluate(() => ({
+    scrollW: document.documentElement.scrollWidth,
+    W: window.innerWidth,
+    theme: document.querySelector("[data-theme]")?.getAttribute("data-theme"),
+    small: [...document.querySelectorAll(".sign-in-card button, .sign-in-card input, .sign-in-card a")]
+      .map((x) => [(x.textContent || (x as HTMLInputElement).type).trim().slice(0, 30), Math.round(x.getBoundingClientRect().height), Math.round(x.getBoundingClientRect().width)] as [string, number, number])
+      .filter(([, h, w]) => h < 44 || w < 44),
+  }));
+  rec(fit.scrollW <= fit.W && fit.small.length === 0 && fit.theme === "light", "create-link: 375px: the create-link card has no horizontal scroll, every field, button and link at least 44px, light palette", JSON.stringify(fit));
+  if (shots) await l.page.screenshot({ path: path.join(shots, "375-create-link.png"), fullPage: true });
+  await l.page.context().close();
+  const y = await visit("", phone);
+  await y.page.getByRole("button", { name: Y.Y8 }).click();
+  await onCreate(y.page);
+  const y8Html = await canon(y.page);
+  rec(y8Html === linkHtml, "create-link: 375px: the card the create link opens is, element for element, the card Y8 opens", y8Html === linkHtml ? "" : `link: ${linkHtml.slice(0, 700)} | Y8: ${y8Html.slice(0, 700)}`);
+  await y.page.context().close();
 });
 
 // ================================================================ PHONE (375px)

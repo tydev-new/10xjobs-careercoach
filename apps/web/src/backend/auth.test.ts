@@ -91,6 +91,24 @@ test("signUpWithPassword: passes emailRedirectTo too (§ 8: every auth link)", a
   assert.deepEqual(seenArgs, { email: "new@example.com", password: "hunter2", options: { emailRedirectTo: "https://ten.example/auth" } });
 });
 
+test("signInWithPassword: Y12 and Y13 also arrive as error_code, and as Supabase's own known message with no code (case-insensitive, trimmed)", async () => {
+  const fake = (error: { message: string; code?: string; error_code?: string }) =>
+    fakeClient({ signInWithPassword: async () => ({ error, data: { session: null } }) });
+  const shapes: [string, { message: string; code?: string; error_code?: string }, string][] = [
+    ["error_code, invalid", { message: "x", error_code: "invalid_credentials" }, SIGN_IN_INVALID_CREDENTIALS_LINE],
+    ["error_code, unconfirmed", { message: "x", error_code: "email_not_confirmed" }, SIGN_IN_UNCONFIRMED_LINE],
+    ["message only, invalid", { message: "Invalid login credentials" }, SIGN_IN_INVALID_CREDENTIALS_LINE],
+    ["message only, shouting and padded", { message: "  INVALID LOGIN CREDENTIALS " }, SIGN_IN_INVALID_CREDENTIALS_LINE],
+    ["message only, unconfirmed", { message: "Email not confirmed" }, SIGN_IN_UNCONFIRMED_LINE],
+    ["message only, lower case and padded", { message: " email not confirmed\n" }, SIGN_IN_UNCONFIRMED_LINE],
+  ];
+  for (const [name, error, line] of shapes) assert.deepEqual(await signInWithPassword(fake(error), "a@example.com", "x"), { ok: false, error: line }, name);
+  // every other error is left as it is: its own message, even next to a similar-looking one
+  for (const message of ["Invalid login credentials for this project", "Email not confirmed yet", "network down"])
+    assert.deepEqual(await signInWithPassword(fake({ message }), "a@example.com", "x"), { ok: false, error: message }, message);
+  assert.deepEqual(await signInWithPassword(fake({ message: "over limit", code: "over_request_rate_limit" }), "a@example.com", "x"), { ok: false, error: "over limit" });
+});
+
 test("signOut: ok on success, error surfaced on failure", async () => {
   const ok = fakeClient({ signOut: async () => ({ error: null }) });
   assert.deepEqual(await signOut(ok), { ok: true });

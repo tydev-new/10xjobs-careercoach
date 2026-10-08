@@ -525,7 +525,9 @@ test("P6 authRedirectFromUrl: recovery hash, error in the hash, error in the que
   assert.equal(MIN_PASSWORD_LENGTH, 8);
   // "one number in code": sign-up's minLength uses it
   const signIn = readFileSync(path.join(REPO, "apps/web/src/real/SignIn.tsx"), "utf8");
-  assert.ok(signIn.includes("minLength={MIN_PASSWORD_LENGTH}") && !/minLength=\{8\}/.test(signIn));
+  assert.ok(signIn.includes("minLength: MIN_PASSWORD_LENGTH") && !/minLength[=:]\s*\{?8\b/.test(signIn));
+  // ...and only on the Create view's field: the spread is guarded by isCreate (Y-7 checks the rendered attribute)
+  assert.match(signIn, /\.\.\.\(isCreate \? \{ minLength: MIN_PASSWORD_LENGTH \} : \{\}\)/);
 });
 
 const ORDERS: { name: string; path: string; events: FakeCfg["events"] }[] = [
@@ -1116,6 +1118,29 @@ test("Y-6 an old sign-in link still signs in: a valid #access_token=...&type=mag
     await o.page.getByText(O2_PAUSED).waitFor();
     assert.equal(await memberChecks(o.page), 1, "the membership check ran");
     assert.equal(await o.page.getByRole("heading", { name: COPY.recoveryTitle }).count(), 0, "no recovery screen");
+  } finally {
+    await o.close();
+  }
+});
+
+test("Y-7 a sign-in error does not follow the person to the reset card or back; minLength is on the Create view's password field only", async () => {
+  const o = await open({ events: [{ event: "INITIAL_SESSION" }], signIn: { error: { code: "invalid_credentials", status: 400, message: "RAW-SUPABASE-TEXT" } } });
+  try {
+    await signInShowing(o.page).waitFor();
+    assert.equal(await o.page.getByLabel("Password").getAttribute("minlength"), null, "Sign in: an existing shorter password must reach the server");
+    await o.page.getByLabel("Email").fill(EMAIL);
+    await o.page.getByLabel("Password").fill("short7!");
+    await signInShowing(o.page).click();
+    await o.page.locator(".sign-in-error").waitFor();
+    assert.equal((await callsOf(o.page, "signInWithPassword")).length, 1, "the 7-character password was sent");
+    await o.page.getByRole("button", { name: Y.Y20 }).click();
+    await o.page.getByRole("heading", { name: COPY.resetTitle }).waitFor();
+    await o.page.getByRole("button", { name: Y.Y24 }).click();
+    await signInShowing(o.page).waitFor();
+    assert.equal(await o.page.locator(".sign-in-error").count(), 0, "the old error is gone after Y20 and Back to sign in");
+    // and the same for the error shown on Create then Y9
+    await o.page.getByRole("button", { name: Y.Y8 }).click();
+    assert.equal(await o.page.getByLabel("Password").getAttribute("minlength"), String(MIN_PASSWORD_LENGTH), "Create: the 8-character floor");
   } finally {
     await o.close();
   }

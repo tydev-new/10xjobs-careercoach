@@ -342,7 +342,7 @@ test("R4 proof 4, the shape Supabase answers supabase-js today (version header +
 // same refusal arrives in another shape. Each is run and reported; see the reviewer's hand-back for the reading.
 const OTHER_SHAPES: Shape[] = ["v2024-header-not-exposed", "code-no-header", "legacy-error_code", "main-stand-in", "oauth-only", "message-only"];
 for (const shape of OTHER_SHAPES) {
-  test(`R4b a wrong password answered in the shape "${shape}" still shows Y12 (and an unconfirmed email Y13), never Supabase's message`, { todo: shape === "legacy-error_code" ? false : 'FINDING (tester, 2026-10-07): in this shape the card shows Supabase\'s own words ("Invalid login credentials", "Email not confirmed"), because signInErrorText reads error.code alone and supabase-js sets it only from a readable 2024 version header or from error_code' }, async (t) => {
+  test(`R4b a wrong password answered in the shape "${shape}" still shows Y12 (and an unconfirmed email Y13), never Supabase's message`, async (t) => {
     const seen: string[] = [];
     let bad = 0;
     for (const kind of ["invalid_credentials", "email_not_confirmed"] as const) {
@@ -542,7 +542,7 @@ test("R12 proof 12 (voice): scan_voice.py --reply over Y11, Y12, Y13 and Y27, as
 // C § 16.2 names the 8-character floor for SIGN-UP's field ("`SignIn.tsx`'s sign-up `minLength={8}`"). On
 // the Sign in view an existing password is whatever the account already has (the sign-in is shared with the
 // older app, C § 8). With the email link gone, a member whose password is shorter than 8 has only Y20 left.
-test("R13 the Sign in view sends an existing 7-character password to the server (the 8-character floor is sign-up's)", { todo: "OBSERVED (tester, 2026-10-07; the same on origin/main): the Sign in view's password field carries minLength=8, so the browser blocks the submit with its own bubble and no request is made" }, async () => {
+test("R13 the Sign in view sends an existing 7-character password to the server (the 8-character floor is sign-up's)", async () => {
   const { ctx, page } = await open();
   try {
     const before = auth.log.length;

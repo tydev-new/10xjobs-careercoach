@@ -141,6 +141,8 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
             className="sign-in-link-button"
             onClick={() => {
               setShowForgot(false);
+              setError(undefined);
+              setStatus("idle");
               setForgotStatus("idle");
               setForgotResult(undefined);
               setForgotEmail("");
@@ -185,7 +187,7 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
               <input
                 type="password"
                 required
-                minLength={MIN_PASSWORD_LENGTH}
+                {...(isCreate ? { minLength: MIN_PASSWORD_LENGTH } : {})}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete={isCreate ? "new-password" : "current-password"}
@@ -200,6 +202,8 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
                 className="sign-in-link-button"
                 onClick={() => {
                   setForgotEmail(email);
+                  setError(undefined);
+                  setStatus("idle");
                   setShowForgot(true);
                 }}
               >

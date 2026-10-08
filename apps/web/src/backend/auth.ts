@@ -67,6 +67,8 @@ export function siteRedirectUrl(_ignoredOrigin?: string): string {
 export interface AuthErrorLike {
   message: string;
   code?: string;
+  /** the legacy spelling of `code`, if a response carries it (read by the sign-in error map only) */
+  error_code?: string;
   status?: number;
   reasons?: string[];
 }
@@ -114,8 +116,13 @@ export const SIGN_IN_UNCONFIRMED_LINE =
  *  still shows Supabase's own message, as before (Y14-Y16, Y44-Y46 and Y48 are
  *  the Stage 4 build's). */
 function signInErrorText(error: AuthErrorLike): string {
-  if (error.code === "invalid_credentials") return SIGN_IN_INVALID_CREDENTIALS_LINE;
-  if (error.code === "email_not_confirmed") return SIGN_IN_UNCONFIRMED_LINE;
+  // The same refusal can arrive in more than one shape: the code on `.code` (the API-version-2024 shape),
+  // the same value on `.error_code` (the legacy shape), or with no code at all and only Supabase's own
+  // message. All three give Y12 / Y13, so Supabase's words never show for these two cases.
+  const code = error.code ?? error.error_code;
+  const message = (error.message ?? "").trim().toLowerCase();
+  if (code === "invalid_credentials" || message === "invalid login credentials") return SIGN_IN_INVALID_CREDENTIALS_LINE;
+  if (code === "email_not_confirmed" || message === "email not confirmed") return SIGN_IN_UNCONFIRMED_LINE;
   return error.message;
 }
 

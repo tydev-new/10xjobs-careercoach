@@ -1,22 +1,38 @@
-// design-web-ui.md § 1.4 — sign-in: magic link or email+password, one line
-// under the logo (PRINCIPLES.md rule 1), a "prefer local" link (rule 9).
-// Sign-in is shared with the older CareerCoach app — it proves who someone
-// is, not that they're in the beta (that's § 1.6, checked by the caller
-// after this resolves).
+// design-web-ui.md § 1.4 — sign-in: one way, email and password (the owner's
+// ruling of 2026-10-07, C29; calls in design-web-agent.md § 16.5). One card,
+// two views and no toggle: Sign in (the view the page opens on) and Create an
+// account. One line under the logo (PRINCIPLES.md rule 1), a "prefer local"
+// line (rule 9). Sign-in is shared with the older CareerCoach app — it proves
+// who someone is, not that they're in the beta (that's § 1.6, checked by the
+// caller after this resolves).
 //
-// § 1.10 additions: in "Email + password" mode, a "Forgot or never set a
-// password?" link opens a reset card ON THE SAME CARD (never a route), and
-// an expired/used link's line (design-web-agent.md § 16.1's "link error")
-// renders above whichever form is showing.
+// The card makes three calls and no others: signInWithPassword, signUp and
+// resetPasswordForEmail. The words are sign-in-copy.ts's (§ 5.3.1 rows).
+//
+// § 1.10 additions: on the Sign in view, a "Forgot or never set a password?"
+// link opens a reset card ON THE SAME CARD (never a route). An expired/used
+// link's line (design-web-agent.md § 16.1's "link error") shows above the
+// Sign in view only — not on Create an account, not on the reset card.
 import { useState, type FormEvent, type ReactElement } from "react";
 import { Wordmark } from "../components/BrandMark";
 import { SIGN_IN_INVITATION } from "./welcome-copy.ts";
+import {
+  BACK_TO_SIGN_IN,
+  CREATE_ACCOUNT_BUTTON,
+  EMAIL_LABEL,
+  EXPIRED_LINK_LINE,
+  FORGOT_LINK,
+  PASSWORD_LABEL,
+  SIGN_IN_BUTTON,
+  SWITCH_TO_CREATE,
+  SWITCH_TO_SIGN_IN,
+  signUpSentLine,
+} from "./sign-in-copy.ts";
 import type { AuthClientLike } from "../backend/auth.ts";
 import {
   MIN_PASSWORD_LENGTH,
   requestPasswordReset,
   resetPasswordEnumerationSafeLine,
-  signInWithMagicLink,
   signInWithPassword,
   signUpWithPassword,
 } from "../backend/auth.ts";
@@ -25,18 +41,17 @@ export interface SignInProps {
   client: AuthClientLike;
   redirectTo: string;
   /** design-web-agent.md § 16.1: an `error_code` was found on the page's
-   *  own URL (recovery or magic-link alike) — RealApp reads this once,
-   *  before the client is created, and clears the URL itself. */
+   *  own URL (a reset, a confirmation or an old sign-in link alike) — RealApp
+   *  reads this once, before the client is created, and clears the URL itself. */
   expiredLink?: boolean;
 }
 
-type Mode = "magic-link" | "password";
+type View = "sign-in" | "create";
 
 export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactElement {
-  const [mode, setMode] = useState<Mode>("magic-link");
+  const [view, setView] = useState<View>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [isSignUp, setIsSignUp] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -47,18 +62,26 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
   const [forgotStatus, setForgotStatus] = useState<"idle" | "sending" | "done" | "error">("idle");
   const [forgotResult, setForgotResult] = useState<string | undefined>(undefined);
 
+  const isCreate = view === "create";
+
+  /** Switch views (Y8, Y9, Y24). The typed email stays; a typed password and
+   *  an old error do not follow the person to the other view. */
+  const goTo = (next: View) => {
+    setView(next);
+    setStatus("idle");
+    setError(undefined);
+    setPassword("");
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setStatus("sending");
     setError(undefined);
-    const result =
-      mode === "magic-link"
-        ? await signInWithMagicLink(client, email, redirectTo)
-        : isSignUp
-          ? await signUpWithPassword(client, email, password, redirectTo)
-          : await signInWithPassword(client, email, password);
+    const result = isCreate
+      ? await signUpWithPassword(client, email, password, redirectTo)
+      : await signInWithPassword(client, email, password);
     if (result.ok) {
-      setStatus(mode === "magic-link" || isSignUp ? "sent" : "idle");
+      setStatus(isCreate ? "sent" : "idle");
       // A password sign-in resolves the session immediately; the caller
       // (RealApp) is listening for the auth state change and moves on
       // itself — nothing else to do here.
@@ -85,14 +108,11 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
   };
 
   if (showForgot) {
+    // The expired-link line (Y27) is not shown here: it points to the link
+    // under the password field, which is not on this card (§ 1.4, 2026-10-07).
     return (
       <div className="sign-in-screen">
         <div className="sign-in-card">
-          {expiredLink ? (
-            <p className="sign-in-link-error">
-              That email link has expired or was already used. Ask for a new one below.
-            </p>
-          ) : null}
           <h1 className="sign-in-logo">Reset your password</h1>
           <p className="sign-in-tagline">
             Enter the email you sign in with to get a link for choosing a new password.
@@ -102,7 +122,7 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
           ) : (
             <form onSubmit={(e) => void submitForgot(e)} method="post" className="sign-in-form">
               <label>
-                Email
+                {EMAIL_LABEL}
                 <input
                   type="email"
                   required
@@ -121,12 +141,14 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
             className="sign-in-link-button"
             onClick={() => {
               setShowForgot(false);
+              setError(undefined);
+              setStatus("idle");
               setForgotStatus("idle");
               setForgotResult(undefined);
               setForgotEmail("");
             }}
           >
-            Back to sign in
+            {BACK_TO_SIGN_IN}
           </button>
         </div>
       </div>
@@ -136,34 +158,22 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
   return (
     <div className="sign-in-screen">
       <div className="sign-in-card">
-        {expiredLink ? (
-          <p className="sign-in-link-error">
-            That email link has expired or was already used. Ask for a new one below.
-          </p>
-        ) : null}
+        {expiredLink && !isCreate ? <p className="sign-in-link-error">{EXPIRED_LINK_LINE}</p> : null}
         <h1 className="sign-in-logo"><Wordmark size={30} /></h1>
         <p className="sign-in-tagline">Help you get a job offer you actually want.</p>
 
-        {/* aria-pressed names the SELECTED segment — neither button is ever
-            `disabled` (a segmented toggle stays reachable by Tab either
-            way; `disabled` would drop the current segment from it). */}
-        <div className="sign-in-mode-toggle">
-          <button type="button" aria-pressed={mode === "magic-link"} onClick={() => setMode("magic-link")}>
-            Email link
-          </button>
-          <button type="button" aria-pressed={mode === "password"} onClick={() => setMode("password")}>
-            Email + password
-          </button>
-        </div>
-
         {status === "sent" ? (
-          <p className="sign-in-sent">
-            Check {email} for a link{isSignUp ? " to confirm your account" : " to sign in"}.
-          </p>
+          <>
+            <p className="sign-in-sent">{signUpSentLine(email)}</p>
+            {/* Y24: the way back. Returns to the Sign in view, email kept. */}
+            <button type="button" className="sign-in-link-button" onClick={() => goTo("sign-in")}>
+              {BACK_TO_SIGN_IN}
+            </button>
+          </>
         ) : (
           <form onSubmit={submit} className="sign-in-form">
             <label>
-              Email
+              {EMAIL_LABEL}
               <input
                 type="email"
                 required
@@ -172,49 +182,47 @@ export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactE
                 autoComplete="email"
               />
             </label>
-            {mode === "password" ? (
-              <label>
-                Password
-                <input
-                  type="password"
-                  required
-                  minLength={MIN_PASSWORD_LENGTH}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete={isSignUp ? "new-password" : "current-password"}
-                />
-              </label>
-            ) : null}
+            <label>
+              {PASSWORD_LABEL}
+              <input
+                type="password"
+                required
+                {...(isCreate ? { minLength: MIN_PASSWORD_LENGTH } : {})}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete={isCreate ? "new-password" : "current-password"}
+              />
+            </label>
             {/* § 1.10: "under the password field" — a non-member gets only
-                this link (owner decision, 2026-09-25); it never renders in
-                "Create account" sub-mode. */}
-            {mode === "password" && !isSignUp ? (
+                this link (owner decision, 2026-09-25); it never renders on the
+                Create an account view. */}
+            {!isCreate ? (
               <button
                 type="button"
                 className="sign-in-link-button"
                 onClick={() => {
                   setForgotEmail(email);
+                  setError(undefined);
+                  setStatus("idle");
                   setShowForgot(true);
                 }}
               >
-                Forgot or never set a password?
+                {FORGOT_LINK}
               </button>
             ) : null}
             {error ? <p className="sign-in-error">{error}</p> : null}
             <button type="submit" disabled={status === "sending"}>
-              {mode === "magic-link" ? "Send me a link" : isSignUp ? "Create account" : "Sign in"}
+              {isCreate ? CREATE_ACCOUNT_BUTTON : SIGN_IN_BUTTON}
             </button>
-            {mode === "password" ? (
-              <button type="button" className="sign-in-link-button" onClick={() => setIsSignUp((v) => !v)}>
-                {isSignUp ? "Already have an account? Sign in" : "New here? Create an account"}
-              </button>
-            ) : null}
+            <button type="button" className="sign-in-link-button" onClick={() => goTo(isCreate ? "sign-in" : "create")}>
+              {isCreate ? SWITCH_TO_SIGN_IN : SWITCH_TO_CREATE}
+            </button>
           </form>
         )}
 
-        {/* § 5.3.1 O5 and O7 (C § 20.7): under the form, in both modes (the
-            sent state included, since it is the same card). O7's "terms" and
-            "privacy notice" are the two static pages. */}
+        {/* § 5.3.1 O5 and O7 (C § 20.7): under the form, on both views (the
+            confirmation line included, since it is the same card). O7's
+            "terms" and "privacy notice" are the two static pages. */}
         <p className="sign-in-invite">{SIGN_IN_INVITATION}</p>
         <p className="sign-in-terms">
           Using Ten means you agree to its{" "}

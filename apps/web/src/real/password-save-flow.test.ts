@@ -9,7 +9,6 @@ import { resendReauthenticationCode, savePassword } from "./password-save-flow.t
 function fakeClient(overrides: Partial<AuthClientLike["auth"]> = {}): AuthClientLike {
   return {
     auth: {
-      signInWithOtp: async () => ({ error: null }),
       signInWithPassword: async () => ({ error: null, data: { session: null } }),
       signUp: async () => ({ error: null }),
       signOut: async () => ({ error: null }),

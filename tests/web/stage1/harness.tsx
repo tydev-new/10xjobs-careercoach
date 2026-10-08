@@ -34,7 +34,6 @@ import "../../../apps/web/src/styles.css";
 const NEVER = <T,>() => new Promise<T>(() => {});
 const stubClient: AuthClientLike = {
   auth: {
-    signInWithOtp: () => NEVER(),
     signInWithPassword: () => NEVER(),
     signUp: () => NEVER(),
     signOut: () => NEVER(),

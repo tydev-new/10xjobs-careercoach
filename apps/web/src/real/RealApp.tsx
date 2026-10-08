@@ -93,10 +93,11 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   const [screen, setScreen] = useState<Screen>(() => (initialRedirect === "recovery" ? { kind: "recovery" } : { kind: "loading" }));
   // § 16.1: "a link error... the sign-in screen shows the expired line,
   // then history.replaceState removes the parameters so a reload doesn't
-  // repeat it." Read once, like `initialRedirect` itself; the owner's
-  // 2026-09-25 approval extends this same line to an expired magic link,
-  // not only an expired recovery link — `authRedirectFromUrl` doesn't
-  // distinguish the two, by design (any `error_code` on the URL).
+  // repeat it." Read once, like `initialRedirect` itself; the line covers
+  // any link that came back with an error (a reset, a sign-up
+  // confirmation, or an old sign-in link) — `authRedirectFromUrl` doesn't
+  // distinguish them, by design (any `error_code` on the URL). It shows
+  // on the Sign in view only (§ 1.4, 2026-10-07).
   const [expiredLink, setExpiredLink] = useState(() => initialRedirect === "link-error");
   useEffect(() => {
     if (expiredLink) window.history.replaceState(null, "", window.location.pathname);

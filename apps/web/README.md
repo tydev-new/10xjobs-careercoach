@@ -311,7 +311,11 @@ abortSignal })` already returns the exact `ReadableStream<UIMessageChunk>`
 
 `src/real/` — the real screens (`docs/design-web-ui.md` §§ 1.4-1.7):
 
-- `SignIn.tsx` — magic link or email+password, `redirectTo = VITE_SITE_URL`.
+- `SignIn.tsx` — one card, two views (Sign in, Create an account), email and
+  password only, no toggle (§ 1.4, 2026-10-07; C § 16.5). The card makes three
+  calls: `signInWithPassword`, `signUp` and `resetPasswordForEmail`, with
+  `redirectTo = VITE_SITE_URL` on the two that send an email. Its words are
+  `sign-in-copy.ts` (§ 5.3.1's Y rows); the Y12 and Y13 error map is in `auth.ts`.
 - `NotAMember.tsx` — the exact § 1.6 copy, sign-out only.
 - `RealApp.tsx` — the state machine: loading → signed-in? → one
   membership check → not-a-member OR (create the root `CLAUDE.md` from the

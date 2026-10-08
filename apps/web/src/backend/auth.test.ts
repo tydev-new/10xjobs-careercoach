@@ -6,6 +6,8 @@ import test from "node:test";
 import {
   MIN_PASSWORD_LENGTH,
   NOT_SET_UP_MESSAGE,
+  SIGN_IN_INVALID_CREDENTIALS_LINE,
+  SIGN_IN_UNCONFIRMED_LINE,
   type AuthClientLike,
   accessTokenFrom,
   authRedirectFromUrl,
@@ -17,7 +19,6 @@ import {
   resetPasswordEnumerationSafeLine,
   sendReauthenticationCode,
   setNewPassword,
-  signInWithMagicLink,
   signInWithPassword,
   signOut,
   signUpWithPassword,
@@ -27,7 +28,6 @@ import {
 function fakeClient(overrides: Partial<AuthClientLike["auth"]> = {}, rpcImpl?: AuthClientLike["rpc"]): AuthClientLike {
   return {
     auth: {
-      signInWithOtp: async () => ({ error: null }),
       signInWithPassword: async () => ({ error: null, data: { session: null } }),
       signUp: async () => ({ error: null }),
       signOut: async () => ({ error: null }),
@@ -60,31 +60,23 @@ test("siteRedirectUrl: an origin argument is ignored entirely — still throws w
 // Sign-in flows
 // ---------------------------------------------------------------------
 
-test("signInWithMagicLink: passes email + emailRedirectTo, returns ok on success", async () => {
-  let seenArgs: unknown;
-  const client = fakeClient({
-    signInWithOtp: async (args) => {
-      seenArgs = args;
-      return { error: null };
-    },
-  });
-  const result = await signInWithMagicLink(client, "alex@example.com", "https://ten.example/auth");
-  assert.deepEqual(result, { ok: true });
-  assert.deepEqual(seenArgs, { email: "alex@example.com", options: { emailRedirectTo: "https://ten.example/auth" } });
-});
-
-test("signInWithMagicLink: surfaces the error message on failure", async () => {
-  const client = fakeClient({ signInWithOtp: async () => ({ error: { message: "rate limited" } }) });
-  const result = await signInWithMagicLink(client, "alex@example.com", "https://ten.example/auth");
-  assert.deepEqual(result, { ok: false, error: "rate limited" });
-});
-
 test("signInWithPassword: ok on success, error surfaced on failure", async () => {
   const ok = fakeClient({ signInWithPassword: async () => ({ error: null, data: { session: null } }) });
   assert.deepEqual(await signInWithPassword(ok, "a@example.com", "hunter2"), { ok: true });
 
-  const bad = fakeClient({ signInWithPassword: async () => ({ error: { message: "invalid credentials" }, data: { session: null } }) });
-  assert.deepEqual(await signInWithPassword(bad, "a@example.com", "wrong"), { ok: false, error: "invalid credentials" });
+  // Any error but the two mapped ones still shows its own message, as before.
+  const bad = fakeClient({ signInWithPassword: async () => ({ error: { message: "network down" }, data: { session: null } }) });
+  assert.deepEqual(await signInWithPassword(bad, "a@example.com", "wrong"), { ok: false, error: "network down" });
+});
+
+test("signInWithPassword: invalid_credentials is Y12 and email_not_confirmed is Y13, never Supabase's own message", async () => {
+  const fake = (code: string) =>
+    fakeClient({ signInWithPassword: async () => ({ error: { message: `RAW-SUPABASE-${code}`, code, status: 400 }, data: { session: null } }) });
+  const y12 = await signInWithPassword(fake("invalid_credentials"), "a@example.com", "wrong");
+  assert.deepEqual(y12, { ok: false, error: SIGN_IN_INVALID_CREDENTIALS_LINE });
+  const y13 = await signInWithPassword(fake("email_not_confirmed"), "a@example.com", "wrong");
+  assert.deepEqual(y13, { ok: false, error: SIGN_IN_UNCONFIRMED_LINE });
+  for (const r of [y12, y13]) assert.doesNotMatch(r.error ?? "", /RAW-SUPABASE/);
 });
 
 test("signUpWithPassword: passes emailRedirectTo too (§ 8: every auth link)", async () => {
@@ -97,6 +89,24 @@ test("signUpWithPassword: passes emailRedirectTo too (§ 8: every auth link)", a
   });
   await signUpWithPassword(client, "new@example.com", "hunter2", "https://ten.example/auth");
   assert.deepEqual(seenArgs, { email: "new@example.com", password: "hunter2", options: { emailRedirectTo: "https://ten.example/auth" } });
+});
+
+test("signInWithPassword: Y12 and Y13 also arrive as error_code, and as Supabase's own known message with no code (case-insensitive, trimmed)", async () => {
+  const fake = (error: { message: string; code?: string; error_code?: string }) =>
+    fakeClient({ signInWithPassword: async () => ({ error, data: { session: null } }) });
+  const shapes: [string, { message: string; code?: string; error_code?: string }, string][] = [
+    ["error_code, invalid", { message: "x", error_code: "invalid_credentials" }, SIGN_IN_INVALID_CREDENTIALS_LINE],
+    ["error_code, unconfirmed", { message: "x", error_code: "email_not_confirmed" }, SIGN_IN_UNCONFIRMED_LINE],
+    ["message only, invalid", { message: "Invalid login credentials" }, SIGN_IN_INVALID_CREDENTIALS_LINE],
+    ["message only, shouting and padded", { message: "  INVALID LOGIN CREDENTIALS " }, SIGN_IN_INVALID_CREDENTIALS_LINE],
+    ["message only, unconfirmed", { message: "Email not confirmed" }, SIGN_IN_UNCONFIRMED_LINE],
+    ["message only, lower case and padded", { message: " email not confirmed\n" }, SIGN_IN_UNCONFIRMED_LINE],
+  ];
+  for (const [name, error, line] of shapes) assert.deepEqual(await signInWithPassword(fake(error), "a@example.com", "x"), { ok: false, error: line }, name);
+  // every other error is left as it is: its own message, even next to a similar-looking one
+  for (const message of ["Invalid login credentials for this project", "Email not confirmed yet", "network down"])
+    assert.deepEqual(await signInWithPassword(fake({ message }), "a@example.com", "x"), { ok: false, error: message }, message);
+  assert.deepEqual(await signInWithPassword(fake({ message: "over limit", code: "over_request_rate_limit" }), "a@example.com", "x"), { ok: false, error: "over limit" });
 });
 
 test("signOut: ok on success, error surfaced on failure", async () => {

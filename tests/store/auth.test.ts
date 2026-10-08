@@ -11,7 +11,7 @@ import test from "node:test";
 import {
   NOT_SET_UP_MESSAGE,
   checkMembership,
-  signInWithMagicLink,
+  signInWithPassword,
   signUpWithPassword,
   type AuthClientLike,
 } from "../../apps/web/src/backend/auth.ts";
@@ -62,11 +62,10 @@ test("U3 with VITE_SITE_URL unset, siteRedirectUrl() throws, with or without an 
   assert.throws(() => (mod.siteRedirectUrl as (o?: string) => string)("https://preview-123.vercel.app"), /VITE_SITE_URL/);
 });
 
-test("U4 magic link and sign-up pass the given redirectTo as emailRedirectTo; password sign-in sends no redirect", async () => {
+test("U4 sign-up passes the given redirectTo as emailRedirectTo; password sign-in sends no redirect", async () => {
   const seen: unknown[] = [];
   const fake: AuthClientLike = {
     auth: {
-      signInWithOtp: async (a) => (seen.push(["otp", a]), { error: null }),
       signInWithPassword: async (a) => (seen.push(["pw", a]), { error: null, data: { session: null } }),
       signUp: async (a) => (seen.push(["up", a]), { error: null }),
       signOut: async () => ({ error: null }),
@@ -74,10 +73,10 @@ test("U4 magic link and sign-up pass the given redirectTo as emailRedirectTo; pa
     },
     rpc: async () => ({ data: null, error: null }),
   };
-  await signInWithMagicLink(fake, "a@example.com", "https://ten.example.app");
+  await signInWithPassword(fake, "a@example.com", "pw");
   await signUpWithPassword(fake, "a@example.com", "pw", "https://ten.example.app");
   assert.deepEqual(seen, [
-    ["otp", { email: "a@example.com", options: { emailRedirectTo: "https://ten.example.app" } }],
+    ["pw", { email: "a@example.com", password: "pw" }],
     ["up", { email: "a@example.com", password: "pw", options: { emailRedirectTo: "https://ten.example.app" } }],
   ]);
 });
@@ -86,8 +85,9 @@ test("U4 magic link and sign-up pass the given redirectTo as emailRedirectTo; pa
 // `updateUser({ password })` and `updateUser({ password, nonce })` as a
 // same-tab password change that SENDS NO LINK, so they deliberately carry
 // no redirect. The rule stays strict for every call that sends a link:
-// signInWithOtp, signUp, resetPasswordForEmail, signInWithOAuth, and
-// updateUser only when its attributes change the email.
+// signUp, resetPasswordForEmail, signInWithOAuth, and updateUser only when
+// its attributes change the email. signInWithOtp stays in the pattern as a
+// tripwire: since 2026-10-07 (C § 16.5) nothing under apps/web/src calls it.
 const LINK_CALLS = /\.(signInWithOtp|signUp|resetPasswordForEmail|signInWithOAuth|updateUser)\(([^)]*)\)/g;
 function redirectOffenders(file: string, s: string): string[] {
   const out: string[] = [];
@@ -119,7 +119,9 @@ test("U5 no source under apps/web/src reads a Site URL, and every auth call that
   }
   assert.deepEqual(offenders, []);
   // the rule is not vacuous: each link-sending call has a real call site
-  for (const fn of ["signInWithOtp", "signUp", "resetPasswordForEmail"]) assert.ok(linkSites.includes(fn), `no call site found for ${fn}`);
+  for (const fn of ["signUp", "resetPasswordForEmail"]) assert.ok(linkSites.includes(fn), `no call site found for ${fn}`);
+  // and the sign-in card asks for no sign-in link (C § 16.5)
+  assert.ok(!linkSites.includes("signInWithOtp"), "a signInWithOtp call site exists");
 });
 
 test("U5b the narrowed rule still flags a link-sending call with no redirect and an email-changing updateUser; a password-only updateUser passes", () => {

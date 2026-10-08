@@ -1,8 +1,13 @@
 // Auth — sign-in and membership detection (docs/design-web-agent.md § 8),
 // plus setting and resetting a password (§ 16).
 //
+// One way to sign in (§ 16.5, 2026-10-07): email and password. The sign-in
+// card makes three calls and no others: signInWithPassword, signUp and
+// resetPasswordForEmail. A still-valid emailed sign-in link that someone
+// opens lands as an ordinary session; nothing here blocks it.
+//
 // Uses @supabase/supabase-js (pinned 2.58.0) for session management: it
-// handles the magic-link / password flows, token refresh, and storing the
+// handles the password flow, token refresh, and storing the
 // session (in the browser, via its own localStorage adapter — this file
 // itself touches no window/document/localStorage directly, so it stays
 // importable and testable under plain Node; only createTenAuthClient()'s
@@ -21,7 +26,8 @@ export interface AuthOptions {
 
 /** The real client for the app to use. Session persistence + auto refresh
  *  on (the normal browser posture); `detectSessionInUrl` picks up the
- *  magic-link / OAuth-style redirect's token from the URL on load. */
+ *  emailed-link redirect's token from the URL on load (a reset, a sign-up
+ *  confirmation, or an old sign-in link). */
 export function createTenAuthClient(opts: AuthOptions): SupabaseClient {
   return createClient(opts.url, opts.anonKey, {
     auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
@@ -61,6 +67,8 @@ export function siteRedirectUrl(_ignoredOrigin?: string): string {
 export interface AuthErrorLike {
   message: string;
   code?: string;
+  /** the legacy spelling of `code`, if a response carries it (read by the sign-in error map only) */
+  error_code?: string;
   status?: number;
   reasons?: string[];
 }
@@ -71,8 +79,7 @@ export interface AuthErrorLike {
 // (a strict superset) satisfies it unchanged.
 export interface AuthClientLike {
   auth: {
-    signInWithOtp(args: { email: string; options?: { emailRedirectTo?: string } }): Promise<{ error: { message: string } | null }>;
-    signInWithPassword(args: { email: string; password: string }): Promise<{ error: { message: string } | null; data: { session: Session | null } }>;
+    signInWithPassword(args: { email: string; password: string }): Promise<{ error: AuthErrorLike | null; data: { session: Session | null } }>;
     signUp(args: {
       email: string;
       password: string;
@@ -94,18 +101,35 @@ export interface AuthResult {
   error?: string;
 }
 
-/** Magic-link sign-in (§ 8: "magic-link or email+password"). No password;
- *  the candidate clicks the emailed link, which lands back on `redirectTo`
- *  with a session. */
-export async function signInWithMagicLink(client: AuthClientLike, email: string, redirectTo: string): Promise<AuthResult> {
-  const { error } = await client.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
-  return error ? { ok: false, error: error.message } : { ok: true };
+/** design-web-ui.md § 5.3.1 Y12, word for word: the email and password don't
+ *  match (Supabase's `invalid_credentials`). Never Supabase's own text. */
+export const SIGN_IN_INVALID_CREDENTIALS_LINE =
+  "That email and password don't match. Try again, or choose a new password with the link under the password field.";
+
+/** § 5.3.1 Y13, word for word: the email isn't confirmed yet
+ *  (`email_not_confirmed`). The reset link confirms the address too (C § 16.5). */
+export const SIGN_IN_UNCONFIRMED_LINE =
+  "Confirm your email first: open the link we sent, then sign in. If you can't find it, choose a new password with the link under the password field: that confirms your email too.";
+
+/** The sign-in card's error map, MINIMUM scope of § 1.4's 2026-10-07 list: Y12
+ *  and Y13 only, so a person locked out is told the way in. Every other error
+ *  still shows Supabase's own message, as before (Y14-Y16, Y44-Y46 and Y48 are
+ *  the Stage 4 build's). */
+function signInErrorText(error: AuthErrorLike): string {
+  // The same refusal can arrive in more than one shape: the code on `.code` (the API-version-2024 shape),
+  // the same value on `.error_code` (the legacy shape), or with no code at all and only Supabase's own
+  // message. All three give Y12 / Y13, so Supabase's words never show for these two cases.
+  const code = error.code ?? error.error_code;
+  const message = (error.message ?? "").trim().toLowerCase();
+  if (code === "invalid_credentials" || message === "invalid login credentials") return SIGN_IN_INVALID_CREDENTIALS_LINE;
+  if (code === "email_not_confirmed" || message === "email not confirmed") return SIGN_IN_UNCONFIRMED_LINE;
+  return error.message;
 }
 
 /** Password sign-in for an existing account. */
 export async function signInWithPassword(client: AuthClientLike, email: string, password: string): Promise<AuthResult> {
   const { error } = await client.auth.signInWithPassword({ email, password });
-  return error ? { ok: false, error: error.message } : { ok: true };
+  return error ? { ok: false, error: signInErrorText(error) } : { ok: true };
 }
 
 /** Password sign-up for a new account. Public sign-up is open (§ 8: "anyone

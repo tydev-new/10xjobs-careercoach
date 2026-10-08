@@ -728,9 +728,6 @@ async function runStateAudit(): Promise<StateAudit> {
     for (const c of await tagControls(page)) {
       if (c.disabled) {
         if (c.tag !== "button") continue;
-        // sign-in's mode toggle uses `disabled` to mark the SELECTED segment,
-        // not a disabled control (reported separately); every other one counts.
-        if (await page.locator(`[data-s1="${c.id}"]`).evaluate((e) => !!e.closest(".sign-in-mode-toggle"))) continue;
         disabledSeen++;
         const st = await styleUnder(page, c.id, []);
         const miss = [st.bg !== want.bg && `bg ${st.bg}`, st.color !== want.color && `color ${st.color}`, st.shadow !== "none" && `shadow ${st.shadow}`, st.cursor !== "not-allowed" && `cursor ${st.cursor}`].filter(Boolean);

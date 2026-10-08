@@ -13,6 +13,8 @@ import {
   authRedirectFromUrl,
   checkMembership,
   claimWelcome,
+  cleanPath,
+  createAccountLinkFromUrl,
   createTenAuthClient,
   passwordErrorMessage,
   requestPasswordReset,
@@ -355,4 +357,57 @@ test("resetPasswordEnumerationSafeLine: byte-identical whether or not an account
     "If an account exists for real@example.com, a link to choose a new password should arrive within a few minutes. " +
       "Check spam too. Only a few emails can be sent each hour, so if nothing comes, try again later.",
   );
+});
+
+// ---------------------------------------------------------------------
+// createAccountLinkFromUrl — design-web-ui.md § 1.4 (2026-10-08), proof item 3
+// ---------------------------------------------------------------------
+
+const SITE = "https://ten-coach.vercel.app";
+
+test("createAccountLinkFromUrl: yes for a query key spelled exactly `signup`, whatever its value or position", () => {
+  for (const q of ["/?signup", "/?signup=", "/?signup=1", "/?signup=0", "/?utm_source=x&signup&ref=y", "/?a=1&signup=zzz&b=2", "/index.html?signup"])
+    assert.equal(createAccountLinkFromUrl(SITE + q), true, q);
+  assert.equal(createAccountLinkFromUrl("http://127.0.0.1:5173/?signup"), true);
+  // an empty hash is not "anything after #"
+  assert.equal(createAccountLinkFromUrl(SITE + "/?signup#"), true);
+});
+
+test("createAccountLinkFromUrl: no for another spelling or case, the word as a value, #signup and the path /signup", () => {
+  for (const q of ["/", "", "/?Signup", "/?SIGNUP", "/?sign-up", "/?signup2", "/?asignup", "/?create", "/?view=signup", "/#signup", "/signup", "/signup/", "/?utm_source=x"])
+    assert.equal(createAccountLinkFromUrl(SITE + q), false, q);
+});
+
+test("createAccountLinkFromUrl: no whenever the address also carries a Supabase redirect", () => {
+  for (const q of [
+    "/?signup#access_token=a&type=signup",
+    "/?signup#error_code=otp_expired",
+    "/?signup#anything",
+    "/?signup&code=a",
+    "/?signup&type=recovery",
+    "/?signup&type=signup",
+    "/?signup&error=access_denied",
+    "/?signup&error_code=otp_expired",
+    "/?signup&error_description=x",
+    "/?signup&access_token=a",
+    "/?code=a&signup",
+  ])
+    assert.equal(createAccountLinkFromUrl(SITE + q), false, q);
+});
+
+test("createAccountLinkFromUrl: an address that is not a URL answers no, and the function reads no tag", () => {
+  assert.equal(createAccountLinkFromUrl("not a url"), false);
+  assert.equal(createAccountLinkFromUrl(""), false);
+  // the tags only ride along: the answer is the same with or without them
+  assert.equal(createAccountLinkFromUrl(SITE + "/?signup&utm_source=A&utm_campaign=B&ref=C"), createAccountLinkFromUrl(SITE + "/?signup"));
+});
+
+test("cleanPath: a run of leading slashes becomes one; a normal path is untouched", () => {
+  assert.equal(cleanPath("/"), "/");
+  assert.equal(cleanPath("//"), "/");
+  assert.equal(cleanPath("///x"), "/x");
+  assert.equal(cleanPath("//index.html"), "/index.html");
+  assert.equal(cleanPath("/index.html"), "/index.html");
+  assert.equal(cleanPath("/a//b"), "/a//b");
+  assert.equal(cleanPath(""), "/");
 });

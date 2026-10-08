@@ -252,6 +252,42 @@ export function authRedirectFromUrl(href: string): AuthUrlRedirect {
   return "none";
 }
 
+/** Query keys a Supabase redirect (a session, an error, a code) comes back with. */
+const REDIRECT_QUERY_KEYS = ["code", "type", "error", "error_code", "error_description", "access_token"];
+
+/**
+ * design-web-ui.md § 1.4 (amended 2026-10-08): does this address ask the sign-in card to open on
+ * Create an account? Pure (the caller passes `href`); the caller reads it once, at mount.
+ *
+ * Yes when the QUERY has a key spelled exactly `signup` (lower case; its value is not read, so
+ * `?signup`, `?signup=` and `?signup=1` all count, in any position among other keys). No for another
+ * spelling or case, the word as a value, `#signup`, and the path `/signup`. No whenever the address
+ * also carries a Supabase redirect (anything after `#`, or a query key in REDIRECT_QUERY_KEYS): then
+ * everything happens as it would without `signup`. Every other key on the link is never read.
+ */
+export function createAccountLinkFromUrl(href: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return false;
+  }
+  if (url.hash.length > 1) return false;
+  const query = new URLSearchParams(url.search);
+  if (!query.has("signup")) return false;
+  return !REDIRECT_QUERY_KEYS.some((k) => query.has(k));
+}
+
+/**
+ * The path `history.replaceState` is given when the address is cleaned (the create link's query, an
+ * expired link's error). A run of leading slashes collapses to one: `//` read as a URL is a
+ * host-less address the browser refuses, which would throw and leave the page blank.
+ * Pure: the caller passes `window.location.pathname`.
+ */
+export function cleanPath(pathname: string): string {
+  return "/" + pathname.replace(/^\/+/, "");
+}
+
 /** The result of a password-save attempt (`updateUser`) or a
  *  reauthentication-code send/resend (`reauthenticate`) — never the raw
  *  `AuthError`, so every caller is forced through `passwordErrorMessage`

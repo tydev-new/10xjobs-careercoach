@@ -113,7 +113,9 @@ before(async () => {
   }
   const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
   server = createServer((req, res) => {
-    const p = decodeURIComponent(new URL(req.url ?? "/", "http://x").pathname);
+    // "http://x" + url, not a URL resolved against "http://x": a doubled-slash address ("//?signup") would
+    // otherwise be read as a host-less network-path reference and throw (CL-10).
+    const p = decodeURIComponent(new URL("http://x" + (req.url ?? "/")).pathname.replace(/^\/\/+/, "/"));
     let file = path.join(outDir, p === "/" ? "index.html" : p);
     if (!file.startsWith(outDir) || !existsSync(file) || lstatSync(file).isDirectory()) file = path.join(outDir, "index.html");
     res.writeHead(200, { "content-type": TYPES[path.extname(file)] ?? "application/octet-stream" }).end(readFileSync(file));
@@ -1143,5 +1145,213 @@ test("Y-7 a sign-in error does not follow the person to the reset card or back; 
     assert.equal(await o.page.getByLabel("Password").getAttribute("minlength"), String(MIN_PASSWORD_LENGTH), "Create: the 8-character floor");
   } finally {
     await o.close();
+  }
+});
+
+// ================================================================ 11. the create link (ui § 1.4, amended 2026-10-08)
+//
+// Proved-by items 1, 2, 4, 5, 6, 8 (the fake's half) and 9 against the fake. The pure function
+// (item 3) is apps/web/src/backend/auth.test.ts; the stand-in's half (7, 8, 10) is tests/e2e-real/e2e.ts.
+
+const CREATE_ACCEPTED = ["?signup", "?signup=", "?signup=1", "?utm_source=x&signup&ref=y", "?signup=0"];
+const CREATE_REJECTED = ["", "?Signup", "?sign-up", "?signup2", "?create", "?view=signup", "#signup"];
+const createViewShowing = (page: Page) => page.getByRole("button", { name: "Create account", exact: true });
+
+test("CL-1 each accepted address opens Create an account: `Create account`, Y9, O5, O7; no Y20, no Y27; the query is gone; a reload opens Sign in", async () => {
+  for (const q of CREATE_ACCEPTED) {
+    const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: q });
+    try {
+      await createViewShowing(o.page).waitFor();
+      assert.equal(await o.page.getByRole("button", { name: Y.Y9 }).count(), 1, `${q}: Y9`);
+      assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 0, `${q}: Y20`);
+      assert.equal(await o.page.getByRole("button", { name: Y.Y8 }).count(), 0, `${q}: Y8`);
+      const t = norm(await o.page.evaluate(() => document.body.innerText));
+      assert.ok(t.includes(Y.O5) && t.includes(Y.O7) && !t.includes(Y.Y27), `${q}: O5, O7, no Y27`);
+      await noRetiredStrings(o.page, `create link ${q}`);
+      const loc = await o.page.evaluate(() => ({ search: location.search, hash: location.hash, path: location.pathname }));
+      assert.deepEqual(loc, { search: "", hash: "", path: "/" }, `${q}: the address is the plain one`);
+      await o.page.reload();
+      await signInShowing(o.page).waitFor();
+      assert.equal(await o.page.getByRole("button", { name: Y.Y8 }).count(), 1, `${q}: a reload opens Sign in, Y8 one tap away`);
+    } finally {
+      await o.close();
+    }
+  }
+});
+
+test("CL-2 each rejected address opens Sign in, and the address is left as it was", async () => {
+  for (const q of CREATE_REJECTED) {
+    const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: q });
+    try {
+      await signInShowing(o.page).waitFor();
+      await settle(o.page);
+      assert.equal(await createViewShowing(o.page).count(), 0, q);
+      const loc = await o.page.evaluate(() => location.search + location.hash);
+      assert.equal(loc, q, `${q || "(plain)"}: the address is unchanged`);
+    } finally {
+      await o.close();
+    }
+  }
+  // tags with no `signup` stay in the address bar, unread
+  const t = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: "?utm_source=x&ref=y" });
+  try {
+    await signInShowing(t.page).waitFor();
+    await settle(t.page);
+    assert.equal(await t.page.evaluate(() => location.search), "?utm_source=x&ref=y");
+  } finally {
+    await t.close();
+  }
+});
+
+test("CL-4 signed in: `?signup` never shows the card, the address ends plain; signing out afterwards opens Sign in (the real member screen and sign-out are the e2e's)", async () => {
+  // a signed-in non-member: the not-a-member screen, then Sign out
+  const o = await open({ signedIn: true, member: false, events: [{ event: "INITIAL_SESSION" }] }, { path: "?signup&utm_source=x" });
+  try {
+    await o.page.getByText(O2_PAUSED).waitFor();
+    assert.equal(await createViewShowing(o.page).count(), 0);
+    assert.equal(await o.page.evaluate(() => location.search), "", "the address ends as the plain one");
+    await o.page.getByRole("button", { name: "Sign out" }).click();
+    await signInShowing(o.page).waitFor();
+    assert.equal(await createViewShowing(o.page).count(), 0, "the yes was dropped, so Sign in opens");
+  } finally {
+    await o.close();
+  }
+  // a signed-in member (the harness has no workspace backend, so only "not the card" is asserted)
+  const m = await open({ signedIn: true, member: true, events: [{ event: "INITIAL_SESSION" }] }, { path: "?signup" });
+  try {
+    await settle(m.page, 1500);
+    assert.equal(await createViewShowing(m.page).count(), 0);
+    assert.equal(await m.page.locator(".sign-in-screen").count(), 0);
+    assert.equal(await m.page.evaluate(() => location.search), "");
+  } finally {
+    await m.close();
+  }
+});
+
+test("CL-4b the yes is used once: from `?signup`, signing in and then signing out opens Sign in, not Create", async () => {
+  const o = await open({ events: [{ event: "INITIAL_SESSION" }], member: false }, { path: "?signup" });
+  try {
+    await createViewShowing(o.page).waitFor();
+    await o.page.getByRole("button", { name: Y.Y9 }).click();
+    await o.page.getByLabel("Email").fill(EMAIL);
+    await o.page.getByLabel("Password").fill("correct horse battery");
+    await signInShowing(o.page).click();
+    await o.page.getByText(O2_PAUSED).waitFor();
+    await o.page.getByRole("button", { name: "Sign out" }).click();
+    await signInShowing(o.page).waitFor();
+    assert.equal(await createViewShowing(o.page).count(), 0);
+  } finally {
+    await o.close();
+  }
+});
+
+test("CL-5 a redirect wins over `signup`: an expired link shows Y27 above Sign in; a recovery link shows 'Choose a new password'; a valid sign-up link goes on to the membership check", async () => {
+  const err = "error=access_denied&error_code=otp_expired&error_description=x";
+  for (const p of [`?signup&${err}`, `?signup#${err}`]) {
+    const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: p });
+    try {
+      await o.page.getByText(Y.Y27).waitFor();
+      await signInShowing(o.page).waitFor();
+      assert.equal(await createViewShowing(o.page).count(), 0, p);
+    } finally {
+      await o.close();
+    }
+  }
+  const r = await open(
+    { signedIn: true, member: true, events: [{ event: "INITIAL_SESSION" }, { event: "PASSWORD_RECOVERY", delay: 5 }] },
+    { path: "?signup" + RECOVERY_HASH },
+  );
+  try {
+    await r.page.getByRole("heading", { name: COPY.recoveryTitle }).waitFor();
+    assert.equal(await createViewShowing(r.page).count(), 0);
+  } finally {
+    await r.close();
+  }
+  const s = await open({ signedIn: true, member: false, events: [{ event: "INITIAL_SESSION" }] }, { path: "?signup#access_token=fake-access-token&expires_in=3600&refresh_token=fake-refresh&token_type=bearer&type=signup" });
+  try {
+    await s.page.getByText(O2_PAUSED).waitFor();
+    assert.equal(await memberChecks(s.page), 1, "the membership check ran");
+    assert.equal(await createViewShowing(s.page).count(), 0);
+  } finally {
+    await s.close();
+  }
+});
+
+test("CL-6 tags go nowhere: after create-account from a tagged link, no call, request, storage, cookie or console line holds TAGMARK; the sign-up carries the plain site address", async () => {
+  const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: "?signup&utm_source=TAGMARK1&utm_campaign=TAGMARK2&ref=TAGMARK3" });
+  try {
+    await createViewShowing(o.page).waitFor();
+    await o.page.getByLabel("Email").fill("tagged@example.com");
+    await o.page.getByLabel("Password").fill("Correct-Horse-9");
+    await createViewShowing(o.page).click();
+    await o.page.getByRole("button", { name: Y.Y24 }).waitFor();
+    const signUps = await callsOf(o.page, "signUp");
+    assert.deepEqual(signUps.map((c) => c.args), [[{ email: "tagged@example.com", password: "Correct-Horse-9", options: { emailRedirectTo: SITE_URL } }]], "one sign-up, the plain site address");
+    // the page's own request/console/storage/history logs (requests[0] is the navigation itself, which carries the address by definition)
+    const inPage = await o.page.evaluate(() => JSON.stringify({ leak: (window as any).__leak, href: location.href, ls: { ...localStorage }, ss: { ...sessionStorage }, cookie: document.cookie, title: document.title, historyState: history.state }));
+    const dump = JSON.stringify(await calls(o.page)) + inPage + o.requests.slice(1).join("\n") + o.console.join("\n");
+    assert.ok(!dump.includes("TAGMARK"), "TAGMARK found in a call, a later request, a console line or the page's own storage/history log");
+    assert.ok(!(await o.page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + document.cookie)).includes("TAGMARK"));
+  } finally {
+    await o.close();
+  }
+});
+
+test("CL-9 from a create-link start: Y9 opens Sign in with the email kept and Y20 showing; Y8 returns to Create; after `Create account`, Y24 opens Sign in", async () => {
+  const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: "?signup" });
+  try {
+    await createViewShowing(o.page).waitFor();
+    await o.page.getByLabel("Email").fill("kept@example.com");
+    await o.page.getByRole("button", { name: Y.Y9 }).click();
+    await signInShowing(o.page).waitFor();
+    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com");
+    assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 1);
+    await o.page.getByRole("button", { name: Y.Y8 }).click();
+    await createViewShowing(o.page).waitFor();
+    await o.page.getByLabel("Password").fill("Correct-Horse-9");
+    await createViewShowing(o.page).click();
+    await o.page.getByRole("button", { name: Y.Y24 }).click();
+    await signInShowing(o.page).waitFor();
+    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com");
+  } finally {
+    await o.close();
+  }
+});
+
+test("CL-10 a doubled slash path never blanks the page: `//?signup` opens Create and ends at `/`; `//` opens Sign in; `//#error_code=otp_expired` shows Y27 above Sign in with a clean address; no page error", async () => {
+  const run = async (suffix: string) => {
+    const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: suffix });
+    const errors: string[] = [];
+    o.page.on("pageerror", (e) => errors.push(String(e)));
+    return { o, errors };
+  };
+  // `open` navigates to base + path, and base ends with "/", so "/?signup" is the address "//?signup"
+  const a = await run("/?signup");
+  try {
+    await createViewShowing(a.o.page).waitFor({ timeout: 8000 });
+    assert.equal(await a.o.page.evaluate(() => location.pathname + location.search + location.hash), "/", "the address ends at /");
+    assert.deepEqual(a.errors, []);
+    assert.ok(!(await a.o.page.evaluate(() => (window as any).__leak?.history ?? [])).some((h: string) => h.includes("//")), "replaceState was never given a doubled slash");
+  } finally {
+    await a.o.close();
+  }
+  const b = await run("/");
+  try {
+    await signInShowing(b.o.page).waitFor({ timeout: 8000 });
+    assert.equal(await createViewShowing(b.o.page).count(), 0);
+    assert.deepEqual(b.errors, []);
+  } finally {
+    await b.o.close();
+  }
+  const c = await run("/#error=access_denied&error_code=otp_expired&error_description=x");
+  try {
+    await c.o.page.getByText(Y.Y27).waitFor({ timeout: 8000 });
+    await signInShowing(c.o.page).waitFor();
+    await settle(c.o.page);
+    assert.equal(await c.o.page.evaluate(() => location.pathname + location.search + location.hash), "/", "the address is clean");
+    assert.equal(await createViewShowing(c.o.page).count(), 0);
+    assert.deepEqual(c.errors, []);
+  } finally {
+    await c.o.close();
   }
 });

@@ -44,12 +44,15 @@ export interface SignInProps {
    *  own URL (a reset, a confirmation or an old sign-in link alike) — RealApp
    *  reads this once, before the client is created, and clears the URL itself. */
   expiredLink?: boolean;
+  /** design-web-ui.md § 1.4 (2026-10-08): open on the Create an account view, the one Y8 opens.
+   *  Read at mount only; RealApp passes it to the first signed-out page load and no later one. */
+  startOnCreate?: boolean;
 }
 
 type View = "sign-in" | "create";
 
-export function SignIn({ client, redirectTo, expiredLink }: SignInProps): ReactElement {
-  const [view, setView] = useState<View>("sign-in");
+export function SignIn({ client, redirectTo, expiredLink, startOnCreate }: SignInProps): ReactElement {
+  const [view, setView] = useState<View>(() => (startOnCreate ? "create" : "sign-in"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");

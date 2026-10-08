@@ -9,6 +9,8 @@ import type { AppMessage } from "../../../../packages/agent/src/types.ts";
 import {
   accessTokenFrom,
   authRedirectFromUrl,
+  cleanPath,
+  createAccountLinkFromUrl,
   checkMembership,
   claimWelcome,
   createTenAuthClient,
@@ -99,8 +101,26 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   // distinguish them, by design (any `error_code` on the URL). It shows
   // on the Sign in view only (§ 1.4, 2026-10-07).
   const [expiredLink, setExpiredLink] = useState(() => initialRedirect === "link-error");
+  // design-web-ui.md § 1.4 (2026-10-08): a link with `?signup` opens the card on Create an account.
+  // Read once, here, from the address (pure; no tag or other key is read). It is used once: the first
+  // signed-out page load gets it, and it is dropped the moment any other screen shows (a member, a
+  // recovery, a later sign-out or an account deletion in this tab all open Sign in).
+  const [createLink, setCreateLink] = useState(() => createAccountLinkFromUrl(window.location.href));
   useEffect(() => {
-    if (expiredLink) window.history.replaceState(null, "", window.location.pathname);
+    if (createLink && screen.kind !== "loading") setCreateLink(false);
+  }, [createLink, screen.kind]);
+  useEffect(() => {
+    // Cleaned in the same step as the read: the whole query goes, whatever came with `signup`.
+    // (A link with tags and no `signup`, or with a Supabase redirect, is left as it is today.)
+    if (createLink || expiredLink) {
+      // Never throws and never blanks the page: if the browser refuses, the card still renders and
+      // the query is simply left where it is.
+      try {
+        window.history.replaceState(null, "", cleanPath(window.location.pathname));
+      } catch {
+        /* leave the address as it is */
+      }
+    }
     // Runs once, at mount, regardless of `client` — stripping the URL
     // doesn't depend on the auth client existing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -401,7 +421,7 @@ export function RealApp({ env, theme, onThemeToggle }: RealAppProps): ReactEleme
   if (screen.kind === "signed-out") {
     return (
       <div className="app-root" data-theme={theme}>
-        <SignIn client={authClient} redirectTo={siteRedirectUrl()} expiredLink={expiredLink} />
+        <SignIn client={authClient} redirectTo={siteRedirectUrl()} expiredLink={expiredLink} startOnCreate={createLink} />
       </div>
     );
   }

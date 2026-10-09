@@ -616,7 +616,7 @@ async function shot(page: Page, name: string) {
 test("brand mark: § 5.6's SVG (fills are tokens) — the wordmark in the rail at 28px on desktop, no wordmark on the phone, no mark in the header outside Ten's avatar, 30px on sign-in", async () => {
   const spec = fence(sub("The brand mark"), "html");
   const norm = (s: string) =>
-    [...s.matchAll(/<(svg|rect|ellipse)\b([^>]*?)\/?>/g)].map((m) => `${m[1]} ${[...m[2].matchAll(/([a-z-]+)="([^"]*)"/g)].filter((a) => !["width", "height", "class"].includes(a[1]) || m[1] !== "svg").map((a) => `${a[1]}=${a[2]}`).sort().join(" ")}`);
+    [...s.matchAll(/<(svg|rect|path|ellipse)\b([^>]*?)\/?>/g)].map((m) => `${m[1]} ${[...m[2].matchAll(/([a-z-]+)="([^"]*)"/g)].filter((a) => !["width", "height", "class"].includes(a[1]) || m[1] !== "svg").map((a) => `${a[1]}=${a[2]}`).sort().join(" ")}`);
   const marks = (page: Page) =>
     page.evaluate(() => {
       const shown = (e: Element) => e.getClientRects().length > 0 && getComputedStyle(e).visibility === "visible" && !e.closest("[hidden]");
@@ -657,6 +657,44 @@ test("brand mark: § 5.6's SVG (fills are tokens) — the wordmark in the rail a
   if (phone.wordmarks.length) bad.push(`375: ${phone.wordmarks.length} wordmark(s) shown, § 5.5 says none on the phone`);
   if (JSON.stringify(norm(signIn.html)) !== JSON.stringify(norm(spec))) bad.push("sign-in's mark is not § 5.6's markup");
   if (signIn.w !== "30") bad.push(`sign-in's mark is ${signIn.w}px, § 5.6 says 30px`);
+  assert.deepEqual(bad, []);
+});
+
+// § 5.6 "The brand mark" proof 3 and 5 (C30): the rendered tile is the website's terracotta, the glyph is white,
+// and a screen reader hears "Ten" once in the wordmark (the mark's wrapper is aria-hidden).
+test("brand mark (C30): the rendered tile is #C15F3C with a white 10x, on sign-in, the rail and Ten's avatar; the wordmark is named \"Ten\" once", async () => {
+  const ctx = await context();
+  const bad: string[] = [];
+  const tile = (page: Page) =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll("svg.mark")).map((m) => ({
+        where: m.closest(".avatar") ? "avatar" : m.closest(".wordmark") ? "wordmark" : "other",
+        tile: getComputedStyle(m.querySelector("rect")!).fill,
+        glyph: getComputedStyle(m.querySelector("path")!).fill,
+        ellipses: m.querySelectorAll("ellipse").length,
+      })),
+    );
+  const signIn = await openPreview(ctx, "sign-in");
+  const app = await openApp(ctx);
+  for (const [name, page, want] of [["sign-in", signIn, ["wordmark"]], ["app", app, ["wordmark", "avatar"]]] as const) {
+    const marks = await tile(page);
+    for (const w of want) if (!marks.some((m) => m.where === w)) bad.push(`${name}: no ${w} mark rendered`);
+    for (const m of marks) {
+      if (m.tile !== "rgb(193, 95, 60)") bad.push(`${name} ${m.where}: tile ${m.tile}`);
+      if (m.glyph !== "rgb(255, 255, 255)") bad.push(`${name} ${m.where}: glyph ${m.glyph}`);
+      if (m.ellipses) bad.push(`${name} ${m.where}: an ellipse is drawn`);
+    }
+  }
+  for (const [name, page] of [["sign-in", signIn], ["app", app]] as const) {
+    const w = await page.evaluate(() => {
+      const wm = document.querySelector(".wordmark")!;
+      return { hidden: wm.querySelector("svg.mark")!.closest("[aria-hidden=true]") !== null, text: wm.querySelector(".wordmark-text")?.textContent, label: wm.querySelector("svg.mark")!.getAttribute("aria-label"), role: wm.querySelector("svg.mark")!.getAttribute("role") };
+    });
+    if (!w.hidden || w.text !== "Ten" || w.label !== "Ten" || w.role !== "img") bad.push(`${name}: wordmark ${JSON.stringify(w)}`);
+    const named = await page.locator(".wordmark").getByRole("img", { name: "Ten" }).count();
+    if (named !== 0) bad.push(`${name}: the wordmark exposes ${named} image(s) named Ten besides its text`);
+  }
+  await ctx.close();
   assert.deepEqual(bad, []);
 });
 

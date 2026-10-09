@@ -2381,6 +2381,16 @@ on it.
   named the email link as the next step, so they now point to the link
   under the password field; Y11 and Y13 gain the next step for someone
   whose email never comes. § 1.4, § 1.10 and § 5.6 are edited.
+- **C30. The mark is the website's terracotta "10x" tile** (owner,
+  2026-10-09: "can you change logo in app to match logo on website?";
+  then "tile only"). § 5.6's mark was a black tile with a "1" bar and a
+  lime oval "0" (the one-bar-and-oval mark). **Pick:** the website's
+  tile replaces it everywhere it appears: `--brand` `#C15F3C` with a
+  white "10x" drawn as paths from the owner's logo file; the word "Ten"
+  and the rest of the palette stay as they are, and lime stays the one
+  accent (the mark's "0" leaves its use list). No row in § 5.3.1
+  changes: F8's words are still "Ten". § 5.6 "The brand mark",
+  "Ten's avatar" and the chain rules are edited.
 
 **Decisions where the doc had a slot but no words** (the NEW rows):
 
@@ -2535,7 +2545,8 @@ The pattern, at a frame width of 760px or less (the container query in
   - Tab: a column 48px high with the icon (20px, margin 5px 0) over the
     label (`--type-tab`, 11px/1, weight 500). Rest: `--fg-subtle`.
     Current: `--fg`, with `aria-current="page"`.
-  - The Ten tab replaces its icon with a tile 44×30px, radius 10px:
+  - The Ten tab replaces its icon with a tile 44×30px, radius 10px (an
+    icon tile, not the brand mark, § 5.6; C30 leaves it as is):
     `--hero` fill with a `--lime` icon at rest; `--lime` fill with an
     `--on-lime` icon when current. Its label reads "Ten".
   - The needs-your-yes marker on the phone is an 8px `--amber` dot at
@@ -2626,13 +2637,17 @@ These must agree with the chain, or the spec goes back to the owner:
 - **One accent: lime `#C8F03C`.** Every other hue is a status color.
   - Lime is a fill only, never text on a light ground (it is 1.4:1
     against white). Its whole use list is:
-    1. the brand mark's "0";
-    2. the Continue with Ten button;
-    3. the phone's Ten tab;
-    4. the selected amount in Buy credit (`--lime-soft`);
-    5. the toast's check icon;
-    6. the sign-in headline's underline. This is the owner's "one bold
+    1. the Continue with Ten button;
+    2. the phone's Ten tab;
+    3. the selected amount in Buy credit (`--lime-soft`);
+    4. the toast's check icon;
+    5. the sign-in headline's underline. This is the owner's "one bold
        touch" (2026-09-26).
+    (Amended 2026-10-09, C30: the brand mark's "0" was item 1; the mark
+    is now a terracotta tile and lime is not in it.)
+  - **The terracotta of the mark is not an accent.** `--brand`
+    `#C15F3C` is used by the mark's tile and nowhere else (§ 5.6, "The
+    brand mark"). *Prevents:* a second accent creeping in beside lime.
   - Amber is only for needs-you (§ 1.3). No alert-styled count badges
     (`design-references.md`, Huntr and Teal; rule 8).
 - **No rail summary line.** The rail shows the five places and nothing
@@ -2732,9 +2747,11 @@ Values are the same in both themes where only one is given.
   --on-lime: #0A0A0B;
   --lime-soft: #F1FAD3;
   --lime-ink: #3D5700;
-  --hero: #0B0C0E;          /* the Continue with Ten band, the mark's tile, the toast */
+  --hero: #0B0C0E;          /* the Continue with Ten band, the toast */
   --on-hero: #F4F5F7;
   --on-hero-muted: #A3A8B0;
+  --brand: #C15F3C;         /* the mark's tile and nothing else; same in dark (C30) */
+  --on-brand: #FFFFFF;      /* the "10x" on the tile */
   --focus: #0A0A0B;
   --focus-halo: rgba(10, 10, 11, 0.12);
   /* status (a category, never urgency) */
@@ -2823,6 +2840,10 @@ below is at least 4.5:1:
 | `--on-lime` on `--lime` | 15.1 |
 
 Stage 1's tester recomputes all of them.
+
+One pair sits outside this table on purpose: the mark's white `--on-brand`
+on `--brand` is 4.23:1. It is a logo, not text (§ 5.6, "The brand mark"),
+and it clears 3:1 for graphics.
 
 **Type on the phone** (760px or less):
 
@@ -2951,34 +2972,148 @@ No emoji. No sparkle icon.
 
 #### The brand mark
 
-A rounded tile holding a "1" bar and an oval "0": Ten, read as the
-numeral.
+**Amended 2026-10-09 (owner ruling; C30).** The owner asked for the
+app's logo to match the one on the website, and chose **tile only**:
+the website's terracotta "10x" tile replaces the app's black-and-lime
+tile everywhere the mark shows. The word beside it stays "Ten", in the
+app's own font. Nothing else about the palette changes; lime stays the
+one accent. The old mark (a black tile with a "1" bar and a lime oval
+"0") is gone from this section, and nothing in the app draws it any
+more.
 
-- **The mark (inline in the app).** The fills are tokens, so the dark
-  theme follows:
+A rounded terracotta tile holding "10x" in white: the website's tile,
+drawn once and used the same everywhere.
+
+- **The tokens**, added to § 5.6's token block:
+  - `--brand` is the website's own `--primary` (`src/index.css`), not
+    the website favicon's `#ea580c`, which is the outlier.
+  - Dark has the same values on purpose. The tile is a logo, so it keeps
+    its colour on any ground: `#C15F3C` is 4.54:1 against the dark
+    `--bg` `#0E0F11` and 4.20:1 against `--bg-panel` `#17181B`.
+  - The glyph is white, as in the website's CSS, not the drawn logo's
+    off-white `#F7F7F0` (3.93:1 on the tile; white is 4.23:1).
+
+| Token | Light | Dark (dormant) | Use |
+|---|---|---|---|
+| `--brand` | `#C15F3C` | `#C15F3C` | the mark's tile, and nothing else |
+| `--on-brand` | `#FFFFFF` | `#FFFFFF` | the "10x" on the tile |
+
+- **The mark (inline in the app).** Corner radius 8.5 of 32 (26.6%; the
+  website's nav tile is 9 of 34, 26.5%). The `path`'s `d` is one line,
+  exactly as written here:
 
 ```html
 <svg class="mark" width="28" height="28" viewBox="0 0 32 32" role="img" aria-label="Ten">
-  <rect width="32" height="32" rx="9" fill="var(--hero)"/>
-  <rect x="7" y="8.5" width="3.6" height="15" rx="1.8" fill="var(--on-hero)"/>
-  <ellipse cx="19.4" cy="16" rx="4.6" ry="5.7" fill="none" stroke="var(--lime)" stroke-width="3.6"/>
+  <rect width="32" height="32" rx="8.5" fill="var(--brand)"/>
+  <path fill="var(--on-brand)" d="M10.1 20.4L3.4 20.4L3.4 19.7C3.6 19.7 3.9 19.7 4.2 19.7C4.6 19.6 4.8 19.6 4.9 19.5C5.1 19.5 5.2 19.4 5.3 19.3C5.4 19.1 5.5 18.9 5.5 18.7L5.5 13.6L3.4 13.6L3.4 12.8L3.9 12.8C4.3 12.8 4.7 12.8 5.1 12.7C5.4 12.6 5.7 12.4 5.9 12.3C6.2 12.1 6.3 12 6.5 11.8C6.6 11.7 6.8 11.5 6.8 11.4L8.3 11.4C8.3 11.7 8.2 12.1 8.2 12.6C8.2 13.1 8.2 13.5 8.2 13.9L8.2 18.6C8.2 18.8 8.2 19 8.3 19.1C8.4 19.3 8.5 19.4 8.7 19.5C8.8 19.5 9.1 19.6 9.4 19.6C9.7 19.7 10 19.7 10.1 19.7ZM19.2 12.8C19.6 13.2 19.9 13.7 20.1 14.3C20.3 14.8 20.4 15.4 20.4 16C20.4 16.7 20.3 17.4 20 17.9C19.8 18.5 19.4 19 19 19.4C18.5 19.8 18 20.1 17.4 20.3C16.8 20.5 16.2 20.6 15.4 20.6C14.6 20.6 13.8 20.5 13.2 20.2C12.6 20 12.1 19.7 11.7 19.2C11.3 18.8 10.9 18.4 10.7 17.8C10.5 17.2 10.4 16.6 10.4 16C10.4 15.4 10.5 14.8 10.7 14.2C10.9 13.7 11.2 13.2 11.6 12.8C12.1 12.4 12.6 12 13.2 11.8C13.8 11.5 14.6 11.4 15.4 11.4C16.2 11.4 17 11.5 17.6 11.8C18.2 12 18.8 12.4 19.2 12.8ZM16.9 18.8C17 18.5 17.1 18.1 17.2 17.6C17.3 17.2 17.3 16.6 17.3 16C17.3 15.4 17.3 14.9 17.2 14.5C17.2 14 17.1 13.6 16.9 13.2C16.8 12.9 16.6 12.6 16.3 12.4C16.1 12.2 15.8 12.1 15.4 12.1C15 12.1 14.7 12.2 14.5 12.4C14.2 12.6 14 12.9 13.9 13.2C13.7 13.5 13.6 13.9 13.6 14.4C13.5 14.9 13.5 15.4 13.5 16C13.5 16.6 13.5 17.1 13.5 17.5C13.6 18 13.7 18.4 13.9 18.7C14 19.1 14.2 19.4 14.4 19.6C14.7 19.8 15 19.9 15.4 19.9C15.7 19.9 16 19.8 16.3 19.6C16.5 19.4 16.7 19.2 16.9 18.8ZM28.6 20.4L24.7 20.4L24.7 19.9C24.9 19.9 25.1 19.9 25.2 19.8C25.3 19.8 25.4 19.8 25.4 19.7C25.4 19.7 25.4 19.6 25.4 19.5C25.3 19.5 25.3 19.4 25.2 19.3C25.1 19.2 25 19 24.8 18.7C24.6 18.4 24.4 18.2 24.3 17.9C24 18.2 23.8 18.4 23.7 18.6C23.5 18.8 23.3 19.1 23.2 19.3C23.1 19.4 23 19.4 23 19.5C23 19.6 23 19.6 23 19.6C23 19.7 23.1 19.8 23.2 19.8C23.3 19.9 23.5 19.9 23.7 19.9L23.7 20.4L21.1 20.4L21.1 19.9C21.5 19.8 21.7 19.7 21.9 19.6C22.2 19.4 22.3 19.3 22.4 19.2C22.7 18.9 22.9 18.6 23.1 18.4C23.3 18.2 23.6 17.9 24 17.5C23.7 17.2 23.4 16.8 23.1 16.3C22.8 15.8 22.5 15.4 22.3 15.1C22.2 15 22 14.9 21.9 14.8C21.7 14.7 21.5 14.7 21.2 14.6L21.2 14.2L25 14.2L25 14.6C24.9 14.6 24.8 14.6 24.6 14.6C24.5 14.7 24.4 14.7 24.4 14.7C24.4 14.8 24.4 14.8 24.5 14.9C24.5 14.9 24.5 15 24.5 15C24.6 15.2 24.8 15.3 24.9 15.6C25.1 15.9 25.3 16.1 25.5 16.4C25.7 16.2 25.8 16 25.9 15.9C26.1 15.7 26.2 15.5 26.4 15.2C26.5 15.1 26.5 15.1 26.6 15C26.6 15 26.6 14.9 26.6 14.9C26.6 14.8 26.5 14.8 26.5 14.7C26.4 14.7 26.2 14.6 25.9 14.6L25.9 14.2L28.4 14.2L28.4 14.6C28.2 14.7 28 14.7 27.8 14.8C27.6 14.9 27.4 15.1 27.2 15.3C26.9 15.7 26.7 15.9 26.5 16.1C26.4 16.2 26.1 16.5 25.8 16.8C26 17.1 26.3 17.5 26.6 18C27 18.5 27.3 19 27.5 19.3C27.7 19.5 27.8 19.6 27.9 19.7C28.1 19.8 28.3 19.9 28.6 19.9Z"/>
 </svg>
 ```
 
-- **Sizes.** 28px in the rail, the header avatar and the conversation.
-  30px on sign-in. 24px on the Continue with Ten band. On the `--hero`
-  band the tile inverts: fill `var(--on-hero)`, "1" `var(--hero)`, "0"
-  `var(--hero)`.
-- **The wordmark.** The mark, a 9px gap, then live text "Ten" in
-  `--type-wordmark` with `--track-wordmark`, color `--fg`. It is text,
-  not outlined, so it takes the self-hosted font.
-- **The favicon.** A new file, `apps/web/public/favicon.svg`, linked
-  from `index.html` as `<link rel="icon" type="image/svg+xml"
-  href="/favicon.svg">`. It uses heavier strokes so it reads at 16px:
+- **Why paths, and where they come from.** The "10x" is drawn paths,
+  not text: no font to load, nothing to fall back to, and the same
+  shape in every browser. Georgia (the website's nav tile) is not on
+  Android or Linux, and Source Serif 4 at its heaviest is a different
+  drawing. The outlines are the owner's own logo, the vector file
+  `public/10xlogo_0702.pdf` in the website repo, converted to paths,
+  scaled by 0.3197 (the logo's 100.1-unit tile to 32), rounded to
+  0.1 unit and centred as one group (the ink spans x 3.4 to 28.6 and
+  y 11 to 21 of 32). The paths keep the default `fill-rule`
+  (`nonzero`); the "0"'s hole depends on it. Nobody edits the `d` by
+  hand: new artwork means redoing the conversion.
+  - The website's nav tile sets "10x" in Georgia, whose old-style
+    figures differ a little from the drawn logo. The mark follows the
+    drawn logo, which is the brand's artwork. At 24 to 30px the two
+    read as the same tile (renders under "Proof").
+- **Sizes.** Unchanged: 28px in the rail, the header avatar and the
+  conversation; 30px on sign-in; 24px on the Continue with Ten band.
+  The box is the same size as before, so no layout moves.
+- **On the `--hero` band the tile does not invert.** The old inversion
+  rule is deleted. `--brand` is 4.63:1 against `--hero` `#0B0C0E`, so
+  the same tile and the same white "10x" sit on the band as they do on
+  white.
+- **Contrast** (computed). White "10x" on `--brand` is **4.23:1**. It
+  is under the 4.5:1 bar for text, and that is allowed here: a logo is
+  exempt from the text bar (WCAG 1.4.3, logotypes), and the heavy
+  glyphs clear the 3:1 bar for graphics (1.4.11). `--on-brand` is
+  never used for text anywhere else. The tile against the grounds it
+  sits on: `--bg` 4.23, `--bg-rail` 3.87, `--hero` 4.63, and the
+  weakest, `--bg-press`, 3.41. All are 3:1 or more.
+- **Terracotta appears only in the mark.** `--brand` and `--on-brand`
+  are used by `BrandMark`'s tile and nowhere else: no button, link,
+  chip, border, chart, highlight or text, and never as a status color.
+  The favicon is its own file with the same hex typed in (an asset,
+  not a stylesheet). *Prevents:* a second accent creeping in beside
+  lime. The app has one accent (§ 5.6, chain rules); the tile is the
+  logo, not an accent.
+- **The accessible name** stays "Ten" (row F8): `role="img"` and
+  `aria-label="Ten"` on the mark. In the wordmark the mark sits in an
+  `aria-hidden` wrapper, so a screen reader hears "Ten" once. The "10x"
+  is never read out.
+- **The wordmark.** Unchanged: the mark, a 9px gap, then live text "Ten"
+  in `--type-wordmark` with `--track-wordmark`, color `--fg`. It is text,
+  not outlined, so it takes the self-hosted font. Renders at 28 and 30px
+  are under "Proof".
+- **The Ten tab on the phone** (§ 5.5) is an icon in a tile, not the
+  brand mark. It keeps `--hero` and `--lime` as written there.
+- **The favicon.** The file `apps/web/public/favicon.svg`, linked from
+  `index.html` as `<link rel="icon" type="image/svg+xml"
+  href="/favicon.svg">` (already linked; the file's content changes).
+  It shows only "10", larger: at 16px the "x" in "10x" would be 4px
+  wide and mud. The "10" is 14 units tall (7px at 16px) with 3 units of
+  margin on each side. Same tile (`#C15F3C`, radius 8.5), white glyph
+  (`#FFFFFF`), and the hex written out, since a favicon can't read
+  the app's tokens:
 
 ```svg
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0A0A0B"/><rect x="6.5" y="8" width="4.4" height="16" rx="2.2" fill="#FFFFFF"/><ellipse cx="19.6" cy="16" rx="4.4" ry="5.8" fill="none" stroke="#C8F03C" stroke-width="4.4"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8.5" fill="#C15F3C"/><path fill="#FFFFFF" d="M13.3 22.7L3.1 22.7L3.1 21.7C3.3 21.7 3.7 21.7 4.3 21.6C4.8 21.5 5.2 21.5 5.4 21.4C5.6 21.3 5.8 21.2 5.9 21C6.1 20.8 6.2 20.5 6.2 20.2L6.2 12.3L3 12.3L3 11.1L3.7 11.1C4.4 11.1 5 11 5.6 10.9C6.1 10.7 6.5 10.5 6.9 10.3C7.2 10.1 7.5 9.8 7.7 9.6C8 9.4 8.2 9.1 8.3 8.9L10.5 8.9C10.4 9.5 10.4 10.1 10.4 10.8C10.4 11.5 10.4 12.2 10.4 12.8L10.4 20C10.4 20.3 10.4 20.6 10.5 20.8C10.7 21 10.9 21.2 11.1 21.3C11.3 21.4 11.7 21.5 12.2 21.6C12.7 21.7 13.1 21.7 13.3 21.7ZM27.1 11.1C27.8 11.8 28.2 12.5 28.5 13.4C28.8 14.2 29 15.1 29 16C29 17.1 28.8 18.1 28.4 18.9C28 19.8 27.5 20.5 26.9 21.1C26.2 21.8 25.4 22.3 24.5 22.6C23.6 22.9 22.5 23.1 21.3 23.1C20.1 23.1 19 22.9 18 22.5C17.1 22.1 16.3 21.6 15.7 21C15 20.3 14.5 19.6 14.2 18.7C13.9 17.9 13.7 17 13.7 16C13.7 15 13.9 14.1 14.2 13.3C14.5 12.5 15 11.7 15.6 11.1C16.3 10.4 17.1 9.9 18 9.5C19 9.1 20.1 8.9 21.4 8.9C22.7 8.9 23.8 9.1 24.7 9.5C25.7 9.9 26.5 10.5 27.1 11.1ZM23.6 20.3C23.9 19.8 24 19.2 24.1 18.5C24.3 17.8 24.3 17 24.3 16C24.3 15.1 24.3 14.3 24.2 13.6C24.1 12.9 23.9 12.3 23.7 11.8C23.5 11.2 23.1 10.8 22.8 10.5C22.4 10.2 21.9 10 21.4 10C20.8 10 20.3 10.2 20 10.5C19.6 10.8 19.3 11.2 19 11.7C18.8 12.2 18.6 12.9 18.5 13.6C18.5 14.3 18.4 15.1 18.4 16C18.4 16.9 18.4 17.7 18.5 18.3C18.6 19 18.8 19.6 19 20.2C19.2 20.7 19.5 21.2 19.9 21.5C20.3 21.8 20.8 22 21.3 22C21.9 22 22.3 21.9 22.7 21.6C23.1 21.3 23.4 20.9 23.6 20.3Z"/></svg>
 ```
+
+- **Proof, for the tester.** Each line is checkable from this section.
+  1. **The SVG matches this doc.** The `<path d>` in `BrandMark.tsx` is
+     byte for byte the one in "The mark" above (2672 characters; first
+     characters `M10.1 20.4L3.4 20.4`, last `28.6 19.9Z`); the `rect`
+     is `rx="8.5"` with `fill="var(--brand)"`, the path is
+     `fill="var(--on-brand)"`, `viewBox="0 0 32 32"`, `role="img"`,
+     `aria-label="Ten"`. `favicon.svg`'s `d` is the one in "The
+     favicon" (1373 characters; first `M13.3 22.7L3.1 22.7`, last
+     `23.6 20.3Z`), with `rx="8.5"`, `fill="#C15F3C"` on the tile
+     and `fill="#FFFFFF"` on the path.
+  2. **The token values.** `styles.css`'s token block has `--brand:
+     #C15F3C` and `--on-brand: #FFFFFF`; the dark block adds nothing
+     (same values). `#C15F3C` and `var(--brand)` appear nowhere else
+     in `apps/web/src` and `apps/web/public` except `favicon.svg`,
+     which carries the hex.
+  3. **Every place the mark renders shows the new tile**, in the
+     rendered app, not just in the code: sign-in (30px, in the
+     wordmark), the rail (28px, in the wordmark), Ten's avatar in the
+     header (28px, `Avatar.tsx`), the avatar beside each of Ten's
+     turns (28px, `Transcript.tsx`), and the browser tab (the
+     favicon). The Continue with Ten band's 24px mark follows when the
+     band is built. A reload picks up the new favicon: look at a
+     fresh tab.
+  4. **No leftover of the old mark.** `BrandMark.tsx` has no
+     `<ellipse>`, no `var(--lime)`, no `var(--hero)`, no
+     `var(--on-hero)` and no small `<rect>` for the "1" bar (its only
+     `<rect>` is the 32 by 32 tile). The old favicon's `#0A0A0B` tile
+     and `#C8F03C` stroke are gone from `favicon.svg`, which has no
+     `ellipse` either. `styles.css`'s token comment on `--hero` no
+     longer says "the mark's tile", and `BrandMark.tsx`'s header
+     comment no longer says "1" bar and oval "0".
+  5. **The accessible name** is "Ten" on the mark alone, and "Ten"
+     once in the wordmark (the mark's wrapper is `aria-hidden`).
+  6. **375px sign-in is unchanged in layout.** The mark is 30px, as
+     before; the wordmark row, the headline and the form sit at the
+     same coordinates before and after. Only the pixels of the tile
+     change.
+  7. **The avatar's states** (§ "Ten's avatar"): idle, thinking,
+     working, needs-you and done each show the ring described there
+     around the new tile; with `prefers-reduced-motion: reduce` the
+     rings hold still.
+  8. **Screenshots to look at.** The designer's renders are
+     `sheet-2x.png`, `sheet-1x.png` and `side-by-side.png` in the
+     scratchpad (named in the hand-back); the tester takes their
+     own of sign-in at 375px and 1440px, the rail, the header avatar
+     in each state, and a tab at 16px.
 
 #### Component states
 
@@ -3047,8 +3182,10 @@ The sections below name only what differs.
 
 **Ten's avatar** (§ 1.3, in the header):
 
-- The 28px mark. A ring drawn as a `::after` 3px outside the tile,
-  radius 11px, 2px wide, carries the state.
+- The 28px mark (the terracotta tile, C30). A ring drawn as a `::after`
+  3px outside the tile, radius 10.5px (the tile's 7.4px corner plus
+  3px; it was 11px for the old tile), 2px wide, carries the state.
+  The tile itself never changes, in any state.
 - Rings by state:
 
 | State | Ring | Motion (`no-preference` only) | Reduced motion |
@@ -3061,6 +3198,24 @@ The sections below name only what differs.
 
 - Hover and the accessible name stay § 1.3's text.
 - No visible state word sits beside the avatar.
+- **Amended 2026-10-09 (C30): the states with the new tile.**
+  - Nothing animates the tile or its "10x", and nothing ever animated
+    the old "0": every state is the ring alone, as the table says. So
+    nothing needs a replacement; the restated rule is: **the tile is
+    still, the ring carries the state.**
+  - **idle:** the tile alone, no ring.
+  - **thinking:** the `--border-strong` ring, pulsing; still under
+    reduced motion.
+  - **working:** the `--fg` arc turning; a still dashed `--fg-muted`
+    ring under reduced motion.
+  - **needs-you:** the `--amber` ring, pulsing; still under reduced
+    motion. Amber (`#9A5B07`) sits next to a terracotta tile, two warm
+    colors, so the 1px of page ground between tile and ring is kept
+    and the state never rests on color alone: the hover text and
+    accessible name (F20), and the rail's "Needs your yes" pill, say
+    it in words.
+  - **done:** the `--green` ring, fading to none over
+    `--duration-done`; no ring under reduced motion.
 
 **Balance chip.**
 

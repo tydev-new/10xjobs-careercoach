@@ -31,7 +31,7 @@
 //   E2E_KEEP=1 keeps the temp dir (builds, failure screenshots);
 //   E2E_CONSOLE=1 echoes browser console errors; E2E_STACKS=1 page-error stacks.
 // Per-browser sections: journey import gate balance ceiling member delete
-// refresh password signin create-link phone cors setup uploads env; then once: preview. Firefox/WebKit
+// refresh password signin create-link brand phone cors setup uploads env; then once: preview. Firefox/WebKit
 // need `npx playwright install firefox webkit` in apps/web.
 // Exit code 0 = all PASS; one PASS/FAIL line per assertion.
 // Also here: upload-errors.test.ts (node --test), the upload messages over PGlite.
@@ -2499,6 +2499,65 @@ await section("create-link", async () => {
   const y8Html = await canon(y.page);
   rec(y8Html === linkHtml, "create-link: 375px: the card the create link opens is, element for element, the card Y8 opens", y8Html === linkHtml ? "" : `link: ${linkHtml.slice(0, 700)} | Y8: ${y8Html.slice(0, 700)}`);
   await y.page.context().close();
+});
+
+// ================================================================ THE BRAND MARK (ui § 5.6, amended 2026-10-09, C30)
+// Proof items 3 and 7 on the production build: the terracotta "10x" tile renders on sign-in (30px, 375px and
+// desktop), the rail (28px), Ten's avatar in the header and beside Ten's turn. BRAND_SHOTS=<dir> saves the renders.
+await section("brand", async () => {
+  const shots = process.env.BRAND_SHOTS;
+  const TILE = "rgb(193, 95, 60)";
+  const WHITE = "rgb(255, 255, 255)";
+  const marks = (page: any) =>
+    page.evaluate(() =>
+      Array.from(document.querySelectorAll("svg.mark")).map((m) => ({
+        where: m.closest(".avatar") ? "header-avatar" : m.closest(".rail") ? "rail" : m.closest(".sign-in-card") ? "sign-in" : m.closest(".bubble, .transcript, .message") ? "turn-avatar" : "other",
+        w: m.getAttribute("width"),
+        tile: getComputedStyle(m.querySelector("rect")!).fill,
+        glyph: getComputedStyle(m.querySelector("path")!).fill,
+        ellipses: m.querySelectorAll("ellipse").length,
+        name: m.getAttribute("aria-label"),
+      })),
+    );
+  const checkMarks = (list: any[], where: string, w: string, label: string) => {
+    const hit = list.filter((m) => m.where === where);
+    rec(hit.length >= 1 && hit.every((m) => m.tile === TILE && m.glyph === WHITE && m.ellipses === 0 && m.w === w && m.name === "Ten"), `brand: ${label}: the ${w}px tile renders terracotta (#C15F3C) with a white 10x, no ellipse`, JSON.stringify(hit));
+  };
+  // sign-in, 375px and desktop
+  for (const [name, viewport] of [["375", { width: 375, height: 812 }], ["desktop", { width: 1280, height: 860 }]] as const) {
+    const s = await newPage({ viewport });
+    await s.page.locator(".sign-in-card svg.mark").waitFor({ timeout: 15000 });
+    checkMarks(await marks(s.page), "sign-in", "30", `sign-in at ${name}`);
+    const sw = await s.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    rec(sw, `brand: sign-in at ${name}: no horizontal scroll`);
+    if (shots) await s.page.screenshot({ path: path.join(shots, `signin-${name}.png`), fullPage: true });
+    await s.page.context().close();
+  }
+  // the rail, the header avatar and a turn's avatar, in a conversation with Ten
+  const who = em("brand.member");
+  await standIn.createUser({ email: who });
+  const m = await newPage({ viewport: { width: 1280, height: 860 } });
+  await signIn(m.page, who);
+  await m.page.locator(".composer-input").waitFor({ timeout: 20000 });
+  await say(m.page, "hello from the brand check");
+  const reply = (await lastAssistant(m.page).textContent().catch(() => "")) ?? "";
+  rec(reply.includes("Hi — I'm here."), "brand: a conversation with Ten ran", reply.slice(0, 80));
+  const list = await marks(m.page);
+  checkMarks(list, "rail", "28", "the rail");
+  checkMarks(list, "header-avatar", "28", "Ten's avatar in the header");
+  checkMarks(list, "turn-avatar", "28", "the avatar beside Ten's turn");
+  rec(list.every((x: any) => x.where !== "other" && x.tile === TILE), "brand: every mark on the member screen is the terracotta tile", JSON.stringify(list.map((x: any) => x.where)));
+  const rail = await m.page.evaluate(() => ({ named: document.querySelectorAll(".rail .wordmark-text").length, text: document.querySelector(".rail .wordmark-text")?.textContent }));
+  eq(rail, { named: 1, text: "Ten" }, "brand: the rail's wordmark still reads \"Ten\"");
+  if (shots) {
+    await m.page.screenshot({ path: path.join(shots, "conversation-desktop.png"), fullPage: false });
+    await m.page.locator(".rail").screenshot({ path: path.join(shots, "rail.png") });
+    await m.page.locator(".avatar").first().screenshot({ path: path.join(shots, "header-avatar-idle.png") });
+  }
+  await m.page.context().close();
+  // the favicon the page links is the new file, served from the build
+  const fav = await fetch(ORIGIN + "/favicon.svg").then((r) => r.text());
+  rec(fav.trim() === readFileSync(path.join(WEB, "public/favicon.svg"), "utf8").trim() && fav.includes("#C15F3C") && !fav.includes("ellipse"), "brand: the served favicon.svg is the new tile");
 });
 
 // ================================================================ PHONE (375px)

@@ -39,9 +39,11 @@
   --on-lime: #0A0A0B;
   --lime-soft: #F1FAD3;
   --lime-ink: #3D5700;
-  --hero: #0B0C0E;          /* the Continue with Ten band, the mark's tile, the toast */
+  --hero: #0B0C0E;          /* the Continue with Ten band, the toast */
   --on-hero: #F4F5F7;
   --on-hero-muted: #A3A8B0;
+  --brand: #C15F3C;         /* the mark's tile and nothing else; same in dark (C30) */
+  --on-brand: #FFFFFF;      /* the "10x" on the tile */
   --focus: #0A0A0B;
   --focus-halo: rgba(10, 10, 11, 0.12);
   /* ---- status (a category, never urgency) ---- */
@@ -587,7 +589,7 @@ select:focus-visible {
   content: "";
   position: absolute;
   inset: -3px;
-  border-radius: 11px;
+  border-radius: 10.5px;
   border: 2px solid transparent;
   pointer-events: none;
 }
@@ -3597,7 +3599,8 @@ summary.job-group-head {
 /* ---- END saved-conversation notices ---- */
 
 /* ---- Brand mark and wordmark (design-web-ui.md § 5.6, "The brand
-   mark"). Fills are tokens, so the dark theme (dormant) follows. ---- */
+   mark"). The tile is --brand on any ground (dark inherits it); the mark
+   never inverts on the --hero band (C30). ---- */
 
 .mark {
   flex: none;

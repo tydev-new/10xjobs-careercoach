@@ -510,8 +510,17 @@ test("L7-L9 proofs 7, 8, 9 and the welcome claim: from `/?signup&utm_source=TAGM
     await tab.goto(ORIGIN + "/" + standIn.pw.recoveryHash(who).replace("type=recovery", "type=signup"));
     await tab.locator(".composer-input").waitFor({ timeout: 20000 });
     const o1 = new RegExp("^" + Y.O1.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace("\\$<amount>", "\\$\\d+\\.\\d\\d") + "$");
-    await tab.getByText(o1).waitFor({ timeout: 15000 });
-    await tab.waitForTimeout(600);
+    // Two tabs share the session, so the first tab (still open on Sign in) signs in too, and both ask for the
+    // welcome credit. One is granted and shows O1; the other is told "already a member" and shows none. Which
+    // tab wins is a race (seen 2026-10-09: the new tab lost once in two full-suite runs). The claim is granted
+    // once and O1 shows in exactly one of the two tabs; the test records which.
+    await o.page.locator(".composer-input").waitFor({ timeout: 20000 });
+    await tab.waitForTimeout(1500);
+    const [inFirst, inNew] = [await o.page.getByText(o1).count(), await tab.getByText(o1).count()];
+    console.log(`  [L7-L9] O1 shows in: the first tab ${inFirst}, the confirmation link's tab ${inNew}`);
+    assert.equal(inFirst + inNew, 1, `O1 in exactly one tab: first=${inFirst} new=${inNew}`);
+    const grants = await standIn.sql("select 1 from public.ten_credit_ledger l join auth.users u on u.id = l.user_id where u.email = $1 and l.kind = 'credit'", [who.toLowerCase()]).catch(() => null);
+    if (grants) assert.equal(grants.length, 1, "the welcome credit was granted once");
     // ---- the tags
     assert.ok(o.away.length >= 5, `requests away from the site's host were recorded: ${o.away.length}`);
     const hits = o.away.filter((r) => `${r.url}\n${r.headers}\n${r.body}`.includes("TAGMARK"));

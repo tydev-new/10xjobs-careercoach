@@ -632,3 +632,23 @@ test("the skill's own files carry no email, phone, profile link or home path (th
   const PII = /\/Users\/[A-Za-z]|\/home\/[a-z]+\/|(?<![A-Za-z0-9._%+-])(?!support@10xjobs\.co\b)[A-Za-z0-9._%+-]+@(?!example\.)[A-Za-z0-9.-]+\.[a-z]{2,}|\(?\b\d{3}\)?[-. ]\d{3}[-. ]\d{4}\b|linkedin\.com\/in\/[A-Za-z0-9-]+/;
   for (const f of [SCRIPT, LIB]) assert.ok(!PII.test(readFileSync(f, "utf8")), f);
 });
+
+// ----------------------------------------------------------------- 16. the function's files (review by code)
+
+test("16. the function's files: one database call, in rpc.ts only; no auth call; no forbidden header read", () => {
+  const dir = join(ROOT, "supabase", "functions", "ten-feedback");
+  const strip = (t) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  for (const file of ["handler.ts", "index.ts", "core.ts"]) {
+    const code = strip(readFileSync(join(dir, file), "utf8"));
+    assert.ok(!/\bfetch\s*\(/.test(code), `${file} must not call fetch (the one database call lives in rpc.ts)`);
+    assert.ok(!/headers\.get\(\s*["'](authorization|apikey|cookie|x-forwarded-for|x-real-ip|user-agent|cf-connecting-ip)/i.test(code), `${file} reads a forbidden header`);
+    assert.ok(!/verifyUser|isMember|balanceFor|\/auth\/v1/.test(code), `${file} touches auth`);
+  }
+  const handler = strip(readFileSync(join(dir, "handler.ts"), "utf8"));
+  // the only request headers read: origin (CORS) and content-length (the size cap)
+  assert.deepEqual([...handler.matchAll(/headers\.get\(\s*["']([^"']+)["']/g)].map((m) => m[1]).sort(), ["content-length", "origin"]);
+  const rpc = strip(readFileSync(join(dir, "rpc.ts"), "utf8"));
+  assert.equal((rpc.match(/rest\/v1\//g) ?? []).length, 1, "exactly one PostgREST endpoint");
+  assert.ok(rpc.includes("rpc/ten_feedback_add"));
+  assert.deepEqual([...handler.matchAll(/^\s{2}(\w+)\??\(/gm)].map((m) => m[1]).filter((n) => ["addFeedback", "logStatus"].includes(n)).sort(), ["addFeedback", "logStatus"]);
+});

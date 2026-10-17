@@ -6,6 +6,9 @@ Story bank, one-verdict role evaluation, a pipeline board, tailored
 applications, interview prep and practice, outreach — with **all of
 your data in a folder on your machine** (or your own cloud workspace in
 the web beta), and a coach that reads it and tells you what's next.
+The one thing Ten itself ever sends is feedback you choose to send
+about Ten: you see exactly what goes first, and it goes only after you
+say yes ([`docs/design-feedback.md`](docs/design-feedback.md)).
 
 Install: [`INSTALL.md`](INSTALL.md). Then, in a folder you choose:
 *"I need a job."*

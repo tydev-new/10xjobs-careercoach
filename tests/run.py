@@ -144,6 +144,17 @@ else:
         print("FAIL tests/feedback.test.mjs (node --test) — see output above")
     else:
         passed += 1
+    # The script's floor is Node 18 (docs/design-feedback.md § 8): the same
+    # suite on a Node 18 binary when NODE18_BIN names one (as for the checkers).
+    node18_fb = os.environ.get("NODE18_BIN")
+    if node18_fb:
+        print(f"\n--- {node18_fb} --test tests/feedback.test.mjs ---")
+        result = subprocess.run([node18_fb, "--test", os.path.join(HERE, "feedback.test.mjs")], cwd=os.path.join(HERE, ".."))
+        if result.returncode != 0:
+            failed += 1
+            print("FAIL tests/feedback.test.mjs on Node 18 — see output above")
+        else:
+            passed += 1
 
 # packages/checkers: the JS ports' own unit tests (docs/design-web-agent.md
 # § 5). The parity machinery (parity.mjs, coverage-gate.mjs) is gone at J2

@@ -10,6 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { webcrypto } from "node:crypto";
 import { createServer } from "node:http";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -331,7 +332,16 @@ test("6. the send: production URL by default, TEN_FEEDBACK_URL when set; body by
 
 test("6b. the real timeout signal is an AbortSignal that fires, and a hung server ends in the failure line", async () => {
   const hang = (_url, init) => new Promise((_res, rej) => init.signal.addEventListener("abort", () => rej(new Error("aborted"))));
-  const out = await sendFeedback({ any: 1 }, { fetchImpl: hang, timeoutMs: 30 });
+  // AbortSignal.timeout's timer is unref'd by design (Node 18 and later): a real
+  // fetch holds a socket open, which keeps the loop alive until it fires. This
+  // fake holds nothing, so give the loop something to wait on while it counts down.
+  const keepAlive = setInterval(() => {}, 10);
+  let out;
+  try {
+    out = await sendFeedback({ any: 1 }, { fetchImpl: hang, timeoutMs: 30 });
+  } finally {
+    clearInterval(keepAlive);
+  }
   assert.equal(out, "failed");
   const signals = [];
   await sendFeedback({ any: 1 }, { fetchImpl: async (_u, init) => { signals.push(init.signal); return { status: 201 }; } });
@@ -402,9 +412,9 @@ test("10. a skill not on the list, and a step with @, /, a backslash, a line bre
 // ----------------------------------------------------------------- the id helper
 
 test("the random id helper makes 32 lowercase hex characters", () => {
-  const id = newInstallationId((a) => globalThis.crypto.getRandomValues(a));
+  const id = newInstallationId((a) => webcrypto.getRandomValues(a));
   assert.match(id, /^[0-9a-f]{32}$/);
-  assert.notEqual(id, newInstallationId((a) => globalThis.crypto.getRandomValues(a)));
+  assert.notEqual(id, newInstallationId((a) => webcrypto.getRandomValues(a)));
 });
 
 // ----------------------------------------------------------------- the real command (child process)

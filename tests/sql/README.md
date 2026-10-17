@@ -20,6 +20,7 @@ node r6-conversations.mjs  # § 11: 20260924100000_ten_conversations.sql applied
 node r8-paypal.mjs         # § 17.3/17.8(7): 20260925000000_ten_paypal_credit.sql after the three applied ones; checks, refunds, teardown (tester)
 node r9-welcome.mjs        # § 20.11: 20261002000000_ten_welcome_credit.sql after the four applied ones; every claim path, the cap, normalisation, deletion, teardown (no ceiling function: the owner dropped the daily limit)
 node r10-welcome-tester.mjs  # § 20 independent tester: adversarial normalisation (quotes, multiple @, lookalikes, dots, empty local; edges the rule doesn't name print [OBSERVED]), cap 0/1/N, usd bounds, grants, search_path hijack, deletion, money checks, teardown
+node r11-feedback.mjs      # design-feedback.md § 17.3: 20261017000000_ten_feedback.sql after the five applied ones; the ten columns, the grants (anon/authenticated refused, 42501), every check, the per-install/hourly/daily/total limits and `closed`, the settings row, the lock read from the function's body, the order guard, teardown (r10 is the welcome tester's file, so this one is r11)
 (cd race && npm ci && node r10-race.mjs)  # § 20.1 step 4 for real: embedded Postgres 17 on 127.0.0.1 in a temp dir; two accounts racing for the last place, two tabs, one inbox twice, 40 at once at cap 7. Not in npm test (it downloads Postgres binaries)
 ```
 

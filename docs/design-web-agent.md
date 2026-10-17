@@ -29,6 +29,11 @@ ceiling and its non-member line, and over § 17.5's old $5/day.
 Again 2026-10-07: § 16.5 (one way to sign in, email and password; owner
 ruling; the reworded lines in `design-web-ui.md` § 1.4 are a draft for
 owner approval).
+**Pending, 2026-10-17 (draft for owner approval, not yet in force):**
+`docs/design-feedback.md` § 12 would add a second gate kind, `feedback`,
+to § 3 (sent by code only after the exact typed yes) and one tool,
+`send_feedback`, to § 4. Until the owner approves it, § 3 and § 4 stand
+as written.
 **Builds on:** `docs/plan-portable-skills-and-web-agent.md` (Phase 0 settled),
 `apps/workspace-ui/server/workspace-core.mjs`, `skills/coach/references/gate-grammar.md`,
 `docs/loading-map.md`. Card prop types live in `docs/design-web-ui.md`; this doc

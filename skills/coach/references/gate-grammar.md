@@ -10,6 +10,9 @@
    - Submits: "Ready to submit. Say the word and I click — nothing is sent until you do."
    - Numbers/offers: "This number goes to the employer the moment you say it — confirm it's the one."
    - Spends: "This costs up to $<amount> — nothing starts until you say yes."
+   - Feedback to the Ten team: "This goes to the people building Ten,
+     exactly as shown, with nothing else from your files or this
+     conversation. Nothing is sent until you say yes."
 3. **The candidate's yes** — given by the candidate in the conversation, after steps 1 and 2. Nothing else fires it (see Rules).
 4. **The report-back** — after the human fires (or declines), the agent logs the outcome (date, follow-up cadence, pipeline stage) and confirms in one line what was recorded.
 

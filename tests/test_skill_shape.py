@@ -11,7 +11,7 @@ shape (docs/skill-shape.md).
 import os
 
 SKILLS = os.path.join(os.path.dirname(__file__), "..", "skills")
-CONVERTED = ["storybank", "profile", "search", "evaluate", "apply", "outreach", "interview", "learn", "coach"]
+CONVERTED = ["storybank", "profile", "search", "evaluate", "apply", "outreach", "interview", "learn", "coach", "feedback"]
 
 
 def _read(*parts):

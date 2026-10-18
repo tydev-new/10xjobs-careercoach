@@ -18,7 +18,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
-  FB, MARKS, PAYLOAD_KEYS, PROD_URL, RENDER_LABELS, SKILLS,
+  FB, MARKS, PAYLOAD_KEYS, PROD_URL, RENDER_LABELS, SKILLS, USAGE,
   buildFeedback, newInstallationId, parseArgs, redact, renderFeedback, run, sendFeedback,
 } from "../skills/feedback/scripts/lib/feedback.mjs";
 
@@ -482,7 +482,7 @@ test("the command end to end: dry run, then a send to a local stub, then the sam
   }
 });
 
-test("8. the random id is made once; with an unwritable cache folder the send still works with a fresh id and writes nothing else", async () => {
+test("8. the random id is made once; with an unwritable cache folder there is no id (null) in the dry run and the send alike, and nothing else is written", async () => {
   const stub = await stubServer(201);
   const base = mkdtempSync(join(tmpdir(), "ten-fb-id-"));
   try {
@@ -502,12 +502,16 @@ test("8. the random id is made once; with an unwritable cache folder the send st
     writeFileSync(blocked, "I am a file");
     const before = readdirSync(base).sort();
     stub.seen.length = 0;
-    const out = await cli(["--comment", "three"], { env: { TEN_FEEDBACK_URL: stub.url, XDG_CACHE_HOME: blocked } });
+    const benv = { TEN_FEEDBACK_URL: stub.url, XDG_CACHE_HOME: blocked };
+    const dry = await cli(["--comment", "three", "--dry-run"], { env: benv });
+    assert.ok(dry.stdout.split("\n").includes("Random id: none"), dry.stdout);
+    const out = await cli(["--comment", "three"], { env: benv });
     assert.equal(out.code, 0);
     assert.equal(out.stderr, "");
     assert.equal(lastLine(out.stdout), FB.FB4);
     assert.equal(stub.seen.length, 1);
-    assert.match(JSON.parse(stub.seen[0].body).installationId, /^[0-9a-f]{32}$/);
+    assert.equal(JSON.parse(stub.seen[0].body).installationId, null, "the id shown (none) is the id sent");
+    assert.ok(out.stdout.split("\n").includes("Random id: none"));
     assert.deepEqual(readdirSync(base).sort(), before, "nothing else was written");
     assert.equal(readFileSync(blocked, "utf8"), "I am a file");
   } finally {
@@ -661,4 +665,84 @@ test("16. the function's files: one database call, in rpc.ts only; no auth call;
   assert.equal((rpc.match(/rest\/v1\//g) ?? []).length, 1, "exactly one PostgREST endpoint");
   assert.ok(rpc.includes("rpc/ten_feedback_add"));
   assert.deepEqual([...handler.matchAll(/^\s{2}(\w+)\??\(/gm)].map((m) => m[1]).filter((n) => ["addFeedback", "logStatus"].includes(n)).sort(), ["addFeedback", "logStatus"]);
+});
+
+// ----------------------------------------------------------------- the tester's LOW findings, fixed
+
+test("A4 a flag taken as a value is a usage error: `--comment --dry-run` sends nothing and exits 1; a value that merely starts with -- is still words", async () => {
+  for (const argv of [["--comment", "--dry-run"], ["--kind", "--comment", "x"], ["--rating", "--dry-run"], ["--skill", "--step=a"], ["--comment", "--kind"]]) {
+    const f = fakeFetch(201);
+    const out = await run(argv, deps({ fetchImpl: f }));
+    assert.equal(out.exitCode, 1, JSON.stringify(argv));
+    assert.equal(f.calls.length, 0, JSON.stringify(argv));
+    assert.equal(lastLine(out.stdout), USAGE);
+  }
+  const ok = await run(["--comment", "--help me", "--dry-run"], deps());
+  assert.equal(ok.exitCode, 0);
+  assert.ok(ok.stdout.includes("Your words: --help me"));
+});
+
+test("A3 a redirect is never followed: the send asks for redirect manual, so a 3xx is a failure line", async () => {
+  const f = fakeFetch(307);
+  const out = await run(["--comment", "hello"], deps({ fetchImpl: f }));
+  assert.equal(f.calls[0].init.redirect, "manual");
+  assert.equal(out.exitCode, 1);
+  assert.equal(lastLine(out.stdout), FB.FB6);
+  assert.equal(f.calls.length, 1, "never re-posted");
+});
+
+test("R3 the whole address goes: a local part over 64 characters, an apostrophe, and the other shapes", () => {
+  const cases = [
+    ["x".repeat(70) + "@gmail.com", MARKS.email],
+    ["zebulonquartermaine".repeat(4) + "@gmail.com", MARKS.email],
+    ["o'brien.sentinel@gmail.com", MARKS.email],
+    ["o’brien@mail.example.org", MARKS.email],
+    ["write to jo@x.com.", `write to ${MARKS.email}.`],
+    ["<jo@x.com>", `<${MARKS.email}>`],
+    ["mailto:jo@x.com", `mailto:${MARKS.email}`],
+    ["a@b", "a@b"],
+    ["user@localhost", "user@localhost"],
+  ];
+  for (const [input, want] of cases) assert.equal(redact(input), want, input);
+});
+
+test("R4 phone numbers: E.164, a bare ten-digit number and (415)555-0100 go; dates, versions and prices stay", () => {
+  for (const p of ["+14155550100", "+447700900123", "+33612345678", "(415)555-0100", "(415) 555-0100", "4155550100", "415-555-0100", "415.555.0100", "+1 415 555 0100", "212.555.0143"]) {
+    assert.equal(redact(`call ${p} now`), `call ${MARKS.phone} now`, p);
+  }
+  for (const keep of ["2026-10-17", "0.9.2", "$150,000", "1234567890123", "version 12345", "3 of 5"]) assert.equal(redact(keep), keep, keep);
+});
+
+test("C2 the length rule is decided after cleaning: white space and addresses collapse first, and only truly huge input is refused early", () => {
+  const ctx = { version: "1", host: "local", installationId: ID };
+  assert.equal(buildFeedback({ comment: "hello" + " ".repeat(30000) + "world" }, ctx).comment, "hello world");
+  const emails = Array.from({ length: 70 }, (_, i) => `${"x".repeat(60)}${i}@${"d".repeat(240)}.com`).join(" ");
+  assert.ok(emails.length > 20000);
+  assert.ok(!buildFeedback({ comment: emails }, ctx).error);
+  assert.equal(buildFeedback({ comment: "word ".repeat(450) }, ctx).error.message, FB.FB9); // 2,250 real characters
+  assert.equal(buildFeedback({ comment: "x".repeat(200001) }, ctx).error.message, FB.FB9);
+  const t0 = Date.now();
+  buildFeedback({ comment: "a@".repeat(90000) + " end" }, ctx);
+  assert.ok(Date.now() - t0 < 3000, "a 180,000-character hostile input is cleaned quickly");
+});
+
+test("the version is read from one known place and never by searching upward: a skills folder inside a .claude folder says unknown and opens no plugin.json", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "ten-fb-wsv-"));
+  const cache = mkdtempSync(join(tmpdir(), "ten-fb-cache-"));
+  try {
+    // the workspace has its own plugin file, and the skill is installed inside it
+    mkdirSync(join(ws, ".claude-plugin"));
+    writeFileSync(join(ws, ".claude-plugin", "plugin.json"), JSON.stringify({ version: "9.9.9-workspace" }));
+    mkdirSync(join(ws, ".claude", "skills"), { recursive: true });
+    cpSync(join(ROOT, "skills", "feedback"), join(ws, ".claude", "skills", "feedback"), { recursive: true });
+    const inWs = await cli(["--comment", "hi", "--dry-run"], { cwd: ws, env: { XDG_CACHE_HOME: cache }, script: join(ws, ".claude", "skills", "feedback", "scripts", "feedback.mjs") });
+    assert.ok(inWs.stdout.includes("Ten version: unknown"), inWs.stdout);
+    assert.ok(!inWs.stdout.includes("9.9.9-workspace"));
+    // the repository layout still reads the repository's own plugin file
+    const repo = await cli(["--comment", "hi", "--dry-run"], { env: { XDG_CACHE_HOME: cache } });
+    const v = JSON.parse(readFileSync(join(ROOT, ".claude-plugin", "plugin.json"), "utf8")).version;
+    assert.ok(repo.stdout.includes(`Ten version: ${v}`), repo.stdout);
+  } finally {
+    for (const d of [ws, cache]) rmSync(d, { recursive: true, force: true });
+  }
 });

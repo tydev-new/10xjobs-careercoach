@@ -25,9 +25,10 @@ export const KINDS = Object.freeze(["bug", "comment"]);
 export const MAX_COMMENT = 2000;
 export const MAX_STEP = 60;
 export const SEND_TIMEOUT_MS = 15000;
-// A guard on the redaction pass, not a product limit: nobody's note is 20,000
-// characters before redaction and 2,000 after.
-const MAX_RAW = 20000;
+// A guard on the cleaning pass, not a product limit: the 2,000-character rule
+// is decided AFTER white space is collapsed and addresses are blanked, so only
+// truly huge input is refused (as FB9) before that.
+const MAX_RAW = 200000;
 
 /** § 13, word for word. FB2 is the labels (RENDER_LABELS); FB14 is MARKS. */
 export const FB = Object.freeze({
@@ -78,22 +79,55 @@ export const BAD_KIND = "The kind must be bug or comment.";
 
 // ---------------------------------------------------------------- redaction
 
-// § 8.4. Bounded quantifiers keep every pattern linear on hostile input.
+// § 8.4. Every pattern is linear on hostile input (the email scan is a loop
+// around each "@", not a regular expression that restarts at every character).
 // The home-path shapes are the ones tests/test_invariants.py `PII` lists:
 // a macOS or Linux home folder. They are built from parts so this file
 // never contains a literal home path itself (that test scans skills/).
 const HOME_ROOTS = "(?:\\/" + "Users|\\/" + "home)\\/";
-const EMAIL = /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,63}/g;
+// The characters an address's local part may hold here, apostrophes included
+// (o'brien), with no length limit: the whole address goes, however long.
+const LOCAL = /[A-Za-z0-9._%+'\u2019-]/;
+const DOMAIN = /[A-Za-z0-9.-]/;
 const LINK = /(?:https?:\/\/)?(?:[a-z]{2,3}\.)?linkedin\.com\/in\/[A-Za-z0-9%_-]{1,100}\/?/gi;
 const PATH = new RegExp(HOME_ROOTS + "[^\\s\"'`<>]+", "g");
-const PHONE = /(?:\+\d{1,3}[-. ]?)?\(?\b\d{3}\)?[-. ]\d{3}[-. ]\d{4}\b/g;
+// A phone number: E.164 (+14155550100, any country), or a North American shape
+// (the PII shape of tests/test_invariants.py) with optional separators, so
+// (415)555-0100 and a bare ten-digit number go too.
+const PHONE = /\+\d{8,15}\b|(?:\+\d{1,3}[-. ]?)?(?:\(\d{3}\)|\b\d{3})[-. ]?\d{3}[-. ]?\d{4}\b/g;
 const TRAILING = /[.,;:!?)\]}]+$/;
+
+/** Replaces every email address with its mark. For each "@": walk left over
+ * the local part, walk right over the domain, and keep it if the domain ends
+ * in a dot and two or more letters. */
+function redactEmails(text) {
+  let out = "";
+  let last = 0;
+  let at = text.indexOf("@");
+  while (at !== -1) {
+    let start = at;
+    while (start > last && LOCAL.test(text[start - 1])) start--;
+    let end = at + 1;
+    while (end < text.length && DOMAIN.test(text[end])) end++;
+    let domain = text.slice(at + 1, end);
+    const trimmed = domain.replace(/[.-]+$/, "");
+    end -= domain.length - trimmed.length;
+    domain = trimmed;
+    if (start < at && /^[A-Za-z0-9.-]*[A-Za-z0-9-]\.[A-Za-z]{2,}$/.test(domain)) {
+      out += text.slice(last, start) + MARKS.email;
+      last = end;
+      at = text.indexOf("@", end);
+    } else {
+      at = text.indexOf("@", at + 1);
+    }
+  }
+  return out + text.slice(last);
+}
 
 /** Blanks an email address, a phone number, a LinkedIn profile link and a
  * home folder path (FB14). A safety net, not the guard. */
 export function redact(text) {
-  return String(text)
-    .replace(EMAIL, MARKS.email)
+  return redactEmails(String(text))
     .replace(LINK, MARKS.link)
     .replace(PATH, (m) => MARKS.path + (m.match(TRAILING)?.[0] ?? ""))
     .replace(PHONE, MARKS.phone);
@@ -271,6 +305,9 @@ export async function sendFeedback(payload, { url = PROD_URL, fetchImpl, timeout
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
+      // never follow a redirect: a 3xx is a failure (FB6), and the note is
+      // posted to the one configured address and nowhere else
+      redirect: "manual",
       signal,
     });
     const status = res?.status;
@@ -293,6 +330,13 @@ const RESULT_LINE = { sent: FB.FB4, busy: FB.FB5, failed: FB.FB6 };
 
 const VALUE_FLAGS = new Set(["kind", "comment", "rating", "skill", "step"]);
 
+/** A value that is itself a known flag (`--comment --dry-run`) means the real
+ * value is missing: a usage error, never a send. */
+function isKnownFlag(arg) {
+  const m = /^--([a-z-]+)(?:=[\s\S]*)?$/.exec(arg);
+  return !!m && (m[1] === "dry-run" || VALUE_FLAGS.has(m[1]));
+}
+
 /** Parses the argument list of § 8.1. Returns { flags, dryRun } or { usage: true }. */
 export function parseArgs(argv) {
   const flags = {};
@@ -307,7 +351,7 @@ export function parseArgs(argv) {
     if (!m || !VALUE_FLAGS.has(m[1])) return { usage: true };
     if (m[2] !== undefined) {
       flags[m[1]] = m[2];
-    } else if (i + 1 < argv.length) {
+    } else if (i + 1 < argv.length && !isKnownFlag(argv[i + 1])) {
       flags[m[1]] = argv[++i];
     } else {
       return { usage: true };

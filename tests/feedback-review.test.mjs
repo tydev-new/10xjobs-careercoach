@@ -238,7 +238,7 @@ test("P2 nothing from the workspace reaches the request: a planted workspace wit
   assert.deepEqual(inWs, [], "the script asked about a path under its working folder");
 });
 
-test("P2b the in-workspace layout (skills copied into <workspace>/.claude/skills, as the t22 runner and a project-scoped install do): the version search walks up through the workspace, and a workspace's own .claude-plugin/plugin.json is read and its version sent", { todo: "FINDING (tester, 2026-10-17): § 8.3 says the script 'never opens a file under its working folder'; with the skills inside the workspace, readVersion walks up from the script and reads <workspace>/.claude-plugin/plugin.json, whose version (up to 40 of [0-9A-Za-z.+-]) is sent" }, async () => {
+test("P2b the in-workspace layout (skills copied into <workspace>/.claude/skills, as the t22 runner and a project-scoped install do): the version search walks up through the workspace, and a workspace's own .claude-plugin/plugin.json is read and its version sent", async () => {
   const ws = tmp("fb-ws2-");
   mkdirSync(path.join(ws, ".claude", "skills"), { recursive: true });
   cpSync(path.join(REPO, "skills/feedback"), path.join(ws, ".claude/skills/feedback"), { recursive: true });
@@ -308,7 +308,7 @@ test("R2 characterization: forms beyond the doc's shapes, each run through the r
   for (const r of rows) { t.diagnostic(r); console.log("  [R2] " + r); }
 });
 
-test("R3 an email whose local part is over 64 characters, or holds an apostrophe, leaves part of its address in the body", { todo: "FINDING (tester, 2026-10-17): the email pattern has no left boundary, so it matches only the last 64 characters of a long local part, or the part after an apostrophe; the rest of the address is sent" }, () => {
+test("R3 an email whose local part is over 64 characters, or holds an apostrophe, leaves part of its address in the body", () => {
   for (const s of [`${"zebulonquartermaine".repeat(4)}@gmail.com`, "o'brien.sentinel@gmail.com"]) {
     const out = lib.redact(`mail ${s} now`);
     assert.equal(out, `mail ${lib.MARKS.email} now`, `"${s}" -> "${out}"`);
@@ -327,7 +327,7 @@ test("C1 whitespace: line breaks, tabs and runs of spaces in the words are colla
   assert.equal(r.stdout.trimEnd().split("\n").length, 10, "FB1, eight lines, the result line");
 });
 
-test("C2 the 20,000-character pre-cut: words that would be 2,000 characters or fewer after redaction and the whitespace collapse are refused with FB9 ('over 2,000 characters') when the raw text is over 20,000", { todo: "FINDING (tester, 2026-10-17): § 8.4 counts after redaction; the lib refuses anything over 20,000 raw characters first, so a note that would be short after redaction or the whitespace collapse is refused with FB9, a line that is then untrue" }, async () => {
+test("C2 the 20,000-character pre-cut: words that would be 2,000 characters or fewer after redaction and the whitespace collapse are refused with FB9 ('over 2,000 characters') when the raw text is over 20,000", async () => {
   const spaces = "hello" + " ".repeat(20001) + "world";
   assert.equal(lib.buildFeedback({ comment: spaces }, { host: "local" }).comment, "hello world", "20,001 spaces between two words");
   const emails = Array.from({ length: 70 }, (_, i) => `${"x".repeat(60)}${i}@${"d".repeat(240)}.com`).join(" ");
@@ -336,7 +336,7 @@ test("C2 the 20,000-character pre-cut: words that would be 2,000 characters or f
   assert.ok(!b.error, `seventy long emails: ${JSON.stringify(b.error)}`);
 });
 
-test("C3 an unwritable cache folder: the dry run and the send each make a fresh id, so the id the person saw is not the id that went", { todo: "FINDING (tester, 2026-10-17): § 8.3 'a fresh id is used for this send' and § 5.8 'the only text this skill ever sends is the rendering the candidate saw' disagree when the id file can't be written: the dry run shows one id and the send carries another" }, async () => {
+test("C3 an unwritable cache folder: the dry run and the send each make a fresh id, so the id the person saw is not the id that went", async () => {
   const blocker = path.join(tmp("fb-cache-ro-"), "not-a-dir");
   writeFileSync(blocker, "a file where the cache folder should be\n");
   const dry = await cli(["--comment", "hello", "--dry-run"], { env: { XDG_CACHE_HOME: blocker } });
@@ -348,9 +348,11 @@ test("C3 an unwritable cache folder: the dry run and the send each make a fresh 
   const shownId = parseRendering(dry.stdout)[7][1].split(" ")[0];
   const sentId = JSON.parse(lastReq().body).installationId;
   console.log(`  [C3] dry run showed ${shownId}; the send carried ${sentId}`);
-  assert.ok(/^[0-9a-f]{32}$/.test(sentId));
+  // owner/architect ruling 2026-10-17: with no id stored, both carry NO id (null)
+  assert.equal(sentId, null, "no id can be stored, so none is sent");
+  assert.equal(shownId, "none", "...and none is shown");
   assert.equal(readFileSync(blocker, "utf8"), "a file where the cache folder should be\n", "the blocker file was written");
-  assert.equal(sentId, shownId, "the id shown is not the id sent");
+  assert.equal(sentId === null ? "none" : sentId, shownId, "the id shown is not the id sent");
 });
 
 test("C4 the id file is made once, 32 lowercase hex, mode 600, under XDG_CACHE_HOME/ten; the dry run makes it too; it is never under the working folder", async () => {
@@ -419,21 +421,25 @@ test("A2 answers through the real command: 201 FB4 exit 0; 429 FB5; 200, 202, 20
   assert.ok(took >= 14500 && took < 25000, `the hang ended after ${took} ms`);
 });
 
-test("A3 the send follows a redirect: a 307 from the configured address re-posts the whole note to wherever it points", { todo: "FINDING (tester, 2026-10-17): sendFeedback uses fetch's default redirect: 'follow', so a 307/308 answer sends the note on to another address (the doc is silent; the harness guard checks only the configured URL)" }, async () => {
+test("A3 the send follows a redirect: a 307 from the configured address re-posts the whole note to wherever it points", async () => {
   const n2 = seen2.length;
   mode = { redirect: 307 };
   const r = await cli(["--comment", "redirect me"]);
   mode = { status: 201 };
   console.log(`  [A3] after a 307 the command said ${JSON.stringify(r.last)}; the second address got ${seen2.length - n2} request(s): ${JSON.stringify(seen2.slice(n2))}`);
   assert.equal(seen2.length - n2, 0, "the note reached a second address");
+  assert.equal(r.last, lib.FB.FB6, "a redirect is a failure, shown as FB6");
+  assert.equal(r.last, lib.FB.FB6, "a redirect is a failure, shown as FB6");
 });
 
-test("A4 an empty value: `--comment --dry-run` takes '--dry-run' as the words and SENDS instead of showing", { todo: "FINDING (tester, 2026-10-17): parseArgs takes the next argument as a flag's value even when it is another flag, so a dry run with an empty --comment value sends the note '--dry-run'" }, async () => {
+test("A4 an empty value: `--comment --dry-run` takes '--dry-run' as the words and SENDS instead of showing", async () => {
   const n0 = seen.length;
   mode = { status: 201 };
   const r = await cli(["--comment", "--dry-run"]);
   console.log(`  [A4] exit ${r.code}, last line ${JSON.stringify(r.last)}, requests ${seen.length - n0}`);
   assert.equal(seen.length - n0, 0, "a command with --dry-run in it sent a note");
+  assert.equal(r.code, 1, "a usage error exits 1");
+  assert.equal(r.code, 1, "a usage error exits 1");
 });
 
 test("A5 the production address is the doc's constant, used only when TEN_FEEDBACK_URL is unset or empty (checked on the lib, never sent)", async () => {

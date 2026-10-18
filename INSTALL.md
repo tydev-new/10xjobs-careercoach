@@ -47,7 +47,7 @@ said yes. It posts your own words (an email address, phone number, profile
 link or folder path in them blanked out), a rating if you gave one, which skill
 was running, Ten's version, and a random id made once on your computer
 (`~/.cache/ten/installation-id`, or under `$XDG_CACHE_HOME`; never in your
-workspace) to Ten's feedback endpoint; nothing from your workspace or the
+workspace; if it can't be stored, none is sent) to Ten's feedback endpoint; nothing from your workspace or the
 conversation goes with it. If your Claude Code or Cowork settings block
 network access for the command, you get "This couldn't be sent just now, so
 nothing went", and the work carries on. Copied with `cp -r skills/*`, the note

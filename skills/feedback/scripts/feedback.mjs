@@ -8,19 +8,22 @@
 //                             [--rating 1-5] [--skill <name>] [--step "<title>"]
 //                             [--dry-run]
 //
-// Reads: its arguments; $CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json, else the
-// first .claude-plugin/plugin.json found walking up from this script; the id
-// file. It never opens a file under its working folder.
+// Reads: its arguments; the plugin's plugin.json from ONE known place
+// ($CLAUDE_PLUGIN_ROOT, else the repository layout this script sits in:
+// <root>/skills/feedback/scripts, never a skills folder inside a `.claude`
+// folder, which is where a user-level or a workspace-level install lives); the
+// id file. It never searches upward and never opens a file under its working
+// folder, so a workspace's own files cannot reach a report.
 // Writes: only the id file, $XDG_CACHE_HOME/ten/installation-id (default
 // ~/.cache/ten/installation-id): 32 random lowercase hex characters, made
-// once. If it can't be written, a fresh id is used for this send and nothing
-// else is written.
+// once. If it can't be written there is no id (null) for the dry run AND the
+// send alike, so the id shown is the id sent, and nothing else is written.
 //
 // Environment (tests and the harness only): TEN_FEEDBACK_URL replaces the
 // production address; XDG_CACHE_HOME moves the id file.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { webcrypto } from "node:crypto";
 import { newInstallationId, run } from "./lib/feedback.mjs";
@@ -37,26 +40,29 @@ function versionFrom(file) {
   }
 }
 
-/** The plugin's version: $CLAUDE_PLUGIN_ROOT first, else the first
- * .claude-plugin/plugin.json above this script, else "unknown" (a copy made
- * with `cp -r skills/*` has none above it, which is honest, not an error). */
+/** The plugin's version: $CLAUDE_PLUGIN_ROOT first, else the repository layout
+ * this script sits in (<root>/skills/feedback/scripts), else "unknown". A copy
+ * made with `cp -r skills/*` lives in a `.claude/skills` folder (the user's, or a
+ * workspace's): it gets "unknown" and nothing is looked up. Only paths derived
+ * from this script's own location are ever opened, never a search upward, so a
+ * file in the working folder can't be read. */
 function readVersion(env) {
   const root = env.CLAUDE_PLUGIN_ROOT;
   if (root) {
     const v = versionFrom(join(root, ".claude-plugin", "plugin.json"));
     if (v) return v;
   }
-  let dir = HERE;
-  for (;;) {
-    const file = join(dir, ".claude-plugin", "plugin.json");
-    if (existsSync(file)) return versionFrom(file) ?? "unknown";
-    const up = dirname(dir);
-    if (up === dir) return "unknown";
-    dir = up;
+  const skills = dirname(dirname(HERE)); // <root>/skills in the repository layout
+  const repoRoot = dirname(skills);
+  if (basename(skills) === "skills" && basename(repoRoot) !== ".claude") {
+    return versionFrom(join(repoRoot, ".claude-plugin", "plugin.json")) ?? "unknown";
   }
+  return "unknown";
 }
 
-/** The random id, made once per computer. Never inside a workspace. */
+/** The random id, made once per computer. Never inside a workspace. When it
+ * can't be stored the answer is null: a fresh id for this send would not be the
+ * id the person saw in the dry run, so there is no id at all. */
 function installationId(env) {
   const cache = env.XDG_CACHE_HOME || join(homedir(), ".cache");
   const file = join(cache, "ten", "installation-id");
@@ -71,7 +77,7 @@ function installationId(env) {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, fresh + "\n", { mode: 0o600 });
   } catch {
-    // can't be written: use it for this send only; nothing else is written
+    return null; // can't be stored: no id, in the dry run and the send alike
   }
   return fresh;
 }

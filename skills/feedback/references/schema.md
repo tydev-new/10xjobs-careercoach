@@ -17,7 +17,7 @@ Eight fields, always all eight, in this order. Nothing else is ever sent.
 | `step` | text | the title of the section that ran, without its bracket; at most 60 characters, one line, no `@`, `/` or `\`; else empty | the skill, `--step` |
 | `version` | text | 1 to 40 of `0-9 A-Z a-z . + -`; the plugin's version, else `unknown` | code |
 | `host` | text | `local` or `web` | code |
-| `installationId` | text or null | local: 32 lowercase hex characters; web: null | code |
+| `installationId` | text or null | local: 32 lowercase hex characters, or null when none can be stored (the dry run and the send then both show `none`); web: null | code |
 
 A `skill` not on the list, or a `step` that breaks its rule, is sent empty
 and shown as "none", so what is shown is still what goes.

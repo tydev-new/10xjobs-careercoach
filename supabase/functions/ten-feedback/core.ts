@@ -87,7 +87,6 @@ export function validateBody(body: unknown): Validated {
   // The table's own checks across fields.
   if (comment === "" && rating === null) return { ok: false };
   if (kind === "bug" && comment === "") return { ok: false };
-  if (host === "web" && installationId !== null) return { ok: false };
 
   return {
     ok: true,

@@ -238,7 +238,6 @@ Deno.test("13. not JSON, an array, a ninth key, a missing key, a wrong type, and
     ["installationId not hex", valid({ installationId: "z".repeat(32) })],
     ["installationId a number", valid({ installationId: 5 })],
     ["installationId with a newline after a good id", valid({ installationId: ID + "\n" })],
-    ["web with an id", valid({ host: "web", installationId: ID })],
     ["a bug with no words", valid({ kind: "bug", comment: "", rating: 4 })],
     ["no words and no rating", valid({ kind: "comment", comment: "", rating: null })],
   ];
@@ -261,6 +260,7 @@ Deno.test("13. the boundary values pass", async () => {
     valid({ step: "x".repeat(60) }),
     valid({ version: "1".repeat(40) }),
     valid({ host: "web", installationId: null }),
+    valid({ host: "web", installationId: ID }),
     valid({ host: "local", installationId: null }),
     valid({ comment: "a long note\twith a tab and trailing words  " }),
   ];

@@ -95,8 +95,7 @@ create table public.ten_feedback (
   installation_id text
                     constraint ten_feedback_installation check (installation_id ~ '^[0-9a-f]{32}$'),
   constraint ten_feedback_words check (comment <> '' or rating is not null),
-  constraint ten_feedback_bug_words check (kind <> 'bug' or comment <> ''),
-  constraint ten_feedback_web_no_id check (host = 'local' or installation_id is null)
+  constraint ten_feedback_bug_words check (kind <> 'bug' or comment <> '')
 );
 create index ten_feedback_created_at on public.ten_feedback (created_at);
 create index ten_feedback_install_created on public.ten_feedback (installation_id, created_at)

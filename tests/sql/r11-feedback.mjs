@@ -189,7 +189,6 @@ const backdate = (db, interval) => sup(db, `update public.ten_feedback set creat
     ["an upper-case install id", { id: "A".repeat(32) }, "ten_feedback_installation"],
     ["an install id of 31 characters", { id: "a".repeat(31) }, "ten_feedback_installation"],
     ["a non-hex install id", { id: "g".repeat(32) }, "ten_feedback_installation"],
-    ["web with an install id", { host: "web", id: ID_A }, "ten_feedback_web_no_id"],
     ["a bug with no words", { kind: "bug", comment: "", rating: 3 }, "ten_feedback_bug_words"],
     ["no words and no rating", { comment: "", rating: null }, "ten_feedback_words"],
   ];
@@ -214,6 +213,7 @@ const backdate = (db, interval) => sup(db, `update public.ten_feedback set creat
     ["a version of exactly 40 characters", { version: "1".repeat(40) }],
     ["a version with . + -", { version: "1.2.3-rc.1+b5" }],
     ["a web note with no id", { host: "web", id: null }],
+    ["a web note with an opaque browser id (owner ruling 2026-10-17: same as the local id)", { host: "web", id: ID_A }],
     ["a local note with no id", { host: "local", id: null }],
     ["a comment note with a rating and words", { rating: 3 }],
   ]) {

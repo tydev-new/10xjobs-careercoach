@@ -16,8 +16,10 @@
 // folder, so a workspace's own files cannot reach a report.
 // Writes: only the id file, $XDG_CACHE_HOME/ten/installation-id (default
 // ~/.cache/ten/installation-id): 32 random lowercase hex characters, made
-// once. If it can't be written there is no id (null) for the dry run AND the
-// send alike, so the id shown is the id sent, and nothing else is written.
+// once. The dry run and the send each read it; if there is none they make one,
+// store it and read it back. If it can't be stored or read back the id is null
+// (shown as "none"), in the dry run and the send alike, so what is shown is what
+// goes, and nothing else is written.
 //
 // Environment (tests and the harness only): TEN_FEEDBACK_URL replaces the
 // production address; XDG_CACHE_HOME moves the id file.
@@ -76,10 +78,11 @@ function installationId(env) {
   try {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, fresh + "\n", { mode: 0o600 });
+    const back = readFileSync(file, "utf8").trim();
+    return ID_RE.test(back) ? back : null; // what is stored is what is used
   } catch {
-    return null; // can't be stored: no id, in the dry run and the send alike
+    return null; // can't be stored or read back: no id, in the dry run and the send alike
   }
-  return fresh;
 }
 
 // Node 18 prints an "experimental" notice to stderr the first time `fetch` is

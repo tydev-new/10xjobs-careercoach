@@ -551,8 +551,8 @@ test("9b. neither source file looks at the working folder or the conversation", 
     assert.ok(!/process\.cwd|readdirSync|opendir|glob|readdir\(/.test(text), `${file} lists or resolves the working folder`);
   }
   const cli = readFileSync(SCRIPT, "utf8");
-  // the only reads are the plugin file and the id file
-  assert.deepEqual([...cli.matchAll(/readFileSync\(([^,)]+)/g)].map((m) => m[1]).sort(), ["file", "file"]);
+  // the only reads are the plugin file and the id file (read, then read back)
+  assert.deepEqual([...cli.matchAll(/readFileSync\(([^,)]+)/g)].map((m) => m[1]).sort(), ["file", "file", "file"]);
 });
 
 test("a failing server (429 then a closed port) gives the plain lines, exit 1, nothing on stderr", async () => {
@@ -613,7 +613,7 @@ function docRows() {
 
 test("13. every fixed line in the lib is the design doc's, word for word (FB1 to FB14)", () => {
   const rows = docRows();
-  for (const id of ["FB1", "FB3", "FB4", "FB5", "FB6", "FB7", "FB8", "FB9", "FB10", "FB11", "FB12", "FB13"]) {
+  for (const id of ["FB1", "FB3", "FB4", "FB5", "FB6", "FB7", "FB8", "FB9", "FB10"]) {
     assert.equal(FB[id], rows[id], id);
   }
   const marks = readFileSync(join(ROOT, "docs", "design-feedback.md"), "utf8").match(/^\| FB14 \|.*$/m)[0];
@@ -629,7 +629,6 @@ test("13b. the gate line in gate-grammar is FB3, word for word", () => {
 test("13c. no user-facing line carries a system word (the plain-voice ruling)", () => {
   const SYSTEM = /\b(gate|schema|json|payload|endpoint|server|error|http|api|\.mjs|\.md)\b|§|_/i;
   for (const [id, line] of Object.entries(FB)) {
-    if (id === "FB12" || id === "FB13") continue;
     assert.ok(!SYSTEM.test(line), `${id}: ${line}`);
   }
   for (const label of Object.values(RENDER_LABELS)) assert.ok(!/_/.test(label));
@@ -682,10 +681,10 @@ test("A4 a flag taken as a value is a usage error: `--comment --dry-run` sends n
   assert.ok(ok.stdout.includes("Your words: --help me"));
 });
 
-test("A3 a redirect is never followed: the send asks for redirect manual, so a 3xx is a failure line", async () => {
-  const f = fakeFetch(307);
+test("A3 a redirect is never followed: the send sets redirect error, so any 3xx fails the request and is the failure line", async () => {
+  const f = fakeFetch(new TypeError("fetch failed: unexpected redirect"));
   const out = await run(["--comment", "hello"], deps({ fetchImpl: f }));
-  assert.equal(f.calls[0].init.redirect, "manual");
+  assert.equal(f.calls[0].init.redirect, "error");
   assert.equal(out.exitCode, 1);
   assert.equal(lastLine(out.stdout), FB.FB6);
   assert.equal(f.calls.length, 1, "never re-posted");

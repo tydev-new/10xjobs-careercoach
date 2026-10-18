@@ -4,7 +4,7 @@
 //
 //   echo '<json body>' | node render_feedback.mjs   the rendering of a recorded
 //                                                   request body, or "INVALID"
-//   node render_feedback.mjs --fixed                the fixed lines FB1..FB13 as JSON
+//   node render_feedback.mjs --fixed                the fixed lines FB1..FB10 as JSON
 //
 // "INVALID" means the body is not exactly the eight keys of § 6, in order.
 import { FB, PAYLOAD_KEYS, renderFeedback } from "../../skills/feedback/scripts/lib/feedback.mjs";

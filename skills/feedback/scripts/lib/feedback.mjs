@@ -30,7 +30,7 @@ export const SEND_TIMEOUT_MS = 15000;
 // truly huge input is refused (as FB9) before that.
 const MAX_RAW = 200000;
 
-/** § 13, word for word. FB2 is the labels (RENDER_LABELS); FB14 is MARKS. */
+/** § 13, word for word. FB2 is the labels (RENDER_LABELS); FB14 is MARKS. FB11 is removed. */
 export const FB = Object.freeze({
   FB1: "This is everything that would go to the Ten team:",
   FB3: "This goes to the people building Ten, exactly as shown, with nothing else from your files or this conversation. Nothing is sent until you say yes.",
@@ -41,9 +41,6 @@ export const FB = Object.freeze({
   FB8: "A bug report needs a few words about what happened.",
   FB9: "That's over 2,000 characters. Shorten it and try again.",
   FB10: "A rating is a whole number from 1 to 5.",
-  FB11: "This couldn't be matched to what you saw, so nothing went. Ask again if you'd like to send it.",
-  FB12: "Send feedback",
-  FB13: "Feedback for the Ten team: ",
 });
 
 /** FB14. */
@@ -305,9 +302,9 @@ export async function sendFeedback(payload, { url = PROD_URL, fetchImpl, timeout
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(payload),
-      // never follow a redirect: a 3xx is a failure (FB6), and the note is
-      // posted to the one configured address and nowhere else
-      redirect: "manual",
+      // never follow a redirect: "error" makes any 3xx fail the request (FB6),
+      // and its target is never requested (§ 8.5)
+      redirect: "error",
       signal,
     });
     const status = res?.status;

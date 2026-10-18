@@ -126,9 +126,9 @@ function shownValue(key, v) {
 
 // ============================================================ strings
 
-test("S1 FB1 and FB3-FB13 are the doc's § 13 words, FB14 its four marks, and the eight labels § 7's", () => {
-  assert.equal(Object.keys(FBDOC).length, 14, JSON.stringify(Object.keys(FBDOC)));
-  for (const id of ["FB1", "FB3", "FB4", "FB5", "FB6", "FB7", "FB8", "FB9", "FB10", "FB11", "FB12", "FB13"]) {
+test("S1 FB1 and FB3-FB10 are the doc's § 13 words, FB14 its four marks, and the eight labels § 7's", () => {
+  assert.equal(Object.keys(FBDOC).length, 12, JSON.stringify(Object.keys(FBDOC)));
+  for (const id of ["FB1", "FB3", "FB4", "FB5", "FB6", "FB7", "FB8", "FB9", "FB10"]) {
     assert.equal(FBDOC[id].length, 1, id);
     assert.equal(lib.FB[id], FBDOC[id][0], id);
   }
@@ -145,7 +145,7 @@ test("S2 voice: scan_voice.py --reply over every line the person can see (FB1, F
   const f = path.join(d, "reply.md");
   const local = lib.renderFeedback({ kind: "bug", comment: "the letter check keeps flagging dates that are right", rating: 4, skill: "apply", step: "Tailoring", version: "0.9.2", host: "local", installationId: "3f9c0a7e5b2d4c18a6e0f1b2c3d4e5f6" });
   const web = lib.renderFeedback({ kind: "comment", comment: "", rating: 5, skill: "", step: "", version: "abc123", host: "web", installationId: null });
-  const text = [local, web, ...["FB3", "FB4", "FB5", "FB6", "FB7", "FB8", "FB9", "FB10", "FB11", "FB12", "FB13"].map((k) => lib.FB[k]), Object.values(lib.MARKS).join(" ")].join("\n\n") + "\n";
+  const text = [local, web, ...["FB3", "FB4", "FB5", "FB6", "FB7", "FB8", "FB9", "FB10"].map((k) => lib.FB[k]), Object.values(lib.MARKS).join(" ")].join("\n\n") + "\n";
   writeFileSync(f, text);
   const r = spawnSync("python3", [path.join(REPO, "tests/always-on/scan_voice.py"), "--reply", f], { encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr);

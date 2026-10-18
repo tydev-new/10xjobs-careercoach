@@ -208,3 +208,4 @@ try {
 
 console.log(`\nrace failures: ${fails}${fails ? "\n  " + failed.join("\n  ") : ""}`);
 process.exitCode = fails ? 1 : 0;
+process.exit(fails ? 1 : 0); // explicit: the cluster helper can leave the exit code at 0 (seen 2026-10-17 in r11-feedback-race)

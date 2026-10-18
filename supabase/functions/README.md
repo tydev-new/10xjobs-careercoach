@@ -1,4 +1,4 @@
-# supabase/functions — Ten's four Edge Functions
+# supabase/functions — Ten's five Edge Functions
 
 Contract: `docs/design-web-agent.md` § 8, amended by § 13 ("the site's
 model is a setting" — the proxy now allows exactly two models, Claude
@@ -8,7 +8,9 @@ Sonnet 5 and DeepSeek V4.1 Flash, each with its own per-call ceiling), § 14
 `ten-delete-account`, and § 17.10, "Only Ten's own orders" — fix round 2's
 lead ruling on the independent tester's finding F1, the signed `invoice_id`
 and the payee check; fix round 3 — owner-approved, § 17.3's zero-fee
-allowance and 15 s timeouts on every PayPal call). Built and tested
+allowance and 15 s timeouts on every PayPal call); `ten-feedback` is
+`docs/design-feedback.md` § 9 (a note people choose to send to the people
+building Ten). Built and tested
 **locally only** (Deno, mocked
 OpenRouter/PayPal and mocked Supabase — see "Tests" below). **Not deployed
 by this change.** The owner runs the commands below when ready; nothing
@@ -43,6 +45,12 @@ supabase/functions/
   ten-paypal-webhook/
     handler.ts             handleRequest(req, deps) — PAYMENT.CAPTURE.COMPLETED backup delivery (§ 17.1 step 5)
     index.ts               Deno.serve bootstrap; TEN_PAYPAL_WEBHOOK_ID and TEN_PAYPAL_MERCHANT_ID may both be unset at boot (see "Deploy" below)
+    handler.test.ts
+  ten-feedback/
+    core.ts                pure: the eight-key body shape (design-feedback.md § 9.2 step 3), the 8,192-byte cap
+    handler.ts             handleRequest(req, deps, env) — route, size, shape, one call, a status-only answer; reads no Authorization, apikey, cookie, address or user-agent header
+    rpc.ts                 the one database member: rpc/ten_feedback_add with the service role (10 s timeout); buildDeps
+    index.ts               Deno.serve bootstrap; deployed --no-verify-jwt (the local script has no key to send)
     handler.test.ts
 ```
 
@@ -82,6 +90,15 @@ running 28 tests from ./supabase/functions/ten-paypal-webhook/handler.test.ts
 
 ok | 194 passed | 0 failed
 ```
+
+With `ten-feedback` added (2026-10-17, `docs/design-feedback.md` § 17.2) the
+same command reports `ok | 216 passed | 0 failed`: 22 new tests in
+`ten-feedback/handler.test.ts` (routing and CORS, the 8,192-byte cap counted
+while streaming, every shape rule, header sentinels that must reach neither
+the database arguments nor any console call, the status-only answers, the real
+`rpc.ts` against a stub, and the lib's output always passing the shape check).
+The file review of "one database member, no forbidden header read" runs in
+`tests/feedback.test.mjs`, since this suite has no file access.
 
 The new coverage (§ 17.8/§ 17.10's test plan, the parts this build owns —
 `tests/sql` and the SQL-only checks are the independent tester's, not this
@@ -148,7 +165,7 @@ item 7).
 
 ## Deploy (the owner runs these; an agent never does)
 
-All four functions read Supabase's own auto-injected `SUPABASE_URL`,
+All five functions read Supabase's own auto-injected `SUPABASE_URL`,
 `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` — those are reserved names
 the CLI will refuse to let you set yourself; every other Edge Function gets
 them automatically once deployed to the project.
@@ -163,6 +180,7 @@ supabase functions deploy ten-model-proxy --no-verify-jwt --project-ref ivunfoto
 supabase functions deploy ten-delete-account --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
 supabase functions deploy ten-paypal --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
 supabase functions deploy ten-paypal-webhook --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
+supabase functions deploy ten-feedback --no-verify-jwt --project-ref ivunfotoggdxbjouumdk
 
 # Secrets ten-model-proxy needs (never printed, never committed):
 supabase secrets set TEN_OPENROUTER_API_KEY=<the existing OpenRouter key, shared with the live app> \
@@ -194,6 +212,13 @@ mint a valid `invoice_id` tag through create-order, then build their own
 order in the browser with that same tag/custom_id/amount but another
 account as payee — the payee check refuses that even though the tag alone
 would have verified.
+
+`ten-feedback` needs no secret of its own: it reads only the auto-injected
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`, plus `TEN_APP_ORIGIN` for CORS
+(the same one the proxy uses). Supabase's secrets page says a secret set with
+`supabase secrets set` is one the "deployed functions can now read" (read
+2026-10-17); it does not say outright that every function in the project
+shares every secret, so the owner checklist below still checks it.
 
 `ten-delete-account` needs no extra secret beyond the auto-injected three —
 it never calls OpenRouter or PayPal and never needs the app origin beyond
@@ -324,6 +349,56 @@ anyone anything. Email confirmation is already on and stays on.
 
 Read-only queries (grants per day, all spend today) are in the migration's header.
 
+## Owner checklist for feedback — the `ten-feedback` function (stage 1)
+
+From `docs/design-feedback.md` § 16.1 (an agent never runs any of this).
+Nothing here touches an existing function, table or secret. The function
+answers nothing useful until step 1 is done, and step 1 writes nothing a
+visitor can reach until step 4 deploys the function.
+
+1. **Apply the migration** `20261017000000_ten_feedback.sql` in the SQL editor
+   as `postgres`, at a quiet time. On a lock timeout nothing changes; run it
+   again later. Then `NOTIFY pgrst, 'reload schema';`.
+2. **Check, read-only:**
+   ```sql
+   select * from public.ten_feedback_settings;
+   -- expect: open true, 10, 60, 300, 5000
+   select has_table_privilege('anon', 'public.ten_feedback', 'insert'),
+          has_table_privilege('authenticated', 'public.ten_feedback', 'select'),
+          has_function_privilege('anon', 'public.ten_feedback_add(text,text,smallint,text,text,text,text,text)', 'execute');
+   -- expect: false, false, false
+   ```
+3. **Check the CORS secret exists** (the proxy already uses it):
+   `supabase secrets list --project-ref ivunfotoggdxbjouumdk` lists
+   `TEN_APP_ORIGIN`. If a call from the website's origin later shows no CORS
+   header, this is the first place to look. (Not needed for the local script,
+   which sends no `Origin`.)
+4. **Deploy:** `supabase functions deploy ten-feedback --no-verify-jwt --project-ref ivunfotoggdxbjouumdk`.
+5. **Live check from your own computer, with no key** (this writes one test
+   row, as you):
+   ```sh
+   curl -sS -i -X POST https://ivunfotoggdxbjouumdk.supabase.co/functions/v1/ten-feedback \
+     -H 'content-type: application/json' \
+     -d '{"kind":"comment","comment":"owner test, delete me","rating":null,"skill":"","step":"","version":"owner-test","host":"local","installationId":null}'
+   ```
+   Expect `201` and `{"status":"sent"}`. A `401` means the gateway wants a key
+   (design-feedback.md § 9.1's UNVERIFIED): stop and tell the lead, because the
+   fallback is a different design. Then the same body with a ninth key
+   (`"extra":1`) gets `400`. Then remove the test row:
+   `delete from public.ten_feedback where comment = 'owner test, delete me';`
+6. **Merge the stage 1 PR and refresh the deployed skills:**
+   `cp -r skills/* ~/.claude/skills/`, and publish the plugin version.
+7. **Your live run** (`docs/PROCESS.md` step 6), in your own workspace: tell
+   Ten something is broken, check what it shows, say yes, see "Sent to the Ten
+   team. Thank you." Then the read query in the migration's header shows your
+   row. Report back numbers only (a row arrived, its `host` and `skill`), never
+   its words.
+
+To stop all sends at once: `update public.ten_feedback_settings set open = false;`.
+Read the notes with the queries in the migration's header (§ 16.3). Local
+unit tests never reach production: `tests/feedback.test.mjs` and the harness
+point the script at a stub on `127.0.0.1` through `TEN_FEEDBACK_URL`.
+
 ## Rollback
 
 ```sh
@@ -331,6 +406,7 @@ supabase functions delete ten-model-proxy --project-ref ivunfotoggdxbjouumdk
 supabase functions delete ten-delete-account --project-ref ivunfotoggdxbjouumdk
 supabase functions delete ten-paypal --project-ref ivunfotoggdxbjouumdk
 supabase functions delete ten-paypal-webhook --project-ref ivunfotoggdxbjouumdk
+supabase functions delete ten-feedback --project-ref ivunfotoggdxbjouumdk
 supabase secrets unset TEN_OPENROUTER_API_KEY TEN_APP_ORIGIN --project-ref ivunfotoggdxbjouumdk
 supabase secrets unset TEN_PAYPAL_CLIENT_ID TEN_PAYPAL_CLIENT_SECRET TEN_PAYPAL_API_BASE TEN_PAYPAL_WEBHOOK_ID TEN_PAYPAL_MERCHANT_ID \
   --project-ref ivunfotoggdxbjouumdk
@@ -523,3 +599,21 @@ hand.
    its existing "any OTHER failure → 503" branch (no `.status` on an
    abort error, so it never matches the `404`-only "ignored" case). See
    `_shared/paypal.test.ts`'s six new timeout tests.
+
+**`ten-feedback`** — `POST .../ten-feedback` (and its `OPTIONS` preflight);
+anything else 404s. No sign-in and no key: the local script has none to send,
+and the function does not need to know who sent a note
+(`docs/design-feedback.md` § 9). In order: a body over 8,192 bytes, counted
+while it streams in → 413 `{"status":"invalid"}`; anything but a JSON object
+with exactly the eight keys of § 6, each passing its rule → 400
+`{"status":"invalid"}`; then one call, `rpc/ten_feedback_add` with the service
+role, its arguments taken only from the body. `sent` → 201
+`{"status":"sent"}`; `limited` or `closed` → 429 `{"status":"busy"}` with
+`Retry-After: 3600`; an error or a 10 s timeout → 503 `{"status":"failed"}`.
+The body never carries anything but `status`. It never reads, stores, logs or
+passes on `Authorization`, `apikey`, cookies, `x-forwarded-for` or any address
+header, or `user-agent`; `Origin` picks the CORS headers; the only thing
+logged is the status code answered. Supabase's own platform logs are outside
+Ten's code, and what they keep is UNVERIFIED. The limits (per random id, per
+hour, per day, in total) are counted in the database, in one locked
+transaction, not here.

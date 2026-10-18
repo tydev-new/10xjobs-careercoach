@@ -2,8 +2,11 @@
 
 The repo is an installable plugin: the full skill pack (`profile`,
 `coach`, `search`, `evaluate`, `apply`, `outreach`, `storybank`,
-`interview`, `learn`). All candidate data stays in a folder on your
-machine.
+`interview`, `learn`, `feedback`). All candidate data stays in a folder on
+your machine. The one exception is a note about Ten itself that you choose
+to send with the `feedback` skill: you see exactly what would go first, and
+nothing is sent until you say yes (see "Requirements" for the one network
+call).
 
 ## Option A — plugin marketplace
 
@@ -38,6 +41,16 @@ you need.
 
 Node.js 18 or newer for the skills' scripts (check with `node --version`;
 Ubuntu 24.04's own `nodejs` package is enough, and any current Node LTS
-works). The scripts need no packages. `render_resume.mjs` uses headless
+works). The scripts need no packages. Only one of them uses the network:
+`feedback`'s `scripts/feedback.mjs`, and only when you have seen your note and
+said yes. It posts your own words (an email address, phone number, profile
+link or folder path in them blanked out), a rating if you gave one, which skill
+was running, Ten's version, and a random id made once on your computer
+(`~/.cache/ten/installation-id`, or under `$XDG_CACHE_HOME`; never in your
+workspace; if it can't be stored, none is sent) to Ten's feedback endpoint; nothing from your workspace or the
+conversation goes with it. If your Claude Code or Cowork settings block
+network access for the command, you get "This couldn't be sent just now, so
+nothing went", and the work carries on. Copied with `cp -r skills/*`, the note
+carries the version `unknown`, because there is no plugin file above the script. `render_resume.mjs` uses headless
 Chrome if present, to make the PDF and count its pages. The harness in
 `tests/always-on/` needs the `claude` CLI.

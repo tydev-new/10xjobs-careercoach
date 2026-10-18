@@ -3,7 +3,8 @@
 -- supabase/migrations/20260924000000_ten_ledger_finish_reason.sql,
 -- supabase/migrations/20260924100000_ten_conversations.sql, and
 -- supabase/migrations/20260925000000_ten_paypal_credit.sql, and
--- supabase/migrations/20261002000000_ten_welcome_credit.sql created, and
+-- supabase/migrations/20261002000000_ten_welcome_credit.sql, and
+-- supabase/migrations/20261017000000_ten_feedback.sql created, and
 -- nothing else. The second and fourth files add no object of their own to
 -- drop — ten_usage_ledger.gross_usd/fee_usd and the wider kind/paypal-
 -- breakdown checks are on a table this file already drops, so they go with
@@ -14,6 +15,10 @@
 -- ten_welcome_claims drops the email
 -- fingerprints too (§ 20.3: "tearing down the whole beta drops the claims
 -- table too").
+-- The sixth (docs/design-feedback.md § 10.5) adds three more: the tables
+-- ten_feedback and ten_feedback_settings and the function ten_feedback_add.
+-- Dropping ten_feedback drops every note people sent to the Ten team; the
+-- notes are not linked to any account, so nothing else of theirs goes.
 -- Applied by the OWNER, never by an agent. DESTROYS all beta data (workspace
 -- files, ledger, gate log, saved conversation). The shared auth users are
 -- NOT touched.
@@ -72,8 +77,11 @@ drop table if exists public.ten_conversations;
 drop table if exists public.ten_usage_ledger;
 drop table if exists public.ten_welcome_claims;
 drop table if exists public.ten_welcome_settings;
+drop table if exists public.ten_feedback;
+drop table if exists public.ten_feedback_settings;
 
 -- Functions last: the tables' policies call ten_is_member().
+drop function if exists public.ten_feedback_add(text, text, smallint, text, text, text, text, text);
 drop function if exists public.ten_claim_welcome();
 drop function if exists public.ten_welcome_hash(text);
 drop function if exists public.ten_conversation_save(text, jsonb, boolean, text);

@@ -6,9 +6,9 @@
 // What runs: the REAL production build of apps/web with the real supabase-js,
 // in headless Chromium, against the repo's local stand-in (a member with a
 // saved conversation, so Ten's turns render with no model call). For proof 6
-// and "nothing else changed colour", origin/main is exported with `git archive`
+// and "nothing else changed colour", main just before the mark (7575bf1) and the mark itself (a523815) are exported with `git archive`
 // into a temp dir (no worktree, no ref is touched) and built the same way; those
-// tests are skipped, loudly, where origin/main is not available.
+// tests are skipped, loudly, where either commit is not available.
 //
 //   node --test tests/web/brand-mark-10x-review.test.ts
 //   REVIEW_SHOTS=<dir> ... saves the screenshots to look at.
@@ -64,6 +64,10 @@ const sites: Server[] = [];
 const temps: string[] = [];
 let HEAD = { origin: "", dist: "" };
 let MAIN: { origin: string; dist: string; src: string } | null = null;
+let MARK: { origin: string; dist: string; src: string } = { origin: "", dist: "", src: "" };
+/** main just before PR #40 (the brand mark), and the brand mark's reviewed head */
+const BASE_REF = process.env.BRAND_BASE_REF ?? "7575bf1";
+const MARK_REF = process.env.BRAND_MARK_REF ?? "a523815";
 let mainWhy = "";
 const TYPES: Record<string, string> = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".woff2": "font/woff2" };
 
@@ -99,19 +103,27 @@ before(async () => {
   standIn.setFunctionsTarget(`http://127.0.0.1:${(fn.address() as any).port}`);
   HEAD = await buildAndServe(WEB);
 
-  // origin/main, exported (never checked out), with this checkout's installed modules linked in
-  const src = mkdtempSync(path.join(tmpdir(), "ten-brand-main-"));
-  temps.push(src);
-  const tar = path.join(src, "main.tar");
-  const ar = spawnSync("git", ["-C", REPO, "archive", "--format=tar", "-o", tar, "origin/main"], { encoding: "utf8" });
-  if (ar.status !== 0) mainWhy = `origin/main could not be exported: ${ar.stderr.trim()}`;
-  else {
+  // B6 and B8 compare two FIXED commits, each exported (never checked out) with this checkout's installed
+  // modules linked in: main just before the brand mark (BASE_REF) and the brand mark's own build (MARK_REF).
+  // (Fix, 2026-10-17: they first compared origin/main with the working tree, which stopped meaning anything
+  // once the mark merged into main; both builds then had the new tile.)
+  const exportBuild = async (ref: string) => {
+    const src = mkdtempSync(path.join(tmpdir(), "ten-brand-ref-"));
+    temps.push(src);
+    const tar = path.join(src, "ref.tar");
+    const ar = spawnSync("git", ["-C", REPO, "archive", "--format=tar", "-o", tar, ref], { encoding: "utf8" });
+    if (ar.status !== 0) throw new Error(`${ref} could not be exported: ${ar.stderr.trim()}`);
     const x = spawnSync("tar", ["-xf", tar, "-C", src], { encoding: "utf8" });
-    if (x.status !== 0) mainWhy = `tar failed: ${x.stderr}`;
-    else {
-      for (const d of ["apps/web", "packages/agent", "packages/checkers"]) if (existsSync(path.join(REPO, d, "node_modules"))) symlinkSync(path.join(REPO, d, "node_modules"), path.join(src, d, "node_modules"));
-      MAIN = { ...(await buildAndServe(path.join(src, "apps/web"))), src };
-    }
+    if (x.status !== 0) throw new Error(`tar failed: ${x.stderr}`);
+    for (const d of ["apps/web", "packages/agent", "packages/checkers"]) if (existsSync(path.join(REPO, d, "node_modules"))) symlinkSync(path.join(REPO, d, "node_modules"), path.join(src, d, "node_modules"));
+    return { ...(await buildAndServe(path.join(src, "apps/web"))), src };
+  };
+  try {
+    MAIN = await exportBuild(BASE_REF);
+    MARK = await exportBuild(MARK_REF);
+  } catch (e) {
+    mainWhy = String((e as Error).message);
+    MAIN = null;
   }
   browser = await chromium.launch();
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
@@ -441,7 +453,7 @@ test("B5 proof 5, the accessibility tree: on sign-in the wordmark is one heading
   }
 });
 
-test("B6 proof 6, 375px sign-in against origin/main: every element of the page has the same box in both builds, and the only pixels that differ are inside the mark's 30px box", async (t) => {
+test("B6 proof 6, 375px sign-in against main before the mark (BASE_REF): every element of the page has the same box in both builds, and the only pixels that differ are inside the mark's 30px box", async (t) => {
   if (!MAIN) return t.skip(mainWhy);
   const grab = async (origin: string, name: string) => {
     const o = await open(origin, { width: 375, height: 812 });
@@ -463,7 +475,7 @@ test("B6 proof 6, 375px sign-in against origin/main: every element of the page h
     }
   };
   const a = await grab(MAIN.origin, "main");
-  const b = await grab(HEAD.origin, "branch");
+  const b = await grab(MARK.origin, "branch");
   assert.ok(a.boxes.length > 20, `elements measured: ${a.boxes.length}`);
   assert.deepEqual(b.boxes, a.boxes, "an element moved or changed size");
   assert.deepEqual(b.doc, a.doc);
@@ -631,7 +643,7 @@ test("B7b the look: the app's own mark at 24, 28 and 30px and the served favicon
   }
 });
 
-test("B8 nothing else changed colour: against origin/main the built stylesheet differs only by the two brand tokens and the ring's radius; lime is still the lime button's fill; at 375px the Ten tab's tile is --hero with a --lime icon, and --lime with --on-lime when current", async (t) => {
+test("B8 nothing else changed colour: against main before the mark (BASE_REF) the built stylesheet differs only by the two brand tokens and the ring's radius; lime is still the lime button's fill; at 375px the Ten tab's tile is --hero with a --lime icon, and --lime with --on-lime when current", async (t) => {
   const p = await member(HEAD.origin, { width: 375, height: 812 }, { scale: 2 });
   try {
     const tok = (n: string) => p.page.evaluate((name) => { const s = document.createElement("span"); s.style.color = `var(${name})`; document.body.appendChild(s); const v = getComputedStyle(s).color; s.remove(); return v; }, n);
@@ -656,7 +668,7 @@ test("B8 nothing else changed colour: against origin/main the built stylesheet d
   }
   if (!MAIN) return t.skip(mainWhy);
   const cssOf = (dist: string) => { const dir = path.join(dist, "assets"); const f = readdirSync(dir).filter((n) => n.endsWith(".css")); assert.equal(f.length, 1); return readFileSync(path.join(dir, f[0]), "utf8"); };
-  const head = cssOf(HEAD.dist);
+  const head = cssOf(MARK.dist);
   const main = cssOf(MAIN.dist);
   // undo exactly what the doc says changed; what is left must be main's stylesheet
   const undone = head.replace(/--brand:\s*#c15f3c;/i, "").replace(/--on-brand:\s*#fff(fff)?;/i, "");
@@ -670,7 +682,7 @@ test("B8 nothing else changed colour: against origin/main the built stylesheet d
   assert.equal(diffs.length, 1, JSON.stringify(diffs.slice(0, 5)));
   assert.match(diffs[0], /border-radius:11px.*border-radius:10\.5px/);
   // and in the source tree, the only apps/web files that differ from main
-  const changed = spawnSync("git", ["-C", REPO, "diff", "--name-only", "origin/main", "origin/feat/brand-mark-10x", "--", "apps/web"], { encoding: "utf8" });
+  const changed = spawnSync("git", ["-C", REPO, "diff", "--name-only", BASE_REF, MARK_REF, "--", "apps/web"], { encoding: "utf8" });
   if (changed.status === 0) assert.deepEqual(changed.stdout.trim().split("\n").sort(), ["apps/web/public/favicon.svg", "apps/web/src/components/BrandMark.tsx", "apps/web/src/styles.css"]);
 });
 

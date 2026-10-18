@@ -45,6 +45,14 @@ until it was added by hand.
 **Always-on total: 1,774 words** (Tier 0's 980 + Tier 1's 794 —
 recomputed after the plain-replies Tier 0 growth; was 1,465).
 
+**2026-10-17, the `feedback` skill (docs/design-feedback.md § 5.2,
+stage 1): Tier 1 grows by one 65-word description.** Counted from disk
+today the ten descriptions total 746 words (681 without it), so the delta
+is **+65w**; the older 794w/11-skill figure above is a dated record and was
+not recomputed by this change. Tier 0 is unchanged. The web turn is not
+touched in stage 1 (`feedback` joins `MVP_SKILLS` only in stage 2, § 12.4,
+where the delta is measured against the ~3,300-word turn target).
+
 ---
 
 ## Tier 2 — one skill body, on description match
@@ -60,6 +68,7 @@ recomputed after the plain-replies Tier 0 growth; was 1,465).
 | learn | 76w | 494w |
 | interview | 85w | 932w |
 | outreach | 69w | 704w |
+| feedback (2026-10-17) | 65w | 750w |
 
 7,257 words total (round 2, docs/design-apply-three-lens.md § 9 item
 12: apply +79w for the three-lens exit and the budget's "said up
@@ -72,6 +81,11 @@ work.
 Soft target ~700 words. All eleven are over it — the loops inlined into the orchestrators (the founder's ruling) are what grew the bodies.
 
 ## Tier 3 — references, on demand
+
+*2026-10-17: `feedback` adds 3 files and 1,651 words (`schema.md` 628w,
+`eval.md` 535w, `patterns.md` 488w) to the totals below, which are a dated
+record. `python3 tests/word_report.py` counts the whole tree: 38,207 words
+across 45 files, 35,806 across 41 without `feedback`.*
 
 Loaded only when a mode calls for them. 35,265 words across 36 files
 (round 2, docs/design-apply-three-lens.md § 9 item 12: apply +634w for
@@ -90,7 +104,9 @@ Summary pointers; outreach −82w for its rewired eval.md).
 
 ## Tier 4 — scripts, never loaded
 
-16 Python files. They are **executed, not read into context** — they
+16 Python files (2026-10-17: plus `skills/feedback/scripts/feedback.mjs` and
+its `lib/feedback.mjs`, the only script that reaches the network, and only
+after the candidate has seen the note and said yes). They are **executed, not read into context** — they
 cost nothing to hold and their output is a handful of lines.
 
 This is why structure and counting live in code: a rung is nearly free

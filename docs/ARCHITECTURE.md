@@ -237,6 +237,8 @@ flowchart TD
   Delete["ten-delete-account<br/>(service role)"]
   Proxy["ten-model-proxy<br/>(service role)"]
   Pay["ten-paypal, ten-paypal-webhook<br/>(service role)"]
+  Feedback["ten-feedback<br/>(service role, no sign-in)"]
+  Script["Local feedback script<br/>(no key)"]
   Owner["Owner"]
   subgraph Beta["The member's beta data"]
     subgraph Rows["Rows"]
@@ -247,6 +249,7 @@ flowchart TD
     Bucket[("bucket ten-workspaces")]
   end
   Ledger[("ten_usage_ledger")]
+  Notes[("ten_feedback")]
   Browser -->|ten_ functions| Rows
   Browser -->|"Storage API upload,<br/>RLS insert policy"| Bucket
   Delete -->|removes all of it| Beta
@@ -254,6 +257,8 @@ flowchart TD
   Pay -->|paid credit rows| Ledger
   Owner -->|starter credit, refund rows| Ledger
   Browser -->|first open, welcome claim| Ledger
+  Script -->|a note, after the person's yes| Feedback
+  Feedback -->|"ten_feedback_add: no account link"| Notes
 ```
 
 | What | Holds | Written by |
@@ -263,6 +268,7 @@ flowchart TD
 | `ten_ws_files` | workspace text files (`.md .txt .json .html`) | the member, via `ten_ws_write`, which refuses a stale version |
 | `ten_conversations` | one saved conversation per user | the member, via `ten_conversation_save`, same stale-version rule |
 | bucket `ten-workspaces` | uploaded `.pdf` and `.docx`, under `users/<uid>/ws/` | the member, create only |
+| `ten_feedback`, `ten_feedback_settings` | notes people choose to send to the people building Ten: kind, their words, a rating, which skill and step, Ten's version, local or web, and (local only) a random id. No user id, email or address column. The settings row holds the on/off switch and four limits | `ten-feedback`, through `ten_feedback_add` (service role only), which counts the limits from the table in one locked transaction ([design-feedback.md](design-feedback.md) § 9, § 10) |
 
 Who can read what:
 
@@ -278,6 +284,10 @@ flowchart LR
 - **The member** reads only their own rows (RLS, with membership checked).
   The ledger is the exception: any signed-in user can read their own
   ledger rows, because membership itself lives there.
+- **A feedback note** is in nobody's rows: it has no link to an account,
+  so a member can't read it, and deleting a member's beta data leaves it
+  (`ten-delete-account` is unchanged). Only the owner and the service role
+  can read the table; both tables have RLS on and no policy.
 - **The owner and the server functions** use the service role, which
   skips RLS. The proxy reads balances and today's spend.
 - **OpenRouter and the model host** see what a call carries: the turn's
@@ -328,7 +338,9 @@ deploy. Each change's contract states its own order, and it can differ:
 because the new proxy refuses requests the old site sends (C § 13.2).
 § 17 (buying credit): the older app's patch, the migration,
 `ten-delete-account`, `ten-paypal`, `ten-paypal-webhook` and its id, then
-the site (C § 17.7).
+the site (C § 17.7). Feedback ([design-feedback.md](design-feedback.md)
+§ 16.1) is independent of all of them: its migration, then `ten-feedback`,
+then the skill reaches users by `cp -r skills/*`; nothing else waits on it.
 
 **The site deploy is a script,**
 [`apps/web/scripts/deploy-prod.sh`](../apps/web/scripts/deploy-prod.sh).

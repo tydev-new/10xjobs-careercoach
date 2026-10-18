@@ -389,8 +389,11 @@ The production URL is a constant in `scripts/lib/feedback.mjs`:
 ### 8.3 What it reads and writes
 
 - **Reads:** its own arguments; `$CLAUDE_PLUGIN_ROOT/.claude-plugin/plugin.json`,
-  else the first `.claude-plugin/plugin.json` found walking up from the
-  script; the id file. **Nothing in the workspace** (it never opens a file
+  else the repository's own `.claude-plugin/plugin.json` when the script
+  sits at `<repo>/skills/feedback/scripts` (never a walk up the folders,
+  and nothing at all when the skills folder sits inside a `.claude`
+  folder, user-level or inside a workspace: the tester's stage 1
+  finding 1); the id file. **Nothing in the workspace** (it never opens a file
   under its working folder).
 - **Writes:** only the id file, `$XDG_CACHE_HOME/ten/installation-id`
   (default `~/.cache/ten/installation-id`): 32 random lowercase hex

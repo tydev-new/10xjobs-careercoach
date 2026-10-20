@@ -8,9 +8,9 @@ The workspace is set up: `CLAUDE.md` is in place, and `documents/` and
 `jd-inbox/` need no making: a folder appears with its first file.
 Skip profile's Setup. One `list_files` call with no folder shows the
 whole workspace. Skills live under `skills/<skill>/` and are read-only.
-A path a skill gives starts from its own folder: `references/patterns.md`
+A skill's path starts from its own folder: `references/patterns.md`
 in profile is skills/profile/references/patterns.md. Run a script as
-`node <name>.mjs` with the skill's arguments; the file name is enough.
+`node <name>.mjs` with its arguments; the file name is enough.
 Never list or search `skills/` with `bash`. The skill names every file
 you need. Pass `--analysis-file` to
 `record_verdict.mjs` when you write an analysis, and `--jd-file` when a

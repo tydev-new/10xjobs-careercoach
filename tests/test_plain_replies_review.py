@@ -62,7 +62,7 @@ def test_tier0_paragraph_is_the_design_target_word_for_word():
     target = _target_block("Write every reply, and every line you put in `plan.md`")
     body = _read("skills", "profile", "templates", "workspace-CLAUDE.md")
     assert target in _norm(body)
-    assert len(target.split()) == 91, len(target.split())
+    assert len(target.split()) == 94, len(target.split())
     # a second paragraph of § How you talk, not a new section
     how = body.split("## How you talk", 1)[1].split("\n## ", 1)[0]
     assert target in _norm(how)

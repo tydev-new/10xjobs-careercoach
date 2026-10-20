@@ -46,11 +46,12 @@ def test_b1_marker_is_v9():
     assert _read(*TEMPLATE).splitlines()[0].startswith("<!-- 10xjobs guardrails v9 ")
 
 
-def test_b1_honesty_rule_is_untouched():
-    # the design routes any change here to the lead; it must not move quietly
+def test_b1_honesty_rule_says_due_checks():
+    # lead's ruling 2026-10-20: the old "every check that didn't run" clashed with "not due a check"
     body = _norm(_read(*TEMPLATE))
-    assert ("Plain words drop nothing: every count, every check that didn't run, "
+    assert ("Plain words drop nothing: every count, every check that was due and didn't run, "
             "and everything you can't do is still said.") in body
+    assert "every check that didn't run" not in body
 
 
 def test_b1_coach_session_close_is_one_command_with_semicolon():
@@ -75,8 +76,8 @@ def test_b2_b3_host_note_says_where_things_are():
         "Skip profile's Setup.",
         "One `list_files` call with no folder shows the whole workspace.",
         "Skills live under `skills/<skill>/` and are read-only.",
-        "A path a skill gives starts from its own folder: `references/patterns.md` in profile is skills/profile/references/patterns.md.",
-        "Run a script as `node <name>.mjs` with the skill's arguments; the file name is enough.",
+        "A skill's path starts from its own folder: `references/patterns.md` in profile is skills/profile/references/patterns.md.",
+        "Run a script as `node <name>.mjs` with its arguments; the file name is enough.",
         "Never list or search `skills/` with `bash`. The skill names every file you need.",
     ):
         assert needle in note, needle

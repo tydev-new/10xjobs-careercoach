@@ -136,10 +136,12 @@ you talk, a second paragraph after the existing line:
 > wording check", and a target by its name, not its letter. Leave out
 > script names, table labels, and words the skills coined ("mechanical
 > checks", "gate", "6/7 held"); name a file only when they need to open
-> it. Plain words drop nothing: every count, every check that didn't
+> it. Plain words drop nothing: every count, every check that was due and didn't
 > run, and everything you can't do is still said.
 
-91 words. The version marker changes `v6` → `v7` (skill-shape,
+94 words (91 when first written; "was due and" was added 2026-10-20 by
+docs/design-fewer-steps.md B1, so that "not due a check" doesn't clash
+with this line). The version marker changes `v6` → `v7` (skill-shape,
 converting step 7).
 
 **Existing workspaces.** There is no refresh offer today: the goals doc

@@ -375,7 +375,7 @@ expected-output cases (`tests/checkers/cases/`).
 | `search/scripts/update_job.mjs` | evaluate, apply, coach | `--workspace DIR --company S --title S (--stage S \| --dismiss [--reason S] \| --restore)` | `jobs.md` → `jobs.md` | 0 · 2 not one match/flags |
 | `search/scripts/lib/jobs-md.mjs` | library for the two above | - | - | - |
 | `profile/scripts/check_files.mjs` | every MVP skill at close | `--workspace DIR [--skills DIR]` | schema'd files, skills' `schema.md` and links → nothing | 0 · 1 FAIL |
-| `coach/scripts/check_closeout.mjs` | coach at close | `--workspace DIR [--stage S] [--asked Q]… [--minutes N]` | `plan.md` + `updatedAt` → nothing | 0 · 1 FAIL · 2 flags |
+| `coach/scripts/check_closeout.mjs` | coach at close | `--workspace DIR [--stage S] [--asked Q]… [--minutes N]` | `plan.md` + `updatedAt` (on the web the sandbox's, always fresh: F7) → nothing | 0 · 1 FAIL · 2 flags |
 
 - **Time:** ports read `deps.clock` and `FileInfo.updatedAt` (freezable).
 - **`check_files --skills`** defaults to the bundle and reads every skill's

@@ -127,7 +127,8 @@ async function readFileTool(deps: Deps, ctx: ToolContext, input: ReadFileInput):
       // H5 (fix round 1, lead ruling): binaries are never decoded as text —
       // raw bytes read as UTF-8 are garbage (mojibake, U+FFFD) that silently
       // pollutes the model's context. They go through the app's own
-      // extractor (deps.extractText, unpdf for .pdf) or are refused.
+      // extractor (deps.extractText: .pdf and .docx in the web app) or are
+      // refused.
       let text: string | null;
       try {
         text = deps.extractText ? await deps.extractText(path, read.bytes) : null;
@@ -450,7 +451,7 @@ async function checkLanguageTool(deps: Deps, ctx: ToolContext, input: CheckLangu
 // below — not a second, driftable copy.
 export const TOOL_DESCRIPTIONS = {
   load_skill: "Load one MVP skill's SKILL.md (profile, evaluate, apply, or coach) by name.",
-  read_file: "Read a workspace file by path, or a skill file under skills/. A .pdf comes back as its extracted text; .docx is not extractable yet.",
+  read_file: "Read a workspace file by path, or a skill file under skills/. An uploaded .pdf or .docx comes back as its extracted text.",
   write_file: "Write a workspace text file (.md/.txt/.json/.html). Read the file first if it already exists.",
   list_files: "List workspace files, optionally under one directory.",
   bash: "Run one shell command in the workspace sandbox — used only to run a skill's ported checker script (node <script> ...args).",

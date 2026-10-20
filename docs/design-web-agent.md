@@ -154,7 +154,10 @@ file lives in exactly one place, chosen by its extension (rule 12).
     `version_conflict` (or `resource_missing`).
 
   `version` is a sha256 prefix of the content, computed in SQL, the same as
-  the local store's. `updated_at` is `now()`, which `check_closeout` reads.
+  the local store's. `updated_at` is `now()`. `check_closeout` does not
+  read it: the sandbox has no `updated_at`, and every `bash` call copies
+  the files into a fresh sandbox, so each file looks just written
+  (`docs/design-fewer-steps.md` § 0, F7).
 - **Binaries** (`.pdf .docx`) go to the private bucket `ten-workspaces`, at
   `users/{uid}/ws/{path}`, create-only (no `x-upsert`; a clash is a 409,
   per spike 3). `version` is the object's ETag.

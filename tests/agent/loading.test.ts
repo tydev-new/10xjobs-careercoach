@@ -102,16 +102,19 @@ test("words per turn (measured from the request): always-on + tool descriptions 
     const skillW = words(BUNDLE[`skills/${s}/SKILL.md`]);
     const total = sysW + toolW + skillW;
     const tier1W = MVP.reduce((n, k) => n + words(description(BUNDLE[`skills/${k}/SKILL.md`])), 0);
-    const reference = wr("skills/profile/templates/workspace-CLAUDE.md") + wr(`skills/${s}/SKILL.md`) + tier1W;
+    // the host note is a bundled instruction file, so word_report counts it like the rest
+    // (system-prompt.ts, HOST_NOTE_PATH). Since docs/design-fewer-steps.md B3 it is ~180 words, not ~80:
+    // left out of the reference, its growth alone would fill the 10% allowance meant for headings and tool text.
+    const reference = wr("skills/profile/templates/workspace-CLAUDE.md") + wr("skills/profile/templates/web-host-note.md") + wr(`skills/${s}/SKILL.md`) + tier1W;
     rows.push(`${s}: system=${sysW} tools=${toolW} SKILL.md=${skillW} total=${total} | word_report(Tier0+SKILL.md)+Tier1=${reference}`);
     assert.ok(total <= 3300, `${s}: ${total} words > 3,300`);
-    // what the package adds beyond the skill files (host note, headings, tool text) must not bloat past 10%... of the target
+    // what the package adds beyond the skill files (headings, tool text) must not bloat past 10%... of the target
     assert.ok(total - reference <= 0.10 * 3300 + 1e-9, `${s}: ${total - reference} words beyond word_report's count`);
   }
   console.log("[tester word measure]\n  " + rows.join("\n  "));
 });
 
-test("host note: about 80 words and carries the contract's points", async () => {
+test("host note: about 180 words (80 + the fewer-steps additions) and carries the contract's points", async () => {
   const m = scriptedModel([textStep("hi")]);
   await runTurn(makeCoach({ model: m.model }).coach, "c1", [user("u1", "hello")]);
   const sys = systemOf(m.calls[0]);
@@ -121,7 +124,9 @@ test("host note: about 80 words and carries the contract's points", async () => 
   const n = words(note.replace(/^#.*$/gm, ""));
   console.log(`[tester] host note + headings ≈ ${n} words`);
   for (const re of [/cannot send/i, /submit/i, /plan\.md/i, /To do/i, /outreach/i, /PDF/i, /CLAUDE\.md/, /--jd-file/, /language/i]) assert.match(note, re);
-  assert.ok(n <= 110, `host note is ${n} words; contract says about 80`);
+  // docs/design-fewer-steps.md B2/B3: the note says the site is set up, where skills live, and never to list skills/
+  for (const re of [/need no making/, /Skip profile's Setup/, /skills\/<skill>\//, /the file name is enough/, /Never list or search `skills\/` with `bash`/]) assert.match(note, re);
+  assert.ok(n <= 185, `host note is ${n} words; contract says about 80 plus the ~75-100 of docs/design-fewer-steps.md B3`);
 });
 
 // ------------------------------------------------------------------ window

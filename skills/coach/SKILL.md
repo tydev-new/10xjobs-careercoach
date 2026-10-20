@@ -75,7 +75,7 @@ Detailed craft, goal math, and briefing templates live in `references/patterns.m
 Owned: `plan.md` and `plan-log.md` (shapes in `references/schema.md`). Coach routes across all stages and owns none of their domain files.
 
 - **Hands back:** Everything — coach routes and hands back immediately after recording.
-- **Session close:** Before every reply ends, run `node scripts/check_closeout.mjs --workspace . --stage <stage> --asked "<each question>"` (fixes any FAIL before sending) and `node ../profile/scripts/check_files.mjs --workspace .`. No checker-subagent is spawned (coach's voice). Report outcomes, never narration (clean is one line).
+- **Session close:** when the workspace `CLAUDE.md`'s close-out says a check is due, run `node scripts/check_closeout.mjs --workspace . --stage <stage> --asked "<each question>" ; node ../profile/scripts/check_files.mjs --workspace .` as one command and fix any FAIL before sending. No checker-subagent is spawned (coach's voice). Report outcomes, never narration (clean is one line).
 
 ## Guardrails
 

@@ -68,9 +68,9 @@ def test_tier0_paragraph_is_the_design_target_word_for_word():
     assert target in _norm(how)
 
 
-def test_tier0_marker_is_v8():
+def test_tier0_marker_is_v9():
     first = _read("skills", "profile", "templates", "workspace-CLAUDE.md").splitlines()[0]
-    assert "guardrails v8" in first and "v7" not in first
+    assert "guardrails v9" in first and "v7" not in first
 
 
 def test_loop_discipline_decision_line():

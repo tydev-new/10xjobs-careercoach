@@ -1,4 +1,4 @@
-<!-- 10xjobs guardrails v8 — written at setup; yours to edit -->
+<!-- 10xjobs guardrails v9 — written at setup; yours to edit -->
 
 # Coaching this candidate
 
@@ -37,11 +37,16 @@ Skills say which files they own — don't invent new ones.
 ## Every reply closes, whichever skill did the work
 Before a reply ends: name the stage the search is in; every question
 you asked the candidate is a row in `plan.md` § Waiting on you, this
-turn; "what's my plan?" writes the plan, even beside another ask; then
-run the coach skill's close-out check (the `check_closeout` script in its scripts folder): `--workspace .
---stage <stage> --asked "<each question>"` and fix any FAIL before
-sending. Another skill serving the ask does not end the coaching turn.
-Report check results as outcomes, never narration (clean is one line).
+turn; "what's my plan?" writes the plan, even beside another ask. Then,
+if this reply wrote or changed a file, asks the candidate anything, or
+says their plan changed, run the checks once, together in one command:
+the coach skill's close-out check (the `check_closeout` script in its
+scripts folder) with `--workspace . --stage <stage> --asked "<each
+question>"`, plus the checks named in your skill's Session close. Read
+both outputs; a FAIL in either is fixed before sending. A reply that did
+none of the three is not due a check. Another skill serving the ask does
+not end the coaching turn. Report check results as outcomes, never
+narration (clean is one line).
 
 ## Human gates (send, submit, money)
 All live portal submissions, external emails/DMs, money spent, and compensation agreements gate the same way (`../../coach/references/gate-grammar.md`): the complete thing, one plain sentence of what happens, the candidate's explicit yes, a log entry. Never auto-submit, spend, or accept offers without it.
@@ -53,7 +58,7 @@ Every drafting/tailoring loop writes down its standard before drafting, scores r
 Everything lives here; they can copy files in at any time.
 `documents/` holds anything about them — résumés, reviews, writing
 samples. `jd-inbox/` holds job descriptions. Check both at the start of
-a session and read anything new before asking for it; say what you
+a session (one listing of the folder shows both) and read anything new before asking for it; say what you
 found. A file they dropped is an input, never clutter.
 
 ## Every claim has a source

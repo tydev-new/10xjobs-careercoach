@@ -429,6 +429,11 @@ export interface Deps {
   scripts: ScriptRunner; // the checkers seam (§ 4/§ 5)
   webSearch?: (input: WebSearchInput) => Promise<WebSearchOutput>;
   checkLanguage?: (input: CheckLanguageInput) => Promise<CheckLanguageOutput>;
+  /** read_file's text extractor for uploaded binaries (§ 4): the text of
+   *  `bytes`, or null when this file type has no extractor (read_file then
+   *  returns unsupported_type). Throws when the file can't be parsed. The
+   *  text is handed to the model only — never saved as a copy. */
+  extractText?: (path: string, bytes: Uint8Array) => Promise<string | null>;
   logger?: Logger;
   limits?: Limits;
   /** Called once per step the coach records toward the turn's spend,

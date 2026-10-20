@@ -124,13 +124,21 @@ async function readFileTool(deps: Deps, ctx: ToolContext, input: ReadFileInput):
     const read = await deps.workspace.read(path);
     ctx.versionTracker.record(path, read.version);
     if (read.binary) {
-      // H5 (fix round 1, lead ruling): until a real extractor exists,
-      // .pdf/.docx are refused rather than decoded — decoding raw bytes
-      // as text produces garbage (mojibake, U+FFFD) that silently
-      // pollutes the model's context. No pdfjs-dist/mammoth is wired in
-      // (§ 4 marks this UNVERIFIED for both Node and the browser); this
-      // is the honest state until that lands.
-      return err("unsupported_type", "This file type can't be read yet. Paste the text instead.");
+      // H5 (fix round 1, lead ruling): binaries are never decoded as text —
+      // raw bytes read as UTF-8 are garbage (mojibake, U+FFFD) that silently
+      // pollutes the model's context. They go through the app's own
+      // extractor (deps.extractText, unpdf for .pdf) or are refused.
+      let text: string | null;
+      try {
+        text = deps.extractText ? await deps.extractText(path, read.bytes) : null;
+      } catch {
+        return err("unsupported_type", "This file couldn't be opened — it may be damaged or password-protected. Paste the text instead.");
+      }
+      if (text === null) return err("unsupported_type", "This file type can't be read yet. Paste the text instead.");
+      if (!text.trim()) {
+        return err("unsupported_type", "This file has no readable text — it may be a scanned image. Paste the text instead.");
+      }
+      return { path, content: capText(text), readOnly: true };
     }
     return { path, content: capText(read.content), readOnly: !read.editable };
   } catch (e) {
@@ -442,7 +450,7 @@ async function checkLanguageTool(deps: Deps, ctx: ToolContext, input: CheckLangu
 // below — not a second, driftable copy.
 export const TOOL_DESCRIPTIONS = {
   load_skill: "Load one MVP skill's SKILL.md (profile, evaluate, apply, or coach) by name.",
-  read_file: "Read a workspace file by path, or a skill file under skills/. .pdf/.docx are not extractable yet.",
+  read_file: "Read a workspace file by path, or a skill file under skills/. A .pdf comes back as its extracted text; .docx is not extractable yet.",
   write_file: "Write a workspace text file (.md/.txt/.json/.html). Read the file first if it already exists.",
   list_files: "List workspace files, optionally under one directory.",
   bash: "Run one shell command in the workspace sandbox — used only to run a skill's ported checker script (node <script> ...args).",

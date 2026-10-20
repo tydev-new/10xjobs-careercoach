@@ -17,6 +17,7 @@ import { createBalanceFn } from "../backend/balance.ts";
 import { createSupabaseGate } from "../backend/gate.ts";
 import { createCoachModel } from "../backend/model.ts";
 import { createRealScriptRunner } from "../backend/script-runner.ts";
+import { extractText } from "../backend/extract-text.ts";
 import { buildSkillBundle } from "../backend/skills-bundle.ts";
 import { createSupabaseWorkspaceStore } from "../backend/supabase-workspace-store.ts";
 import { createWebSearch } from "../backend/web-search.ts";
@@ -84,6 +85,7 @@ export function buildRealDeps(opts: RealDepsOptions): Deps {
     clock: { now: () => new Date() },
     scripts,
     webSearch,
+    extractText,
     logger: {
       info: (e) => console.info("[agent]", e),
       warn: (e) => console.warn("[agent]", e),

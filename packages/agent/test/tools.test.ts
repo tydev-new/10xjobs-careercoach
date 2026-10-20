@@ -31,6 +31,7 @@ async function makeCtx(overrides: Partial<Deps> = {}) {
     limits: overrides.limits,
     webSearch: overrides.webSearch,
     checkLanguage: overrides.checkLanguage,
+    extractText: overrides.extractText,
   };
   const ctx: ToolContext = {
     chatId: "chat-1",
@@ -70,6 +71,58 @@ test("write_file: an existing file the chat has never seen returns read_first", 
   const { tools } = await makeCtx({ workspace });
   const out: any = await (tools.write_file.execute as any)({ path: "plan.md", content: "Goal: y" }, {});
   assert.equal(out.error.code, "read_first");
+});
+
+async function uploadedWorkspace(path: string) {
+  const workspace = createInMemoryWorkspaceStore();
+  await workspace.upload(path, new TextEncoder().encode("%PDF-1.4 fixture"));
+  return workspace;
+}
+
+test("read_file: an uploaded .pdf comes back as the extractor's text, readOnly true", async () => {
+  const workspace = await uploadedWorkspace("documents/resume.pdf");
+  const seen: string[] = [];
+  const { tools } = await makeCtx({
+    workspace,
+    extractText: async (path, bytes) => {
+      seen.push(`${path}:${bytes.length}`);
+      return "Jordan Rivera\nStaff Product Manager";
+    },
+  });
+  const out: any = await (tools.read_file.execute as any)({ path: "documents/resume.pdf" }, {});
+  assert.deepEqual(out, { path: "documents/resume.pdf", content: "Jordan Rivera\nStaff Product Manager", readOnly: true });
+  assert.deepEqual(seen, ["documents/resume.pdf:16"]);
+  // No text copy is saved next to the upload.
+  assert.deepEqual((await workspace.list()).map((f) => f.path), ["documents/resume.pdf"]);
+});
+
+test("read_file: a binary with no extractor (or a null one) is unsupported_type", async () => {
+  const workspace = await uploadedWorkspace("documents/resume.docx");
+  for (const extractText of [undefined, async () => null]) {
+    const { tools } = await makeCtx({ workspace, extractText });
+    const out: any = await (tools.read_file.execute as any)({ path: "documents/resume.docx" }, {});
+    assert.equal(out.error.code, "unsupported_type");
+    assert.match(out.error.message, /can't be read yet/);
+  }
+});
+
+test("read_file: a .pdf with no text (a scan) is unsupported_type, saying why", async () => {
+  const { tools } = await makeCtx({ workspace: await uploadedWorkspace("documents/scan.pdf"), extractText: async () => "  \n " });
+  const out: any = await (tools.read_file.execute as any)({ path: "documents/scan.pdf" }, {});
+  assert.equal(out.error.code, "unsupported_type");
+  assert.match(out.error.message, /scanned image/);
+});
+
+test("read_file: a .pdf the extractor can't parse is unsupported_type, not a thrown turn", async () => {
+  const { tools } = await makeCtx({
+    workspace: await uploadedWorkspace("documents/bad.pdf"),
+    extractText: async () => {
+      throw new Error("Invalid PDF structure");
+    },
+  });
+  const out: any = await (tools.read_file.execute as any)({ path: "documents/bad.pdf" }, {});
+  assert.equal(out.error.code, "unsupported_type");
+  assert.match(out.error.message, /damaged or password-protected/);
 });
 
 test("write_file: after read_file, a write succeeds and re-write with a stale version conflicts", async () => {

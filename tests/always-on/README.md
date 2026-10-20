@@ -40,6 +40,8 @@ TRIALS=3 ./run_t21.sh <tag>    # plain-report honesty (docs/design-plain-replies
 ./run_t22.sh <tag>             # feedback conduct (docs/design-feedback.md § 17.5): 7 scripted cases, ONE trial first. Starts its own stub on 127.0.0.1 and REFUSES to start unless TEN_FEEDBACK_URL is loopback — no run can write a real note
 python3 score_t22.py results/t22-<tag>   # script items first: the stub's log, the planted-string diff, the voice scan
 ./judge_t22.sh <tag>           # judgment items only, for runs that pass the script bar; re-run failures at TRIALS=3, pass on 2 of 3
+TRIALS=3 ./run_step_trace.sh deepseek/deepseek-v4.1-flash <tag>   # the step counter (docs/design-fewer-steps.md § 1): 4 scripted turns on the site's loop, your own key (KEY_ENV), one first-session workspace per trial; stops a run above $1 (MAX_USD)
+python3 score_step_trace.py results/st-<tag> > results/st-<tag>/tables.txt   # the step tables: class per call, class counts, cost, ok/MISS. Send tables.txt back, never replies.md or ws/
 ./run_t15.sh <tag>             # checker head-to-head: py vs subagent (no judge —
 python3 score_t15.py <tag>     #   deterministic scorer vs truth.json)
 ```

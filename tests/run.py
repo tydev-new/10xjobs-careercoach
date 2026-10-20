@@ -241,6 +241,16 @@ else:
     else:
         passed += 1
 
+# The step counter (docs/design-fewer-steps.md § 1, Phase A) is covered here by
+# three files, no model and no key anywhere: packages/agent/test/step-trace.test.ts
+# (bin/run.mjs --trace --turns on a scripted fetch: masking, the temp-folder and
+# key refusals, the model allowlist, the attach upload, the cost stop — run by the
+# packages/agent `node --test` block just below), and, picked up by the tests/test_*.py
+# sweep at the top of this file, tests/test_step_trace_scorer.py (the class table:
+# counts add up, ok/MISS exact) and tests/test_step_trace_driver.py
+# (run_step_trace.sh end to end: key/model refusals, the site's starting state, the
+# PDF built and uploaded, the vault locked, the $1 stop).
+#
 # packages/agent's own suite (node --test) — plan step 4. Run with cwd
 # set to packages/agent so its own node_modules (ai,
 # @openrouter/ai-sdk-provider) resolve; `node --test` with no path args

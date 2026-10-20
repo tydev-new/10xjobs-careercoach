@@ -272,7 +272,7 @@ Nothing is thrown into the stream.
 | tool | input | output |
 |---|---|---|
 | `load_skill` | `{ name: "profile" \| "evaluate" \| "apply" \| "coach" \| "search" }` | `{ path, content }` (§ 7) |
-| `read_file` | `{ path }` (workspace path, or `skills/…`) | `{ path, content, readOnly }`; `.pdf`/`.docx` → `unsupported_type` (no extractor yet) |
+| `read_file` | `{ path }` (workspace path, or `skills/…`) | `{ path, content, readOnly }`; `.pdf`/`.docx` → its extracted text, read-only |
 | `write_file` | `{ path, content }` | `{ path, written: true }`, or `version_conflict` / `read_first` / `not_editable` |
 | `list_files` | `{ dir? }` | `{ files: { path, size, updatedAt }[] }` |
 | `bash` | `{ command }` | `{ stdout, stderr, exitCode, changed: string[] }` |
@@ -292,8 +292,12 @@ Nothing is thrown into the stream.
   `read_file`, `write_file` and `bash` write-backs. An existing file the chat
   never saw returns `read_first`; on `version_conflict` the model re-reads and
   redoes its change.
-- **`read_file` on `.pdf`/`.docx`** returns `unsupported_type` until an
-  extractor dep exists; no text copy is ever saved.
+- **`read_file` on `.pdf`/`.docx`** returns the text extracted by
+  `Deps.extractText`. The web app wires unpdf (a browser-safe pdf.js build,
+  loaded on first use) for `.pdf`, and reads `.docx` paragraph text out of
+  the zip with fflate (headers first, then the body). A file with no text (a
+  scan) or one that won't parse returns `unsupported_type` with a "paste the
+  text instead" message. No text copy is ever saved.
 - **`bash`** is just-bash over an in-memory copy of the workspace, with the
   bundle mounted read-only at `skills/`.
   - Each changed file goes back through `WorkspaceStore.write` with its

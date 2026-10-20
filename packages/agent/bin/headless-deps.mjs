@@ -17,6 +17,7 @@ import { createInMemoryGate } from "../src/gate.ts";
 import { createLocalFolderWorkspaceStore } from "../src/workspace/local-folder-store.ts";
 import { buildSkillBundleFromDisk } from "../src/skills/skill-bundle-fs.ts";
 import { createRealScriptRunner } from "../../../apps/web/src/backend/script-runner.ts";
+import { extractText } from "../../../apps/web/src/backend/extract-text.ts";
 
 /**
  * @param {{ workspaceDir: string, skillsDir: string, balance?: number,
@@ -32,6 +33,7 @@ export async function buildHeadlessDeps(opts) {
     fetch: globalThis.fetch,
     clock: { now: () => new Date() },
     scripts: createRealScriptRunner(),
+    extractText,
     logger: opts.logger ?? {
       info: (e) => console.error("[agent:info]", JSON.stringify(e)),
       warn: (e) => console.error("[agent:warn]", JSON.stringify(e)),

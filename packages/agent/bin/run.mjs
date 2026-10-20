@@ -119,6 +119,8 @@ function parseArgs(argv) {
   return args;
 }
 
+const TEMP_ROOTS = ["/tmp", "/private/tmp", "/var/folders", "/private/var/folders"];
+
 /** `--turns` runs only in a fresh folder inside the system temp folder that
  * holds nothing but CLAUDE.md (the site's starting state). Throws with the
  * reason. Paths are compared after symlinks are resolved, so a link out of
@@ -135,6 +137,32 @@ export function assertFreshTempWorkspace(workspace, tmpRoot = os.tmpdir()) {
   const rel = path.relative(tmp, ws);
   if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel)) {
     throw new Error(`--turns refuses a workspace outside the system temp folder (${tmp}); ${workspace} is not inside it`);
+  }
+  // TMPDIR moves os.tmpdir(), so "inside the temp folder" alone could be made to
+  // mean any folder. The real path must also sit under one of the system's own
+  // temp roots, and never under the person's home.
+  const roots = TEMP_ROOTS.flatMap((r) => {
+    try {
+      return [fs.realpathSync(r)];
+    } catch {
+      return [];
+    }
+  });
+  const under = (base) => {
+    const r = path.relative(base, ws);
+    return r !== "" && !r.startsWith("..") && !path.isAbsolute(r);
+  };
+  if (!roots.some(under)) {
+    throw new Error(`--turns refuses a workspace that is not under the system temp roots (${TEMP_ROOTS.join(", ")}); ${workspace} is not`);
+  }
+  let home = null;
+  try {
+    home = fs.realpathSync(os.homedir());
+  } catch {
+    // no readable home to compare with
+  }
+  if (home && home !== "/" && under(home)) {
+    throw new Error(`--turns refuses a workspace under your home folder; ${workspace} is`);
   }
   if (!fs.statSync(ws).isDirectory()) throw new Error(`--turns needs a folder; ${workspace} is not one`);
   const stray = [];
@@ -161,7 +189,29 @@ function loadTurns(file) {
   return raw;
 }
 
+/** Every byte this process writes to stderr passes through the mask, once,
+ * installed before anything can print: the SDK's error dump (a provider's
+ * `responseBody`, `data.error.message`), the `[error] code: message` line, a
+ * stack trace, a usage error. A provider that echoes the bearer token in an
+ * error answer therefore cannot put the key in a log. An uncaught error is
+ * written through the same wrapper, then the process exits 1. */
+function installMaskedStderr() {
+  const at = process.argv.indexOf("--key-env");
+  const name = at >= 0 && process.argv[at + 1] ? process.argv[at + 1] : "OPENROUTER_API_KEY";
+  const mask = makeMask([process.env[name]]);
+  const write = process.stderr.write.bind(process.stderr);
+  process.stderr.write = (chunk, ...rest) =>
+    write(typeof chunk === "string" ? mask(chunk) : chunk instanceof Uint8Array ? mask(Buffer.from(chunk).toString("utf8")) : chunk, ...rest);
+  for (const event of ["uncaughtException", "unhandledRejection"]) {
+    process.on(event, (err) => {
+      process.stderr.write(`run.mjs failed: ${err?.stack ?? err}\n`);
+      process.exit(1);
+    });
+  }
+}
+
 async function main() {
+  installMaskedStderr();
   let args;
   try {
     args = parseArgs(process.argv.slice(2));

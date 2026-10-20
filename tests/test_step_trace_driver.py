@@ -224,6 +224,31 @@ def test_a_real_workspace_is_locked_while_the_run_is_on_and_unlocked_after():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_bash_x_does_not_print_the_keys_value():
+    """`bash -x run_step_trace.sh` echoes every command it runs with its
+    expansions. The key test uses ${!KEY_ENV:+set}, so only the word `set` is
+    expanded; nothing else in the script expands the value."""
+    tmp = tempfile.mkdtemp(prefix="st-drv-")
+    try:
+        home = os.path.join(tmp, "home")
+        os.makedirs(home)
+        for dry in (True, False):
+            env = {k: v for k, v in os.environ.items() if "OPENROUTER" not in k and not k.startswith("CLAUDE") and k != "DRY_RUN"}
+            env.update({"HOME": home, "REALJS": os.path.join(tmp, "no-vault"), "RESULTS_ROOT": os.path.join(tmp, f"results-{dry}"),
+                        "KEY_ENV": KEY_VAR, KEY_VAR: FAKE_KEY, "NODE_OPTIONS": f"--import {PRELOAD}",
+                        "ST_SCRIPT": _script(tmp, _replies()), "ST_LOG": os.path.join(tmp, f"x-{dry}.jsonl")})
+            if dry:
+                env["DRY_RUN"] = "1"
+            r = subprocess.run(["bash", "-x", SCRIPT, MODEL, "xtrace"], env=env, capture_output=True, text=True, timeout=300)
+            assert r.returncode == 0, r.stdout + r.stderr
+            assert "set -x" not in open(SCRIPT).read()
+            for frag in (FAKE_KEY, "STTESTFAKE", "7c2e9a41d0b5f386"):
+                assert frag not in r.stdout + r.stderr, f"{frag} printed under bash -x (dry run {dry})"
+            assert "+ '[' -z set ']'" in r.stderr or "+ '[' -z set ']'" in r.stderr.replace('"', "'"), "the key test expands only the word set"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

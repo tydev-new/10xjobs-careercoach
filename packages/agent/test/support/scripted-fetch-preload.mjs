@@ -10,6 +10,8 @@
 //               `tools` makes a tool-call step (finish_reason tool_calls);
 //               without it the step is a plain reply. `cost` is the usage.cost
 //               the provider reports for the step (omitted when absent).
+//               An item may instead be { "status": 401, "body": "... {AUTH} ..." },
+//               an error answer in which {AUTH} is the Authorization header received.
 //   ST_LOG      path to a JSONL file: one line per request, { n, url, auth,
 //               body, ws } where ws is the workspace's file list AT REQUEST TIME
 //               (read from the --workspace argument), so a test can see what
@@ -46,6 +48,14 @@ globalThis.fetch = async (url, init = {}) => {
     process.env.ST_LOG,
     JSON.stringify({ n, url: String(url), auth: h.get("authorization"), body: String(init.body || ""), ws: ws && existsSync(ws) ? walk(ws) : null, probe }) + "\n",
   );
+  // { "status": 401, "body": "... {AUTH} ..." }: an error answer; {AUTH} becomes the
+  // Authorization header it was sent, so a test can see a provider that echoes the key.
+  if (item.status) {
+    return new Response(String(item.body ?? "").replaceAll("{AUTH}", h.get("authorization") ?? ""), {
+      status: item.status,
+      headers: { "content-type": "application/json" },
+    });
+  }
   const id = `gen-st-${n}`;
   const usage = {
     prompt_tokens: 100,

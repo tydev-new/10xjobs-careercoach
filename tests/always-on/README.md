@@ -42,6 +42,7 @@ python3 score_t22.py results/t22-<tag>   # script items first: the stub's log, t
 ./judge_t22.sh <tag>           # judgment items only, for runs that pass the script bar; re-run failures at TRIALS=3, pass on 2 of 3
 TRIALS=3 ./run_step_trace.sh deepseek/deepseek-v4.1-flash <tag>   # the step counter (docs/design-fewer-steps.md § 1): 4 scripted turns on the site's loop, your own key (KEY_ENV), one first-session workspace per trial; stops a run above $1 (MAX_USD)
 python3 score_step_trace.py results/st-<tag> > results/st-<tag>/tables.txt   # the step tables: class per call, class counts, cost, ok/MISS. Send tables.txt back, never replies.md or ws/
+#   Never run the step-trace scripts with `bash -x` or `set -x`, and never paste a shell's debug output into a bug report: a shell's trace prints what it expands. (run_step_trace.sh itself only tests whether the key variable is set, and run.mjs masks the key in everything it writes to stderr — but the other runners here have not been audited for -x.)
 ./run_t15.sh <tag>             # checker head-to-head: py vs subagent (no judge —
 python3 score_t15.py <tag>     #   deterministic scorer vs truth.json)
 ```

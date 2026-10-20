@@ -167,7 +167,7 @@ def test_failed_requests_never_print_the_key_even_when_the_provider_echoes_it():
     for k, v in seen.items():
         print(f"  [errors] {k}: exit {v[0]}; {v[1]}")
     print(f"  [errors] FINDING: the echoed key reached stderr in: {leaked}")
-    assert leaked, "no echoed key reached stderr any more: replace this pin with a 'never in stderr' assertion"
+    assert not leaked, f"the echoed key reached stderr in: {leaked}"   # fixed: every stderr write is masked
 
 
 def test_the_driver_under_bash_x_prints_the_key_value():

@@ -53,7 +53,7 @@ case "$MAX_USD" in ''|*[!0-9.]*) echo "MAX_USD must be a number of dollars, got 
 KEY_ENV="${KEY_ENV:-OPENROUTER_API_KEY}"
 
 # 1. the key: refuse before anything else. Name only, never the value.
-if [ -z "${!KEY_ENV:-}" ]; then
+if [ -z "${!KEY_ENV:+set}" ]; then
   echo "refusing to start: the $KEY_ENV environment variable is not set (KEY_ENV names which variable holds your OpenRouter key)." >&2
   exit 1
 fi

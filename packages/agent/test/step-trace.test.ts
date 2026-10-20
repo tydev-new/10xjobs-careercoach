@@ -4,7 +4,7 @@
 // real key (a planted fake only), workspaces are fresh temp folders only.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +31,7 @@ function freshWorkspace(): string {
   return ws;
 }
 
-type Item = { text?: string; tools?: { name: string; args?: Record<string, unknown> }[]; cost?: number };
+type Item = { status?: number; body?: string; text?: string; tools?: { name: string; args?: Record<string, unknown> }[]; cost?: number };
 
 interface Drive {
   status: number | null;
@@ -304,4 +304,62 @@ test("trace.mjs: a tracer walks a canned message into steps, and counts the step
     "[trace] turn=3 step=3 reply (11 chars)",
   ]);
   assert.equal(uiStepCount(message), 3);
+});
+
+// ------------------------------------------------------------ the mask covers every stderr write
+
+test("a provider that echoes the bearer token in its error answer never puts the key in stderr, stdout or the saved workspace", () => {
+  const bodies: [string, Item][] = [
+    ["401", { status: 401, body: '{"error":{"message":"Invalid key {AUTH}","code":401}}' }],
+    ["403", { status: 403, body: '{"error":{"message":"forbidden for {AUTH}"}}' }],
+    ["500", { status: 500, body: "upstream said {AUTH}" }],
+  ];
+  for (const [name, item] of bodies) {
+    for (const turns of [undefined, [{ text: "a" }, { text: "b" }]]) {
+      const r = drive([item], turns ? { turns } : {});
+      const label = `${name} ${turns ? "turns" : "prompt"}`;
+      assert.ok(r.requests.length >= 1, `${label}: a request was made`);
+      assert.ok([1, 3].includes(r.status ?? -1), `${label}: exit ${r.status}\n${r.stderr.slice(-400)}`);
+      for (const frag of [KEY, "STEPTRACEFAKE", "3b9e5d7a1c4f8e2a6d0b"]) {
+        assert.ok(!r.stderr.includes(frag), `${label}: ${frag} reached stderr:\n${r.stderr.slice(0, 600)}`);
+        assert.ok(!r.stdout.includes(frag), `${label}: ${frag} reached stdout`);
+      }
+      assert.ok(r.stderr.includes("[redacted]"), `${label}: the echo was masked, not dropped`);
+    }
+  }
+});
+
+test("a usage error that carries the key (a key passed as an argument by mistake) is masked too", () => {
+  const r = drive([{ text: "x" }], { extra: [`--${KEY}`] });
+  assert.equal(r.status, 2);
+  assert.ok(!r.stderr.includes("STEPTRACEFAKE"), r.stderr);
+});
+
+// ------------------------------------------------------------ TMPDIR cannot widen the temp check
+
+test("TMPDIR cannot make a non-temp folder count as the temp folder, and a folder under HOME is refused", () => {
+  const outside = mkdtempSync(path.join(REPO, "tests", "st-outside-"));
+  try {
+    const ws = path.join(outside, "job-search");
+    mkdirSync(ws);
+    copyFileSync(TEMPLATE, path.join(ws, "CLAUDE.md"));
+    const r = drive([{ text: "x" }], { turns: [{ text: "hi" }], ws, env: { TMPDIR: outside } });
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /not under the system temp roots/);
+    assert.equal(r.requests.length, 0);
+  } finally {
+    rmSync(outside, { recursive: true, force: true });
+  }
+  // under HOME, even inside a real temp root
+  const home = tmp("st-home-");
+  const under = path.join(home, "ws");
+  mkdirSync(under);
+  copyFileSync(TEMPLATE, path.join(under, "CLAUDE.md"));
+  const r2 = drive([{ text: "x" }], { turns: [{ text: "hi" }], ws: under, env: { HOME: home } });
+  assert.equal(r2.status, 2, r2.stderr);
+  assert.match(r2.stderr, /under your home folder/);
+  assert.equal(r2.requests.length, 0);
+  // the same folder is fine when HOME is somewhere else
+  const r3 = drive([{ text: "x" }], { turns: [{ text: "hi" }], ws: under });
+  assert.equal(r3.status, 0, r3.stderr);
 });

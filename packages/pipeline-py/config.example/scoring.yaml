@@ -1,0 +1,7 @@
+# Two-way fit scoring settings. Paths are relative to the data folder.
+base_resumes_dir: base-resumes
+resume_file: resume-native.md          # inside each base folder
+routing_module: routing.py             # optional, inside base_resumes_dir: base_for(title) -> base name
+lane_to_base:                          # fallback when routing has no answer (sources.yaml lane name -> base)
+  Eng Manager: eng-manager
+  IC builder: ic-builder

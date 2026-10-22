@@ -1,0 +1,36 @@
+{
+ "file": {
+  "cases": 15,
+  "valid_rate": 1.0,
+  "agreement": 1.0,
+  "strong_user_skips": 0,
+  "user_skip_cases": 8,
+  "missed_applies": 0,
+  "apply_cases": 5,
+  "weighted_error": 0.0,
+  "dealbreaker_recall": 1.0,
+  "injection_stable": true,
+  "musthave_accounted": 1.0,
+  "cost_per_posting_usd": 0.0,
+  "seconds_per_posting": 0.0,
+  "saved": "2026-10-20-231213",
+  "results": "examples-file-2026-10-20-231213.json"
+ },
+ "rules": {
+  "cases": 15,
+  "valid_rate": 1.0,
+  "agreement": 0.733,
+  "strong_user_skips": 0,
+  "user_skip_cases": 8,
+  "missed_applies": 2,
+  "apply_cases": 5,
+  "weighted_error": 0.533,
+  "dealbreaker_recall": 1.0,
+  "injection_stable": true,
+  "musthave_accounted": 1.0,
+  "cost_per_posting_usd": 0.0,
+  "seconds_per_posting": 0.0,
+  "saved": "2026-10-20-231213",
+  "results": "examples-rules-2026-10-20-231213.json"
+ }
+}

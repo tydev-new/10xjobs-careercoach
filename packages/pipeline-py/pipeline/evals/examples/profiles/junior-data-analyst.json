@@ -1,0 +1,45 @@
+{
+ "label": "EXAMPLE (synthetic, repo-safe): junior data analyst",
+ "criteria": "Roles: data analyst, BI/reporting analyst, analytics associate. Entry to mid level (0-3 years required).\nLocation: Chicago, IL metro, or fully remote in the US. No relocation.\nPay: base at least $65,000 (top of a posted range at least $65,000).\nNot: sales roles, senior/lead/principal roles, data scientist roles requiring a graduate degree.",
+ "resume": "BA Economics (2024). Data Analyst, 1.5 years, fictional retailer Lakeshore Goods (Chicago).\n- SQL (Postgres) daily; Excel (pivot tables, lookups); Tableau weekly sales dashboard used by 12 store managers.\n- Python (pandas basics) for cleaning CSV exports; analysed two A/B tests of email promotions.\n- Presented monthly KPI reviews to the merchandising team.",
+ "rules": {
+  "locations_ok": [
+   "chicago",
+   "evanston",
+   "oak park"
+  ],
+  "remote_us_ok": true,
+  "pay_floor": 65000,
+  "lanes": [
+   "data analyst",
+   "bi analyst",
+   "business intelligence",
+   "reporting analyst",
+   "analytics associate"
+  ],
+  "exclude": [
+   "senior",
+   "lead",
+   "principal",
+   "sales",
+   "scientist"
+  ],
+  "employee_only": true,
+  "no_clearance": true,
+  "skills": [
+   "sql",
+   "excel",
+   "tableau",
+   "dashboard",
+   "python",
+   "pandas",
+   "a/b",
+   "kpi",
+   "retail",
+   "postgres",
+   "reporting",
+   "1-3 years",
+   "0-2 years"
+  ]
+ }
+}

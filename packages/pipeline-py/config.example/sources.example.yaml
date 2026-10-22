@@ -1,0 +1,57 @@
+# What the sweep reads (copy to sources.yaml in your data folder). FICTIONAL example: the board slugs below are
+# public ATS boards chosen only to show the format; replace them with companies you care about.
+version: 1
+about: example sources for the fictional persona in config.example/
+window:
+  default_hours: 24
+  overlap_minutes: 15
+lanes:                                   # lane name -> title regexes (case-insensitive)
+  Eng Manager: ["engineering manager", "manager,? (?:platform|infrastructure)"]
+  IC builder: ["(?:senior|staff) (?:software|platform|infrastructure) engineer", "site reliability"]
+exclude_title: ["intern", "sales", "recruit"]
+exclude_company: []
+geo:
+  include: ["springfield"]               # your local area (role tagged "local")
+  exclude: []
+  remote_us: ["^\\s*remote\\b(?! filter)", "united states", "\\busa?\\b"]
+  non_us: ["canada", "united kingdom", "\\buk\\b", "india", "germany", "emea", "apac", "latam"]
+  remote_filter_cards: verify
+  unknown_location: keep
+sources:
+  ashby:
+    enabled: true
+    boards:
+      - {company: Zapier, slug: zapier}
+      - {company: Supabase, slug: supabase}
+  greenhouse:
+    enabled: true
+    boards:
+      - {company: Duolingo, slug: duolingo}
+      - {company: Dropbox, slug: dropbox}
+  lever:
+    enabled: true
+    boards:
+      - {company: Spotify, slug: spotify}
+  smartrecruiters:
+    enabled: false
+    boards: []
+  workday:
+    enabled: false                       # needs your own script: see the fetch_workday comment in pipeline/sweep.py
+  linkedin_guest:
+    enabled: false                       # public guest search pages, read-only; respect the site's terms
+    pages: 2
+    pace_seconds: 1.5
+    queries:
+      - {id: em-remote, q: "engineering manager platform", geo_id: "103644278", remote: true}
+  gov:
+    enabled: false
+  hn_whos_hiring:
+    enabled: false
+    months: 1
+disabled: []
+protected_sources: []
+health:
+  retries: 1
+  retry_pause_seconds: 2
+  history_runs: 5
+  empty_streak: 3

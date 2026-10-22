@@ -1,0 +1,22 @@
+# Identity and contact details. FICTIONAL example persona: replace every value with your own.
+# Tools render name, contact lines and the cover signature from here; nothing personal lives in code.
+# Private fields (address, date_of_birth, ...) are never printed or rendered by the tools.
+schema: candidate-v1
+name: Alex Example
+name_display: ALEX EXAMPLE               # how the name appears at the top of the resume
+email: alex@example.com
+phone: ""                                # optional; leave out of the example so the repo PII scan stays clean
+website: www.example.com/alex
+github: github.com/alex-example
+location: Springfield (remote-friendly)
+city: Springfield
+work_auth: Authorized to work in the U.S. without sponsorship
+sponsorship_needed: false
+timezone: America/Chicago
+resume_contact_lines:                    # rendered under the name and headline, one line each
+  - Springfield, alex@example.com
+  - www.example.com/alex, github.com/alex-example
+cover_signature:                         # last block of every cover letter, one line each
+  - Alex Example
+  - alex@example.com, www.example.com/alex
+logistics_line: Remote or hybrid in Springfield; authorized to work in the U.S.

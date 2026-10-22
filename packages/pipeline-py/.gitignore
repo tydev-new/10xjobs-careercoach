@@ -1,0 +1,10 @@
+# your data folder (profile, claims, jobs database, packages): personal, never commit it
+jobsearch-data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+pipeline/evals/results/
+pipeline/evals/private/
+__pycache__/
+.pytest_cache/

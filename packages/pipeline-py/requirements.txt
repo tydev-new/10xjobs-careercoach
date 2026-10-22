@@ -1,0 +1,6 @@
+# Python 3.10+. System tool: poppler-utils (pdftotext, pdfinfo) for the PDF text and page checks.
+PyYAML>=6.0
+reportlab>=4.0
+jsonschema>=4.17
+pydantic>=2.5
+pytest>=7.4

@@ -1,0 +1,107 @@
+# The ONLY source of facts for resumes and covers. FICTIONAL example persona.
+# check_claims fails any number, year or banned wording in a package that is not backed here.
+version: claims-example-1
+owner: Alex Example
+scopes: [all, eng, ic]
+earliest_year: 2012                 # optional age-signal rule: no year before this anywhere candidate-facing
+years: [2016, 2019, 2021, 2024]     # every year a resume or cover may print
+ignore_terms: []                    # product names with digits that are not metrics (e.g. "Web3")
+
+roles:
+  - key: northwind
+    employer: Northwind Systems
+    title: Engineering Manager, Platform
+    header: Northwind Systems, Engineering Manager, Platform
+    meta: 2021 – Present · Remote
+    approved: 2026-01-02
+    source: master resume
+  - key: contoso
+    employer: Contoso Cloud
+    title: Senior Software Engineer
+    header: Contoso Cloud, Senior Software Engineer
+    meta: 2016 – 2021 · Springfield
+    approved: 2026-01-02
+    source: master resume
+
+earlier_career:
+  default:
+    text: "Earlier career: software engineer at Fabrikam Labs, building data pipelines and internal tools."
+
+claims:
+  - id: nw.team
+    employer: Northwind Systems
+    text: Lead a platform team of 8 engineers.
+    numbers: ["8"]
+    anchors: ["\\b8 engineers\\b", "team of 8"]
+    forbid_with: ["architects", "organization"]
+    scope: [eng]
+    status: approved
+    approved: 2026-01-02
+    source: master resume
+  - id: nw.platform
+    employer: Northwind Systems
+    text: Built the internal Kubernetes platform that runs 30 production services.
+    numbers: ["30"]
+    anchors: ["30 (?:production )?services"]
+    scope: [all]
+    status: approved
+    approved: 2026-01-02
+    source: master resume
+  - id: nw.deploy
+    employer: Northwind Systems
+    text: Cut deployment time from 2 hours to 10 minutes with a shared CI/CD pipeline.
+    numbers: ["2", "10"]
+    anchors: ["deploy\\w*"]
+    scope: [all]
+    status: approved
+    approved: 2026-01-02
+    source: master resume
+  - id: nw.oncall
+    employer: Northwind Systems
+    text: Reduced paging incidents by 40% by rebuilding the on-call rotation and alerting.
+    numbers: ["40%"]
+    anchors: ["incident|pag(?:e|ing)|alert"]
+    scope: [all]
+    status: approved
+    approved: 2026-01-02
+    source: master resume
+  - id: ct.migration
+    employer: Contoso Cloud
+    text: Migrated 12 services from virtual machines to containers with no customer downtime.
+    numbers: ["12"]
+    anchors: ["12 services", "migrat"]
+    scope: [all]
+    status: approved
+    approved: 2026-01-02
+    source: master resume
+  - id: ct.observability
+    employer: Contoso Cloud
+    text: Introduced tracing and dashboards used by every backend team.
+    scope: [all]
+    status: approved
+    approved: 2026-01-02
+    source: master resume
+  - id: ct.cost
+    employer: Contoso Cloud
+    text: Cut cloud spend by about a third
+    scope: [all]
+    status: unconfirmed
+    source: memory; no record yet
+
+banned:
+  - rx: "\\bthousands of (?:users|customers)\\b"
+    why: no claim backs that scale
+  - rx: "\\b(?:seasoned|veteran)\\b"
+    why: career-length wording
+  - rx: "\\bstream(?:ing)? platform"
+    why: implies an unclaimed skill (example of a paraphrase ban)
+
+conditional:
+  - rx: "\\bTerraform\\b"
+    require: "\\b(?:learning|course|personal project)\\b"
+    why: Terraform only as personal-project experience
+
+scoped_phrases:
+  - rx: "\\bhired\\b"
+    scopes: [eng]
+    why: hiring wording only on manager packages

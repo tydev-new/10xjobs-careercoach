@@ -44,7 +44,10 @@ PROSE_DIRS = ("docs", "agents")
 # gains every skill's lib/ folder. packages/checkers/bin/ is gone (the
 # command scripts moved to skills/*/scripts/ too, already covered by
 # test_invariants.py's SHIPPED scan).
-EXTRA_CODE = ("packages/agent/src", "packages/checkers/src", "supabase") + tuple(
+# packages/pipeline-py: the optional local Python pipeline (D2's exemption,
+# docs/design-js-only.md § 1). Not bundled or deployed, but public, and its
+# config.example/ and test fixtures must stay invented.
+EXTRA_CODE = ("packages/agent/src", "packages/checkers/src", "supabase", "packages/pipeline-py") + tuple(
     sorted(
         os.path.relpath(p, ROOT)
         for p in glob.glob(os.path.join(ROOT, "skills", "*", "scripts", "lib"))

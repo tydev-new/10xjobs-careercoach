@@ -39,7 +39,8 @@ Never include anyone's real data in a report.
     `.claude-plugin/`, `apps/`, `scripts/` and `design/`;
   - `tests/test_docs_guard.py` scans the root `*.md` files, `docs/` and
     `agents/`, plus the non-Markdown files in `packages/agent/src`,
-    `packages/checkers/src`, `packages/checkers/bin` and `supabase/`.
+    `packages/checkers/src`, `packages/checkers/bin`, `packages/pipeline-py`
+    and `supabase/`.
 
   Anything outside those folders is not scanned. Build output and
   `node_modules` are skipped. Separately, the production deploy script

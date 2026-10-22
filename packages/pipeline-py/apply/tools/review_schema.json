@@ -1,0 +1,447 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "review-v1",
+  "title": "Package review (4 lenses, 3 goals) - written and validated by finalize_review.py",
+  "type": "object",
+  "required": [
+    "schema",
+    "package",
+    "base",
+    "rubric_version",
+    "lint_version",
+    "claims_version",
+    "round",
+    "cover",
+    "lenses",
+    "edits",
+    "final",
+    "reviewed_at",
+    "gap_handling"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "review-v1"
+    },
+    "package": {
+      "type": "string"
+    },
+    "job_id": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "base": {
+      "enum": [
+        "tpm",
+        "eng-manager",
+        "solutions-fde-delivery",
+        "ic-builder"
+      ]
+    },
+    "rubric_version": {
+      "type": "string"
+    },
+    "lint_version": {
+      "type": "string",
+      "pattern": "^(format-lint |format-check )"
+    },
+    "claims_version": {
+      "type": "string",
+      "pattern": "^claims-"
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "cover": {
+      "enum": [
+        "attached",
+        "none"
+      ],
+      "description": "none = no cover ships (ATS has no cover field, or DO NOT ATTACH)"
+    },
+    "lenses": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "lens",
+          "goal",
+          "doc",
+          "verdict",
+          "reasons"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "lens": {
+            "enum": [
+              "hiring_manager",
+              "age_signal_claims",
+              "recruiter",
+              "ats"
+            ]
+          },
+          "goal": {
+            "enum": [
+              "fit",
+              "blockers",
+              "messaging"
+            ]
+          },
+          "doc": {
+            "enum": [
+              "resume",
+              "cover"
+            ]
+          },
+          "verdict": {
+            "enum": [
+              "Pass",
+              "Revise",
+              "Fail"
+            ]
+          },
+          "reasons": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 8
+            }
+          },
+          "round_checked": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "top_rejection_reason": {
+            "type": "string",
+            "minLength": 8
+          },
+          "answered": {
+            "type": "boolean"
+          },
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "term",
+                "aliases",
+                "hit"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "term": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "hit": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "coverage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "top3_hit": {
+            "type": "boolean"
+          },
+          "max_jd_copy_run": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "title_alias_in_top": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "edits": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "residual_gaps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "final": {
+      "enum": [
+        "PASS",
+        "REVISE",
+        "FAIL"
+      ]
+    },
+    "reviewed_at": {
+      "type": "string"
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "step6_record": {
+      "type": "string",
+      "description": "path of the step-6 jd-analysis JSON (pipeline/score.py); default: from the DB row of job_id"
+    },
+    "gap_source": {
+      "enum": [
+        "step6",
+        "legacy"
+      ],
+      "description": "legacy = job scored before two-way-v1; gaps listed from the review itself"
+    },
+    "gap_handling": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item",
+          "kind",
+          "handling",
+          "reason"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 2
+          },
+          "kind": {
+            "enum": [
+              "gap",
+              "blocker"
+            ]
+          },
+          "handling": {
+            "enum": [
+              "blocker_flagged",
+              "adjacent_shown",
+              "omitted"
+            ]
+          },
+          "claim_id": {
+            "type": "string"
+          },
+          "shown_as": {
+            "type": "string"
+          },
+          "terms": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "decision": {
+            "enum": [
+              "user_applies_anyway",
+              "flagged_to_user"
+            ]
+          },
+          "decision_ref": {
+            "type": "string"
+          },
+          "cover_plan": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      }
+    },
+    "reconciled": {
+      "type": "object",
+      "description": "provenance: 4 independent lens reviews merged by finalize_review.py. submit_gate accepts only a finalize_review.py PASS",
+      "required": [
+        "tool",
+        "version",
+        "at",
+        "builder_run_ids",
+        "lenses",
+        "reviewed_files_sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "enum": [
+            "finalize_review.py"
+          ]
+        },
+        "version": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "builder_run_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lenses": {
+          "type": "object",
+          "required": [
+            "hiring_manager",
+            "age_signal_claims",
+            "recruiter",
+            "ats"
+          ],
+          "additionalProperties": false,
+          "patternProperties": {},
+          "properties": {
+            "hiring_manager": {
+              "type": "object",
+              "required": [
+                "reviewer_run_id",
+                "file",
+                "sha256",
+                "verdict"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "reviewer_run_id": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "PASS",
+                    "REVISE",
+                    "FAIL"
+                  ]
+                }
+              }
+            },
+            "age_signal_claims": {
+              "type": "object",
+              "required": [
+                "reviewer_run_id",
+                "file",
+                "sha256",
+                "verdict"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "reviewer_run_id": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "PASS",
+                    "REVISE",
+                    "FAIL"
+                  ]
+                }
+              }
+            },
+            "recruiter": {
+              "type": "object",
+              "required": [
+                "reviewer_run_id",
+                "file",
+                "sha256",
+                "verdict"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "reviewer_run_id": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "PASS",
+                    "REVISE",
+                    "FAIL"
+                  ]
+                }
+              }
+            },
+            "ats": {
+              "type": "object",
+              "required": [
+                "reviewer_run_id",
+                "file",
+                "sha256",
+                "verdict"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "reviewer_run_id": {
+                  "type": "string"
+                },
+                "file": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "verdict": {
+                  "enum": [
+                    "PASS",
+                    "REVISE",
+                    "FAIL"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "reviewed_files_sha256": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "cover": {
+          "enum": [
+            "attached",
+            "none"
+          ]
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "description": "kept code gates re-run by finalize_review.py (claims, jd_copy, format)",
+      "additionalProperties": {
+        "type": "object"
+      }
+    }
+  }
+}

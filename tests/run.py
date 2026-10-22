@@ -381,5 +381,27 @@ else:
     else:
         passed += 1
 
+# packages/pipeline-py — the optional local Python pipeline (D2's exemption,
+# docs/design-js-only.md § 1). Its suite is pytest-shaped, so it runs under
+# pytest in its own folder. Skips loudly (not silently) when pytest or the
+# package's requirements (requirements.txt) are not installed.
+pipeline_py = os.path.join(HERE, "..", "packages", "pipeline-py")
+if not os.path.isdir(pipeline_py):
+    print("\nSKIPPED packages/pipeline-py: folder not found")
+else:
+    missing = [m for m in ("pytest", "yaml", "reportlab", "jsonschema", "pydantic")
+               if importlib.util.find_spec(m) is None]
+    if missing:
+        print(f"\nSKIPPED packages/pipeline-py (pytest): not installed: {', '.join(missing)} "
+              "(pip install -r packages/pipeline-py/requirements.txt)")
+    else:
+        print("\n--- python3 -m pytest -q (packages/pipeline-py) ---")
+        result = subprocess.run([sys.executable, "-m", "pytest", "-q"], cwd=pipeline_py)
+        if result.returncode != 0:
+            failed += 1
+            print("FAIL packages/pipeline-py (pytest) — see output above")
+        else:
+            passed += 1
+
 print(f"\n{passed} passed, {failed} failed")
 sys.exit(1 if failed else 0)

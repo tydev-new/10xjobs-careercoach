@@ -1,0 +1,34 @@
+# Candidate-specific settings the generic tools and skills read. FICTIONAL example: copy this folder and edit it.
+# Every path is relative to this data folder unless absolute. Omitted paths use the defaults in pipeline/home.py.
+version: agent-config-1
+paths:
+  jobs_db: jobs.db
+  base_resumes: base-resumes
+  package_root: packages
+  # rubric: my-rubric.md          # optional: your own copy of apply/rubric/apply-rubric.md
+
+apply:
+  # package folder prefix -> base resume and claim scopes. A package lives at packages/<batch>/<prefix>-<company-slug>/.
+  lanes:
+    eng: {base: eng-manager, scopes: [eng]}
+    ic:  {base: ic-builder,  scopes: [ic], align: left}
+  max_review_rounds: 2
+  covers_need_style_reapproval: false
+
+evals:
+  rules:                           # the offline `rules` eval backend for the private suite
+    locations_ok: [springfield, remote]
+    remote_us_ok: true
+    pay_floor: 150000
+    no_clearance: true
+    employee_only: true
+    skills: [kubernetes, python, platform, reliability, on-call, team, observability, aws, terraform]
+
+outreach:
+  draft_length_words: 90
+  proof_defaults:                  # proof lines for short notes to hiring managers; each must be an approved claim
+    - claim: nw.platform
+      lead: Platform
+      rule: name the service count only with the platform claim
+    - claim: nw.oncall
+      lead: Reliability

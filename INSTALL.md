@@ -54,3 +54,11 @@ nothing went", and the work carries on. Copied with `cp -r skills/*`, the note
 carries the version `unknown`, because there is no plugin file above the script. `render_resume.mjs` uses headless
 Chrome if present, to make the PDF and count its pages. The harness in
 `tests/always-on/` needs the `claude` CLI.
+
+## Optional: a local Python job pipeline
+
+`packages/pipeline-py/` is an optional, local-only command-line tool (Python
+3.10+): a SQLite job database fed by a sweep of public job boards, and code
+gates (claims, JD-copy, format, independent review, submit readiness) on every
+resume and cover. The skills do not need it or call it. See
+[`packages/pipeline-py/README.md`](packages/pipeline-py/README.md).

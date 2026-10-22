@@ -17,6 +17,7 @@ Read in this order.
 | [`design-web-ui.md`](design-web-ui.md) | the web app's screens (the workspace and its one conversation), cards, and fixture conversations |
 | [`design-plain-replies.md`](design-plain-replies.md) | plain words when Ten talks to the candidate — the always-on rule, its source fixes, the voice scanner, and the honesty measurement |
 | [`design-feedback.md`](design-feedback.md) | feedback and bug reports: the `feedback` skill, its script, the `ten_feedback` table and `ten-feedback` function, both hosts (draft for owner approval) |
+| [`design-skills-only-hosts.md`](design-skills-only-hosts.md) | skills only: the host matrix (Claude, ChatGPT dots, Grok Bot, Google, Meta Muse), the one script language, PR #43, per-host smoke tests (draft for owner approval) |
 | [`old-app-paypal-ten-prefix.md`](old-app-paypal-ten-prefix.md) | a patch for the older app, owner-applied before Ten's first PayPal payment (web agent § 17.6) |
 | [`skill-shape.md`](skill-shape.md) | the five-file shape every skill follows, and how to convert one |
 | [`PROCESS.md`](PROCESS.md) | the ritual for changing anything |

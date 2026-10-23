@@ -29,9 +29,10 @@ out.
 
 **Goals**
 
-- **G1.** Run the whole search, in five stages (groundwork, searching,
+- **G1.** Run the whole search, in five stages (profile, searching,
   applying, interviewing, deciding), as a career coach plus a chief of
-  staff (deck slide 2).
+  staff (deck slide 2, whose "Groundwork" stage is named Profile here so
+  the stage and its skill share one name: owner, 2026-10-23).
 - **G2.** The same skills run on Grok Bot, Claude Code and Cowork, ChatGPT
   dots, Google and Meta Muse. Ten tells the person what each host can and
   cannot do.
@@ -67,7 +68,7 @@ tax advice, and no compensation figure Ten makes up.
 | Skill | Its job, in one line | Stage | Writes |
 |---|---|---|---|
 | **coach** | The front door and the daily rhythm: what changed, what matters, and 2 to 4 things for you. Also first-run setup, deciding between offers, and reporting a problem | all, plus deciding | `plan.md`, `AGENTS.md`, the outcomes table |
-| **profile** | Groundwork: your facts, what you want, base résumés per lane, stories, standing answers. A fact enters the list only after your yes | groundwork | `me/` |
+| **profile** | Your facts, what you want, base résumés per lane, stories, standing answers. A fact enters the list only after your yes | profile | `me/` |
 | **search** | Sweep the boards, drop repeats and clear misses with code, score the rest, build the shortlist, and learn which sources pay off | searching | the jobs, sources and runs tables |
 | **apply** | Pick a job, draft from approved facts, check with code, get four reviews, wait for your yes, submit, keep proof. Outreach messages take the same path | applying | `applications/`, the applications tables |
 | **interview** | Prep packs, mock interviews scored against a rubric, and debriefs | interviewing | `interviews/` |
@@ -139,7 +140,7 @@ examples. An independent reviewer checks anything that goes out. The
 
 | Stage | Operation | Who | Why |
 |---|---|---|---|
-| Groundwork | Read text from your PDF or DOCX résumé | code (the host's reader) | (c) |
+| Profile | Read text from your PDF or DOCX résumé | code (the host's reader) | (c) |
 | | Draft your facts list from your résumé and talks | model | judgment |
 | | Approve each fact | **person** | it's your record |
 | | Criteria: talk through what you want; the filter lines code uses | model drafts, **person** decides | judgment, your call |

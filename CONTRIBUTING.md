@@ -136,7 +136,7 @@ open an issue.
 
 ## Working with AI agents
 
-You are welcome to use them. The role files are in [`agents/`](agents/),
+You are welcome to use them. The role files are in [`team/`](team/),
 and [`docs/TEAM.md`](docs/TEAM.md) explains the loop. Whoever runs the
 agents is responsible for checking every hand-back before believing it.
 Never give an agent secrets, production access or real user data.

@@ -807,7 +807,7 @@ so neither measurement straddles a helper change. Contents:
 - `kit/tests/*.py` and `kit/harness/*.py`;
 - the link rung drops `py` (§ 3.6); § 3.7's `.mjs`-only invariant;
 - text: `CLAUDE.md:28` (proposed to the owner, § 3.8), `CONTRIBUTING.md`,
-  `README.md:84`, `agents/coder.md`, `docs/TEAM.md`, `kit/README.md`, the
+  `README.md:84`, `team/coder.md`, `docs/TEAM.md`, `kit/README.md`, the
   plan's standing checks, `design-web-ui.md:2338`, `design-web-search.md:1070`,
   `skill-shape.md:29/:211/:213/:273`, `design-web-agent.md:516`,
   `loading-map.md:10`, `ARCHITECTURE.md:364-365`.

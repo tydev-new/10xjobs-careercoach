@@ -5,9 +5,9 @@ human owner. This page explains who does what, the loop every change
 goes through, and where you fit in as a contributor. You can join with
 your own agents or with none; the rules are the same.
 
-The four agent roles have files in [`agents/`](../agents/); the owner
+The four agent roles have files in [`team/`](../team/); the owner
 and the lead have none (their jobs are described here and in
-[`agents/README.md`](../agents/README.md)). The loop is
+[`team/README.md`](../team/README.md)). The loop is
 [`PROCESS.md`](PROCESS.md). The plan that set up the team is
 [`plan-portable-skills-and-web-agent.md` § The team](plan-portable-skills-and-web-agent.md#the-team).
 
@@ -26,10 +26,10 @@ and the lead have none (their jobs are described here and in
 |---|---|---|---|
 | **Owner** (a human; no role file) | Decides what gets built. Approves contracts, designs and spending. Holds every key. Runs every production step: migrations, function deploys and secrets, site deploys, settings, credit rows. Runs Ten on real data, in their own account. | Gives an agent a secret, a production write, or real user data. | Decisions, recorded in the issue or the contract with a date ("owner, 2026-09-24"). |
 | **Lead** (the main agent session; no role file) | Holds the issue and runs the loop. Starts every other agent. Checks each hand-back by reading the files and re-running the commands. Commits and merges. Brings every approval to the owner. Prepares deploys (the exact commands and checks); never runs them. | Approves on the owner's behalf. Runs a production step or holds a secret. Believes a hand-back it hasn't checked. There is no other coordinator. | To the owner: a checked summary and the questions that need a decision. |
-| **Architect** ([`architect.md`](../agents/architect.md)) | Contracts, design gates, spike notes, closing reviews against [`PRINCIPLES.md`](../PRINCIPLES.md). Docs only. | Writes feature code. Reviews its own contract. | Files written, decisions with reasons, open questions, anything UNVERIFIED. |
-| **Designer** ([`designer.md`](../agents/designer.md)) | Screens, cards, fixture conversations, the gate and balance, the phone layout. Exact values, rendered and looked at. | Wires live data. Uses real candidate data. | Files, the token table, screenshot paths (checked to exist), notes for the coder. |
-| **Coder** ([`coder.md`](../agents/coder.md)) | Builds one slice against an agreed contract, with unit tests, in its own worktree. | Grades its own work. Commits (the lead commits coder work after checking it). Edits outside its slice without saying so. Hardcodes a key. | Files changed, commands run with real output, what is not done, blockers. |
-| **Tester** ([`tester.md`](../agents/tester.md)) | Writes tests from the spec, not from the code. Runs them. Re-checks every fix itself. Commits its own tests when the lead says to. | Fixes product code. Takes the fixer's word. | PASS, FAIL or BLOCKED per exit criterion, with the command and its output. Findings by severity. |
+| **Architect** ([`architect.md`](../team/architect.md)) | Contracts, design gates, spike notes, closing reviews against [`PRINCIPLES.md`](../PRINCIPLES.md). Docs only. | Writes feature code. Reviews its own contract. | Files written, decisions with reasons, open questions, anything UNVERIFIED. |
+| **Designer** ([`designer.md`](../team/designer.md)) | Screens, cards, fixture conversations, the gate and balance, the phone layout. Exact values, rendered and looked at. | Wires live data. Uses real candidate data. | Files, the token table, screenshot paths (checked to exist), notes for the coder. |
+| **Coder** ([`coder.md`](../team/coder.md)) | Builds one slice against an agreed contract, with unit tests, in its own worktree. | Grades its own work. Commits (the lead commits coder work after checking it). Edits outside its slice without saying so. Hardcodes a key. | Files changed, commands run with real output, what is not done, blockers. |
+| **Tester** ([`tester.md`](../team/tester.md)) | Writes tests from the spec, not from the code. Runs them. Re-checks every fix itself. Commits its own tests when the lead says to. | Fixes product code. Takes the fixer's word. | PASS, FAIL or BLOCKED per exit criterion, with the command and its output. Findings by severity. |
 
 **Who talks to whom.** Agents never hand work to each other directly.
 Everything goes through the lead, and only the owner approves.
@@ -161,7 +161,7 @@ Numbers only; no personal data. Each one changed a rule.
 ## Where a human contributor fits in
 
 - **Run the agents yourself,** or do their jobs by hand. To load the
-  role files into Claude Code, see [`agents/README.md`](../agents/README.md).
+  role files into Claude Code, see [`team/README.md`](../team/README.md).
   Whoever runs them is the lead: you check every hand-back before you
   believe it.
 - **Review agent pull requests** like any other. Read the diff against

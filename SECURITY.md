@@ -38,7 +38,7 @@ Never include anyone's real data in a report.
   - `tests/test_invariants.py` scans `skills/`, `plugins/`, `kit/`,
     `.claude-plugin/`, `apps/`, `scripts/` and `design/`;
   - `tests/test_docs_guard.py` scans the root `*.md` files, `docs/` and
-    `agents/`, plus the non-Markdown files in `packages/agent/src`,
+    `team/`, plus the non-Markdown files in `packages/agent/src`,
     `packages/checkers/src`, `packages/checkers/bin` and `supabase/`.
 
   Anything outside those folders is not scanned. Build output and

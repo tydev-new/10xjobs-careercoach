@@ -1,4 +1,4 @@
-// Design-refresh render pass (docs/design-web-ui-refresh.md, agents/
+// Design-refresh render pass (docs/design-web-ui-refresh.md, team/
 // designer.md's "Render, then look"): plays fixtures end to end against
 // a built preview server and saves named screenshots — no assertions
 // (that's scripts/verify-screens.mjs's job, unmodified by this file).

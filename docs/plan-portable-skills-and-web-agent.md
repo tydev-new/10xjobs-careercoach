@@ -432,7 +432,7 @@ drop on the default model.
 The main session is the **lead**: it holds the issue and runs the ritual in
 `docs/PROCESS.md`. The subagents are defined as `.claude/agents/*.md`.
 `.claude/` is gitignored, so either un-ignore `.claude/agents/` or keep the
-definitions in a tracked `agents/` directory.
+definitions in a tracked `team/` directory.
 
 | Agent | Owns | May not |
 |---|---|---|

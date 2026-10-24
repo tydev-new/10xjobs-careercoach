@@ -32,8 +32,8 @@ from test_invariants import PII, SKIP_DIRS
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
-# Prose: every root *.md, docs/ (recursively), agents/.
-PROSE_DIRS = ("docs", "agents")
+# Prose: every root *.md, docs/ (recursively), team/.
+PROSE_DIRS = ("docs", "team")
 # Code that ships but is outside SHIPPED: the agent/checker sources bundled
 # into the site, and the deployed Edge Functions + migrations. Test dirs
 # under packages/ are left out on purpose: the just-bash sandbox's own fake
@@ -152,7 +152,7 @@ def test_relative_links_and_anchors_in_prose_resolve():
 def _tree():
     root = tempfile.mkdtemp(prefix="docs-guard-")
     os.makedirs(os.path.join(root, "docs"))
-    os.makedirs(os.path.join(root, "agents"))
+    os.makedirs(os.path.join(root, "team"))
     os.makedirs(os.path.join(root, "supabase", "functions"))
     os.makedirs(os.path.join(root, "packages", "agent", "src"))
     with open(os.path.join(root, "docs", "C.md"), "w") as fh:
@@ -173,7 +173,7 @@ def test_pii_scan_catches_planted_hits_in_each_new_area():
         for rel, text in (
             ("SECURITY.md", "Built on /Users/someone/code\n"),
             ("docs/receipt.md", "owner said: jane.doe@gmail.com\n"),
-            ("agents/x.md", "call (415) 555-0100\n"),
+            ("team/x.md", "call (415) 555-0100\n"),
             ("supabase/functions/a.ts", "// linkedin.com/in/janedoe\n"),
             ("packages/agent/src/b.ts", 'const p = "/home/alice/job-search";\n'),
         ):

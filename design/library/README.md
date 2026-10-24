@@ -33,7 +33,7 @@ schema is kept flat and simple specifically so that script can filter by
 This library is a pool to choose *from*, not a mandate to use — a task
 may still justify a font outside this set, but that needs the same
 "decide, don't suggest" exact-value treatment as everything else in
-`agents/designer.md`, and should get added here afterward if it's likely
+`team/designer.md`, and should get added here afterward if it's likely
 to be reused.
 
 ## Licensing

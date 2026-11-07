@@ -17,7 +17,8 @@ export function welcomeLine(usd: number): string {
 
 /** O2, O3, O4. O4's contact is the owner's (2026-10-02). */
 export const NOT_A_MEMBER_LINES: Record<NotAMemberReason, string> = {
-  paused: "Ten has paused free credit for new accounts, so this account can't start yet. Come back later to check again.",
+  paused:
+    "Ten isn't taking new accounts while we redesign it, so this account can't start. You can run Ten free on your own AI instead: see 10xjobs.co/open-source.",
   unconfirmed:
     "Ten's free credit needs a confirmed email address, and this account doesn't have one yet. If we sent you a confirmation email, open its link, then come back.",
   already_claimed:
@@ -25,5 +26,6 @@ export const NOT_A_MEMBER_LINES: Record<NotAMemberReason, string> = {
 };
 
 /** O5: on the sign-in page, under the form, on both views (Sign in and Create
- *  an account) and under the confirmation line (§ 1.4, 2026-10-07). */
-export const SIGN_IN_INVITATION = "New accounts get free credit to try Ten, while places last.";
+ *  an account) and under the confirmation line (§ 1.4, 2026-10-07). Amended
+ *  2026-11-07: no new accounts during the redesign. */
+export const SIGN_IN_INVITATION = "Ten isn't taking new accounts while we redesign it. If you already have one, sign in as usual.";

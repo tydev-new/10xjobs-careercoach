@@ -51,8 +51,14 @@ export interface SignInProps {
 
 type View = "sign-in" | "create";
 
+/** design-web-ui.md § 1.4 (amended 2026-11-07): Ten takes no new accounts
+ *  during the redesign. While false, Y8 is not shown and a `?signup` link
+ *  opens Sign in, so the Create an account view can't be reached. The welcome
+ *  claim is paused server-side too (cap = 0). Set true to reopen. */
+const NEW_ACCOUNTS_OPEN = false;
+
 export function SignIn({ client, redirectTo, expiredLink, startOnCreate }: SignInProps): ReactElement {
-  const [view, setView] = useState<View>(() => (startOnCreate ? "create" : "sign-in"));
+  const [view, setView] = useState<View>(() => (startOnCreate && NEW_ACCOUNTS_OPEN ? "create" : "sign-in"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -217,9 +223,11 @@ export function SignIn({ client, redirectTo, expiredLink, startOnCreate }: SignI
             <button type="submit" disabled={status === "sending"}>
               {isCreate ? CREATE_ACCOUNT_BUTTON : SIGN_IN_BUTTON}
             </button>
-            <button type="button" className="sign-in-link-button" onClick={() => goTo(isCreate ? "sign-in" : "create")}>
-              {isCreate ? SWITCH_TO_SIGN_IN : SWITCH_TO_CREATE}
-            </button>
+            {isCreate || NEW_ACCOUNTS_OPEN ? (
+              <button type="button" className="sign-in-link-button" onClick={() => goTo(isCreate ? "sign-in" : "create")}>
+                {isCreate ? SWITCH_TO_SIGN_IN : SWITCH_TO_CREATE}
+              </button>
+            ) : null}
           </form>
         )}
 
@@ -239,11 +247,16 @@ export function SignIn({ client, redirectTo, expiredLink, startOnCreate }: SignI
           .
         </p>
 
-        {/* PRINCIPLES.md rule 9: local-first stays a supported exit. No
-            specific URL is named by the contract — this repo's own
-            skills/ tree is what "running it from your terminal" means,
-            so this stays a plain line rather than a guessed link. */}
-        <p className="sign-in-local">Prefer local? Run it from your terminal.</p>
+        {/* PRINCIPLES.md rule 9: local-first stays a supported exit. S9
+            (amended 2026-11-07) links the open-source setup page, the way
+            in for new people while hosted accounts are closed. */}
+        <p className="sign-in-local">
+          Prefer local?{" "}
+          <a href="https://10xjobs.co/open-source" target="_blank" rel="noreferrer">
+            Run Ten free on your own AI
+          </a>
+          .
+        </p>
       </div>
     </div>
   );

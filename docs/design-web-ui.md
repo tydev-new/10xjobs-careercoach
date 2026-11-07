@@ -447,6 +447,24 @@ edited.
       "Get started" opens Create an account on Ten with a clean address.
       The marketing site's change is its own repo's.
 
+**Amended 2026-11-07 (owner ruling): no new accounts during the
+redesign.** Hosted Ten is closed to new users while it is redesigned;
+existing members keep signing in as before. New people are pointed to the
+open-source version on their own AI (https://10xjobs.co/open-source).
+- The Sign in view does not show Y8, and a `?signup` link opens the Sign
+  in view (the address is still cleaned as above). The Create an account
+  view stays in the code, unreachable, behind one switch in `SignIn.tsx`
+  (`NEW_ACCOUNTS_OPEN`); reopening sets it back to true and restores O5,
+  O2 and S9's earlier lines.
+- O5 says no new accounts are being taken, and that existing members
+  sign in as usual. S9 now links the open-source setup page.
+- The real gate is server-side: the welcome claim's cap is 0
+  (`ten_welcome_settings`, C § 20), so an account made any other way gets
+  § 1.6's `paused` line (O2) and never reaches the chat. Members are
+  unaffected: membership is a credit row, not the claim.
+- The marketing site (10xjobs.co) no longer links to `?signup`; its
+  change is its own repo's.
+
 ### 1.5 Empty / first-run state
 
 Static UI copy, not a `UIMessage` sent to or from the model (nothing
@@ -495,6 +513,11 @@ controls, no retry button: each line says what the person can do, and
 opening Ten again runs the check again (C § 20.4). A failed claim call is
 not this screen: it is the setup error screen with Q1 and Retry. The `⋯`
 menu keeps only Sign out.
+
+**Amended 2026-11-07 (owner ruling).** While new accounts are closed for
+the redesign (§ 1.4, same date), the claim's cap is 0 and every new
+account answers `paused`. O2 now says Ten isn't taking new accounts and
+points to the open-source version, in place of "come back later".
 
 ### 1.7 Delete my beta data
 
@@ -2109,7 +2132,7 @@ commit. The coder copies each string word for word.
 | S6 | Sign-in | proof point 2, body | `Ten picks from what you gave it, never states a claim stronger than that, and shows you what it cut.` | § 1.4 :156 | Given |
 | S7 | Sign-in | proof point 3, title | `No big run without your yes.` | § 1.4 :162; owner-approved 2026-09-26 | Given |
 | S8 | Sign-in | proof point 3, body | `Bigger jobs show a cost range first, and only your typed yes starts them. In this app, you send and submit, not Ten.` | § 1.4 :166; owner-approved 2026-09-26 | Given |
-| S9 | Sign-in | a line under the form (plain text; no address is named) | `Prefer local? Run it from your terminal.` | § 1.4 :116; was called a link, with no period | Changed (C23) |
+| S9 | Sign-in | a line under the form; "Run Ten free on your own AI" links to https://10xjobs.co/open-source | `Prefer local? Run Ten free on your own AI.` | § 1.4, amended 2026-11-07; was `Prefer local? Run it from your terminal.` | Changed |
 | S10 | Sign-in | the preview's one text alternative | `A preview of Ten's Home page, with sample data` | § 1.4 :184 | Given |
 | S11 | Sign-in | the preview's visible caption | `Sample data` | § 1.4 :185 | Given |
 | S12 | Sign-in | trust line, first item (after the `lock` icon) | `Your files stay yours` | this table; lead ruling 2 | NEW |
@@ -2118,7 +2141,7 @@ commit. The coder copies each string word for word.
 | Y5 | Sign-in | field label, both views | `Password` | this table | Kept |
 | Y6 | Sign-in | Sign in view: the submit button | `Sign in` | this table | Kept |
 | Y7 | Sign-in | Create an account view: the submit button | `Create account` | this table | Kept |
-| Y8 | Sign-in | Sign in view, under the button: switch to Create an account | `New here? Create an account` | this table | Kept |
+| Y8 | Sign-in | Sign in view, under the button: switch to Create an account; not shown while new accounts are closed (§ 1.4, amended 2026-11-07) | `New here? Create an account` | this table | Kept |
 | Y9 | Sign-in | Create an account view, under the button: switch back | `Already have an account? Sign in` | this table | Kept |
 | Y11 | Sign-in | after `Create account`, in place of the form, with Y24 under it; the same words whether or not the address already has an account | `Check <email> for a link to confirm your account. Check spam too. If nothing comes, you may already have an account: go back to sign in, where you can also choose a new password.` | this table; C29; was `Check <email> for a link to confirm your account.` | Changed (C29) |
 | Y12 | Sign-in | error `invalid_credentials` | `That email and password don't match. Try again, or choose a new password with the link under the password field.` | this table; C29; was `… Try again, or use an email link instead.`; never Supabase's own text | Changed (C29) |
@@ -2160,10 +2183,10 @@ commit. The coder copies each string word for word.
 | Y51 | Passwords (§ 1.10) | recovery screen line | `You're signed in from your reset link. This password also works for the older app, which shares your sign-in.` | § 1.10 :380 | Given |
 | Y52 | Passwords (§ 1.10) | recovery screen button after success | `Continue` | § 1.10 :383 | Given |
 | O1 | Every member page | the notice place (§ 1.8), on the page load where the welcome credit was granted, until the first message is sent; `<amount>` is the claim's `usd`, two decimals | `You have $<amount> of free credit to try Ten. Each reply uses some of it, and your balance at the top shows what's left.` | C § 20.4 | NEW |
-| O2 | Not a member (§ 1.6) | the claim answered `paused` | `Ten has paused free credit for new accounts, so this account can't start yet. Come back later to check again.` | C § 20.1 | NEW |
+| O2 | Not a member (§ 1.6) | the claim answered `paused` | `Ten isn't taking new accounts while we redesign it, so this account can't start. You can run Ten free on your own AI instead: see 10xjobs.co/open-source.` | C § 20.1; § 1.6, amended 2026-11-07; was `Ten has paused free credit for new accounts, so this account can't start yet. Come back later to check again.` | Changed |
 | O3 | Not a member (§ 1.6) | the claim answered `unconfirmed` | `Ten's free credit needs a confirmed email address, and this account doesn't have one yet. If we sent you a confirmation email, open its link, then come back.` | C § 20.1 | NEW |
 | O4 | Not a member (§ 1.6) | the claim answered `already_claimed` | `Ten gives free credit once per email inbox, and this inbox has already had it. To ask to join, email support@10xjobs.co.` | C § 20.1; the contact: owner, 2026-10-02 | NEW |
-| O5 | Sign-in | under the form on both views, and under the confirmation line (Y11) | `New accounts get free credit to try Ten, while places last.` | C § 20.9 | NEW |
+| O5 | Sign-in | under the form on both views, and under the confirmation line (Y11) | `Ten isn't taking new accounts while we redesign it. If you already have one, sign in as usual.` | C § 20.9; § 1.4, amended 2026-11-07; was `New accounts get free credit to try Ten, while places last.` | Changed |
 | O6 | Talk to Ten, under the composer (an upload); the error card (the proxy's 403) | the account has no credit row, outside the sign-in flow; replaces the old line in `upload-errors.ts`, the proxy and `ten-paypal` | `This account isn't set up to use Ten yet. Sign out, then sign in again to check.` | C § 20.4 | NEW |
 | O7 | Sign-in | under O5; "terms" links to `/terms.html`, "privacy notice" to `/privacy.html` | `Using Ten means you agree to its terms. See also the privacy notice.` | C § 20.7 | NEW |
 | O8 | Header | `⋯` menu link, beside Privacy (F33) | `Terms` | C § 20.7 | NEW |

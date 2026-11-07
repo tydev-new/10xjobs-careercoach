@@ -3243,12 +3243,14 @@ summary.job-group-head {
   color: var(--fg-muted);
 }
 
-/* The two links in O7 are tap targets (§ 5.6, 44px) and have a hover look
+/* The two links in O7, and S9's link (§ 1.4, amended 2026-11-07), are tap
+   targets (§ 5.6, 44px) and have a hover look
    (and the global a:active press). Their box is 44px tall and at least 44px
    wide, but the extra size is invisible: the negative margins hand the height
    and the side padding back, so the sentence keeps its own line spacing and
    the link hugs its text (no gap before the period). */
-.sign-in-terms a {
+.sign-in-terms a,
+.sign-in-local a {
   display: inline-block;
   padding: 0 6px;
   min-height: 44px;
@@ -3258,7 +3260,8 @@ summary.job-group-head {
   text-decoration: underline;
 }
 
-.sign-in-terms a:hover {
+.sign-in-terms a:hover,
+.sign-in-local a:hover {
   color: var(--primary-hover);
 }
 

@@ -228,7 +228,7 @@ test("R0 the rows and proof 6's list were read from the doc", () => {
   assert.match(Y.Y25, /<email>/);
 });
 
-test("R1 proof 1: Sign in view on load: Email, Password, Y20, `Sign in`, Y8, O5, O7 with its two links, S9; ONE submit button on the page; no .sign-in-mode-toggle, no aria-pressed, no role=tab/switch/radio", async () => {
+test("R1 proof 1: Sign in view on load: Email, Password, Y20, `Sign in`, O5, O7 with its two links, S9 with its link; no Y8 (new accounts closed, § 1.4 2026-11-07); ONE submit button on the page; no .sign-in-mode-toggle, no aria-pressed, no role=tab/switch/radio", async () => {
   const { ctx, page } = await open();
   try {
     const v = await page.evaluate(() => ({
@@ -246,82 +246,19 @@ test("R1 proof 1: Sign in view on load: Email, Password, Y20, `Sign in`, Y8, O5,
     assert.deepEqual(v.labels, [Y.Y4, Y.Y5]);
     assert.deepEqual(v.inputs, ["email", "password"]);
     assert.deepEqual(v.submits, [Y.Y6], "one submit button");
-    // every button on the card, in order: the forgot link, the submit, the switch. Nothing else.
-    assert.deepEqual(v.cardButtons, [Y.Y20, Y.Y6, Y.Y8]);
+    // every button on the card, in order: the forgot link and the submit. Nothing else (Y8 is closed).
+    assert.deepEqual(v.cardButtons, [Y.Y20, Y.Y6]);
     assert.equal(v.toggles, 0, ".sign-in-mode-toggle");
     assert.equal(v.pressed, 0, "aria-pressed or another mode control on the card");
     assert.equal(norm(v.o5), Y.O5);
     assert.equal(norm(v.o7), Y.O7);
-    assert.deepEqual(v.links, [["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]);
+    assert.deepEqual(v.links, [["terms", "/terms.html"], ["privacy notice", "/privacy.html"], ["Run Ten free on your own AI", "https://10xjobs.co/open-source"]]);
     assert.equal(norm(v.s9), Y.S9);
     // "under the form": the form, then O5, O7, S9
     const tops = await page.evaluate(() => [".sign-in-form", ".sign-in-invite", ".sign-in-terms", ".sign-in-local"].map((s) => document.querySelector(s)!.getBoundingClientRect().top));
     assert.ok(tops.every((t, i) => i === 0 || t > tops[i - 1]), `form, O5, O7, S9 in order: ${tops}`);
     await noRetired(page, "Sign in view");
     assert.equal(auth.log.length, 0, `the signed-out page called the auth server on load: ${JSON.stringify(auth.log)}`);
-  } finally {
-    await ctx.close();
-  }
-});
-
-test("R2 proof 2: Create an account view: `Create account`, Y9, O5, O7, S9; Y20 absent; the email is kept, the password and the old error are cleared, both ways", async () => {
-  auth.shape = "v2024";
-  auth.kind = "invalid_credentials";
-  const { ctx, page } = await open();
-  try {
-    await emailBox(page).fill("kept@example.com");
-    await passBox(page).fill("typed-on-sign-in");
-    await submit(page).click();
-    await page.locator(".sign-in-error").waitFor({ timeout: 15000 });
-    await btn(page, Y.Y8).click();
-    await btn(page, Y.Y7).waitFor();
-    assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll(".sign-in-card button")].map((b) => (b.textContent ?? "").trim())), [Y.Y7, Y.Y9], "buttons on Create an account: the submit and Y9 only (no Y20)");
-    assert.equal(await emailBox(page).inputValue(), "kept@example.com", "email kept");
-    assert.equal(await passBox(page).inputValue(), "", "password cleared on the way to Create an account");
-    assert.equal(await page.locator(".sign-in-error").count(), 0, "old error cleared on the way to Create an account");
-    assert.ok(!(await shown(page)).includes(Y.Y12), "Y12 still readable on Create an account");
-    assert.equal(await page.locator(".sign-in-card [aria-pressed], .sign-in-mode-toggle").count(), 0);
-    assert.equal(norm((await page.locator(".sign-in-invite").textContent()) ?? ""), Y.O5);
-    assert.equal(norm(await page.locator(".sign-in-terms").innerText()), Y.O7);
-    assert.equal(norm((await page.locator(".sign-in-local").textContent()) ?? ""), Y.S9);
-    await noRetired(page, "Create an account view");
-    // and back: Y9
-    await passBox(page).fill("typed-on-create");
-    await btn(page, Y.Y9).click();
-    await btn(page, Y.Y6).waitFor();
-    assert.equal(await emailBox(page).inputValue(), "kept@example.com", "email kept going back");
-    assert.equal(await passBox(page).inputValue(), "", "password cleared going back");
-    assert.equal(await btn(page, Y.Y20).count(), 1, "Y20 back on Sign in");
-  } finally {
-    await ctx.close();
-  }
-});
-
-test("R3 proof 3: `Create account` shows Y11 with the address, Y24 under it, then O5, O7 and S9; one POST /signup with redirect_to = the site; no token or otp request; Y24 returns with the email kept and the password empty", async () => {
-  const { ctx, page } = await open();
-  try {
-    const before = auth.log.length;
-    await btn(page, Y.Y8).click();
-    await emailBox(page).fill("new.person@example.com");
-    await passBox(page).fill("Correct-Horse-9");
-    await submit(page).click();
-    await btn(page, Y.Y24).waitFor({ timeout: 15000 });
-    const reqs = auth.log.slice(before);
-    assert.deepEqual(reqs.map((r) => `${r.method} ${r.path}`), ["POST /auth/v1/signup"]);
-    assert.equal(new URLSearchParams(reqs[0].search).get("redirect_to"), ORIGIN, "the site address as the place to return to");
-    assert.equal(norm((await page.locator(".sign-in-sent").textContent()) ?? ""), Y.Y11.replace("<email>", "new.person@example.com"));
-    assert.equal(await page.locator(".sign-in-card form").count(), 0, "in place of the form");
-    const tops = await page.evaluate(() => [".sign-in-sent", ".sign-in-link-button", ".sign-in-invite", ".sign-in-terms", ".sign-in-local"].map((s) => document.querySelector(s)?.getBoundingClientRect().top ?? -1));
-    assert.ok(tops.every((t, i) => t >= 0 && (i === 0 || t > tops[i - 1])), `Y11, Y24, O5, O7, S9 in order: ${tops}`);
-    assert.equal(norm((await page.locator(".sign-in-invite").textContent()) ?? ""), Y.O5);
-    assert.equal(norm(await page.locator(".sign-in-terms").innerText()), Y.O7);
-    assert.equal(norm((await page.locator(".sign-in-local").textContent()) ?? ""), Y.S9);
-    await noRetired(page, "confirmation line");
-    await btn(page, Y.Y24).click();
-    await btn(page, Y.Y6).waitFor();
-    assert.equal(await emailBox(page).inputValue(), "new.person@example.com", "email kept");
-    assert.equal(await passBox(page).inputValue(), "", "the new password does not follow to the Sign in view");
-    assert.equal(await page.locator(".sign-in-sent").count(), 0);
   } finally {
     await ctx.close();
   }
@@ -392,7 +329,7 @@ test("R8 proof 8: Y20 needs no mode click; has-account, no-account and 429 all r
 });
 
 for (const where of ["#", "?"] as const) {
-  test(`R9 proof 9: a page opened with error_code=otp_expired in the ${where === "#" ? "hash" : "query"} shows Y27 above the Sign in form, the address loses the error, and Y27 is absent on Create an account, the confirmation line and the reset card`, async () => {
+  test(`R9 proof 9: a page opened with error_code=otp_expired in the ${where === "#" ? "hash" : "query"} shows Y27 above the Sign in form, the address loses the error, and Y27 is absent on the reset card`, async () => {
     const { ctx, page } = await open(`${where}error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`);
     try {
       await page.getByText(Y.Y27, { exact: true }).waitFor({ timeout: 15000 });
@@ -405,15 +342,6 @@ for (const where of ["#", "?"] as const) {
       }, Y.Y27);
       assert.ok(pos.line <= pos.form, `Y27 above the form: ${JSON.stringify(pos)}`);
       await noRetired(page, "expired-link state");
-      await btn(page, Y.Y8).click();
-      await btn(page, Y.Y7).waitFor();
-      assert.ok(!(await shown(page)).includes(Y.Y27), "Y27 on Create an account");
-      await emailBox(page).fill("x@example.com");
-      await passBox(page).fill("Correct-Horse-9");
-      await submit(page).click();
-      await btn(page, Y.Y24).waitFor({ timeout: 15000 });
-      assert.ok(!(await shown(page)).includes(Y.Y27), "Y27 beside the confirmation line");
-      await btn(page, Y.Y24).click();
       await btn(page, Y.Y20).click();
       await page.getByRole("heading", { name: "Reset your password" }).waitFor();
       assert.ok(!(await shown(page)).includes(Y.Y27), "Y27 on the reset card");
@@ -427,7 +355,7 @@ for (const where of ["#", "?"] as const) {
   });
 }
 
-test("R11 proof 11, 375px: Sign in, Create an account, the confirmation line and the reset card have no horizontal scroll; every field, button and link is at least 44px tall; nothing on the card is cut off at the right edge; light palette", async () => {
+test("R11 proof 11, 375px: Sign in and the reset card have no horizontal scroll; every field, button and link is at least 44px tall; nothing on the card is cut off at the right edge; light palette", async () => {
   auth.shape = "v2024";
   const { ctx, page } = await open("", { width: 375, height: 812 });
   const problems: string[] = [];
@@ -451,21 +379,13 @@ test("R11 proof 11, 375px: Sign in, Create an account, the confirmation line and
     return r.controls.map((c) => c.name);
   };
   try {
-    assert.deepEqual(await check("1 sign in"), ["email", "password", Y.Y20, Y.Y6, Y.Y8, "terms", "privacy notice"]);
+    assert.deepEqual(await check("1 sign in"), ["email", "password", Y.Y20, Y.Y6, "terms", "privacy notice", "Run Ten free on your own AI"]);
     // the Sign in view with Y27 above it and Y12 in it: the tallest the card gets
     await emailBox(page).fill("someone-with-a-very-long-address-indeed@a-long-domain-name.example.com");
     await passBox(page).fill("not-the-password");
     await submit(page).click();
     await page.locator(".sign-in-error").waitFor({ timeout: 15000 });
     await check("1b sign in with Y12");
-    await btn(page, Y.Y8).click();
-    await btn(page, Y.Y7).waitFor();
-    assert.deepEqual(await check("2 create an account"), ["email", "password", Y.Y7, Y.Y9, "terms", "privacy notice"]);
-    await passBox(page).fill("Correct-Horse-9");
-    await submit(page).click();
-    await btn(page, Y.Y24).waitFor({ timeout: 15000 });
-    assert.deepEqual(await check("3 confirmation line"), [Y.Y24, "terms", "privacy notice"]);
-    await btn(page, Y.Y24).click();
     await btn(page, Y.Y20).click();
     await page.getByRole("heading", { name: "Reset your password" }).waitFor();
     assert.deepEqual(await check("4 reset card"), ["email", "Send reset link", Y.Y24]);
@@ -562,7 +482,8 @@ test("R7b proof 7 (requests), last: over this whole file's run the auth server g
   const paths = [...new Set(auth.log.map((l) => `${l.method} ${l.path}`))].sort();
   console.log(`  [R7b] ${auth.log.length} auth requests: ${paths.join(", ")}`);
   assert.deepEqual(auth.log.filter((l) => /otp|magiclink|verify/.test(l.path)), []);
-  assert.deepEqual(paths, ["POST /auth/v1/recover", "POST /auth/v1/signup", "POST /auth/v1/token"]);
+  // no POST /auth/v1/signup: new accounts are closed (§ 1.4, 2026-11-07)
+  assert.deepEqual(paths, ["POST /auth/v1/recover", "POST /auth/v1/token"]);
   assert.ok(auth.log.filter((l) => l.path === "/auth/v1/token").every((l) => /grant_type=password/.test(l.search)), "a token request that is not the password grant");
   assert.ok(auth.log.length >= 20, "the log is live");
   assert.deepEqual(external, []);

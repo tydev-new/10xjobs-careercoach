@@ -1,1 +1,0 @@
-Evaluate the Datagrid Labs analytics engineer role — worth applying?

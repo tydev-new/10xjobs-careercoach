@@ -1,1 +1,0 @@
-[scheduled run] The weekly sweep just completed. Sweep output: 0 new roles inserted; active To Review = 5 vs cap 5; with the Interested row the pipeline holds 6. The prune report window is open. Execute the end-of-sweep duties.

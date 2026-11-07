@@ -1,0 +1,7 @@
+# Paraphrases that imply a gap term (2026-10-21, apply-rubric-2026-10-21). gap_check.py treats each phrase as if the
+# gap term itself appeared: if a step-6 gap lists the key term and the resume/cover uses one of these phrases with no
+# backing claim, the package fails as an OVERCLAIM. Keys and phrases are case-insensitive. Add a key when a calibration
+# or review finds a new paraphrase; never add a phrase that a real, approved claim uses.
+kafka: [event streaming, streaming backbone, streaming backbones, streaming platform, stream processing, event bus, message bus, pub/sub, event-driven backbone]
+streaming: [event streaming, streaming backbone, streaming backbones, stream processing]
+go: [golang]

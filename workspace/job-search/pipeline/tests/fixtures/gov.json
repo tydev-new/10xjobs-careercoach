@@ -1,0 +1,14 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://www.governmentjobs.com/SearchEngine/JobsFeed?agency=fictional-agency",
+    "status": 200,
+    "body": "<rss xmlns:j=\"http://www.neogov.com/namespaces/JobListing\"><channel><title>Fictional Agency</title><item><title>Fictional Card Curator</title><link>https://jobs.example.invalid/toy</link><j:location>Example City</j:location><j:advertiseFromDate>2099-01-01</j:advertiseFromDate></item></channel></rss>"
+  },
+  {
+    "synthetic": true,
+    "url": "https://www.calcareers.ca.gov/CalHRPublic/Search/JobSearchResults.aspx",
+    "status": 200,
+    "body": "Synthetic test: JobControlId=0"
+  }
+]

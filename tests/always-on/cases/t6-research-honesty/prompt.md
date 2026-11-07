@@ -1,1 +1,0 @@
-Should I apply to the Quorvex Systems role in my pipeline?

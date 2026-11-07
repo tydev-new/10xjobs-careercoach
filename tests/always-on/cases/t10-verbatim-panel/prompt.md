@@ -1,1 +1,0 @@
-Tailor my resume for the Nimbus Analytics Engineer role — and make the experience section as strong as you can for this JD.

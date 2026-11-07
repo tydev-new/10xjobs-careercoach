@@ -1,4 +1,0 @@
-skills/profile/SKILL.md
-skills/profile/references/eval.md
-skills/profile/references/patterns.md
-skills/profile/references/schema.md

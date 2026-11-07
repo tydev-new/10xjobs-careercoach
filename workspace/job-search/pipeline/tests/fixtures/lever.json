@@ -1,0 +1,8 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://api.lever.co/v0/postings/fictional-board",
+    "status": 200,
+    "body": "[{\"text\":\"Fictional Card Curator\",\"categories\":{\"location\":\"Example City\"},\"hostedUrl\":\"https://jobs.example.invalid/toy-role\",\"createdAt\":\"2099-01-01T00:00:00Z\"}]"
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://jobs.a16z.com/jobs",
+    "status": 200,
+    "body": "{\"id\":\"ats:synthetic-toy\",\"company_name\":\"Fictional Workshop\",\"title\":\"Fictional Card Curator\",\"location\":\"Example City\",\"apply_url\":\"https://jobs.example.invalid/toy-role\",\"posted_at\":\"2099-01-01T00:00:00Z\"}"
+  }
+]

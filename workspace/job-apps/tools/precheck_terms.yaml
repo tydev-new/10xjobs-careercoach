@@ -1,0 +1,10 @@
+version: candidate-config-v1
+banned: []
+case_sensitive: []
+age_signal: []
+warn: []
+legacy_top: []
+fixed_facts:
+  companies: []
+  contact: []
+  selected_work_first_regex: null

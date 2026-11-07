@@ -1,1 +1,0 @@
-Tailor my resume and cover letter for the Nimbus Analytics Engineer role.

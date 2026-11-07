@@ -1,0 +1,5 @@
+base_resumes_dir: ${JOBBI_ROOT}/workspace/job-apps/base-resumes
+resume_file: resume-native.md
+routing_module: ${JOBBI_ROOT}/workspace/job-apps/base-resumes/routing.py
+lane_to_base: {}
+analysis_dir: jd-analysis

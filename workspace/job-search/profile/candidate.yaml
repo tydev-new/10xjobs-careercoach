@@ -1,0 +1,27 @@
+schema: synthetic-example
+synthetic: true
+name: Alex Example
+name_display: ALEX EXAMPLE
+email: alex@example.invalid
+phone: null
+linkedin: null
+github: null
+profile_urls: []
+location: null
+city: null
+address: null
+work_auth: null
+sponsorship_needed: null
+eeo: {}
+timezone: null
+resume_contact_lines:
+- alex@example.invalid
+cover_signature:
+- Alex Example
+- alex@example.invalid
+logistics_line: ''
+standing_answer_rules: []
+education_lines:
+- Certificate, Example Subject, Fictional Academy (synthetic)
+selected_work_html: Synthetic example project; not a real candidate achievement.
+selected_work_md: Synthetic example project; not a real candidate achievement.

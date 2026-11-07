@@ -1,1 +1,0 @@
-Hmm, one thing — it was actually 3 clinic managers who used it day to day, not 12. The 12 number was every manager who ever got the link. Otherwise yes, that's my story.

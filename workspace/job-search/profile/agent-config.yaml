@@ -1,0 +1,28 @@
+version: portable-config-v1
+candidate_file: ${JOBBI_ROOT}/workspace/job-search/profile/candidate.yaml
+claims_file: ${JOBBI_ROOT}/workspace/job-search/profile/claims.yaml
+criteria_file: ${JOBBI_ROOT}/workspace/job-search/criteria.md
+profile_file: ${JOBBI_ROOT}/workspace/job-search/profile.md
+paths:
+  search_workspace: ${JOBBI_ROOT}/workspace/job-search
+  apps_workspace: ${JOBBI_ROOT}/workspace/job-apps
+  jobs_db: ${JOBBI_ROOT}/workspace/job-search/pipeline/jobs.db
+  pipeline: ${JOBBI_ROOT}/workspace/job-search/pipeline
+  base_resumes: ${JOBBI_ROOT}/workspace/job-apps/base-resumes
+  rubric: ${JOBBI_ROOT}/workspace/job-apps/rework/apply-rubric.md
+  package_root: ${JOBBI_ROOT}/workspace/job-apps
+  contacts: ${JOBBI_ROOT}/workspace/job-search/contacts
+  outreach_playbook: ${JOBBI_ROOT}/workspace/job-search/outreach/playbook.md
+  operating_rules: ${JOBBI_ROOT}/workspace/job-search/operating-rules.md
+apply:
+  covers_need_style_reapproval: []
+  max_review_rounds: null
+coach:
+  resume_density_reference: null
+  story_shape: null
+outreach:
+  craft: null
+  draft_length_words: null
+  weekly_wave: null
+  proof_defaults: []
+  enterprise_targets_use_named_hm: true

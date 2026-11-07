@@ -1,0 +1,18 @@
+version: 1
+window:
+  default_hours: 24
+  overlap_minutes: 0
+lanes:
+  unconfigured:
+  - (?!)
+exclude_title: []
+exclude_company: []
+geo:
+  include: []
+  exclude: []
+  remote_us: []
+  non_us: []
+  unknown_location: keep
+  remote_filter_cards: verify
+sources: {}
+protected_sources: []

@@ -1,0 +1,8 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://api.ashbyhq.com/posting-api/job-board/fictional-board",
+    "status": 200,
+    "body": "{\"jobs\":[{\"title\":\"Fictional Card Curator\",\"location\":\"Example City\",\"jobUrl\":\"https://jobs.ashbyhq.com/fictional-board/toy\",\"publishedAt\":\"2099-01-01T00:00:00Z\"}]}"
+  }
+]

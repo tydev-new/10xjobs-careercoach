@@ -1,0 +1,8 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://jobs.example.invalid/jobs",
+    "status": 200,
+    "body": "<script id=\"__NEXT_DATA__\">{\"jobs\": {\"found\": [{\"title\": \"Fictional Card Curator\", \"organization\": {\"name\": \"Fictional Workshop\"}, \"locations\": [\"Example City\"], \"url\": \"https://jobs.example.invalid/toy-role\", \"createdAt\": \"2099-01-01T00:00:00Z\"}]}}</script>"
+  }
+]

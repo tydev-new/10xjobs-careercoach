@@ -1,96 +1,54 @@
-# 10xjobs-careercoach
+# Portable job-search kit
 
-**Ten** is an executive job-search copilot with a built-in coach,
-shipped as a set of Claude skills (and, in private beta, as a web app).
-Story bank, one-verdict role evaluation, a pipeline board, tailored
-applications, interview prep and practice, outreach — with **all of
-your data in a folder on your machine** (or your own cloud workspace in
-the web beta), and a coach that reads it and tells you what's next.
-The one thing Ten itself ever sends is feedback you choose to send
-about Ten: you see exactly what goes first, and it goes only after you
-say yes ([`docs/design-feedback.md`](docs/design-feedback.md)).
+Skills and tools for sourcing roles, scoring them, and preparing application packages. This public tree ships with synthetic examples only. It does not include a real candidate profile, an approval to apply, or permission to send email.
 
-Install: [`INSTALL.md`](INSTALL.md). Then, in a folder you choose:
-*"I need a job."*
+This branch replaces the previous working tree. Git history is preserved and was not rewritten or scrubbed. Anything committed before this replacement remains reachable from older commits.
 
-## Start here (contributors)
+## What you can run
 
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): how the pieces fit,
-  with diagrams: one coaching turn, the money path, the data, deploys.
-- [`docs/TEAM.md`](docs/TEAM.md): the agent team, the loop every change
-  goes through, and where a human contributor fits in.
-- [`CONTRIBUTING.md`](CONTRIBUTING.md): setup, tests, your first
-  contribution, and what a good pull request looks like.
-- [`docs/PROCESS.md`](docs/PROCESS.md): the loop every change goes
-  through, step by step.
-- [`SECURITY.md`](SECURITY.md): keys, personal data, and how to report a
-  vulnerability privately.
+Nine skills: source, evaluate, apply, evidence summary, coach, outreach, hiring-manager idea email, storybank, and interview.
 
-## How it works
+Retained tooling includes the sourcing adapters and SQLite ledger, scoring, base-resume routing, package build, deterministic precheck, combined independent review, finalization, and the submission-readiness gate. Scope and intentional omissions are in [CAPABILITIES.md](CAPABILITIES.md). The command list is [workspace/job-apps/rework/PIPELINE.md](workspace/job-apps/rework/PIPELINE.md).
 
-Unified skills, one workspace. Each skill owns a few files; the coach owns
-the plan. You never need to know the skills exist — three moves cover
-everything: **"what's next?"** (the coach reads the workspace and
-prescribes), **"do it"**, and **"here's what happened"**.
+## Install and onboarding
 
-```
-groundwork ──── searching ──── applying ──── interviewing ──── deciding
-(profile,       (search,       (apply,       (interview,        (Rule 10
- storybank)      evaluate)      outreach)      learn)           boundaries)
+Python 3.10+ and Poppler (`pdfinfo`, `pdftotext`). Follow [INSTALL.md](INSTALL.md), then complete onboarding only in a private copy. The checklist is [CONFIGURATION.md](CONFIGURATION.md).
+
+```sh
+python3 setup/bootstrap.py /absolute/path/to/new-private-kit
+export JOBBI_ROOT=/absolute/path/to/new-private-kit
+python3 "$JOBBI_ROOT/workspace/job-apps/lib/agent_config.py"
+python3 "$JOBBI_ROOT/setup/onboarding_status.py"
 ```
 
-What makes it a coach rather than a generator:
+`JOBBI_ROOT` is the root of that private copy. Configured paths use `${JOBBI_ROOT}`. Do not point it at this public checkout after you add real profile data.
 
-- **Nothing enters your résumé that you haven't ruled on.** A fact from
-  a conversation is proposed, never written; a struck claim never comes
-  back in other words; an independent checker reads every candidate-
-  voiced document against your own rules before it ships.
-- **Honest numbers.** No rate below five real outcomes, no trend on
-  fewer than three points, no credential from a quiz, no role invented
-  on a thin week.
-- **Every improvement is a bounded loop against a written standard** —
-  with a round budget, a record of each round, and a ceiling: two rounds
-  without movement means change the approach or bring you the decision,
-  never grind.
-- **You fire every gate.** Nothing is sent, submitted, or accepted by
-  the agent; it prepares, you click.
+## Approvals
 
-## The shape
+Replace the synthetic `candidate.yaml`, `claims.yaml`, and base resumes with facts the current user has approved. Choose policy, criteria, sources, and standing answers explicitly. Nothing in this tree is an inherited authorization, standing demographic answer, target list, or schedule.
 
-Every skill has the same five files — `SKILL.md` (the goal, the loops
-with their standard, budget, measured rules, and exits), `references/
-eval.md` (how the work is judged, and who checks: script, independent
-subagent, or the model), `references/schema.md` (the file shapes),
-`references/patterns.md` (how to get there faster), and `scripts/`
-(what code checks, so prose doesn't have to). The spec is
-[`docs/skill-shape.md`](docs/skill-shape.md); `tests/test_invariants.py`
-fails the moment a skill drifts from it.
+`tools/submit_gate.py` reports readiness only. It is not permission to submit. Submission stays browser-only and needs the current user's explicit go naming the roles. Upload only the files the gate prints. Use approved standing answers. Do not invent facts or credentials.
 
-Precedence for any design question: [`PRINCIPLES.md`](PRINCIPLES.md) →
-[the goals](docs/design-cowork-coaching-goals.md) → [the design](docs/design-cowork-coaching.md)
-→ [the shape](docs/skill-shape.md). The web app's contracts,
-[`design-web-agent.md`](docs/design-web-agent.md) and
-[`design-web-ui.md`](docs/design-web-ui.md), answer to the same chain;
-their place inside it is not yet ranked. The process every change goes through
-— design gate, independent review, measured harness — is
-[`docs/PROCESS.md`](docs/PROCESS.md).
+Outreach and hiring-manager notes are drafts. Sending requires the current user to approve the person, the channel, and the exact text. This tree does not submit applications, send mail, create external drafts, or install a routine.
 
-## Measured, not asserted
+## Examples
 
-Each skill has a conduct harness (`tests/always-on/`): a planted
-workspace, a baited prompt, an independent judge scoring the reply and
-the files against a written expectation. The records are in
-[`docs/evals/`](docs/evals/); the rollout that brought every skill to
-the shape is [`eval-shape-rollout-2026-08-21.md`](docs/evals/eval-shape-rollout-2026-08-21.md).
+Bundled identity, claims, and base resumes are labelled synthetic: Alex Example, Example Workshop, and the years 2097–2099. They are not renamed career facts. Eval postings and the ten HTTP fixtures are fictional parser fixtures, not captured vacancies and not a target list.
 
-```bash
-python3 tests/run.py                                   # almost every suite (see CONTRIBUTING.md)
-CASES=all TRIALS=2 tests/always-on/run_t8.sh <tag>     # one conduct suite
+## Tests
+
+From a machine with the install dependencies:
+
+```sh
+bash setup/run_offline_tests.sh
 ```
 
-## Contributing
+What that run covers, and what it does not, is in [TESTING.md](TESTING.md). On this public tree, `workspace/job-apps/tools/run_all_checks.sh` is still expected to fail: the private sourcing case set is not included, and `examples --check` has no accepted baseline. That failure is the gate working. Do not remove it, and do not commit a baseline to turn the aggregate green.
 
-Start with [`CONTRIBUTING.md`](CONTRIBUTING.md), then `CLAUDE.md` and
-[`docs/PROCESS.md`](docs/PROCESS.md). A change to a skill is a design
-gate, an independent review, and a measurement — the ritual is the
-product. MIT licensed.
+## License
+
+[LICENSE](LICENSE) is this repository's MIT license, Copyright (c) 2026 10xjobs.co, kept verbatim. [NOTICE.md](NOTICE.md) is the provenance note. Dependencies are not vendored and keep their own licenses. This tree does not name a new copyright holder.
+
+## Publication boundary
+
+Do not commit an onboarded copy, a database, a PDF, contacts, stories, or test logs. `.gitignore` is not a privacy guarantee. `setup/bootstrap.py` copies only the hashed paths in `DISTRIBUTION.json` and refuses extra files and symlinks. It is not a scrubber. `python3 setup/privacy_scan.py --public` is a heuristic tripwire, not proof that the tree is anonymous or ready for production use.

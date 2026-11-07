@@ -1,56 +1,49 @@
-# Installing in Claude Code / Claude Cowork
+# Install
 
-The repo is an installable plugin: the full skill pack (`profile`,
-`coach`, `search`, `evaluate`, `apply`, `outreach`, `storybank`,
-`interview`, `learn`, `feedback`). All candidate data stays in a folder on
-your machine. The one exception is a note about Ten itself that you choose
-to send with the `feedback` skill: you see exactly what would go first, and
-nothing is sent until you say yes (see "Requirements" for the one network
-call).
+Install dependencies in a private virtual environment. Do not vendor them into this tree, and do not install them inside a checkout you plan to publish.
 
-## Option A — plugin marketplace
+## System tools
 
-`/plugin` works in the **Claude Code terminal** (run `claude` in any
-terminal). Plugins installed there surface in Cowork too (shared
-`~/.claude` config).
+- Python 3.10 or newer
+- Poppler, providing `pdfinfo` and `pdftotext` (Debian/Ubuntu package `poppler-utils`)
 
-```
-/plugin marketplace add tydev-new/10xjobs-careercoach
-/plugin install 10xjobs@10xjobs-marketplace
+## Python packages
+
+From the kit root:
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python3 -m pip install -r setup/requirements.txt
 ```
 
-## Option B — copy the skills
+`.venv/` is gitignored. The pins are the versions recorded with this export. Installing them and running `bash setup/run_offline_tests.sh` is the offline check. It does not certify live job-board, model, mail, or browser-submit integrations. See [TESTING.md](TESTING.md).
 
-Copy the skill folders into `~/.claude/skills/` (all projects) or a
-project's `.claude/skills/`:
+## Private copy
 
-```bash
-git clone https://github.com/tydev-new/10xjobs-careercoach
-cp -r 10xjobs-careercoach/skills/* ~/.claude/skills/
+```sh
+python3 setup/bootstrap.py /absolute/path/to/new-private-kit
+python3 setup/relocate.py /absolute/path/to/new-private-kit
+export JOBBI_ROOT=/absolute/path/to/new-private-kit
+export JOBSEARCH_WORKSPACE="$JOBBI_ROOT/workspace/job-search"
 ```
 
-## First session
+The destination must be a new directory outside this tree. Bootstrap checks this tree against `DISTRIBUTION.json`, copies those files, and initializes an empty original-schema database. It refuses symlinks, unexpected files, and a source profile that is not marked synthetic.
 
-Open a folder you want the search to live in and say "I need a job" or
-"help me get started". The `profile` skill sets the folder up (it writes
-a `CLAUDE.md` of guardrails first, then asks for your documents) and the
-`coach` skill takes it from there — "what's next?" is the only command
-you need.
+## Onboarding
 
-## Requirements
+Only in the private copy:
 
-Node.js 18 or newer for the skills' scripts (check with `node --version`;
-Ubuntu 24.04's own `nodejs` package is enough, and any current Node LTS
-works). The scripts need no packages. Only one of them uses the network:
-`feedback`'s `scripts/feedback.mjs`, and only when you have seen your note and
-said yes. It posts your own words (an email address, phone number, profile
-link or folder path in them blanked out), a rating if you gave one, which skill
-was running, Ten's version, and a random id made once on your computer
-(`~/.cache/ten/installation-id`, or under `$XDG_CACHE_HOME`; never in your
-workspace; if it can't be stored, none is sent) to Ten's feedback endpoint; nothing from your workspace or the
-conversation goes with it. If your Claude Code or Cowork settings block
-network access for the command, you get "This couldn't be sent just now, so
-nothing went", and the work carries on. Copied with `cp -r skills/*`, the note
-carries the version `unknown`, because there is no plugin file above the script. `render_resume.mjs` uses headless
-Chrome if present, to make the PDF and count its pages. The harness in
-`tests/always-on/` needs the `claude` CLI.
+```sh
+python3 "$JOBBI_ROOT/setup/onboarding_status.py"
+```
+
+Then edit the files listed in [CONFIGURATION.md](CONFIGURATION.md). The status script lists settings that are still null, empty, or synthetic. It does not fill them in, does not approve claims, and does not authorize an application or an email.
+
+## Offline tests
+
+```sh
+bash setup/run_offline_tests.sh
+```
+
+The script scans this tree, checks that bootstrap still rejects a contaminated copy and still creates an empty database, builds a disposable copy, and runs the application and sourcing pytest suites there. Generated PDFs and databases stay in the temp directory.

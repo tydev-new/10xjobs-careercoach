@@ -1,0 +1,45 @@
+{
+ "label": "EXAMPLE (synthetic, repo-safe): senior backend engineer",
+ "criteria": "Roles: senior or staff backend / platform software engineer (IC).\nLocation: Seattle, WA metro, or fully remote in the US. No relocation.\nPay: base at least $170,000 (top of a posted range at least $170,000).\nEmployment: full-time employee only. No security clearance roles. No pure on-call/SRE-only roles.",
+ "resume": "Backend engineer, 9 years. Fictional employers: Cedar Payments (5 yrs), Orbit Retail (4 yrs).\n- Go and Python services on Kubernetes (EKS), PostgreSQL, Kafka; AWS (SQS, S3, RDS).\n- Led the ledger migration to an event-sourced design processing 40M transactions/day with zero downtime.\n- Designed idempotent payment APIs; on-call rotation lead; mentored 5 engineers; wrote the team's design-review template.",
+ "rules": {
+  "locations_ok": [
+   "seattle",
+   "bellevue",
+   "redmond",
+   "kirkland"
+  ],
+  "remote_us_ok": true,
+  "pay_floor": 170000,
+  "lanes": [
+   "(?:senior|staff|principal).*(?:backend|platform|software) engineer",
+   "(?:backend|platform) engineer"
+  ],
+  "exclude": [
+   "site reliability",
+   "sre",
+   "frontend",
+   "ios",
+   "android"
+  ],
+  "employee_only": true,
+  "no_clearance": true,
+  "skills": [
+   "go",
+   "golang",
+   "python",
+   "kubernetes",
+   "postgres",
+   "postgresql",
+   "kafka",
+   "aws",
+   "ledger",
+   "payments",
+   "api",
+   "distributed",
+   "event",
+   "mentor",
+   "design review"
+  ]
+ }
+}

@@ -460,14 +460,13 @@ async function sendReset(page: Page, email: string) {
 // The Sign in view's own submit button: the sign-in screen is showing.
 const signInShowing = (page: Page) => page.getByRole("button", { name: "Sign in", exact: true });
 
-test("P5 forgot: Y20 is on the Sign in view with no mode click and not on Create an account; the card's title, line and buttons are § 1.10's", async () => {
+// New accounts are closed (design-web-ui.md § 1.4, amended 2026-11-07): the
+// Create an account view can't be reached, so no test here opens it.
+test("P5 forgot: Y20 is on the Sign in view with no mode click; the card's title, line and buttons are § 1.10's", async () => {
   const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
   try {
     await signInShowing(o.page).waitFor();
     assert.equal(await o.page.getByRole("button", { name: COPY.forgotLink }).count(), 1, "on the Sign in view");
-    await o.page.getByRole("button", { name: "New here? Create an account" }).click();
-    assert.equal(await o.page.getByRole("button", { name: COPY.forgotLink }).count(), 0, "not on Create an account");
-    await o.page.getByRole("button", { name: "Already have an account? Sign in" }).click();
     await o.page.getByRole("button", { name: COPY.forgotLink }).click();
     const t = await bodyText(o.page);
     assert.ok(t.includes(COPY.resetTitle) && t.includes(COPY.resetLine), t.slice(0, 300));
@@ -609,7 +608,7 @@ test("P6c Sign out from the recovery screen signs out and shows sign-in, with no
 });
 
 for (const where of ["hash", "query"] as const) {
-  test(`P6d an otp_expired link (error in the ${where}) shows Y27 above the Sign in view only: not on Create an account, not on the reset card; the URL is cleaned so a reload doesn't repeat it`, async () => {
+  test(`P6d an otp_expired link (error in the ${where}) shows Y27 above the Sign in view only: not on the reset card; the URL is cleaned so a reload doesn't repeat it`, async () => {
     const err = "error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired";
     const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: where === "hash" ? `#${err}` : `?${err}` });
     try {
@@ -625,11 +624,6 @@ for (const where of ["hash", "query"] as const) {
         return { i, f };
       }, COPY.expired);
       assert.ok(order.i >= 0 && order.i < order.f, `expired line above the Sign in form: ${JSON.stringify(order)}`);
-      // not on Create an account, back on Sign in again
-      await o.page.getByRole("button", { name: "New here? Create an account" }).click();
-      assert.ok(!(await bodyText(o.page)).includes(COPY.expired), "Y27 on Create an account");
-      await o.page.getByRole("button", { name: "Already have an account? Sign in" }).click();
-      assert.ok((await bodyText(o.page)).includes(COPY.expired), "Y27 back on the Sign in view");
       // not on the reset card (it points to a link that is not on that card)
       await o.page.getByRole("button", { name: COPY.forgotLink }).click();
       await o.page.getByRole("heading", { name: COPY.resetTitle }).waitFor();
@@ -853,24 +847,15 @@ test("P8 375px: the dialog, the reset card and the recovery screen (form and cod
   try {
     await x.page.getByText(COPY.expired).waitFor();
     reports.push(await phoneCheck(x.page, ".sign-in-card", "sign-in / expired line + forgot link"));
-    await x.page.getByRole("button", { name: "New here? Create an account" }).click();
-    reports.push(await phoneCheck(x.page, ".sign-in-card", "create an account"));
   } finally {
     await x.close();
   }
-  // § 1.4 proof 11: the Sign in view, the Create an account view and the confirmation line
-  // (a long address must not scroll the page), each field, button and link at least 44px
+  // § 1.4 proof 11: the Sign in view, each field, button and link at least 44px
+  // (Create an account and its confirmation line are closed, § 1.4 2026-11-07)
   const v = await open({ events: [{ event: "INITIAL_SESSION" }] }, { viewport: PHONE });
   try {
     await signInShowing(v.page).waitFor();
     reports.push(await phoneCheck(v.page, ".sign-in-card", "sign-in view"));
-    await v.page.getByRole("button", { name: "New here? Create an account" }).click();
-    reports.push(await phoneCheck(v.page, ".sign-in-card", "create an account view"));
-    await v.page.getByLabel("Email").fill("someone-with-a-very-long-address-indeed@a-long-domain-name.example.com");
-    await v.page.getByLabel("Password").fill("Correct-Horse-9");
-    await v.page.getByRole("button", { name: "Create account", exact: true }).click();
-    await v.page.getByRole("button", { name: "Back to sign in" }).waitFor();
-    reports.push(await phoneCheck(v.page, ".sign-in-card", "confirmation line"));
   } finally {
     await v.close();
   }
@@ -988,7 +973,7 @@ async function noRetiredStrings(page: Page, where: string) {
   for (const bad of NOT_ON_SCREEN) assert.ok(!t.includes(bad.toLowerCase()), `${where}: shows "${bad}"`);
 }
 
-test("Y-1 Sign in view on load: Email, Password, Y20, `Sign in`, Y8, O5, O7 with its two links, S9; one submit; no toggle, no aria-pressed", async () => {
+test("Y-1 Sign in view on load: Email, Password, Y20, `Sign in`, O5, O7 with its two links, S9; no Y8 (new accounts closed, § 1.4 2026-11-07); one submit; no toggle, no aria-pressed", async () => {
   const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
   try {
     await signInShowing(o.page).waitFor();
@@ -1008,8 +993,8 @@ test("Y-1 Sign in view on load: Email, Password, Y20, `Sign in`, Y8, O5, O7 with
     assert.deepEqual(shape.labels, [Y.Y4, Y.Y5]);
     assert.deepEqual(shape.types, ["email", "password"]);
     assert.deepEqual(shape.submits, [Y.Y6]);
-    assert.deepEqual(shape.linkButtons, [Y.Y20, Y.Y8]);
-    assert.deepEqual(shape.order, ["email", "password", Y.Y20, Y.Y6, Y.Y8], "Email, Password, Y20, Sign in, Y8");
+    assert.deepEqual(shape.linkButtons, [Y.Y20]);
+    assert.deepEqual(shape.order, ["email", "password", Y.Y20, Y.Y6], "Email, Password, Y20, Sign in");
     assert.equal(shape.toggles, 0);
     assert.equal(shape.pressed, 0);
     assert.equal(norm(shape.o5), Y.O5);
@@ -1017,58 +1002,6 @@ test("Y-1 Sign in view on load: Email, Password, Y20, `Sign in`, Y8, O5, O7 with
     assert.deepEqual(shape.links, [["terms", "/terms.html"], ["privacy notice", "/privacy.html"]]);
     assert.equal(norm(shape.s9), Y.S9);
     await noRetiredStrings(o.page, "Sign in view");
-  } finally {
-    await o.close();
-  }
-});
-
-test("Y-2 Create an account view (after Y8): `Create account`, Y9, O5, O7; no Y20; the typed email is kept; Y9 returns", async () => {
-  const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
-  try {
-    await o.page.getByLabel("Email").fill("kept@example.com");
-    await o.page.getByLabel("Password").fill("typed-on-sign-in");
-    await o.page.getByRole("button", { name: Y.Y8 }).click();
-    await o.page.getByRole("button", { name: Y.Y7, exact: true }).waitFor();
-    assert.deepEqual(await o.page.evaluate(() => [...document.querySelectorAll("button[type=submit]")].map((b) => b.textContent)), [Y.Y7]);
-    assert.equal(await o.page.getByRole("button", { name: Y.Y9 }).count(), 1);
-    assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 0, "Y20 absent");
-    assert.equal(await o.page.getByRole("button", { name: Y.Y8 }).count(), 0);
-    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com");
-    const t = norm(await o.page.evaluate(() => document.body.innerText));
-    assert.ok(t.includes(Y.O5) && t.includes(Y.O7) && t.includes(Y.S9), t.slice(0, 400));
-    assert.equal(await o.page.locator(".sign-in-mode-toggle, [aria-pressed]").count(), 0);
-    await noRetiredStrings(o.page, "Create an account view");
-    await o.page.getByRole("button", { name: Y.Y9 }).click();
-    await signInShowing(o.page).waitFor();
-    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com", "email kept going back");
-    assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 1, "Y20 back on Sign in");
-  } finally {
-    await o.close();
-  }
-});
-
-test("Y-3 `Create account`: Y11 with the address filled in, Y24 under it, O5 and O7 below; one signUp carrying the site address; Y24 returns with the email kept", async () => {
-  const o = await open({ events: [{ event: "INITIAL_SESSION" }] });
-  try {
-    await o.page.getByRole("button", { name: Y.Y8 }).click();
-    await o.page.getByLabel("Email").fill("new@example.com");
-    await o.page.getByLabel("Password").fill("Correct-Horse-9");
-    await o.page.getByRole("button", { name: Y.Y7, exact: true }).click();
-    await o.page.getByRole("button", { name: Y.Y24 }).waitFor();
-    const signUps = await callsOf(o.page, "signUp");
-    assert.deepEqual(signUps.map((c) => c.args), [[{ email: "new@example.com", password: "Correct-Horse-9", options: { emailRedirectTo: SITE_URL } }]]);
-    assert.equal((await calls(o.page)).filter((c) => /^signIn/.test(c.fn)).length, 0, "no sign-in call of any kind");
-    const sent = norm((await o.page.locator(".sign-in-sent").textContent()) ?? "");
-    assert.equal(sent, Y.Y11.replace("<email>", "new@example.com"));
-    const order = await o.page.evaluate(() => ["sign-in-sent", "sign-in-link-button", "sign-in-invite", "sign-in-terms"].map((c) => document.querySelector(`.${c}`)?.getBoundingClientRect().top ?? -1));
-    assert.ok(order.every((v, i) => v >= 0 && (i === 0 || v > order[i - 1])), `Y11, then Y24, then O5, then O7: ${JSON.stringify(order)}`);
-    assert.equal(await o.page.locator("form").count(), 0, "in place of the form");
-    const t = norm(await o.page.evaluate(() => document.body.innerText));
-    assert.ok(t.includes(Y.O5) && t.includes(Y.O7), "O5 and O7 below");
-    await noRetiredStrings(o.page, "confirmation state");
-    await o.page.getByRole("button", { name: Y.Y24 }).click();
-    await signInShowing(o.page).waitFor();
-    assert.equal(await o.page.getByLabel("Email").inputValue(), "new@example.com", "email kept");
   } finally {
     await o.close();
   }
@@ -1125,7 +1058,7 @@ test("Y-6 an old sign-in link still signs in: a valid #access_token=...&type=mag
   }
 });
 
-test("Y-7 a sign-in error does not follow the person to the reset card or back; minLength is on the Create view's password field only", async () => {
+test("Y-7 a sign-in error does not follow the person to the reset card or back; the Sign in password field has no minLength", async () => {
   const o = await open({ events: [{ event: "INITIAL_SESSION" }], signIn: { error: { code: "invalid_credentials", status: 400, message: "RAW-SUPABASE-TEXT" } } });
   try {
     await signInShowing(o.page).waitFor();
@@ -1140,9 +1073,6 @@ test("Y-7 a sign-in error does not follow the person to the reset card or back; 
     await o.page.getByRole("button", { name: Y.Y24 }).click();
     await signInShowing(o.page).waitFor();
     assert.equal(await o.page.locator(".sign-in-error").count(), 0, "the old error is gone after Y20 and Back to sign in");
-    // and the same for the error shown on Create then Y9
-    await o.page.getByRole("button", { name: Y.Y8 }).click();
-    assert.equal(await o.page.getByLabel("Password").getAttribute("minlength"), String(MIN_PASSWORD_LENGTH), "Create: the 8-character floor");
   } finally {
     await o.close();
   }
@@ -1157,22 +1087,17 @@ const CREATE_ACCEPTED = ["?signup", "?signup=", "?signup=1", "?utm_source=x&sign
 const CREATE_REJECTED = ["", "?Signup", "?sign-up", "?signup2", "?create", "?view=signup", "#signup"];
 const createViewShowing = (page: Page) => page.getByRole("button", { name: "Create account", exact: true });
 
-test("CL-1 each accepted address opens Create an account: `Create account`, Y9, O5, O7; no Y20, no Y27; the query is gone; a reload opens Sign in", async () => {
+test("CL-1 new accounts closed (§ 1.4, 2026-11-07): each accepted address opens Sign in, never Create, with no Y8; the query is gone", async () => {
   for (const q of CREATE_ACCEPTED) {
     const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: q });
     try {
-      await createViewShowing(o.page).waitFor();
-      assert.equal(await o.page.getByRole("button", { name: Y.Y9 }).count(), 1, `${q}: Y9`);
-      assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 0, `${q}: Y20`);
+      await signInShowing(o.page).waitFor();
+      await settle(o.page);
+      assert.equal(await createViewShowing(o.page).count(), 0, `${q}: Create`);
       assert.equal(await o.page.getByRole("button", { name: Y.Y8 }).count(), 0, `${q}: Y8`);
-      const t = norm(await o.page.evaluate(() => document.body.innerText));
-      assert.ok(t.includes(Y.O5) && t.includes(Y.O7) && !t.includes(Y.Y27), `${q}: O5, O7, no Y27`);
-      await noRetiredStrings(o.page, `create link ${q}`);
+      assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 1, `${q}: Y20`);
       const loc = await o.page.evaluate(() => ({ search: location.search, hash: location.hash, path: location.pathname }));
       assert.deepEqual(loc, { search: "", hash: "", path: "/" }, `${q}: the address is the plain one`);
-      await o.page.reload();
-      await signInShowing(o.page).waitFor();
-      assert.equal(await o.page.getByRole("button", { name: Y.Y8 }).count(), 1, `${q}: a reload opens Sign in, Y8 one tap away`);
     } finally {
       await o.close();
     }
@@ -1228,23 +1153,6 @@ test("CL-4 signed in: `?signup` never shows the card, the address ends plain; si
   }
 });
 
-test("CL-4b the yes is used once: from `?signup`, signing in and then signing out opens Sign in, not Create", async () => {
-  const o = await open({ events: [{ event: "INITIAL_SESSION" }], member: false }, { path: "?signup" });
-  try {
-    await createViewShowing(o.page).waitFor();
-    await o.page.getByRole("button", { name: Y.Y9 }).click();
-    await o.page.getByLabel("Email").fill(EMAIL);
-    await o.page.getByLabel("Password").fill("correct horse battery");
-    await signInShowing(o.page).click();
-    await o.page.getByText(O2_PAUSED).waitFor();
-    await o.page.getByRole("button", { name: "Sign out" }).click();
-    await signInShowing(o.page).waitFor();
-    assert.equal(await createViewShowing(o.page).count(), 0);
-  } finally {
-    await o.close();
-  }
-});
-
 test("CL-5 a redirect wins over `signup`: an expired link shows Y27 above Sign in; a recovery link shows 'Choose a new password'; a valid sign-up link goes on to the membership check", async () => {
   const err = "error=access_denied&error_code=otp_expired&error_description=x";
   for (const p of [`?signup&${err}`, `?signup#${err}`]) {
@@ -1277,48 +1185,7 @@ test("CL-5 a redirect wins over `signup`: an expired link shows Y27 above Sign i
   }
 });
 
-test("CL-6 tags go nowhere: after create-account from a tagged link, no call, request, storage, cookie or console line holds TAGMARK; the sign-up carries the plain site address", async () => {
-  const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: "?signup&utm_source=TAGMARK1&utm_campaign=TAGMARK2&ref=TAGMARK3" });
-  try {
-    await createViewShowing(o.page).waitFor();
-    await o.page.getByLabel("Email").fill("tagged@example.com");
-    await o.page.getByLabel("Password").fill("Correct-Horse-9");
-    await createViewShowing(o.page).click();
-    await o.page.getByRole("button", { name: Y.Y24 }).waitFor();
-    const signUps = await callsOf(o.page, "signUp");
-    assert.deepEqual(signUps.map((c) => c.args), [[{ email: "tagged@example.com", password: "Correct-Horse-9", options: { emailRedirectTo: SITE_URL } }]], "one sign-up, the plain site address");
-    // the page's own request/console/storage/history logs (requests[0] is the navigation itself, which carries the address by definition)
-    const inPage = await o.page.evaluate(() => JSON.stringify({ leak: (window as any).__leak, href: location.href, ls: { ...localStorage }, ss: { ...sessionStorage }, cookie: document.cookie, title: document.title, historyState: history.state }));
-    const dump = JSON.stringify(await calls(o.page)) + inPage + o.requests.slice(1).join("\n") + o.console.join("\n");
-    assert.ok(!dump.includes("TAGMARK"), "TAGMARK found in a call, a later request, a console line or the page's own storage/history log");
-    assert.ok(!(await o.page.evaluate(() => JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + document.cookie)).includes("TAGMARK"));
-  } finally {
-    await o.close();
-  }
-});
-
-test("CL-9 from a create-link start: Y9 opens Sign in with the email kept and Y20 showing; Y8 returns to Create; after `Create account`, Y24 opens Sign in", async () => {
-  const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: "?signup" });
-  try {
-    await createViewShowing(o.page).waitFor();
-    await o.page.getByLabel("Email").fill("kept@example.com");
-    await o.page.getByRole("button", { name: Y.Y9 }).click();
-    await signInShowing(o.page).waitFor();
-    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com");
-    assert.equal(await o.page.getByRole("button", { name: Y.Y20 }).count(), 1);
-    await o.page.getByRole("button", { name: Y.Y8 }).click();
-    await createViewShowing(o.page).waitFor();
-    await o.page.getByLabel("Password").fill("Correct-Horse-9");
-    await createViewShowing(o.page).click();
-    await o.page.getByRole("button", { name: Y.Y24 }).click();
-    await signInShowing(o.page).waitFor();
-    assert.equal(await o.page.getByLabel("Email").inputValue(), "kept@example.com");
-  } finally {
-    await o.close();
-  }
-});
-
-test("CL-10 a doubled slash path never blanks the page: `//?signup` opens Create and ends at `/`; `//` opens Sign in; `//#error_code=otp_expired` shows Y27 above Sign in with a clean address; no page error", async () => {
+test("CL-10 a doubled slash path never blanks the page: `//?signup` opens Sign in (new accounts closed) and ends at `/`; `//` opens Sign in; `//#error_code=otp_expired` shows Y27 above Sign in with a clean address; no page error", async () => {
   const run = async (suffix: string) => {
     const o = await open({ events: [{ event: "INITIAL_SESSION" }] }, { path: suffix });
     const errors: string[] = [];
@@ -1328,7 +1195,9 @@ test("CL-10 a doubled slash path never blanks the page: `//?signup` opens Create
   // `open` navigates to base + path, and base ends with "/", so "/?signup" is the address "//?signup"
   const a = await run("/?signup");
   try {
-    await createViewShowing(a.o.page).waitFor({ timeout: 8000 });
+    await signInShowing(a.o.page).waitFor({ timeout: 8000 });
+    await settle(a.o.page);
+    assert.equal(await createViewShowing(a.o.page).count(), 0);
     assert.equal(await a.o.page.evaluate(() => location.pathname + location.search + location.hash), "/", "the address ends at /");
     assert.deepEqual(a.errors, []);
     assert.ok(!(await a.o.page.evaluate(() => (window as any).__leak?.history ?? [])).some((h: string) => h.includes("//")), "replaceState was never given a doubled slash");

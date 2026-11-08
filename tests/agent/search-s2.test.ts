@@ -300,7 +300,10 @@ test("§ 4.1: the word-filter table through list_board (hyphen, comma, slash, ca
 });
 
 test("§ 4.1: posting age — only a KNOWN date older than the limit is dropped (missing and unparseable dates kept)", async () => {
-  const jobs = [ghJob(1, "Old", { first_published: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }), ghJob(2, "New", { first_published: "2026-09-27T00:00:00Z" }), ghJob(3, "Undated", { first_published: null, updated_at: null })];
+  // "New" is dated from today (list_board reads the real clock), so it stays inside the 30-day limit;
+  // a fixed date here aged past the limit on 2026-10-28 and failed from then on.
+  const fiveDaysAgo = new Date(Date.now() - 5 * 86400000).toISOString();
+  const jobs = [ghJob(1, "Old", { first_published: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z" }), ghJob(2, "New", { first_published: fiveDaysAgo }), ghJob(3, "Undated", { first_published: null, updated_at: null })];
   const f = stubFetch([[GH_API + "acme/jobs?", () => json({ jobs })]]);
   const { call } = toolsFor(createInMemoryWorkspaceStore(), f.fn);
   const b = (await call("list_board", { ...LB_OK, postedWithinDays: 30 })).boards[0];

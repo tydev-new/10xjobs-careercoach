@@ -1056,10 +1056,9 @@ await section("welcome", async () => {
     rec(claimCalls().length === n5 && (await p5.page.locator(".welcome-notice").count()) === 0, "welcome: an invited member makes no claim call and sees no O1");
     await p5.page.context().close();
 
-    // ---- 6. strings: sign-in (O5, O7, both modes), the bundle, the static pages
+    // ---- 6. strings: sign-in (O5, O7; Create an account is closed, ui § 1.4 2026-11-07), the bundle, the static pages
     const p6 = await newPage();
-    for (const mode of ["Sign in", "Create an account"]) {
-      if (mode === "Create an account") await p6.page.getByRole("button", { name: uiRow("Y8") }).click();
+    for (const mode of ["Sign in"]) {
       const o5 = norm((await p6.page.locator(".sign-in-invite").textContent()) ?? "");
       const o7 = norm((await p6.page.locator(".sign-in-terms").textContent()) ?? "");
       const hrefs = await p6.page.locator(".sign-in-terms a").evaluateAll((as: any[]) => as.map((a) => [a.textContent, a.getAttribute("href")]));
@@ -1255,8 +1254,8 @@ await section("welcome-review", async () => {
       }, sel);
     const phone = { width: 375, height: 812 };
     const s1 = await newPage({ viewport: phone });
-    for (const mode of ["Sign in", "Create an account"]) {
-      if (mode === "Create an account") await s1.page.getByRole("button", { name: uiRow("Y8") }).click();
+    // Create an account is closed (ui § 1.4, 2026-11-07): the Sign in view only
+    for (const mode of ["Sign in"]) {
       await s1.page.locator(".sign-in-form").waitFor();
       const f = await fits(s1.page, [".sign-in-invite", ".sign-in-terms", ".sign-in-form button[type=submit]"]);
       rec(!f.over && f.bad.length === 0, `review R7: 375px sign-in view "${mode}": no sideways scroll; O5, O7 and the submit button sit inside the screen`, JSON.stringify(f));
@@ -2132,14 +2131,11 @@ await section("password", async () => {
   await page.waitForTimeout(500);
   const expHref = await page.evaluate(() => location.href);
   rec(expShown && !/error_code|otp_expired/.test(expHref), "password: an otp_expired link shows the expired line (Y27) and the URL loses the error", expHref);
-  // Y27 belongs to the Sign in view only: not on Create an account, not on the reset card
-  await page.getByRole("button", { name: uiRow("Y8") }).click();
-  const onCreate = await page.getByText(EXPIRED).count();
-  await page.getByRole("button", { name: uiRow("Y9") }).click();
+  // Y27 belongs to the Sign in view only: not on the reset card (Create an account is closed, ui § 1.4 2026-11-07)
   await page.getByRole("button", { name: "Forgot or never set a password?" }).click();
   await page.getByRole("heading", { name: "Reset your password" }).waitFor();
   const onReset = await page.getByText(EXPIRED).count();
-  rec(onCreate === 0 && onReset === 0, "password: Y27 is absent on Create an account and on the reset card", `create=${onCreate} reset=${onReset}`);
+  rec(onReset === 0, "password: Y27 is absent on the reset card", `reset=${onReset}`);
   await page.reload();
   await page.locator(".sign-in-screen").waitFor({ timeout: 15000 });
   await page.waitForTimeout(800);
@@ -2173,7 +2169,8 @@ await section("password", async () => {
 
 // ================================================================ ONE WAY TO SIGN IN (ui § 1.4, 2026-10-07; C § 16.5)
 // The "Proved by" list's items 3, 4, 6, 7 (e2e half), 10 and 11 on the production build and the
-// stand-in. SHOTS_375=<dir> saves the 375px screenshots (Sign in, Create, confirmation, reset card).
+// stand-in. SHOTS_375=<dir> saves the 375px screenshots (Sign in, reset card). Create an account and its
+// confirmation line are closed (ui § 1.4, 2026-11-07), so proofs 2 and 3 no longer run here.
 await section("signin", async () => {
   const phone = { width: 375, height: 812 };
   const shots = process.env.SHOTS_375;
@@ -2221,38 +2218,12 @@ await section("signin", async () => {
     submits: [...document.querySelectorAll("button[type=submit]")].map((b) => (b.textContent ?? "").trim()),
     toggles: document.querySelectorAll(".sign-in-mode-toggle, [aria-pressed]").length,
   }));
-  eq(view1, { labels: [Y.Y4, Y.Y5], links: [Y.Y20, Y.Y8], submits: [Y.Y6], toggles: 0 }, "signin: the Sign in view: Email, Password, Y20, Y8, one `Sign in` button, no toggle and no aria-pressed");
+  eq(view1, { labels: [Y.Y4, Y.Y5], links: [Y.Y20], submits: [Y.Y6], toggles: 0 }, "signin: the Sign in view: Email, Password, Y20, one `Sign in` button, no Y8 (new accounts closed, ui § 1.4 2026-11-07), no toggle and no aria-pressed");
   rec((await textOf(a.page, ".sign-in-invite")) === Y.O5 && (await textOf(a.page, ".sign-in-terms")) === Y.O7 && (await textOf(a.page, ".sign-in-local")) === Y.S9, "signin: ...and O5, O7 and S9 word for word");
   await noRetired(a.page, "Sign in view");
   await fitsPhone(a.page, "Sign in view", "375-signin-view.png");
 
-  // ---- the Create an account view (proof 2)
-  await a.page.locator(".sign-in-form input[type=email]").fill("kept.address@example.com");
-  await a.page.getByRole("button", { name: Y.Y8 }).click();
-  const view2 = await a.page.evaluate(() => ({
-    submits: [...document.querySelectorAll("button[type=submit]")].map((b) => (b.textContent ?? "").trim()),
-    links: [...document.querySelectorAll(".sign-in-form .sign-in-link-button")].map((b) => (b.textContent ?? "").trim()),
-    email: (document.querySelector(".sign-in-form input[type=email]") as HTMLInputElement).value,
-  }));
-  eq(view2, { submits: [Y.Y7], links: [Y.Y9], email: "kept.address@example.com" }, "signin: the Create an account view: `Create account`, Y9 only (no Y20), the typed email kept");
-  rec((await textOf(a.page, ".sign-in-invite")) === Y.O5 && (await textOf(a.page, ".sign-in-terms")) === Y.O7, "signin: ...O5 and O7 under it");
-  await noRetired(a.page, "Create an account view");
-  await fitsPhone(a.page, "Create an account view", "375-signin-create.png");
-
-  // ---- Create account against the stand-in (proof 3)
-  const signupsBefore = standIn.pw.signups.length;
-  await a.page.locator(".sign-in-form input[type=password]").fill("Correct-Horse-9");
-  await submit(a.page);
-  await a.page.getByRole("button", { name: Y.Y24 }).waitFor({ timeout: 15000 });
-  const sup = standIn.pw.signups.slice(signupsBefore);
-  eq(sup, [{ email: "kept.address@example.com", redirectTo: ORIGIN }], "signin: Create account made one POST /signup, carrying the site address as redirect_to");
-  rec((await textOf(a.page, ".sign-in-sent")) === Y.Y11.replace("<email>", "kept.address@example.com"), "signin: the confirmation line is Y11 with the typed address filled in");
-  rec((await a.page.locator("form").count()) === 0 && (await textOf(a.page, ".sign-in-invite")) === Y.O5 && (await textOf(a.page, ".sign-in-terms")) === Y.O7, "signin: ...in place of the form, with O5 and O7 below");
-  await noRetired(a.page, "confirmation line");
-  await fitsPhone(a.page, "confirmation line", "375-signin-confirmation.png");
-  await a.page.getByRole("button", { name: Y.Y24 }).click();
-  await a.page.getByRole("button", { name: Y.Y8 }).waitFor();
-  rec((await a.page.locator(".sign-in-form input[type=email]").inputValue()) === "kept.address@example.com", "signin: Y24 returns to the Sign in view with the email kept");
+  // (proofs 2 and 3, the Create an account view and Create account, are closed: ui § 1.4, 2026-11-07)
 
   // ---- the reset card (proof 8's card, 375px)
   await a.page.getByRole("button", { name: Y.Y20 }).click();
@@ -2260,7 +2231,7 @@ await section("signin", async () => {
   await noRetired(a.page, "reset card");
   await fitsPhone(a.page, "reset card", "375-signin-reset-card.png");
   await a.page.getByRole("button", { name: Y.Y24 }).click();
-  rec((await a.page.getByRole("button", { name: Y.Y8 }).count()) === 1, "signin: the reset card's Back to sign in returns to the Sign in view");
+  rec((await a.page.getByRole("button", { name: Y.Y20 }).count()) === 1, "signin: the reset card's Back to sign in returns to the Sign in view");
   await a.page.context().close();
 
   // ---- the errors, against the stand-in's real answers (proof 4, Y12 and Y13 only: the minimum map)
@@ -2322,12 +2293,12 @@ await section("signin", async () => {
   rec(inBundle.length === 0, "signin: none of the retired sign-in strings is in the bundle (ignoring case)", inBundle.join(" | "));
 });
 
-// ================================================================ THE CREATE LINK (ui § 1.4, amended 2026-10-08)
-// Proved-by items 1, 4, 5, 6, 7, 8, 9, 10, 11 on the production build and the stand-in.
+// ================================================================ THE CREATE LINK, CLOSED (ui § 1.4, amended 2026-10-08; closed 2026-11-07)
+// New accounts are closed: a `?signup` address opens the Sign in view (never Create an account, and no Y8),
+// and the address is still cleaned. The rejected-address, doubled-slash, signed-in and redirect cases hold
+// as before. The sign-up, tag and 375px create-card proofs (7, 8, 9, 10) went with the Create view.
 await section("create-link", async () => {
-  const phone = { width: 375, height: 812 };
-  const shots = process.env.SHOTS_375;
-  const Y = Object.fromEntries(["Y6", "Y7", "Y8", "Y9", "Y11", "Y20", "Y24", "Y27", "O5", "O7"].map((id) => [id, uiRow(id)]));
+  const Y = Object.fromEntries(["Y6", "Y8", "Y20", "Y27", "O5", "O7"].map((id) => [id, uiRow(id)]));
   const six = UI_DOC.slice(UI_DOC.indexOf("6. **Not in the bundle, and not on any rendered sign-in state**"), UI_DOC.indexOf("The check ignores"));
   const retired = [...six.matchAll(/"([^"]+)"/g)].map((m) => m[1].replace(/\s+/g, " ")).filter((x) => x.length > 3);
   const visit = async (suffix: string, viewport?: { width: number; height: number }) => {
@@ -2335,7 +2306,7 @@ await section("create-link", async () => {
     await np.page.goto(ORIGIN + "/" + suffix);
     return np;
   };
-  const onCreate = async (page: any) => {
+  const onCard = async (page: any) => {
     await page.locator(".sign-in-form").waitFor({ timeout: 15000 });
     return page.evaluate(() => ({
       submits: [...document.querySelectorAll("button[type=submit]")].map((b) => (b.textContent ?? "").trim()),
@@ -2346,26 +2317,24 @@ await section("create-link", async () => {
       loc: { path: location.pathname, search: location.search, hash: location.hash },
     }));
   };
-  const CREATE = { submits: [Y.Y7], links: [Y.Y9], invite: Y.O5, terms: Y.O7, expired: 0 };
+  const SIGN_IN = { submits: [Y.Y6], links: [Y.Y20], invite: Y.O5, terms: Y.O7, expired: 0 };
   const view = (v: any) => ({ submits: v.submits, links: v.links, invite: v.invite, terms: v.terms, expired: v.expired });
 
-  // ---- 1 and 6: accepted addresses open Create; the address is cleaned; a reload opens Sign in
+  // ---- accepted addresses open Sign in (no Y8); the address is still cleaned
   for (const q of ["?signup", "?signup=", "?signup=1", "?utm_source=x&signup&ref=y", "?signup=0"]) {
     const a = await visit(q);
-    const v = await onCreate(a.page);
-    eq(view(v), CREATE, `create-link: ${q} opens Create an account: Create account, Y9, O5, O7; no Y20, no Y27`);
+    await a.page.waitForTimeout(300);
+    const v = await onCard(a.page);
+    eq(view(v), SIGN_IN, `create-link: ${q} opens the Sign in view: Sign in, Y20, O5, O7; no Y8 (new accounts closed), no Y27`);
     eq(v.loc, { path: "/", search: "", hash: "" }, `create-link: ${q}: by the time the card shows, the address is the plain one`);
     const t = (await a.page.evaluate(() => document.body.innerText)).replace(/\s+/g, " ").toLowerCase();
     rec(!retired.some((x) => t.includes(x.toLowerCase())), `create-link: ${q}: none of the retired sign-in strings shows`);
-    await a.page.reload();
-    await a.page.getByRole("button", { name: Y.Y8 }).waitFor({ timeout: 15000 });
-    rec((await a.page.getByRole("button", { name: Y.Y20 }).count()) === 1, `create-link: ${q}: a reload opens the Sign in view, Y8 one tap away`);
     await a.page.context().close();
   }
   // rejected: the Sign in view, the address as it was
   for (const q of ["", "?Signup", "?sign-up", "?signup2", "?create", "?view=signup", "#signup", "?utm_source=x&ref=y"]) {
     const a = await visit(q);
-    await a.page.getByRole("button", { name: Y.Y8 }).waitFor({ timeout: 15000 });
+    await a.page.getByRole("button", { name: Y.Y20 }).waitFor({ timeout: 15000 });
     await a.page.waitForTimeout(300);
     const loc = await a.page.evaluate(() => location.search + location.hash);
     rec(loc === q, `create-link: "${q || "/"}" opens Sign in and leaves the address as it was`, loc);
@@ -2373,52 +2342,20 @@ await section("create-link", async () => {
   }
 
   // ---- a doubled-slash path must not blank the page (the cleanup is given "/" for "//")
-  for (const [suffix, want] of [["/?signup", "create"], ["/", "sign-in"], ["/#error_code=otp_expired&error=access_denied", "expired"]] as const) {
+  for (const [suffix, want, endAt] of [["/?signup", "sign-in", "/"], ["/", "sign-in", "//"], ["/#error_code=otp_expired&error=access_denied", "expired", "/"]] as const) {
     const np = await newPage({ noGoto: true });
     const errs: string[] = [];
     np.page.on("pageerror", (e: any) => errs.push(String(e)));
     await np.page.goto(ORIGIN + "/" + suffix);
     const shown = await np.page.locator(".sign-in-form").waitFor({ timeout: 15000 }).then(() => true, () => false);
     await np.page.waitForTimeout(300);
-    const kind = !shown ? "NO CARD" : (await np.page.locator(".sign-in-link-error").count()) === 1 ? "expired" : (await np.page.locator("button[type=submit]").textContent())?.trim() === Y.Y7 ? "create" : "sign-in";
+    const kind = !shown ? "NO CARD" : (await np.page.locator(".sign-in-link-error").count()) === 1 ? "expired" : (await np.page.locator("button[type=submit]").textContent())?.trim() === Y.Y6 ? "sign-in" : "other";
     const at = await np.page.evaluate(() => location.pathname + location.search + location.hash);
-    rec(kind === want && errs.length === 0 && (want === "sign-in" ? at === "//" : at === "/"), `create-link: the address "//${suffix.slice(1)}" renders the card (${want}) with no page error, and ${want === "sign-in" ? "is left alone" : "ends at /"}`, `${kind} at ${at} errors ${JSON.stringify(errs)}`);
+    rec(kind === want && errs.length === 0 && at === endAt, `create-link: the address "//${suffix.slice(1)}" renders the card (${want}) with no page error, and ends at ${endAt}`, `${kind} at ${at} errors ${JSON.stringify(errs)}`);
     await np.page.context().close();
   }
 
-  // ---- 9: Y9 / Y8 / Y24 from a create-link start, and 8: one sign-up, the plain site address
-  const c = await visit("?signup&utm_source=TAGMARK1&utm_campaign=TAGMARK2&ref=TAGMARK3");
-  const seen: { url: string; headers: string; body: string }[] = [];
-  c.page.on("request", async (r: any) => {
-    const u = new URL(r.url());
-    if (u.origin === ORIGIN) return; // the host's own: the first request carries the whole address (the honest limit)
-    seen.push({ url: r.url(), headers: JSON.stringify(await r.allHeaders().catch(() => ({}))), body: r.postData() ?? "" });
-  });
-  await onCreate(c.page);
-  const tagEmail = em("createlink.tag");
-  await c.page.locator(".sign-in-form input[type=email]").fill(tagEmail);
-  await c.page.getByRole("button", { name: Y.Y9 }).click();
-  await c.page.getByRole("button", { name: Y.Y8 }).waitFor();
-  rec((await c.page.locator(".sign-in-form input[type=email]").inputValue()) === tagEmail && (await c.page.getByRole("button", { name: Y.Y20 }).count()) === 1, "create-link: Y9 opens Sign in with the email kept and Y20 showing");
-  await c.page.getByRole("button", { name: Y.Y8 }).click();
-  await c.page.getByRole("button", { name: Y.Y9 }).waitFor();
-  const signupsBefore = standIn.pw.signups.length;
-  await c.page.locator(".sign-in-form input[type=password]").fill("Correct-Horse-9");
-  await c.page.locator(".sign-in-form button[type=submit]").click();
-  await c.page.getByRole("button", { name: Y.Y24 }).waitFor({ timeout: 15000 });
-  eq(standIn.pw.signups.slice(signupsBefore), [{ email: tagEmail.toLowerCase(), redirectTo: ORIGIN }], "create-link: from a create-link start the stand-in saw one sign-up, and the place to return to is the site address with no query");
-  await c.page.getByRole("button", { name: Y.Y24 }).click();
-  await c.page.getByRole("button", { name: Y.Y8 }).waitFor();
-  rec(true, "create-link: after `Create account`, Y24 opens the Sign in view");
-  // ---- 7: the tags go nowhere
-  await c.page.waitForTimeout(500);
-  const inReqs = seen.filter((r) => `${r.url}\n${r.headers}\n${r.body}`.includes("TAGMARK"));
-  rec(inReqs.length === 0 && seen.length > 0, "create-link: no request to another origin (the Supabase stand-in) has TAGMARK in its address, headers or body", `${seen.length} requests; hits: ${inReqs.map((r) => r.url).join(" | ")}`);
-  const inLog = standIn.log.filter((l) => `${l.path}${l.search}${l.auth}${l.apikey}${l.origin}`.includes("TAGMARK"));
-  rec(inLog.length === 0, "create-link: the stand-in's own request log holds no TAGMARK", inLog.map((l) => l.path).join(" | "));
-  const store = await c.page.evaluate(() => JSON.stringify({ ls: { ...localStorage }, ss: { ...sessionStorage }, cookie: document.cookie, href: location.href }));
-  rec(!store.includes("TAGMARK"), "create-link: localStorage, sessionStorage, cookies and the address hold no TAGMARK");
-  await c.page.context().close();
+  // ---- the tags are never read: `utm_` and `ref` are asked of the address nowhere in apps/web/src
   const srcHits = (() => {
     const hits: string[] = [];
     const walk = (d: string) => {
@@ -2445,14 +2382,14 @@ await section("create-link", async () => {
   rec((await m.page.locator(".sign-in-screen").count()) === 0 && (await m.page.evaluate(() => location.search)) === "", "create-link: signed in, `?signup` shows the workspace, never the card, and the address ends plain");
   await m.page.getByRole("button", { name: "Menu" }).click();
   await m.page.getByRole("menuitem", { name: "Sign out" }).click();
-  await m.page.getByRole("button", { name: Y.Y8 }).waitFor({ timeout: 15000 });
-  rec((await m.page.locator(".sign-in-form button[type=submit]").textContent())?.trim() === Y.Y6, "create-link: signing out afterwards shows the Sign in view");
+  await m.page.getByRole("button", { name: Y.Y20 }).waitFor({ timeout: 15000 });
+  rec((await m.page.locator(".sign-in-form button[type=submit]").textContent())?.trim() === Y.Y6 && (await m.page.getByRole("button", { name: Y.Y8 }).count()) === 0, "create-link: signing out afterwards shows the Sign in view, with no Y8");
   await m.page.context().close();
 
   // ---- 5: a redirect wins
   const e = await visit("?signup&error_code=otp_expired&error_description=x");
   await e.page.getByText(Y.Y27).waitFor({ timeout: 15000 });
-  rec((await e.page.getByRole("button", { name: Y.Y8 }).count()) === 1, "create-link: `?signup&error_code=otp_expired` shows Y27 above the Sign in view");
+  rec((await e.page.getByRole("button", { name: Y.Y20 }).count()) === 1, "create-link: `?signup&error_code=otp_expired` shows Y27 above the Sign in view");
   await e.page.context().close();
   const rc = em("createlink.recover");
   await standIn.createUser({ email: rc });
@@ -2466,39 +2403,6 @@ await section("create-link", async () => {
   const checks = standIn.log.filter((l) => l.at >= t0 && l.method === "POST" && l.path === "/rest/v1/rpc/ten_is_member").length;
   rec(inChat && checks >= 1, "create-link: `?signup` with a valid #access_token=…&type=signup goes on to the membership check", `chat=${inChat} checks=${checks}`);
   await sg.page.context().close();
-
-  // ---- 10: 375px: the card opened by the link is, element for element, the card Y8 opens; items 11 above hold
-  const l = await visit("?signup", phone);
-  await onCreate(l.page);
-  // the card's DOM, tags and attributes (sorted: the order React sets them in is not the card's content), text and all
-  const canon = (page: any): Promise<string> =>
-    page.evaluate(() => {
-      const walk = (n: Node): string =>
-        n.nodeType === 3
-          ? (n.textContent ?? "")
-          : n.nodeType === 1
-            ? `<${(n as Element).tagName.toLowerCase()} ${[...(n as Element).attributes].map((a) => `${a.name}=${JSON.stringify(a.value)}`).sort().join(" ")}>${[...n.childNodes].map(walk).join("")}</>`
-            : "";
-      return walk(document.querySelector(".sign-in-card")!);
-    });
-  const linkHtml = await canon(l.page);
-  const fit = await l.page.evaluate(() => ({
-    scrollW: document.documentElement.scrollWidth,
-    W: window.innerWidth,
-    theme: document.querySelector("[data-theme]")?.getAttribute("data-theme"),
-    small: [...document.querySelectorAll(".sign-in-card button, .sign-in-card input, .sign-in-card a")]
-      .map((x) => [(x.textContent || (x as HTMLInputElement).type).trim().slice(0, 30), Math.round(x.getBoundingClientRect().height), Math.round(x.getBoundingClientRect().width)] as [string, number, number])
-      .filter(([, h, w]) => h < 44 || w < 44),
-  }));
-  rec(fit.scrollW <= fit.W && fit.small.length === 0 && fit.theme === "light", "create-link: 375px: the create-link card has no horizontal scroll, every field, button and link at least 44px, light palette", JSON.stringify(fit));
-  if (shots) await l.page.screenshot({ path: path.join(shots, "375-create-link.png"), fullPage: true });
-  await l.page.context().close();
-  const y = await visit("", phone);
-  await y.page.getByRole("button", { name: Y.Y8 }).click();
-  await onCreate(y.page);
-  const y8Html = await canon(y.page);
-  rec(y8Html === linkHtml, "create-link: 375px: the card the create link opens is, element for element, the card Y8 opens", y8Html === linkHtml ? "" : `link: ${linkHtml.slice(0, 700)} | Y8: ${y8Html.slice(0, 700)}`);
-  await y.page.context().close();
 });
 
 // ================================================================ THE BRAND MARK (ui § 5.6, amended 2026-10-09, C30)

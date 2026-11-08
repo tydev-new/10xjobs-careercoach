@@ -1,0 +1,8 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://api.smartrecruiters.com/v1/companies/fictional-board/postings",
+    "status": 200,
+    "body": "{\"content\":[{\"id\":\"synthetic-toy\",\"name\":\"Fictional Card Curator\",\"company\":{\"name\":\"Fictional Workshop\"},\"location\":{\"city\":\"Example City\"},\"releasedDate\":\"2099-01-01T00:00:00Z\"}],\"totalFound\":1}"
+  }
+]

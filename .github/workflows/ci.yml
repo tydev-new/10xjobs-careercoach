@@ -1,0 +1,23 @@
+name: offline
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Poppler
+        run: sudo apt-get update && sudo apt-get install -y poppler-utils
+      - name: Python packages
+        run: python -m pip install -r setup/requirements.txt
+      - name: Offline tests
+        run: bash setup/run_offline_tests.sh

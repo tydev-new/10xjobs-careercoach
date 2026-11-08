@@ -1,1 +1,0 @@
-the letter check keeps flagging dates that are right

@@ -1,0 +1,8 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://boards-api.greenhouse.io/v1/boards/fictional-board/jobs",
+    "status": 200,
+    "body": "{\"jobs\":[{\"id\":0,\"title\":\"Fictional Card Curator\",\"location\":{\"name\":\"Example City\"},\"absolute_url\":\"https://jobs.example.invalid/toy-role\",\"first_published\":\"2099-01-01T00:00:00Z\"}]}"
+  }
+]

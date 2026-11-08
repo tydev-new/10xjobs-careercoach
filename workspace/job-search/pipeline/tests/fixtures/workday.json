@@ -1,0 +1,20 @@
+{
+  "synthetic": true,
+  "summary": {
+    "tenantsOk": 1,
+    "hits": 1,
+    "queries": 1
+  },
+  "hits": [
+    {
+      "company": "Fictional Workshop",
+      "title": "Fictional Card Curator",
+      "locations": [
+        "Example City"
+      ],
+      "url": "https://jobs.example.invalid/toy-role",
+      "startDate": "2099-01-01T00:00:00Z",
+      "reqId": "synthetic-toy"
+    }
+  ]
+}

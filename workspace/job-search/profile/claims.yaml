@@ -1,0 +1,80 @@
+version: claims-synthetic-v1
+synthetic: true
+owner: Alex Example
+years:
+- '2097'
+- '2099'
+roles:
+- key: EXAMPLE
+  employer: Example Workshop
+  title: Project Contributor
+  header: Example Workshop, Project Contributor
+  meta: "2097 \u2013 2099 \xB7 Example City"
+  approved: '2099-01-01'
+  source: Synthetic example only; not a real approval
+earlier_career:
+  default:
+    text: 'Earlier career: Synthetic example only.'
+  all:
+    text: 'Earlier career: Synthetic example only.'
+  eng:
+    text: 'Earlier career: Synthetic example only.'
+  ic:
+    text: 'Earlier career: Synthetic example only.'
+  sol:
+    text: 'Earlier career: Synthetic example only.'
+  fde:
+    text: 'Earlier career: Synthetic example only.'
+  tpm:
+    text: 'Earlier career: Synthetic example only.'
+  health:
+    text: 'Earlier career: Synthetic example only.'
+claims:
+- id: example.delivery
+  status: approved
+  text: Built a synthetic intake demonstration for Example Workshop.
+  source: Newly authored synthetic fixture; no real candidate
+  approved: '2099-01-01'
+  scope:
+  - all
+  numbers: []
+  anchors:
+  - synthetic intake
+  forbid_with: []
+- id: example.cards
+  status: approved
+  text: Sorted 17 sample cards by fictional tag.
+  source: Newly invented synthetic fixture; NOT real consent or candidate history
+  approved: '2099-01-01'
+  scope:
+  - all
+  numbers:
+  - '17'
+  anchors:
+  - sample cards
+  forbid_with: []
+- id: example.intake
+  status: approved
+  text: Built fictional intake-label matching for a toy exercise.
+  source: Newly invented synthetic fixture; NOT real consent or candidate history
+  approved: '2099-01-01'
+  scope:
+  - all
+  numbers: []
+  anchors:
+  - intake-label matching
+  forbid_with: []
+- id: example.stack
+  status: approved
+  text: Used Python for a fictional card-sorting exercise.
+  source: Newly invented synthetic fixture; NOT real consent or candidate history
+  approved: '2099-01-01'
+  scope:
+  - all
+  numbers: []
+  anchors:
+  - card-sorting
+  forbid_with: []
+banned: []
+conditional: []
+scoped_phrases: []

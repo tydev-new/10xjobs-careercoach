@@ -1,16 +1,24 @@
+# Intentional privacy boundary: never commit generated or candidate state.
 __pycache__/
+.pytest_cache/
 *.pyc
-.DS_Store
-.claude/
-tests/always-on/results/
-node_modules/
-dist/
-# local secrets (API keys for spikes and dev); never commit
+.venv/
+*.db
+*.db-*
+*.pdf
+*.docx
+*.bak*
 .env
-.env.*
-*.env.local
-# Vercel project link (IDs); never commit
-.vercel/
-
-# Test harnesses symlink node_modules on the fly; a trailing-slash rule misses symlinks.
-tests/web/*/node_modules
+workspace/job-search/pipeline/state/
+workspace/job-search/pipeline/evals/private/
+workspace/job-search/pipeline/evals/runs/
+skills/job-search-source/evals/runs/
+workspace/job-apps/daily-*/
+workspace/job-apps/evals/cases/
+workspace/job-apps/evals/calibration/cases/
+workspace/job-search/pipeline/evals/results/
+skills/job-search-source/evals/results/
+workspace/job-search/jd-analysis/
+workspace/job-search/workday/runs/
+workspace/job-search/jobs.md
+workspace/job-search/active.md

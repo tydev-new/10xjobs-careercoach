@@ -1,0 +1,45 @@
+{
+ "label": "EXAMPLE (synthetic, repo-safe): registered nurse moving into health tech",
+ "criteria": "Roles: clinical implementation consultant/specialist, clinical informatics analyst/specialist, clinical solutions or customer success roles at health-tech companies.\nLocation: Denver, CO metro, or fully remote in the US. No relocation.\nPay: base at least $85,000 (when a range is posted, its top must be at least $85,000).\nEmployment: full-time employee only (no contracts). Travel up to 30%.\nLevel: individual contributor; not people-manager roles yet.",
+ "resume": "Registered Nurse (BSN), 8 years ICU, Denver Health-style academic hospital (fictional: Front Range Medical Center).\n- Epic super-user for the ICU; led Epic go-live training for 60 nurses during a system conversion.\n- Built nursing workflow tip sheets and order-set feedback with the informatics team.\n- Quality project: reduced central-line infections 30% in 12 months (bundle audit + dashboard in Excel).\n- Charge nurse and preceptor for new graduates. CCRN certified. Completed an intro SQL course (2025).",
+ "rules": {
+  "locations_ok": [
+   "denver",
+   "aurora, co",
+   "lakewood, co",
+   "boulder"
+  ],
+  "remote_us_ok": true,
+  "pay_floor": 85000,
+  "lanes": [
+   "implementation",
+   "informatics",
+   "clinical (?:solutions|product specialist|success)",
+   "customer success"
+  ],
+  "exclude": [
+   "manager",
+   "director",
+   "head of"
+  ],
+  "employee_only": true,
+  "no_clearance": true,
+  "skills": [
+   "epic",
+   "go-live",
+   "training",
+   "workflow",
+   "ehr",
+   "icu",
+   "nurse",
+   "rn",
+   "clinical",
+   "quality",
+   "excel",
+   "sql",
+   "dashboard",
+   "order set",
+   "precept"
+  ]
+ }
+}

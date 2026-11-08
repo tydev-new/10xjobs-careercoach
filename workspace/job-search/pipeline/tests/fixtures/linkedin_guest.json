@@ -1,0 +1,8 @@
+[
+  {
+    "synthetic": true,
+    "url": "https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search",
+    "status": 200,
+    "body": "<li><div data-entity-urn=\"urn:li:jobPosting:900000000000000000003\"></div><h3 class=\"base-search-card__title\">Fictional Card Curator</h3><h4 class=\"base-search-card__subtitle\">Fictional Workshop</h4><span class=\"job-search-card__location\">Example City</span><time datetime=\"2099-01-01\">Synthetic</time></li>"
+  }
+]

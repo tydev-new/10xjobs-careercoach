@@ -12,6 +12,7 @@ _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
 _JOBBI_CAND = _jobbi_candidate(_JOBBI_ROOT)
 
 import json, subprocess, sys
+import pytest
 import package_fixtures as F
 import run as R
 from _cases import *
@@ -21,6 +22,7 @@ def test_calibration_compare_parse_pending():
     got, missing = C.parse('1P 2F 4P', 4, allow_missing={3})
     assert got == {1: 'P', 2: 'F', 4: 'P'} and missing == []
 
+@pytest.mark.extended
 def test_saved_frozen_and_calibration_baselines():
     """Contract: saved frozen and calibration baselines."""
     rc, out = eval_ev('--check')
@@ -28,6 +30,7 @@ def test_saved_frozen_and_calibration_baselines():
     r = subprocess.run([sys.executable, str(calibration_EV / 'run.py'), '--set', 'calibration', '--check'], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout[-1500:]
 
+@pytest.mark.extended
 def test_reviewer_catch_rate_distinguishes_good_from_missed_findings(tmp_path):
     """Contract: reviewer catch rate distinguishes good from missed findings."""
     case_tmp = tmp_path / '0'

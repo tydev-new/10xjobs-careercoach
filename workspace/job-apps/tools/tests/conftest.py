@@ -12,3 +12,6 @@ _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
 _JOBBI_CAND = _jobbi_candidate(_JOBBI_ROOT)
 
 collect_ignore = ['_archive']
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "extended: optional eval-corpus checks; not part of the default public command")

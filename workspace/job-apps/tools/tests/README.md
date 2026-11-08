@@ -16,7 +16,9 @@ The suite is organized by protected rule, not the date a rule was added:
   hold acknowledgment → submit-gate test.
 - `test_resume_format.py`: layout/summary, nonwriting build refusals, deterministic
   and parallel builds, temporary-DB migration/outcome attribution, portable config.
-- `test_calibration.py`: frozen/calibration gates, axes and reviewer catch rates.
+- `test_calibration.py`: axis classification stays in the default suite. Frozen-baseline
+  and reviewer-catch tests are marked `extended` and need the eval corpus from
+  `setup/prepare_synthetic_tests.py` without `--fixtures-only`.
 
 `package_fixtures.py` owns common temporary-package setup; `_cases.py` contains
 specialized scenario setup. They never modernize live packages. All DB writes

@@ -90,9 +90,9 @@ def read_lens(d, lens):
 
 def write_lens(d, lens, x):
     (Path(d) / 'reviews' / f'{lens}.json').write_text(json.dumps(x, indent=1))
-NOCOVER = Path(str(_JOBBI_APPS / 'tests/synthetic-fixtures/scenario-5'))
+NOCOVER = Path(str(_JOBBI_APPS / 'tests/synthetic-fixtures/fixture-nocover-a'))
 
-COVER = Path(str(_JOBBI_APPS / 'tests/synthetic-fixtures/scenario-6'))
+COVER = Path(str(_JOBBI_APPS / 'tests/synthetic-fixtures/fixture-cover-a'))
 
 def copy_current(src, dst_root):
     d = Path(dst_root) / Path(src).name
@@ -130,8 +130,8 @@ def write_combined(d, c):
 LEGACY_DAY = APPS / 'tests/synthetic-fixtures'
 LEGACY_NONE = LEGACY_DAY / 'fixture-nocover-a'
 LEGACY_COVER = LEGACY_DAY / 'fixture-cover-a'
-STAMP_COVER = APPS / 'tests/synthetic-fixtures/fixture-stamp-cover'
-SAMPLE_PACKAGE = APPS / 'tests/synthetic-fixtures/scenario-4'
+STAMP_COVER = COVER
+SAMPLE_PACKAGE = COVER
 def clone(tmp, src=LEGACY_NONE, reviews=False):
     d = Path(tmp) / Path(src).name
     d.parent.mkdir(parents=True, exist_ok=True)

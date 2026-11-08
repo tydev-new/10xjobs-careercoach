@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# All gates in one go (2026-10-21; simplified 2026-10-21 PM): apply gate tests (incl. format_check + finalize_review),
-# pipeline tests, format_check on the 4 bases, apply evals, calibration, pipeline evals.
+# Historical aggregate. Not the default public command (setup/run_offline_tests.sh).
+# On this public tree the sourcing examples --check has no accepted baseline and the
+# private suite is absent, so this script is expected to FAIL. Do not save a baseline
+# to turn it green. Run it only in a kit prepared without --fixtures-only.
 set -u; rc=0
 export JOBBI_ROOT="${JOBBI_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}"
 cd "$JOBBI_ROOT/workspace/job-apps" && { python3 -m pytest -q tools/tests 2>&1 | tail -1; [ ${PIPESTATUS[0]} -eq 0 ] || rc=1; }

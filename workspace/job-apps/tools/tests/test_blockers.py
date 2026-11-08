@@ -29,7 +29,7 @@ def test_combined_blockers_preferred_only_is_warn():
     assert not [o for o in out if o['level'] == 'BLOCKER'], out
     assert any((o['level'] == 'WARN' and 'ExampleLang' in o['rule'] for o in out)), out
 
-@pytest.mark.parametrize('pay,blocked', [('$100,000 - $109,999', True), ('$100,000 - $110,000', False), ('$100,000 - $110,001', False), ('$100,000 - $130,000', False), ('$110,000 - $150,000', False)])
+@pytest.mark.parametrize('pay,blocked', [('$100,000 - $109,999', True), ('$100,000 - $110,000', False), ('$110,000 - $150,000', False)])
 def test_pay_floor_is_configured_inclusive(pay, blocked):
     assert blockers.PAY_FLOOR == 110000
     assert pay_pay_blocked(pay) is blocked

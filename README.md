@@ -43,7 +43,7 @@ From a machine with the install dependencies:
 bash setup/run_offline_tests.sh
 ```
 
-What that run covers, and what it does not, is in [TESTING.md](TESTING.md). On this public tree, `workspace/job-apps/tools/run_all_checks.sh` is still expected to fail: the private sourcing case set is not included, and `examples --check` has no accepted baseline. That failure is the gate working. Do not remove it, and do not commit a baseline to turn the aggregate green.
+What that run covers, and what it does not, is in [TESTING.md](TESTING.md). It does not certify sourcing quality. The rules backend on the 15 synthetic examples is still about 0.733 agreement, `examples --check` has no accepted baseline, and the private suite is not in this tree. `bash setup/run_extended_checks.sh` reports that gap. `workspace/job-apps/tools/run_all_checks.sh` is still expected to fail here. Do not commit a baseline to turn it green.
 
 ## License
 

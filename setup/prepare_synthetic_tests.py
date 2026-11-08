@@ -5,7 +5,10 @@ in the public distribution. Network is unnecessary; run under a network-denied t
 """
 from pathlib import Path
 import argparse,json,os,subprocess,sys,yaml,shutil
-p=argparse.ArgumentParser(description=__doc__);p.add_argument("root",type=Path);a=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__)
+p.add_argument("root",type=Path)
+p.add_argument("--fixtures-only",action="store_true",help="package fixtures only; skip the optional eval corpus and baselines")
+a=p.parse_args()
 source=Path(__file__).resolve().parents[1];root=a.root.absolute()
 if root.exists():raise SystemExit("test root must be NEW")
 subprocess.run([sys.executable,str(source/"setup/bootstrap.py"),str(root)],check=True)
@@ -76,12 +79,18 @@ def fixture(rel,cover):
  run(tools/"stamp_review.py",pkg)
  print("SYNTHETIC fixture:",rel,flush=True)
 
-for rel in ["scenario-1","scenario-5","scenario-7","fixture-nocover-a","scenario-3/fixture-nocover-a","scenario-3/fixture-nocover-b","scenario-3/fixture-nocover-c"]:fixture(rel,False)
-for rel in ["scenario-2","scenario-4","scenario-6","fixture-cover-a","fixture-stamp-cover","scenario-3/fixture-cover-a","scenario-3/fixture-cover-b"]:fixture(rel,True)
+# One nocover template and one cover template, plus the five distinct packages the
+# parallel-build test mutates at once. Duplicate scenario copies of the same template
+# are not rebuilt.
+for rel in ["fixture-nocover-a","scenario-3/fixture-nocover-a","scenario-3/fixture-nocover-b","scenario-3/fixture-nocover-c"]:fixture(rel,False)
+for rel in ["fixture-cover-a","scenario-3/fixture-cover-a","scenario-3/fixture-cover-b"]:fixture(rel,True)
 # Exercise date-based queue discovery using invented private daily copies.
 daily=apps/"daily-2099-01-01";daily.mkdir()
 for name in ("fixture-nocover-a","fixture-cover-a"):
  shutil.copytree(apps/"tests/synthetic-fixtures"/name,daily/name)
+if a.fixtures_only:
+ print("Generated invented runtime-only fixtures. Eval corpus skipped (--fixtures-only).")
+ raise SystemExit(0)
 # Tiny invented eval corpus exercises the original harness, not historical calibration quality.
 for case_set in (apps/"evals/cases", apps/"evals/calibration/cases"):
  for name,bad in (("synthetic-cards-pass",False),("synthetic-cards-metric-fail",True)):

@@ -46,4 +46,4 @@ Then edit the files listed in [CONFIGURATION.md](CONFIGURATION.md). The status s
 bash setup/run_offline_tests.sh
 ```
 
-The script scans this tree, checks that bootstrap still rejects a contaminated copy and still creates an empty database, builds a disposable copy, and runs the application and sourcing pytest suites there. Generated PDFs and databases stay in the temp directory.
+The script scans this tree, checks that bootstrap still rejects a contaminated copy and still creates an empty database, builds a disposable copy, and runs the essential application and sourcing pytest suites there. Generated PDFs and databases stay in the temp directory. It does not run the sourcing quality eval or approve a baseline. That report is `bash setup/run_extended_checks.sh`.

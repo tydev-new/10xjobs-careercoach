@@ -31,6 +31,9 @@ become private once populated. `.gitignore` alone is not a publication boundary.
 - `workspace/job-search/criteria.md`, `pipeline/sources.yaml`, `pipeline/scoring.yaml`
   and `workspace/job-search/profile/agent-config.yaml`: screening, boards, enabled adapters,
   lane/role routing and paths. Select fresh sources; no former company list survives.
+  A board type the sweep does not fetch yet is a new file in
+  `workspace/job-search/pipeline/adapters/`. The steps are in
+  `skills/job-search-source/SKILL.md` under New ATS. That does not require a sweep.py edit.
 - Skills and operational briefs describe review and browser-only submission policy.
   No earlier go, hold override, standing demographic answer or routine is imported.
 

@@ -63,6 +63,12 @@ def test_broken_adapter_is_an_error_not_a_crash(tmp_path):
     found, errors = adapters.load(str(tmp_path))
     assert found == {} and errors and errors[0].startswith("bad.py failed to load")
 
+def _stamp(path):
+    if not os.path.exists(path):
+        return None
+    st = os.stat(path)
+    return (st.st_mtime_ns, st.st_size)
+
 def _isolated_run(monkeypatch, tmp_path, **flags):
     state = tmp_path / "state"
     state.mkdir()
@@ -72,12 +78,12 @@ def _isolated_run(monkeypatch, tmp_path, **flags):
     monkeypatch.setattr(W, "NAMES_PATH", str(tmp_path / "names.json"))
     monkeypatch.setattr(W.time, "sleep", lambda *_: None)
     real_db = os.path.join(PIPE, "jobs.db")
-    assert not os.path.exists(real_db)
+    before = _stamp(real_db)
     ns = dict(hours=None, since="2099-01-01T00:00:00+00:00", until=None, sources=None, only=None,
               dry_run=False, run_id="plugintest", test_one=None, test_source=None, add=False, tag=None)
     ns.update(flags)
     report = W.run(argparse.Namespace(**ns))
-    assert not os.path.exists(real_db)
+    assert _stamp(real_db) == before, "plugin test wrote the workspace jobs.db"
     return report
 
 def test_test_one_and_test_source_run_a_plugin(monkeypatch, tmp_path):

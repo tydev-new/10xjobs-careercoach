@@ -119,7 +119,7 @@
     "workspace/job-search/pipeline/tests/test_schema.py": "23740d454d7363e56126278c9b08bc4d3af324a3aa6acfce9702bbd9972c069f",
     "workspace/job-search/pipeline/tests/test_scoring.py": "73243843e2daca7bef4b708b8bf46fd2bc87eda7bab7947cdcc1e1b88c7cee90",
     "workspace/job-search/pipeline/tests/test_sources.py": "5a655368eabf657592f6b4649538957ee50f01f4216af3f4d48b240b0d5dbe56",
-    "workspace/job-search/pipeline/tests/test_adapters.py": "ffeac6cac52993a9564fdee88fc412816ae9152050d680e2c2cdce385857f0d7",
+    "workspace/job-search/pipeline/tests/test_adapters.py": "5ef19334f3d53b3ede565526d671ef661b6e5c32e450e3e04187f6f1864e48fd",
     "workspace/job-search/pipeline/tests/test_upsert.py": "1864bc814ad214ac65f7c7af7eee2870efcda94c98031864bf0da3a39bbd8c34",
     "workspace/job-search/pipeline/tests/test_db_locking.py": "5334a601ffe7d0a18502ec44423090977295c0f37c90f5b7af2458058b64bfa0",
     "workspace/job-search/pipeline/tests/test_remote.py": "e3772b3560b33ca95085ca9917f45f1b821463b322bb47555cc6483046c219e8",

@@ -132,6 +132,16 @@ def test_workday(monkeypatch, tmp_path):
     posts, st = W.fetch_workday({"script": "../workday_sweep.py"}, SINCE, {"run_dir": str(tmp_path)})
     check_posts(posts, "workday", min_n=len(fixture["hits"]))
 
+def test_example_board_adapter():
+    """plug-in sample: fixture in, JobRecord out, no network."""
+    import adapters
+    found, errors = adapters.load()
+    assert errors == [] and "example_board" in found
+    posts, st = found["example_board"]({"slug": "demo"}, SINCE, {})
+    assert st["ok"] == 1 and st["failed"] == 0
+    check_posts(posts, "ats:example_board")
+    assert posts[0]["url"].startswith("https://jobs.example.invalid/")
+
 def test_failed_source_is_detected(monkeypatch):
     monkeypatch.setattr(W, "http", lambda *a, **k: (503, b""))
     posts, st = W.fetch_ashby([{"company": "X", "slug": "x"}], SINCE, {})

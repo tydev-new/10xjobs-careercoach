@@ -3,6 +3,9 @@
 
   upsert.py --company X --title Y --source li:signed-in --url URL [--lane TPM] [--fit Solid] [--note "..."]
             [--location ..] [--pay ..] [--posted ..] [--analysis jd-analysis/x.md] [--run-id RUN] [--told]
+New rows are checked against schema.JobRecord before insert (the same gate sweep.py uses). A bad row is not
+saved: the error names the field and what is allowed, the attempt is stored in the rejected table, and the
+process exits non-zero. manual and referral may omit --url. Every other source needs an http(s) URL.
 New rows land as To Review (or --status). Every call with --run-id also records a sighting for that source.
 Prints the job id and whether it was new.
 """
@@ -21,19 +24,34 @@ _JOBBI_CAND = _jobbi_candidate(_JOBBI_ROOT)
 import argparse, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import jobsdb as J
+import schema as SC
+from pydantic import ValidationError
 
-def main():
+def posting_from_args(a):
+    """the same shape sweep.py validates with record_from_posting."""
+    return {"company": a.company, "title": a.title, "url": a.url, "source": a.source,
+            "req": a.req, "location": a.location, "pay": a.pay}
+
+def reject_new(c, a, posting, why):
+    """record the failure the way sweep does, then stop. Nothing is inserted."""
+    J.add_rejected(c, a.run_id or "upsert", posting, why)
+    c.commit()
+    print(f"rejected, not saved ({a.company} | {a.title}): {why}", file=sys.stderr)
+    sys.exit(1)
+
+def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--company", required=True); ap.add_argument("--title", required=True)
-    ap.add_argument("--source", required=True, help="ats:ashby, li:guest, li:signed-in, hiring.cafe, workday, gov:neogov, peer:<seed>, vc:<firm>, news:<site>, web, referral ...")
-    ap.add_argument("--url"); ap.add_argument("--req"); ap.add_argument("--lane"); ap.add_argument("--fit", choices=J.FITS)
+    ap.add_argument("--source", required=True, help="ats:ashby, li:guest, li:signed-in, hiring.cafe, workday, gov:neogov, peer:<seed>, vc:<firm>, news:<site>, web, referral, manual")
+    ap.add_argument("--url", help="http(s) posting URL. Required except for source manual or referral")
+    ap.add_argument("--req"); ap.add_argument("--lane"); ap.add_argument("--fit", choices=J.FITS)
     ap.add_argument("--status", choices=J.STATUSES, default="To Review"); ap.add_argument("--note", default="")
     ap.add_argument("--location"); ap.add_argument("--pay"); ap.add_argument("--posted"); ap.add_argument("--analysis")
     ap.add_argument("--run-id"); ap.add_argument("--told", action="store_true", help="the user has now been told about this role")
     ap.add_argument("--remote", choices=["home-area", "remote-region", "out-of-area", "unverified"],
                     help="where the role can be worked from, verified from the JD / ATS location (unverified = 'remote unverified')")
     ap.add_argument("--no-render", action="store_true")
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
     with J.locked():
         c, rec = J.open_for_write()
         r = J.find(c, a.company, a.title, a.url, a.req)
@@ -53,6 +71,11 @@ def main():
                 f["updated_at"] = J.now_iso()
                 c.execute("UPDATE jobs SET " + ",".join(f"{k}=?" for k in f) + " WHERE id=?", (*f.values(), jid))
         else:
+            posting = posting_from_args(a)
+            try:
+                SC.record_from_posting(posting)
+            except ValidationError as e:
+                reject_new(c, a, posting, SC.explain(e))
             note = a.note + (f" · {a.url}" if a.url and a.url not in a.note else "") + f" · src {a.source}"
             jid = J.insert_job(c, company=a.company, title=a.title, source=a.source, lane=a.lane, status=a.status, fit=a.fit,
                                url=a.url, req_id=a.req, location=a.location, pay_text=a.pay, posted_at=a.posted,

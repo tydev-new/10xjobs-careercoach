@@ -4,6 +4,8 @@
    entries with a clear error instead of crashing, and returns the cleaned config plus the error list.
 2. JobRecord (Pydantic): the one job-record model every source's output must pass before a DB insert.
    Records that fail go to the `rejected` table with the reason.
+   url is required except for manual and referral, which a person can log without a posting link.
+   Adapters may append to ATS_TYPES; the check reads that list when the record is validated.
 """
 
 # Portable path/config adapter; pipeline implementation below is retained.
@@ -19,7 +21,7 @@ _JOBBI_CAND = _jobbi_candidate(_JOBBI_ROOT)
 
 import datetime as dt
 import re
-from typing import Literal, Optional
+from typing import Optional
 
 import jsonschema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -140,6 +142,10 @@ def validate_sources(cfg):
     return {**cfg, "sources": srcs}, errors
 
 # ------------------------------------------------------------------ output: one job record
+# manual and referral are often a conversation, not a posting, so they may omit url.
+# Anything fetched from a page (ATS, web, linkedin, hiring.cafe, and the rest) still needs one.
+URL_OPTIONAL = {"manual", "referral"}
+
 def ats_type_of(source):
     s = (source or "").lower()
     for pre, t in (("ats:", None), ("li:", "linkedin"), ("gov:usajobs", "usajobs"), ("gov:neogov", "neogov"), ("gov:smartrecruiters", "smartrecruiters"),
@@ -147,15 +153,17 @@ def ats_type_of(source):
                    ("hiring.cafe", "hiring_cafe"), ("referral", "referral"), ("peer:", "web"), ("news:", "web"), ("web", "web")):
         if s.startswith(pre):
             return t or s.split(":", 1)[1].split(":")[0]
+    if s in ATS_TYPES:
+        return s
     return "manual"
 
 class JobRecord(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     company: str = Field(min_length=1, max_length=200)
     title: str = Field(min_length=2, max_length=300)
-    url: str = Field(pattern=r"^https?://[^\s]+$", max_length=2000)
     source: str = Field(min_length=2, max_length=80, pattern=r"^[a-z][a-z0-9:._\-]*$")
-    ats_type: Literal[tuple(ATS_TYPES)]
+    ats_type: str
+    url: Optional[str] = Field(default=None, max_length=2000)
     found_date: dt.date
     req_id: Optional[str] = Field(default=None, max_length=120)
     location: Optional[str] = Field(default=None, max_length=1000)
@@ -171,16 +179,63 @@ class JobRecord(BaseModel):
             raise ValueError("contains a line break")
         return v
 
+    @field_validator("ats_type")
+    @classmethod
+    def _known_ats(cls, v):
+        if v not in ATS_TYPES:
+            raise ValueError(f"{v!r} is not an allowed ATS type; must be one of: " + ", ".join(ATS_TYPES))
+        return v
+
+    @field_validator("url")
+    @classmethod
+    def _url_rule(cls, v, info):
+        ats = (info.data or {}).get("ats_type")
+        if v is None or str(v).strip() == "":
+            if ats not in URL_OPTIONAL:
+                raise ValueError("an http or https URL is required for this source. Only manual and referral may omit it")
+            return None
+        v = str(v).strip()
+        if not re.match(r"^https?://\S+$", v):
+            raise ValueError("must be an http or https URL with no spaces (for example https://jobs.example.com/123)")
+        return v
+
 def _clip(v, n):
     """long free-text pay/location blurbs are trimmed, not rejected (a long pay note is not a bad record)."""
     v = " ".join(str(v).split()) if v else None
     return (v[: n - 1] + "…") if v and len(v) > n else v
 
 def record_from_posting(p, found_date=None):
-    """sweep posting dict -> JobRecord (raises ValidationError)."""
-    return JobRecord(company=p.get("company") or "", title=p.get("title") or "", url=p.get("url") or "", source=p.get("source") or "",
+    """sweep or upsert posting dict -> JobRecord (raises ValidationError). Blank url becomes None."""
+    url = (p.get("url") or "").strip() or None
+    return JobRecord(company=p.get("company") or "", title=p.get("title") or "", url=url, source=p.get("source") or "",
                      ats_type=ats_type_of(p.get("source")), found_date=found_date or dt.date.today(), req_id=p.get("req") or None,
                      location=p.get("location") or None, pay=_clip(p.get("pay"), 300), jd_text=p.get("jd_text"))
 
+def _allowed(field):
+    """what a person can put in this field, named in rejection errors."""
+    if field == "ats_type":
+        return "one of: " + ", ".join(ATS_TYPES) + ". Derived from source (ats:<type>, li:* is linkedin, hiring.cafe, web, peer:*, news:*, referral, manual)"
+    return {
+        "company": "non-empty text, no HTML, no line breaks, at most 200 characters",
+        "title": "at least 2 characters, no HTML, no line breaks, at most 300 characters",
+        "url": "an http or https URL, at most 2000 characters. Required for every source except manual and referral, which may omit it",
+        "source": "lowercase, 2 to 80 characters: a letter, then letters, digits, colon, period, underscore, or hyphen. Examples: li:signed-in, hiring.cafe, web, referral, manual, ats:ashby",
+        "req_id": "optional, at most 120 characters",
+        "location": "optional text, at most 1000 characters",
+        "pay": "optional text, at most 300 characters (longer blurbs are trimmed)",
+        "found_date": "a date (YYYY-MM-DD)",
+        "jd_text": "optional text, at most 200000 characters",
+    }.get(field, "")
+
 def explain(e: ValidationError):
-    return "; ".join(f"{'.'.join(map(str, x['loc'])) or 'record'}: {x['msg']}" for x in e.errors())
+    """one line a person can act on: which field, why, and what is allowed."""
+    parts = []
+    for x in e.errors():
+        loc = ".".join(map(str, x["loc"])) or "record"
+        msg = x["msg"]
+        allowed = _allowed(loc)
+        if allowed and "must be one of:" not in msg and allowed not in msg:
+            parts.append(f"{loc}: {msg}. Allowed: {allowed}")
+        else:
+            parts.append(f"{loc}: {msg}")
+    return "; ".join(parts)

@@ -5,7 +5,8 @@
   sweep.py --hours 3 --sources ashby,greenhouse
   sweep.py --since 2099-01-01T12:00:00+00:00 --dry-run      # report only, DB untouched
   sweep.py --test-one ashby:example-board        # one company / board, lane+geo matches over --hours (default 14 days), no DB writes
-  sweep.py --test-source greenhouse:acme [--add]   # candidate source: 14-day lookback; --add appends it to sources.yaml if it produced lane matches
+  sweep.py --test-source greenhouse:acme [--add]   # candidate source: 14-day lookback; --add appends a board ATS to sources.yaml if it produced lane matches
+  # A new ATS is a file in pipeline/adapters/ (TYPE + fetch). --test-one and --test-source accept it without a sweep.py edit.
 
 Pipeline per posting: window -> lane (title) -> exclude -> geo -> dedupe in jobs.db (URL, company+req, company+title)
 -> new rows inserted as To Review (fit NULL; the evaluate step scores them) + a sighting for every match.
@@ -475,6 +476,13 @@ FETCHERS = {
 }
 BOARD_SOURCES = {"ashby", "greenhouse", "lever", "smartrecruiters"}
 
+def load_plugin_fetchers():
+    """Shipped FETCHERS plus pipeline/adapters/*.py. A shipped name always wins."""
+    import adapters
+    found, errors = adapters.load()
+    merged, more = adapters.merge(FETCHERS, found)
+    return merged, errors + more
+
 # ------------------------------------------------------------------ filtering
 class Filters:
     def __init__(self, cfg):
@@ -568,16 +576,21 @@ def run(args):
     os.makedirs(os.path.join(run_dir, "raw"), exist_ok=True)
     ctx = {"run_dir": run_dir, "only": args.only}
 
+    fetchers, plugin_errors = load_plugin_fetchers()
+    for e in plugin_errors:
+        print("adapters:", e, file=sys.stderr)
+    cfg_errors = list(cfg_errors) + [f"adapter: {e}" for e in plugin_errors]
+
     srcs = cfg["sources"]
-    wanted = [s for s in FETCHERS if srcs.get(s, {}).get("enabled")]
+    wanted = [s for s in fetchers if srcs.get(s, {}).get("enabled")]
     if args.sources:
-        wanted = [s for s in args.sources.split(",") if s in FETCHERS]
+        wanted = [s for s in args.sources.split(",") if s in fetchers]
     single = None
     if args.test_one or args.test_source:
         spec = args.test_one or args.test_source
         vendor, slug = spec.split(":", 1)
-        if vendor not in FETCHERS:
-            sys.exit(f"unknown source type {vendor}; types: {', '.join(FETCHERS)}")
+        if vendor not in fetchers:
+            sys.exit(f"unknown source type {vendor}; types: {', '.join(fetchers)}")
         single = vendor
         wanted = [vendor]
         if vendor in BOARD_SOURCES:
@@ -595,6 +608,13 @@ def run(args):
             g["pages"] = 2; srcs = dict(srcs); srcs["linkedin_guest"] = g
         elif vendor == "a16z":
             g = dict(srcs["a16z"]); g["queries"] = [slug]; srcs = dict(srcs); srcs["a16z"] = g
+        elif vendor not in FETCHERS:
+            # plugged-in type: hand it the slug. Shipped types keep the branches above.
+            base = dict(srcs.get(vendor) or {})
+            base["slug"] = slug
+            base["enabled"] = True
+            srcs = dict(srcs); srcs[vendor] = base
+            ctx["only"] = slug
         if not (args.since or args.hours):
             since = now - dt.timedelta(days=14)
     dry = args.dry_run or bool(single)
@@ -606,7 +626,7 @@ def run(args):
     matched_all = []
     for s in wanted:
         t0 = time.time()
-        posts, st = fetch_with_retry(s, FETCHERS[s], srcs.get(s, {}), since, ctx, hcfg)
+        posts, st = fetch_with_retry(s, fetchers[s], srcs.get(s, {}), since, ctx, hcfg)
         attempts = st["attempts"]
         json.dump(posts, open(os.path.join(run_dir, "raw", f"{s}.json"), "w"), indent=0, default=str)
         win = [p for p in posts if in_window(p, since) and (parse_dt(p["posted_at"]) or until) <= until + dt.timedelta(minutes=5)]
@@ -822,14 +842,15 @@ def write_candidates_md(r, run_dir):
     open(os.path.join(run_dir, "candidates.md"), "w").write("\n".join(L) + "\n")
 
 def main():
+    fetchers, _ = load_plugin_fetchers()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--hours", type=float); ap.add_argument("--since"); ap.add_argument("--until")
-    ap.add_argument("--sources", help="comma list of source types: " + ",".join(FETCHERS))
+    ap.add_argument("--sources", help="comma list of source types: " + ",".join(fetchers))
     ap.add_argument("--only", help="workday: tenant subset")
     ap.add_argument("--dry-run", action="store_true"); ap.add_argument("--run-id")
     ap.add_argument("--test-one", help="<type>:<slug> - one company/board, no DB writes")
     ap.add_argument("--test-source", help="<type>:<slug> - candidate source, 14-day lookback, no DB writes")
-    ap.add_argument("--add", action="store_true", help="with --test-source: add to sources.yaml if it produced matches")
+    ap.add_argument("--add", action="store_true", help="with --test-source: append ashby, greenhouse, lever, or smartrecruiters to sources.yaml if it produced matches")
     ap.add_argument("--tag", help="with --add: tag to store, e.g. peer:<seed> or vc:<firm>")
     a = ap.parse_args()
     r = run(a)

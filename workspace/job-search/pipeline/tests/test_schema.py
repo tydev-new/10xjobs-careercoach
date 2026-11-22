@@ -62,6 +62,27 @@ def test_job_record_required_and_rejects():
         with pytest.raises(Exception):
             SC.record_from_posting(bad)
 
+def test_manual_referral_and_browser_sources():
+    for src in ("manual", "referral", "referral:alex"):
+        rec = SC.record_from_posting({"company": "Acme", "title": "Staff TPM", "source": src})
+        assert rec.url is None and rec.ats_type in ("manual", "referral")
+    referred = SC.record_from_posting({"company": "Acme", "title": "Staff TPM", "url": "https://example.com/j/1", "source": "referral"})
+    assert referred.url.startswith("https://") and referred.ats_type == "referral"
+    web = SC.record_from_posting({"company": "Acme", "title": "Staff TPM", "url": "https://example.com/j/1", "source": "web"})
+    assert web.ats_type == "web"
+    li = SC.record_from_posting({"company": "Acme", "title": "Staff TPM", "url": "https://www.linkedin.com/jobs/view/1", "source": "li:signed-in"})
+    assert li.ats_type == "linkedin"
+    cafe = SC.record_from_posting({"company": "Acme", "title": "Staff TPM", "url": "https://hiring.cafe/j/1", "source": "hiring.cafe"})
+    assert cafe.ats_type == "hiring_cafe"
+    with pytest.raises(Exception) as ei:
+        SC.record_from_posting({"company": "Acme", "title": "Staff TPM", "source": "web"})
+    msg = SC.explain(ei.value)
+    assert msg.startswith("url:") and "manual" in msg and "referral" in msg and "Allowed:" in msg
+    with pytest.raises(Exception) as bad_ats:
+        SC.record_from_posting({"company": "Acme", "title": "Staff TPM", "url": "https://example.com/j", "source": "ats:notatype"})
+    ats_msg = SC.explain(bad_ats.value)
+    assert "ats_type" in ats_msg and "notatype" in ats_msg and "ashby" in ats_msg
+
 def test_db_enforces_types_and_unique(tmp_path):
     import jobsdb as J
     c = J.connect(str(tmp_path / "t.db"))

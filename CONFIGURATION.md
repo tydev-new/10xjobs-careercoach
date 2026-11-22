@@ -5,6 +5,15 @@ private copy, never in a public source tree. Files that are safe synthetic examp
 become private once populated. `.gitignore` alone is not a publication boundary.
 
 ## Authorities to review together
+- `skills/job-search-intake/SKILL.md`: capture a partial profile before hand-editing
+  the files below. The user can paste a resume, LinkedIn text, files, or chat.
+  `python3 setup/intake.py report` lists missing fields and which task each one
+  blocks. `python3 setup/intake.py set` writes one field and records provenance.
+  Captured claims stay unconfirmed until the user sets status to approved in
+  claims.yaml. Intake does not authorize send or submit.
+- `workspace/job-search/profile/intake.yaml`: the value, source, and date for each
+  field intake wrote. Tools still read the canonical files below. Empty in this
+  public tree.
 - `workspace/job-search/profile/candidate.yaml`: identity/contact, selected work,
   resume header/signature, approved form-answer rules, base/employer key mappings.
   Replace fictional fields; do not assume an example is an approved fact.
@@ -33,10 +42,13 @@ round remains wording-only unless genuinely user-approved, and later rounds requ
 approval. Readiness is not permanently disabled and is never permission to submit.
 False/empty geographic flags and lists are unselected examples, not recommendations.
 A future maintainer should validate required configuration and distinguish missing
-from explicitly disabled settings BEFORE real use. No machine-enforced onboarding
-validator is claimed here. `python3 setup/onboarding_status.py` only lists starter
-values that are still null, empty, or synthetic. It does not approve claims and
-does not authorize send or submit. Runtime config is currently fragmented, not a single
+from explicitly disabled settings BEFORE real use. `python3 setup/intake.py report`
+lists the intake fields that are still missing and which task each one blocks.
+`python3 setup/intake.py set` merges one answered field and records provenance.
+It does not approve claims and does not authorize send or submit. It is not a
+full validator of every policy key. `python3 setup/onboarding_status.py` still
+lists starter values that are null, empty, or synthetic, and now also prints
+`INTAKE_MISSING`. Runtime config is currently fragmented, not a single
 validated schema. US-oriented enum/pay parsing assumptions remain.
 
 ## Policy keys consumed directly by retained source

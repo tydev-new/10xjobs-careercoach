@@ -7,6 +7,7 @@ cd "$ROOT"
 export PYTHONDONTWRITEBYTECODE=1
 python3 setup/privacy_scan.py --self-test
 python3 setup/privacy_scan.py --public
+python3 -m pytest -q -p no:cacheprovider setup/tests
 python3 setup/check_bootstrap_boundary.py
 DEST="$(mktemp -d)"
 cleanup() { rm -rf "$DEST"; }

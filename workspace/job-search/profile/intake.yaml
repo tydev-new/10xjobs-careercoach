@@ -1,0 +1,5 @@
+schema: intake-v1
+synthetic: true
+submit_authorized: false
+send_authorized: false
+fields: {}

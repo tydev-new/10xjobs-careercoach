@@ -6,7 +6,7 @@ This branch replaces the previous working tree. Git history is preserved and was
 
 ## What you can run
 
-Nine skills: source, evaluate, apply, evidence summary, coach, outreach, hiring-manager idea email, storybank, and interview.
+Ten skills: intake, source, evaluate, apply, evidence summary, coach, outreach, hiring-manager idea email, storybank, and interview.
 
 Retained tooling includes the sourcing adapters and SQLite ledger, scoring, base-resume routing, package build, deterministic precheck, combined independent review, finalization, and the submission-readiness gate. Scope and intentional omissions are in [CAPABILITIES.md](CAPABILITIES.md). The command list is [workspace/job-apps/rework/PIPELINE.md](workspace/job-apps/rework/PIPELINE.md).
 
@@ -19,6 +19,7 @@ python3 setup/bootstrap.py /absolute/path/to/new-private-kit
 export JOBBI_ROOT=/absolute/path/to/new-private-kit
 python3 "$JOBBI_ROOT/workspace/job-apps/lib/agent_config.py"
 python3 "$JOBBI_ROOT/setup/onboarding_status.py"
+python3 "$JOBBI_ROOT/setup/intake.py" report
 ```
 
 `JOBBI_ROOT` is the root of that private copy. Configured paths use `${JOBBI_ROOT}`. Do not point it at this public checkout after you add real profile data.

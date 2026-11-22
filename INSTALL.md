@@ -32,13 +32,14 @@ The destination must be a new directory outside this tree. Bootstrap checks this
 
 ## Onboarding
 
-Only in the private copy:
+Only in the private copy. Start with the intake skill, [skills/job-search-intake/SKILL.md](skills/job-search-intake/SKILL.md). The user can paste a resume, LinkedIn text, files, or answer in chat. The agent writes the fields it can use and leaves the rest until a task needs them.
 
 ```sh
 python3 "$JOBBI_ROOT/setup/onboarding_status.py"
+python3 "$JOBBI_ROOT/setup/intake.py" report
 ```
 
-Then edit the files listed in [CONFIGURATION.md](CONFIGURATION.md). The status script lists settings that are still null, empty, or synthetic. It does not fill them in, does not approve claims, and does not authorize an application or an email.
+`intake.py report` lists the intake fields that are still missing and which task each one blocks. `intake.py set` merges one answer into the private file it belongs in and records where it came from. It does not approve claims, and it does not authorize an application or an email. Hand-editing still works. The file list is [CONFIGURATION.md](CONFIGURATION.md). A missing field is asked once, when a task needs it, then written back.
 
 ## Offline tests
 
@@ -46,4 +47,4 @@ Then edit the files listed in [CONFIGURATION.md](CONFIGURATION.md). The status s
 bash setup/run_offline_tests.sh
 ```
 
-The script scans this tree, checks that bootstrap still rejects a contaminated copy and still creates an empty database, builds a disposable copy, and runs the essential application and sourcing pytest suites there. Generated PDFs and databases stay in the temp directory. It does not run the sourcing quality eval or approve a baseline. That report is `bash setup/run_extended_checks.sh`.
+The script scans this tree, runs the intake tests, checks that bootstrap still rejects a contaminated copy and still creates an empty database, builds a disposable copy, and runs the essential application and sourcing pytest suites there. Generated PDFs and databases stay in the temp directory. It does not run the sourcing quality eval or approve a baseline. That report is `bash setup/run_extended_checks.sh`.

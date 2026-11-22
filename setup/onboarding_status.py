@@ -5,6 +5,8 @@ This is not an onboarding validator. A null value is unselected, not a
 recommendation and not proof that a check was deliberately disabled.
 Null max_review_rounds leaves finalization with zero free rounds until a
 private copy sets one. Nothing printed here is permission to apply or send.
+INTAKE_MISSING names profile fields that are still empty. Fill one with
+setup/intake.py set. That still does not approve a claim or authorize send.
 """
 from pathlib import Path
 import argparse, sys
@@ -46,6 +48,10 @@ def main():
     print("SOURCES_CONFIGURED: " + ("no" if not sources.get("sources") else "yes"))
     print("STANDING_ANSWERS: " + ("none" if not cand.get("standing_answer_rules") else "present"))
     print("NOTE: unconfigured is not the same as deliberately disabled. Readiness is not permission to submit. Drafts are not sends.")
+    import intake
+    missing = intake.missing_names(root)
+    print("INTAKE_MISSING: " + (", ".join(missing) if missing else "(none)"))
+    print("INTAKE_REPORT: python3 setup/intake.py report")
     return 0 if synthetic or a.root else 0
 
 if __name__ == "__main__":

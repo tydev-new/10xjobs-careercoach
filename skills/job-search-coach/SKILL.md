@@ -12,6 +12,8 @@ Use the candidate's job-search **workspace**: `paths.search_workspace` from `pyt
 ## Goal
 Convert committed minutes into pipeline movement. Every reply is a DECISION, ARTIFACT, TO-DO, or STATUS, and ends with **one** next step and why.
 
+If a field you need is missing, ask for just that and backfill via intake (`python3 "$JOBBI_ROOT/setup/intake.py" set`).
+
 ## Skill vs native
 Read `operating-rules.md` when present. Default to **hybrid**:
 
@@ -35,7 +37,7 @@ Read `operating-rules.md` when present. Default to **hybrid**:
 - Silent auto-submit.
 
 ## On start
-1. Read `plan.md`, `criteria.md`, `profile.md` and `operating-rules.md`. Read the pipeline from the DB: `python3 pipeline/find.py --status Applied`, then `--status Interviewing` and `--status Packaged`, or read the generated `active.md`.
+1. Read `plan.md`, `criteria.md`, `profile.md` and `operating-rules.md`. A file that is still the onboarding stub is empty. Read the pipeline from the DB: `python3 pipeline/find.py --status Applied`, then `--status Interviewing` and `--status Packaged`, or read the generated `active.md`.
 2. Check `documents/` and `jd-inbox/` for new drops, and mention what you found.
 3. Name the stage: groundwork | searching | applying | interviewing | deciding.
 

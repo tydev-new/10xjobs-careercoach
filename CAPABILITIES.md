@@ -1,7 +1,7 @@
 # Retained source and explicit omissions
 
 ## Retained implementations, not replacements
-- Nine skills: sourcing, evaluate, apply, evidence summary, coach, outreach,
+- Ten skills: intake, sourcing, evaluate, apply, evidence summary, coach, outreach,
   hiring-manager idea email, storybank and interview. Original generic steps and
   section structure are preserved; personal references/config values are scrubbed.
 - pipeline/sweep.py: original Ashby, Greenhouse, Lever, SmartRecruiters, LinkedIn

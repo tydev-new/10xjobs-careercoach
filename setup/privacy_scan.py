@@ -108,6 +108,16 @@ def empty_state(root):
     proof = ((cfg or {}).get("outreach") or {}).get("proof_defaults")
     if proof:
         out.append("agent-config.yaml: outreach proof defaults are set")
+    intake = load_yaml(root / "workspace/job-search/profile/intake.yaml")
+    if intake:
+        if intake.get("synthetic") is not True:
+            out.append("intake.yaml: synthetic flag is not true")
+        if intake.get("submit_authorized") not in (False, None):
+            out.append("intake.yaml: submit is authorized")
+        if intake.get("send_authorized") not in (False, None):
+            out.append("intake.yaml: send is authorized")
+        if intake.get("fields"):
+            out.append("intake.yaml: fields are populated")
     tenants = root / "workspace/job-search/workday-tenants.md"
     if tenants.is_file():
         for line in tenants.read_text().splitlines():
@@ -140,6 +150,9 @@ def self_test():
         (pipe / "sources.yaml").write_text("sources: {}\nexclude_title: []\nexclude_company: []\nprotected_sources: []\n")
         (root / "workspace/job-search/workday-tenants.md").write_text("| Company | Host |\n|---|---|\n")
         clean = scan(root)
+        (profile / "intake.yaml").write_text("schema: intake-v1\nsynthetic: true\nsubmit_authorized: false\nsend_authorized: false\nfields:\n  pay_floor:\n    value: 1\n")
+        populated = scan(root)
+        (profile / "intake.yaml").unlink()
         bad_email = "hidden.person@" + "private.test"
         bad_path = "/Users" + "/someone/notes"
         (root / "note.md").write_text(f"Reach me at {bad_email} or {bad_path}\n")
@@ -154,6 +167,8 @@ def self_test():
         bad.append("dirty fixture did not report email and path: " + "; ".join(dirty))
     if not any("candidate.yaml" in x for x in swapped):
         bad.append("swapped identity was accepted: " + "; ".join(swapped))
+    if not any("intake.yaml: fields are populated" in x for x in populated):
+        bad.append("populated intake was accepted: " + "; ".join(populated))
     if bad:
         raise SystemExit("privacy scan self-test failed: " + " | ".join(bad))
     print("privacy scan self-test: PASS")

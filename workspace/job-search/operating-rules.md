@@ -73,4 +73,4 @@ SSOT for how the assistant runs this search. **Skills** = process, memory, gates
 **Ad hoc:** extra Gmail sync on ask; batch submit only after explicit go naming the roles; the user URL drops → evaluate + peer expansion pass.
 
 ## Last updated
-Candidate-specific history omitted. PIPELINE.md and the current nine skills are authoritative over older operational notes.
+Candidate-specific history omitted. PIPELINE.md and the current ten skills are authoritative over older operational notes.

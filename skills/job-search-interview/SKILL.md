@@ -1,36 +1,35 @@
 ---
 name: Job search interview
 description: >-
-  Use when practicing interviews with no loop scheduled, running drills or
-  mocks, prepping for a booked interview, debriefing after one, or analyzing a
-  transcript.
+  Use when practicing with nothing scheduled, running drills or mocks, preparing
+  for a booked interview, debriefing after one, or reading a transcript.
 ---
-# Job-search interview train
+# Job-search interview practice
 
 Workspace default: `<search-workspace>/`.
 
 ## Goal
-Keep interview skill warm **even with nothing scheduled**. Prepare for booked loops when they appear.
+Keep practice going even with nothing scheduled. Prepare when a loop is booked.
 
-## Rubric (1–5 each)
-Substance · Structure · Relevance · Credibility · Differentiation — calibrate to seniority in `profile.md`.
+## Rubric
+Score each from 1 to 5: substance, structure, relevance, credibility, and what sets them apart. Match the level in `profile.md`.
 
 ## Modes
 
-### Train (no interview booked)
-1. Ensure storybank has coverage; if thin, route to storybank first.
-2. Pick one drill: `ladder` (30/60/90s) · `pushback` · `retrieval` · `mock` (4–6 Qs, lane-tagged).
-3. Score coach-first, then ask self-score; note delta. One adjustment for next round.
-4. Append `practice-log.md`. Stop after 3 stagnant rounds on one dimension → diagnose.
+### Practice (nothing booked)
+1. If stories are thin, use the storybank skill first.
+2. One drill: `ladder` (30, 60, and 90 seconds), `pushback`, `retrieval`, or `mock` (4 to 6 questions, tagged by lane).
+3. You score first, then they score themselves. Note the gap. One change for the next round.
+4. Append `practice-log.md`. After 3 flat rounds, stop and find the cause.
 
-### Prep (interview booked)
-Brief in `prep/`: predicted Qs, story map, questions to ask them, day-of cheat sheet. Prefer evaluated JD + company notes.
+### Prep (booked)
+Brief in `prep/`: likely questions, a story map, questions for them, and a sheet for the day. Prefer evaluated job text plus company notes.
 
-### Debrief (after real interview)
-Same-day capture → practice-log + question-bank notes + story use counts. No fabricated panel details.
+### Debrief
+Same day, write `practice-log.md`, question-bank notes, and how often each story was used.
 
 ## Voice
-Strengths then gaps (unless they want blunt). Evidence-tagged claims only. End with one recommended next drill/story.
+Strengths, then gaps, unless they want it blunt. End with one next drill or story.
 
 ## Boundaries
-Communication coaching ≠ domain oracle for deep system design — say so when relevant. Comp: organize their numbers; never invent offers.
+Speech coaching is not deep technical design. Say so when that comes up. For pay, arrange their numbers.

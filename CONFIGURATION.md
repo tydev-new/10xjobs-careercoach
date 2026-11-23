@@ -5,21 +5,27 @@ private copy, never in a public source tree. Files that are safe synthetic examp
 become private once populated. `.gitignore` alone is not a publication boundary.
 
 ## Authorities to review together
-- `skills/job-search-intake/SKILL.md`: capture a partial profile before hand-editing
-  the files below. The user can paste a resume, LinkedIn text, files, or chat.
-  `python3 setup/intake.py report` lists missing fields and which task each one
-  blocks. `python3 setup/intake.py set` writes one field and records provenance.
-  Captured claims stay unconfirmed until the user sets status to approved in
-  claims.yaml. Intake does not authorize send or submit.
+- `AGENTS.md`: kit-wide rules for every skill. Bootstrap copies this file with
+  the rest of the kit.
+- `skills/job-search-intake/SKILL.md`: capture what the user gives. They can paste
+  a resume, LinkedIn text, files, or chat. `python3 setup/intake.py report` lists
+  missing fields and which task each one blocks. `python3 setup/intake.py set`
+  writes one field and records where it came from and the date. A claim the user
+  states is stored approved. A claim taken from a file stays unconfirmed until
+  `python3 setup/intake.py confirm` records their yes and sets it approved. Do not
+  approve a claim by editing its status in claims.yaml. Intake does not authorize
+  send or submit.
 - `workspace/job-search/profile/intake.yaml`: the value, source, and date for each
   field intake wrote. Tools still read the canonical files below. Empty in this
   public tree.
 - `workspace/job-search/profile/candidate.yaml`: identity/contact, selected work,
   resume header/signature, approved form-answer rules, base/employer key mappings.
   Replace fictional fields; do not assume an example is an approved fact.
-- `workspace/job-search/profile/claims.yaml`: approved proof, source/evidence,
-  numbers/anchors, roles, conditional/scoped/forbidden wording. The user must approve
-  new factual claims. Approval of a claim is NOT approval to send or submit.
+- `workspace/job-search/profile/claims.yaml`: approved proof, source, evidence,
+  numbers, anchors, roles, and wording that is conditional, scoped, or forbidden.
+  The user approves a new fact by saying it, or by confirming an extracted one
+  through intake. Approval of a claim is not approval to send or submit. Only a
+  claim with status approved counts as proof.
 - `workspace/job-apps/base-resumes/*/resume-native.md` and `_shared/*`: claim-backed
   base documents, dates/headers, publications and optional sections. Keep all role
   dates/contact/header facts consistent with the approved profile.
@@ -47,8 +53,9 @@ False/empty geographic flags and lists are unselected examples, not recommendati
 A future maintainer should validate required configuration and distinguish missing
 from explicitly disabled settings BEFORE real use. `python3 setup/intake.py report`
 lists the intake fields that are still missing and which task each one blocks.
-`python3 setup/intake.py set` merges one answered field and records provenance.
-It does not approve claims and does not authorize send or submit. It is not a
+`python3 setup/intake.py set` merges one answered field and records where it came
+from and the date. A claim the user states is stored approved. An extracted claim
+stays unconfirmed until confirm. It does not authorize send or submit. It is not a
 full validator of every policy key. `python3 setup/onboarding_status.py` still
 lists starter values that are null, empty, or synthetic, and now also prints
 `INTAKE_MISSING`. Runtime config is currently fragmented, not a single

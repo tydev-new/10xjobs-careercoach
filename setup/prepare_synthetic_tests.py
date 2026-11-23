@@ -16,7 +16,7 @@ os.environ.update(JOBBI_ROOT=str(root),JOBSEARCH_WORKSPACE=str(root/"workspace/j
 for k in ("STAMP_REVIEW_DB","PRECHECK_DB","PRECHECK_NO_LINK"):os.environ.pop(k,None)
 apps=root/"workspace/job-apps";search=root/"workspace/job-search";tools=apps/"tools"
 policy=yaml.safe_load((search/"profile/policy.yaml").read_text())
-policy.update(synthetic=True,max_review_rounds=2,pay_floor=110000,travel_max=11,age_cutoff_year=2095,
+policy.update(synthetic=True,max_review_rounds=2,travel_max=11,age_cutoff_year=2095,
  max_pages=4,summary_bullets=[2,5],experience_words=70,summary_words=65,sentence_words=24,
  experience_soft_words=26,summary_soft_words=12,hide_graduation_years=True,
  home_area_regex="example city",excluded_area_regex="excluded example city",restrict_onsite_to_home=True,
@@ -26,6 +26,7 @@ profile=yaml.safe_load((search/"profile/profile.yaml").read_text())
 candidate=profile.setdefault("identity", {})
 candidate["standing_answer_rules"]=[{"question_rx":"(?i)sponsorship","answer_rx":"(?i)^no$"}]
 candidate["selected_work_md"]="**Card Atlas.** A fictional exercise in sorting sample cards."
+profile.setdefault("fields", {})["pay_floor"]={"value":110000,"source":"user-stated","date":"2099-01-01","explicit":True}
 (search/"profile/profile.yaml").write_text(yaml.safe_dump(profile, sort_keys=False))
 claims=yaml.safe_load((search/"profile/claims.yaml").read_text())
 claims["banned"]=[{"rx":"pretend omniscience|all imaginary colors","why":"explicitly invented fixture rule"}]

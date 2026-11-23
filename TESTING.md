@@ -70,7 +70,7 @@ Surviving essential coverage, and what was dropped because the same failure was 
 | Hold blocks submit until an explicit acknowledgement | `test_package_end_to_end_precheck_review_hold_ack_and_submit_gate` and `test_cant_fix_holds_until_explicit_ack` | none |
 | Builder run is not the reviewer; distinct runs; stale file and hash changes refuse reconcile and finalize | reconcile tests plus `test_format_finalize_refuses_unusable_lens_set` | none. The two tools are different contracts |
 | Round escalation needs the user when the edit is not wording-only | `test_round_three_and_later_approval_contract` | none |
-| Pay floor is inclusive at the configured 110000; unknown pay is not a blocker | below, exact floor, and one range above; `test_unknown_pay_does_not_invent_a_blocker` | `$110,001` and `$130,000`, same "top of range above the floor" result as `$110,000-$150,000` |
+| Pay floor is inclusive at the profile value 110000; unknown pay is not a blocker | below, exact floor, and one range above; `test_unknown_pay_does_not_invent_a_blocker` | `$110,001` and `$130,000`, same "top of range above the floor" result as `$110,000-$150,000` |
 | Source parsers, schema, dedupe, failed fetch, retries, health flags | one test per adapter fixture, plus schema/dedupe/health/retry tests | none. Shared `check_posts` is a helper, not a collapsed adapter |
 | Geo unknown, blank, country-only, and out-of-area | `test_remote.py` and `test_eval_locations.py` | none. Fit-check and the rules scorer are different layers |
 | DB lock, sequential connect, concurrent writers, score.py then another writer | `test_db_locking.py` | none |

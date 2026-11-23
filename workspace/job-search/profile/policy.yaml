@@ -7,7 +7,6 @@ experience_soft_words: null
 summary_soft_words: null
 summary_bullets: null
 max_review_rounds: null
-pay_floor: null
 travel_max: null
 timezone: null
 synthetic: true
@@ -16,7 +15,6 @@ hide_graduation_years: false
 metric_pairs: []
 repeat_metric_markers: []
 hard_gap_terms: []
-home_locations: []
 excluded_locations: []
 field_region_codes: []
 restrict_onsite_to_home: false

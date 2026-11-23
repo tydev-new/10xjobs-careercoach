@@ -101,7 +101,7 @@ def empty_state(root):
     policy = load_yaml(root / "workspace/job-search/profile/policy.yaml")
     if not policy or policy.get("synthetic") is not True:
         out.append("policy.yaml: synthetic flag is not true")
-    for key in ("home_locations", "excluded_locations", "workday_search_terms", "workday_lanes"):
+    for key in ("excluded_locations", "workday_search_terms", "workday_lanes"):
         if policy and policy.get(key) not in ([], None):
             out.append(f"policy.yaml: {key} is not empty")
     sources = load_yaml(root / "workspace/job-search/pipeline/sources.yaml")
@@ -146,7 +146,7 @@ def self_test():
             fields: {}
             """))
         (profile / "claims.yaml").write_text("synthetic: true\nowner: Alex Example\nclaims: []\n")
-        (profile / "policy.yaml").write_text("synthetic: true\nhome_locations: []\nexcluded_locations: []\nworkday_search_terms: []\nworkday_lanes: []\n")
+        (profile / "policy.yaml").write_text("synthetic: true\nexcluded_locations: []\nworkday_search_terms: []\nworkday_lanes: []\n")
         (profile / "agent-config.yaml").write_text("outreach:\n  proof_defaults: []\n")
         (pipe / "sources.yaml").write_text("sources: {}\nexclude_title: []\nexclude_company: []\nprotected_sources: []\n")
         (root / "workspace/job-search/workday-tenants.md").write_text("| Company | Host |\n|---|---|\n")

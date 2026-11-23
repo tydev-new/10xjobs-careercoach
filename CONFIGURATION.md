@@ -32,7 +32,8 @@ become private once populated. `.gitignore` alone is not a publication boundary.
   fixed company headers/dates/contact fields and selected-work order. These are
   separate deterministic checks: explicitly synchronize with approved facts.
 - `workspace/job-search/profile/policy.yaml`: choose age/date, page/word/bullet,
-  pay/travel/location, review-round, outreach and Workday rules deliberately.
+  travel, excluded locations, review-round, outreach, and Workday rules deliberately.
+  Pay floor and home locations are profile fields (`pay_floor` and `location`), not policy keys.
 - `pipeline/sources.yaml`, `pipeline/scoring.yaml`, and
   `workspace/job-search/profile/agent-config.yaml`: boards, enabled adapters,
   and paths. Sweep reads roles, places, and named boards from `profile.yaml`
@@ -84,7 +85,6 @@ separate review. Synthetic test-only replacement rules do not belong in real pol
 - `hard_gap_terms`
 - `hide_graduation_years`
 - `home_area_regex`
-- `home_locations`
 - `lead_location_regex`
 - `local_onsite_extract_regex`
 - `local_remote_extract_regex`
@@ -93,7 +93,6 @@ separate review. Synthetic test-only replacement rules do not belong in real pol
 - `metric_pairs`
 - `native_package_globs`
 - `outside_region_regex`
-- `pay_floor`
 - `remote_country_prefix`
 - `remote_region_regex`
 - `repeat_metric_markers`

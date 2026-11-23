@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"blockers.py: pre-build check (2026-11-04, source workflow revision simplification). Run it BEFORE building a package.\n\n  python3 blockers.py <job_id>            read jobs.db (read-only) + the package jd.md or the step-6 analysis\n  python3 blockers.py <jd-file> [--location L] [--pay P] [--url U]\n  add --json for machine output\n\nPrints one line per hit: BLOCKER (stop; build only after the user says yes) or WARN (plan for it). Exit 1 if any BLOCKER.\nRules are read from policy.yaml, not inherited from a former candidate:\n  BLOCKER: configured required skills/domain gaps, clearance constraints, location,\n           travel and pay limits, plus recorded step-6 blockers/dealbreakers.\n  WARN: preferred-only gaps, citizenship requirements needing the user's answer,\n        account-based ATSs, missing pay or unverified location.\nRegex only: it shows the evidence line so the call stays the user's. Never contacts the employer or submits anything."
+"blockers.py: pre-build check (2026-11-04, source workflow revision simplification). Run it BEFORE building a package.\n\n  python3 blockers.py <job_id>            read jobs.db (read-only) + the package jd.md or the step-6 analysis\n  python3 blockers.py <jd-file> [--location L] [--pay P] [--url U]\n  add --json for machine output\n\nPrints one line per hit: BLOCKER (stop; build only after the user says yes) or WARN (plan for it). Exit 1 if any BLOCKER.\nPay floor and home places come from profile.yaml. Other limits come from policy.yaml.\n  BLOCKER: configured required skills/domain gaps, clearance constraints, location,\n           travel and pay limits, plus recorded step-6 blockers/dealbreakers.\n  WARN: preferred-only gaps, citizenship requirements needing the user's answer,\n        account-based ATSs, missing pay or unverified location.\nRegex only: it shows the evidence line so the call stays the user's. Never contacts the employer or submits anything."
 
 # Portable path/config adapter; pipeline implementation below is retained.
 from pathlib import Path as _JobbiPath
@@ -17,10 +17,11 @@ from pathlib import Path
 DB = Path(str(_JOBBI_SEARCH / 'pipeline/jobs.db'))
 JS = Path(str(_JOBBI_SEARCH))
 def _pay_floor():
+    """Profile pay floor. Empty or unset means the pay check is off."""
     row = _jobbi_profile().record("pay_floor")
-    if row is not None:
-        return row.get("value")
-    return _JOBBI_POLICY.get("pay_floor")
+    if row is None or row.get("value") in (None, "", []):
+        return None
+    return row.get("value")
 PAY_FLOOR = _pay_floor()
 TRAVEL_MAX = _JOBBI_POLICY.get("travel_max")
 HOME_AREA_RX = _JOBBI_POLICY.get("home_area_regex", r"(?!)")

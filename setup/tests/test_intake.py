@@ -138,8 +138,8 @@ def test_list_merge_replace_and_sources_keep_other_keys(tmp_path):
     assert profile["fields"]["target_roles"]["value"] == ["Staff Engineer"]
     assert load(root / "workspace/job-search/pipeline/sources.yaml") == before["sources"]
     policy = load(root / "workspace/job-search/profile/policy.yaml")
-    assert policy["pay_floor"] is None
-    assert policy["home_locations"] == []
+    assert "pay_floor" not in policy
+    assert "home_locations" not in policy
 
 
 def test_location_and_named_source_turns_on_without_wiping_geo(tmp_path):
@@ -175,7 +175,7 @@ def test_location_and_named_source_turns_on_without_wiping_geo(tmp_path):
     assert overlaid["geo"]["exclude"] == []
     assert sources["protected_sources"] == []
     intake.set_field(root, "work_mode", "Remote", "user-stated", "2026-11-22")
-    assert load(root / "workspace/job-search/profile/policy.yaml")["home_locations"] == []
+    assert "home_locations" not in load(root / "workspace/job-search/profile/policy.yaml")
     report = intake.build_report(root)
     assert report["fields"]["work_mode"]["value"] == "remote"
     assert report["fields"]["work_mode"]["source"] == "user-stated"
@@ -302,7 +302,7 @@ def test_explicit_empty_is_not_asked_again(tmp_path):
     assert report["fields"]["pay_floor"]["value"] is None
     assert report["fields"]["pay_floor"]["ask"] == "no"
     policy = load(root / "workspace/job-search/profile/policy.yaml")
-    assert policy["pay_floor"] is None
+    assert "pay_floor" not in policy
     profile = load(root / "workspace/job-search/profile/profile.yaml")
     assert "## Dealbreakers" not in (profile.get("criteria") or "")
     assert profile["fields"]["dealbreakers"]["value"] == []

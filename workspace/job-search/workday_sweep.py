@@ -28,16 +28,18 @@ LANES = _JOBBI_POLICY.get("workday_lanes", [])
 TITLE_EXCLUDE = re.compile(_JOBBI_POLICY.get("title_exclude_regex", r"(?!)"), re.I)
 
 def home_locations():
+    """Profile location list. Empty or unset means this check is off."""
     row = _jobbi_profile().record("location")
-    if row is not None:
-        return [str(item).lower() for item in (row.get("value") or [])]
-    return [str(item).lower() for item in _JOBBI_POLICY.get("home_locations", [])]
+    if row is None:
+        return []
+    return [str(item).lower() for item in (row.get("value") or [])]
 
 def pay_limit():
+    """Profile pay floor. Empty or unset means this check is off."""
     row = _jobbi_profile().record("pay_floor")
-    if row is not None:
-        return row.get("value")
-    return _JOBBI_POLICY.get("pay_floor")
+    if row is None or row.get("value") in (None, "", []):
+        return None
+    return row.get("value")
 EXCLUDED_LOCATIONS = _JOBBI_POLICY.get("excluded_locations", [])
 REMOTE_RE = re.compile(r"\b(remote|virtual|work from home|work at home|wfh|telecommut\w*|anywhere|field-[a-z]{2})\b", re.I)
 US_STATES = "alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming"

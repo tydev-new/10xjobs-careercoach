@@ -16,7 +16,7 @@ WORK_MODES = ("remote", "hybrid", "onsite", "mixed")
 BOARD_ATS = ("ashby", "greenhouse", "lever", "smartrecruiters")
 POLICY_KEYS = (
     "age_cutoff_year", "max_pages", "experience_words", "summary_words", "summary_bullets",
-    "max_review_rounds", "pay_floor", "travel_max", "timezone", "home_locations", "excluded_locations",
+    "max_review_rounds", "travel_max", "timezone", "excluded_locations",
     "workday_search_terms", "workday_lanes", "cover_words", "outreach_words", "outreach_batch_size",
     "outreach_followup_days", "outreach_max_followups",
 )

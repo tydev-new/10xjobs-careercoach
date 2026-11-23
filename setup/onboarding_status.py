@@ -6,7 +6,8 @@ recommendation and not proof that a check was deliberately disabled.
 Null max_review_rounds leaves finalization with zero free rounds until a
 private copy sets one. Nothing printed here is permission to apply or send.
 INTAKE_MISSING names profile fields that are still empty. Fill one with
-setup/intake.py set. That still does not approve a claim or authorize send.
+setup/intake.py set. A claim the user states is stored approved. An extracted
+claim stays unconfirmed until confirm sets it approved. Nothing here authorizes send.
 """
 from pathlib import Path
 import argparse, sys

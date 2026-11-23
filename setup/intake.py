@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Report missing intake fields, and merge one answered field into the private files.
 
-A missing field is not a disabled check. This script does not approve claims
-and does not authorize submit or send. Confirm records that the user said yes
-to a claim; the claim status stays unconfirmed until a person edits claims.yaml.
+A missing field is not a disabled check. set stores a user-stated claim as
+approved, with the source and date. An extracted claim stays unconfirmed until
+confirm --source user-stated sets it approved. This script does not authorize
+submit or send.
 """
 from pathlib import Path
 import argparse, copy, json, re, sys
@@ -328,6 +329,7 @@ def normalize_sources(value):
                     row["url"] = str(url)
         else:
             raise IntakeError("preferred source must be a name or a mapping")
+        row["enabled"] = True
         key = (row["company"].casefold(), row.get("ats_type"), row.get("slug"), row.get("url"))
         if key in seen:
             continue
@@ -361,7 +363,7 @@ def normalize_claims(value):
             raise IntakeError("each claim must be a mapping with text")
         status = item.get("status")
         if status not in (None, "unconfirmed"):
-            raise IntakeError(f"intake refuses status {status}; a claim stays unconfirmed")
+            raise IntakeError(f"intake refuses status {status}; pass the text and let the source decide")
         text = clean_phrase(item.get("text") or "", "claim text", 400)
         numbers = item.get("numbers") or []
         if not isinstance(numbers, list):
@@ -523,17 +525,30 @@ def sync_boards(sources, rows):
             board["url"] = row["url"]
         if not any(item.get("company") == board["company"] and item.get("slug") == board.get("slug") and item.get("url") == board.get("url") for item in boards):
             boards.append(board)
-        if "enabled" not in group:
-            group["enabled"] = False
+        group["enabled"] = True
         group["boards"] = boards
         groups[ats] = group
     sources["sources"] = groups
+
+
+def approve_claim(row, date):
+    """Mark a claim approved from the user's own words. Scope defaults to all so it can be proof."""
+    row["status"] = "approved"
+    row["approved"] = date
+    if not row.get("scope"):
+        row["scope"] = ["all"]
+    meta = dict(row.get("intake") or {})
+    meta["user_confirmed"] = True
+    meta["confirmed_date"] = date
+    meta["confirmed_source"] = "user-stated"
+    row["intake"] = meta
 
 
 def append_claims(claims, payloads, source, date):
     rows = list(claims.get("claims") or [])
     by_id = {str(item.get("id")): item for item in rows if isinstance(item, dict)}
     written = []
+    stated = source == "user-stated"
     for payload in payloads:
         cid = payload["id"]
         if cid is None:
@@ -545,22 +560,28 @@ def append_claims(claims, payloads, source, date):
                 raise IntakeError(f"{cid} already exists with different text")
             if current.get("status") == "approved":
                 raise IntakeError(f"{cid} is already approved; intake will not edit it")
-            written.append({"id": cid, "text": payload["text"], "status": "unconfirmed"})
+            if stated:
+                approve_claim(current, date)
+            written.append({"id": cid, "text": payload["text"], "status": current.get("status")})
             continue
         record = {
             "id": cid,
-            "status": "unconfirmed",
+            "status": "approved" if stated else "unconfirmed",
             "text": payload["text"],
             "source": source,
-            "scope": [],
+            "scope": ["all"] if stated else [],
             "numbers": list(payload["numbers"]),
             "anchors": [re.escape(number) for number in payload["numbers"]],
             "forbid_with": [],
-            "intake": {"source": source, "date": date, "user_confirmed": False},
+            "intake": {"source": source, "date": date, "user_confirmed": stated},
         }
+        if stated:
+            record["approved"] = date
+            record["intake"]["confirmed_date"] = date
+            record["intake"]["confirmed_source"] = "user-stated"
         rows.append(record)
         by_id[cid] = record
-        written.append({"id": cid, "text": payload["text"], "status": "unconfirmed"})
+        written.append({"id": cid, "text": payload["text"], "status": record["status"]})
     claims["claims"] = rows
     return written
 
@@ -635,13 +656,17 @@ def apply_field(bundle, field, value, source, date, replace):
 
 def merge_sources(existing, incoming, replace):
     base = [] if replace else [dict(item) for item in existing if isinstance(item, dict)]
-    seen = {(item.get("company", "").casefold(), item.get("ats_type"), item.get("slug"), item.get("url")) for item in base}
+    index = {}
+    for i, item in enumerate(base):
+        key = (item.get("company", "").casefold(), item.get("ats_type"), item.get("slug"), item.get("url"))
+        index[key] = i
     for item in incoming:
         key = (item["company"].casefold(), item.get("ats_type"), item.get("slug"), item.get("url"))
-        if key in seen:
+        if key in index:
+            base[index[key]]["enabled"] = True
             continue
         base.append(item)
-        seen.add(key)
+        index[key] = len(base) - 1
     return base
 
 
@@ -680,13 +705,7 @@ def confirm_claim(root, claim_id, source, date=None):
         return {"id": claim_id, "status": "approved", "changed": False}
     if status != "unconfirmed":
         raise IntakeError(f"{claim_id} cannot be confirmed from status {status}")
-    intake_meta = dict(found.get("intake") or {})
-    intake_meta["user_confirmed"] = True
-    intake_meta["confirmed_date"] = date
-    intake_meta["confirmed_source"] = "user-stated"
-    found["intake"] = intake_meta
-    if found.get("status") != "unconfirmed":
-        raise IntakeError("confirmation must not change claim status")
+    approve_claim(found, date)
     fields = bundle["intake"].setdefault("fields", {})
     record = fields.get("claims") if isinstance(fields.get("claims"), dict) else {"value": [], "explicit": True}
     ledger = []
@@ -708,7 +727,7 @@ def confirm_claim(root, claim_id, source, date=None):
     record["explicit"] = True
     fields["claims"] = record
     save_bundle(root, original, bundle)
-    return {"id": claim_id, "status": "unconfirmed", "changed": True}
+    return {"id": claim_id, "status": "approved", "changed": True}
 
 
 def user_claim_rows(claims):
@@ -868,15 +887,15 @@ def claims_row(bundle):
     approved = [row for row in rows if row.get("status") == "approved"]
     pending = [row for row in rows if row.get("status") != "approved"]
     explicit_empty = isinstance(record, dict) and record.get("explicit") is True and not rows
-    if approved:
+    needs = [row for row in pending if not (row.get("intake") or {}).get("user_confirmed")]
+    if approved and not pending:
         state = "set"
         ask = "no"
         active = set()
     elif pending:
         state = "pending"
-        needs = [row for row in pending if not (row.get("intake") or {}).get("user_confirmed")]
         ask = "confirm" if needs else "no"
-        active = set(USED_BY["claims"])
+        active = set() if approved else set(USED_BY["claims"])
     elif explicit_empty:
         state = "set"
         ask = "no"
@@ -996,7 +1015,7 @@ def main(argv=None):
     setter.add_argument("--source", required=True)
     setter.add_argument("--date")
     setter.add_argument("--replace", action="store_true")
-    confirm = commands.add_parser("confirm", help="record that the user confirmed a claim; status stays unconfirmed")
+    confirm = commands.add_parser("confirm", help="approve one extracted claim after the user says yes")
     confirm.add_argument("--id", required=True)
     confirm.add_argument("--source", required=True)
     confirm.add_argument("--date")

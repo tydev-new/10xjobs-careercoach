@@ -157,7 +157,7 @@ def test_list_merge_replace_and_sources_keep_other_keys(tmp_path):
     assert policy["home_locations"] == []
 
 
-def test_location_and_board_do_not_enable_or_wipe_geo(tmp_path):
+def test_location_and_named_source_turns_on_without_wiping_geo(tmp_path):
     root = scaffold(tmp_path)
     intake.set_field(root, "location", "Austin", "user-stated", "2026-11-22")
     intake.set_field(root, "location", ["Dallas"], "user-stated", "2026-11-22")
@@ -170,6 +170,7 @@ def test_location_and_board_do_not_enable_or_wipe_geo(tmp_path):
     assert sources["geo"]["remote_us"] == []
     assert any("Austin" in item for item in sources["geo"]["include"])
     assert any("Dallas" in item for item in sources["geo"]["include"])
+    intake.set_field(root, "preferred_sources", "Example Co", "user-stated", "2026-11-22")
     intake.set_field(
         root,
         "preferred_sources",
@@ -178,10 +179,13 @@ def test_location_and_board_do_not_enable_or_wipe_geo(tmp_path):
         "2026-11-22",
     )
     sources = load(root / "workspace/job-search/pipeline/sources.yaml")
-    assert sources["sources"]["ashby"]["enabled"] is False
+    assert sources["sources"]["ashby"]["enabled"] is True
     assert sources["sources"]["ashby"]["boards"] == [
         {"company": "Example Workshop", "ats_type": "ashby", "slug": "example-workshop"}
     ]
+    saved = load(root / "workspace/job-search/profile/intake.yaml")["fields"]["preferred_sources"]["value"]
+    assert {"company": "Example Co", "enabled": True} in saved
+    assert {"company": "Example Workshop", "ats_type": "ashby", "slug": "example-workshop", "enabled": True} in saved
     assert sources["protected_sources"] == []
     intake.set_field(root, "work_mode", "Remote", "user-stated", "2026-11-22")
     policy = load(root / "workspace/job-search/profile/policy.yaml")
@@ -212,51 +216,92 @@ def test_validation_refuses_without_writing(tmp_path):
     assert after["bytes"] == before["bytes"]
 
 
-def test_claims_stay_unconfirmed_and_do_not_clobber(tmp_path):
+def approved_ids(root):
+    lib = str(ROOT / "workspace/job-apps/lib")
+    if lib not in sys.path:
+        sys.path.insert(0, lib)
+    import claims as claimlib
+    claimlib.load.cache_clear()
+    path = str(root / "workspace/job-search/profile/claims.yaml")
+    return [row["id"] for row in claimlib.approved(path=path)]
+
+
+def test_user_stated_claim_is_approved_and_extracted_waits_for_confirm(tmp_path):
     root = scaffold(tmp_path)
     before = snapshot(root)
     intake.set_field(
         root,
         "claims",
         {"text": "Built 1 small billing API.", "numbers": ["1"]},
+        "user-stated",
+        "2026-11-22",
+    )
+    claims = load(root / "workspace/job-search/profile/claims.yaml")
+    old = before["claims"]["claims"]
+    assert norm(claims["claims"][: len(old)]) == norm(old)
+    stated = claims["claims"][-1]
+    assert stated["status"] == "approved"
+    assert stated["source"] == "user-stated"
+    assert norm(stated["approved"]) == "2026-11-22"
+    assert stated["scope"] == ["all"]
+    assert stated["intake"]["user_confirmed"] is True
+    assert stated["intake"]["date"] == "2026-11-22"
+    report = intake.build_report(root)
+    assert report["fields"]["claims"]["state"] == "set"
+    assert report["fields"]["claims"]["ask"] == "no"
+    assert stated["id"] in report["fields"]["claims"]["approved"]
+    assert report["fields"]["claims"]["blocks"] == {}
+    assert report["submit_authorized"] is False
+    assert report["send_authorized"] is False
+    assert stated["id"] in approved_ids(root)
+    with pytest.raises(intake.IntakeError):
+        intake.set_field(
+            root, "claims",
+            {"id": stated["id"], "text": "Built 1 small billing API.", "numbers": ["1"]},
+            "user-stated", "2026-11-22",
+        )
+    with pytest.raises(intake.IntakeError):
+        intake.set_field(root, "claims", {"text": "Sorted 2 sample cards.", "numbers": ["9"]}, "extracted-from-resume", "2026-11-22")
+    intake.set_field(
+        root,
+        "claims",
+        {"text": "Sorted 2 sample cards.", "numbers": ["2"]},
         "extracted-from-resume",
         "2026-11-22",
     )
-    with pytest.raises(intake.IntakeError):
-        intake.set_field(root, "claims", {"text": "Built 1 small billing API.", "numbers": ["9"]}, "user-stated", "2026-11-22")
     claims = load(root / "workspace/job-search/profile/claims.yaml")
-    assert claims["owner"] == before["claims"]["owner"]
-    assert claims["synthetic"] is True
-    old = before["claims"]["claims"]
-    assert norm(claims["claims"][: len(old)]) == norm(old)
-    added = claims["claims"][-1]
-    assert added["status"] == "unconfirmed"
-    assert added["text"] == "Built 1 small billing API."
-    assert added["source"] == "extracted-from-resume"
-    assert added["intake"]["user_confirmed"] is False
-    assert added["intake"]["date"] == "2026-11-22"
-    assert "approved" not in added
-    assert added["id"].startswith("pending.")
+    extracted = claims["claims"][-1]
+    assert extracted["status"] == "unconfirmed"
+    assert extracted["source"] == "extracted-from-resume"
+    assert extracted["intake"]["user_confirmed"] is False
+    assert "approved" not in extracted
+    assert extracted["id"] not in approved_ids(root)
     report = intake.build_report(root)
     assert report["fields"]["claims"]["state"] == "pending"
     assert report["fields"]["claims"]["ask"] == "confirm"
-    assert added["id"] in report["fields"]["claims"]["confirm"]
-    assert report["fields"]["claims"]["blocks"]["apply"]
-    intake.confirm_claim(root, added["id"], "user-stated", "2026-11-22")
+    assert extracted["id"] in report["fields"]["claims"]["confirm"]
+    result = intake.confirm_claim(root, extracted["id"], "user-stated", "2026-11-23")
+    assert result == {"id": extracted["id"], "status": "approved", "changed": True}
     claims = load(root / "workspace/job-search/profile/claims.yaml")
     confirmed = claims["claims"][-1]
-    assert confirmed["status"] == "unconfirmed"
-    assert confirmed["intake"]["user_confirmed"] is True
-    assert confirmed["text"] == added["text"]
+    assert confirmed["status"] == "approved"
+    assert norm(confirmed["approved"]) == "2026-11-23"
+    assert confirmed["scope"] == ["all"]
+    assert confirmed["source"] == "extracted-from-resume"
+    assert confirmed["intake"]["confirmed_source"] == "user-stated"
+    assert confirmed["text"] == extracted["text"]
     assert norm(claims["claims"][: len(old)]) == norm(old)
+    assert extracted["id"] in approved_ids(root)
     report = intake.build_report(root)
+    assert report["fields"]["claims"]["state"] == "set"
     assert report["fields"]["claims"]["ask"] == "no"
-    assert report["fields"]["claims"]["state"] == "pending"
-    assert confirmed["id"] in report["fields"]["claims"]["waiting_approval"]
+    assert report["fields"]["claims"]["waiting_approval"] == []
+    again = intake.confirm_claim(root, extracted["id"], "user-stated", "2026-11-23")
+    assert again["changed"] is False
     with pytest.raises(intake.IntakeError):
-        intake.confirm_claim(root, added["id"], "extracted-from-resume", "2026-11-22")
+        intake.confirm_claim(root, extracted["id"], "extracted-from-resume", "2026-11-23")
     with pytest.raises(intake.IntakeError):
-        intake.confirm_claim(root, "example.delivery", "user-stated", "2026-11-22")
+        intake.confirm_claim(root, "example.delivery", "user-stated", "2026-11-23")
 
 
 def test_explicit_empty_is_not_asked_again(tmp_path):

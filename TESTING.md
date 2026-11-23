@@ -11,7 +11,7 @@ bash setup/run_offline_tests.sh
 That command is what CI runs. It does five things:
 
 1. Heuristic privacy scan of this tree, plus the scanner's own negative fixture.
-2. Intake tests: the missing-field report and the backfill writer (merge, validation, no clobber, provenance). Claims stay unconfirmed.
+2. Intake tests: the missing-field report and the backfill writer (merge, validation, no clobber, provenance). A user-stated claim is stored approved. An extracted claim stays unconfirmed until confirm sets it approved. A named board or company is saved enabled.
 3. Bootstrap boundary: a copy with an extra `.env` is refused, and a clean destination initializes the original schema with zero data rows.
 4. A disposable kit with the seven synthetic packages the deterministic tests copy. No eval corpus and no baseline are written (`--fixtures-only`).
 5. Essential pytest: application tests marked `not extended`, then the sourcing/ledger tests.
@@ -84,4 +84,4 @@ Style warnings (word count, repeats, middle-dot) stay warnings in the essential 
 
 The rules-backend agreement of 0.733 is a quality gap, not a passing bar. `examples --check` fails closed without an accepted baseline. The private sourcing case set is absent. Historical package and calibration breadth is not restored. The two invented eval cases are a contract exercise, not model-quality calibration.
 
-No live ATS, model, mailbox, or browser-submit run is claimed. Missing-versus-disabled configuration is not fully machine-validated. `setup/intake.py` reports the intake fields and writes one field at a time; it is not a full validator of every policy key, and it does not approve claims. `setup/onboarding_status.py` lists empty starter keys and is not part of the default command. Submission remains an explicit user go, in the browser, using current approved answers and the files the readiness gate names. A privacy-scan pass is not proof of anonymization. Git history before this branch was not scrubbed.
+No live ATS, model, mailbox, or browser-submit run is claimed. Missing-versus-disabled configuration is not fully machine-validated. `setup/intake.py` reports the intake fields and writes one field at a time. It is not a full validator of every policy key. A user-stated claim is stored approved, and confirm approves an extracted claim. It does not authorize send or submit. `setup/onboarding_status.py` lists empty starter keys and is not part of the default command. Submission remains an explicit user go, in the browser, using current approved answers and the files the readiness gate names. A privacy-scan pass is not proof of anonymization. Git history before this branch was not scrubbed.

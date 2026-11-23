@@ -39,7 +39,9 @@ python3 "$JOBBI_ROOT/setup/onboarding_status.py"
 python3 "$JOBBI_ROOT/setup/intake.py" report
 ```
 
-`intake.py report` lists the intake fields that are still missing and which task each one blocks. `intake.py set` merges one answer into the private file it belongs in and records where it came from. It does not approve claims, and it does not authorize an application or an email. Hand-editing still works. The file list is [CONFIGURATION.md](CONFIGURATION.md). A missing field is asked once, when a task needs it, then written back.
+Kit-wide rules are in [AGENTS.md](AGENTS.md). Bootstrap copies that file with the rest of the kit. Skills are not installed as separate packages.
+
+`intake.py report` lists the intake fields that are still missing and which task each one blocks. `intake.py set` merges one answer into the private file it belongs in and records where it came from and the date. A claim the user states is stored approved. A claim taken from a resume or other file stays unconfirmed until `intake.py confirm` sets it approved. It does not authorize an application or an email. Hand-editing other profile files still works. Claim approval goes through set or confirm, not a status edit in claims.yaml. The file list is [CONFIGURATION.md](CONFIGURATION.md). A missing field is asked once, when a task needs it, then written back.
 
 ## Offline tests
 

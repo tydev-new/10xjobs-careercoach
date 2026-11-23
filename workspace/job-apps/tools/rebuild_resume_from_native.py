@@ -69,8 +69,7 @@ if is_ic:
     def _s():
         st = _o(); st["BodyJust"].alignment = 0; return st
     NL.styles = _s
-import yaml   # 2026-10-21 p3 item 9: identity lines come from profile/candidate.yaml (same strings as before)
-CAND = yaml.safe_load(Path(str(_JOBBI_SEARCH / 'profile/candidate.yaml')).read_text())
+CAND = _JOBBI_CAND  # identity lines come from profile/profile.yaml
 def add_header(story, st, auth=None):
     story.append(Paragraph(CAND["name_display"], st["Name"]))
     story.append(Paragraph(head, ParagraphStyle(name="Headline", parent=st["Contact"], fontName="Helvetica-Bold",

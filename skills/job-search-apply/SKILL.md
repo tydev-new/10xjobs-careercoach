@@ -7,7 +7,7 @@ description: >-
 ---
 # Job search apply
 
-`python3 <apps-workspace>/lib/agent_config.py` prints every path and preference (`profile/agent-config.yaml`). Identity is in `candidate.yaml`. Facts are in `claims.yaml`. Lanes and dealbreakers are in `criteria.md`. `<apps>` is `paths.apps_workspace` (run tools from there). `<pipeline>` is `paths.pipeline`. The command list that wins is `<apps>/rework/PIPELINE.md`. Read it if anything below looks out of date.
+`python3 <apps-workspace>/lib/agent_config.py` prints every path and preference (`profile/agent-config.yaml`). Identity, lanes, dealbreakers, location, work mode, pay floor, and work authorization are in `profile/profile.yaml` (`python3 <apps-workspace>/lib/profile.py`). Facts are in `claims.yaml`. `<apps>` is `paths.apps_workspace` (run tools from there). `<pipeline>` is `paths.pipeline`. The command list that wins is `<apps>/rework/PIPELINE.md`. Read it if anything below looks out of date.
 
 Scripts check anything with one right answer, and they FAIL only on hard facts. Style is WARN only. The reviewer judges meaning and context from a short question list, and must accept or fix every WARN with a reason.
 

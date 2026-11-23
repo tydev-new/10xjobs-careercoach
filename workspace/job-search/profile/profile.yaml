@@ -1,0 +1,38 @@
+schema: profile-v1
+synthetic: true
+submit_authorized: false
+send_authorized: false
+identity:
+  schema: synthetic-example
+  synthetic: true
+  name: Alex Example
+  name_display: ALEX EXAMPLE
+  email: alex@example.invalid
+  phone: null
+  linkedin: null
+  github: null
+  profile_urls: []
+  location: null
+  city: null
+  address: null
+  sponsorship_needed: null
+  eeo: {}
+  timezone: null
+  resume_contact_lines:
+  - alex@example.invalid
+  cover_signature:
+  - Alex Example
+  - alex@example.invalid
+  logistics_line: ''
+  standing_answer_rules: []
+  education_lines:
+  - Certificate, Example Subject, Fictional Academy (synthetic)
+  selected_work_html: Synthetic example project; not a real candidate achievement.
+  selected_work_md: Synthetic example project; not a real candidate achievement.
+fields: {}
+# Lane judgment intake does not own. Each item has name, description, and competitiveness.
+lanes: []
+criteria: |
+  # New user onboarding
+
+  No personal data or preferences are configured. Ask the user and record only approved information in private state. Bundled examples are synthetic and are not an approval to apply or contact anyone.

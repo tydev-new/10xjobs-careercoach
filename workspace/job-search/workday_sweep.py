@@ -6,7 +6,7 @@ from pathlib import Path as _JobbiPath
 import os as _jobbi_os, sys as _jobbi_sys
 _JOBBI_ROOT = _JobbiPath(_jobbi_os.environ.get("JOBBI_ROOT", str(_JobbiPath(__file__).resolve().parents[2])))
 _jobbi_sys.path.insert(0, str(_JOBBI_ROOT))
-from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate
+from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate, profile_module as _jobbi_profile
 _JOBBI_SEARCH = _JOBBI_ROOT / "workspace" / "job-search"
 _JOBBI_APPS = _JOBBI_ROOT / "workspace" / "job-apps"
 _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
@@ -27,7 +27,17 @@ LANES = _JOBBI_POLICY.get("workday_lanes", [])
 # Big-company seniority filter: Director-level is out at enterprises (rules v6.2), and junior titles are out.
 TITLE_EXCLUDE = re.compile(_JOBBI_POLICY.get("title_exclude_regex", r"(?!)"), re.I)
 
-HOME_LOCATIONS = _JOBBI_POLICY.get("home_locations", [])
+def home_locations():
+    row = _jobbi_profile().record("location")
+    if row is not None:
+        return [str(item).lower() for item in (row.get("value") or [])]
+    return [str(item).lower() for item in _JOBBI_POLICY.get("home_locations", [])]
+
+def pay_limit():
+    row = _jobbi_profile().record("pay_floor")
+    if row is not None:
+        return row.get("value")
+    return _JOBBI_POLICY.get("pay_floor")
 EXCLUDED_LOCATIONS = _JOBBI_POLICY.get("excluded_locations", [])
 REMOTE_RE = re.compile(r"\b(remote|virtual|work from home|work at home|wfh|telecommut\w*|anywhere|field-[a-z]{2})\b", re.I)
 US_STATES = "alabama|alaska|arizona|arkansas|california|colorado|connecticut|delaware|florida|georgia|hawaii|idaho|illinois|indiana|iowa|kansas|kentucky|louisiana|maine|maryland|massachusetts|michigan|minnesota|mississippi|missouri|montana|nebraska|nevada|new hampshire|new jersey|new mexico|new york|north carolina|north dakota|ohio|oklahoma|oregon|pennsylvania|rhode island|south carolina|south dakota|tennessee|texas|utah|vermont|virginia|washington|west virginia|wisconsin|wyoming"
@@ -85,8 +95,8 @@ def loc_class(text):
     l = (text or "").lower()
     m = re.match(r"\s*field-([a-z]{2})\b", l)   # Territory-style seats: allowed region codes come from current policy
     if m: return "remote-region" if m.group(1) in _JOBBI_POLICY.get("field_region_codes", []) else "other"
-    if any(e in l for e in EXCLUDED_LOCATIONS) and not any(b in l for b in HOME_LOCATIONS): return "excluded-area"
-    if any(b in l for b in HOME_LOCATIONS): return "home-area"
+    if any(e in l for e in EXCLUDED_LOCATIONS) and not any(b in l for b in home_locations()): return "excluded-area"
+    if any(b in l for b in home_locations()): return "home-area"
     if REMOTE_RE.search(l) and not NON_US_RE.search(l) and (US_RE.search(text or "") or l.strip() in ("remote", "virtual", "work from home")): return "remote-region"
     return "other"
 
@@ -114,6 +124,9 @@ def lane_of(title):
     if TITLE_EXCLUDE.search(title): return None
     for name, rx in LANES:
         if re.search(rx, title, re.I): return name
+    for role in _jobbi_profile().value("target_roles") or []:
+        if str(role).lower() in (title or "").lower():
+            return role
     return None
 
 def age_days(posted):
@@ -196,7 +209,8 @@ def sweep_tenant(t, terms, max_age, pages):
             rec["payMax"] = max(p[1] for p in pays) if pays else None
             if clr and _JOBBI_POLICY.get("block_clearance", False):
                 rec["reason"] = "clearance required"; out["dropped"].append(rec); continue
-            if _JOBBI_POLICY.get("pay_floor") is not None and rec["payMax"] is not None and rec["payMax"] <= _JOBBI_POLICY["pay_floor"]:
+            floor = pay_limit()
+            if floor is not None and rec["payMax"] is not None and rec["payMax"] <= floor:
                 rec["reason"] = f"pay max {rec['pay']} is under the configured pay policy"; out["dropped"].append(rec); continue
             out["hits"].append(rec)
     except Exception as e:
@@ -230,7 +244,11 @@ def main():
     out_dir = a.out_dir or os.path.join(HERE, "workday", "runs", started.strftime("%Y-%m-%d-%H%M"))
     os.makedirs(out_dir, exist_ok=True)
     with cf.ThreadPoolExecutor(a.workers) as ex:
-        results = list(ex.map(lambda t: sweep_tenant(t, SEARCH_TERMS, a.max_age, a.pages), tenants))
+        terms = list(SEARCH_TERMS)
+        for role in _jobbi_profile().value("target_roles") or []:
+            if role not in terms:
+                terms.append(role)
+        results = list(ex.map(lambda t: sweep_tenant(t, terms, a.max_age, a.pages), tenants))
     hits = sorted([h for r in results for h in r["hits"]], key=lambda h: (h["ageDays"] if h["ageDays"] is not None else 99, h["company"]))
     summary = {"run": started.isoformat(timespec="seconds"), "elapsedSec": round((dt.datetime.now() - started).total_seconds(), 1),
                "tenants": len(tenants), "tenantsOk": sum(r["ok"] for r in results),

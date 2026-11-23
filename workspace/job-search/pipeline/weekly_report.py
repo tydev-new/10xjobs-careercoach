@@ -15,7 +15,7 @@ from pathlib import Path as _JobbiPath
 import os as _jobbi_os, sys as _jobbi_sys
 _JOBBI_ROOT = _JobbiPath(_jobbi_os.environ.get("JOBBI_ROOT", str(_JobbiPath(__file__).resolve().parents[3])))
 _jobbi_sys.path.insert(0, str(_JOBBI_ROOT))
-from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate
+from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate, profile_module as _jobbi_profile
 _JOBBI_SEARCH = _JOBBI_ROOT / "workspace" / "job-search"
 _JOBBI_APPS = _JOBBI_ROOT / "workspace" / "job-apps"
 _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
@@ -31,7 +31,7 @@ SCRIPT_SOURCES = re.compile(r"^(ats:|workday|li:guest|gov:|vc:|hn)")
 
 def target_from_criteria():
     try:
-        t = open(os.path.join(J.WS, "criteria.md")).read()
+        t = _jobbi_profile().load().get("criteria") or ""
     except Exception:
         return None, None
     m = re.search(r"Target number of strong sources[^:]*:\s*\**\s*(\d+)", t, re.I)
@@ -92,8 +92,8 @@ SUGGEST = {
     "stage/size": "Stage/size skips: for Director titles from this source, require a stage check before insert (criteria Director gate).",
     "seniority": "Seniority skips: tighten the lane title regexes (require Senior/Staff/Principal/Manager/Director) for this source.",
     "off-lane": "Off-lane skips: add the recurring off-lane title words to sources.yaml exclude_title.",
-    "domain/specialty": "Specialty skips: consider a criteria.md line listing specialties to skip (e.g. security/networking/storage IC) and mirror it in exclude_title.",
-    "brand/hot rule": "Brand/hot skips: these follow an older Eng rule; confirm in criteria.md whether it still applies under v6.2.",
+    "domain/specialty": "Specialty skips: consider a profile.yaml line listing specialties to skip (e.g. security/networking/storage IC) and mirror it in exclude_title.",
+    "brand/hot rule": "Brand/hot skips: these follow an older Eng rule; confirm in profile.yaml whether it still applies under v6.2.",
     "clearance/sponsorship": "Clearance skips: add 'clearance|TS/SCI|public trust' to exclude_title for this source.",
     "closed/stale": "Stale skips: shorten this source's window or drop reposts older than N days.",
     "duplicate": "Duplicate skips: dedupe keys are missing these; check company-name normalization for this source.",
@@ -152,7 +152,7 @@ def reply_rate_section(c):
     return L
 
 def main():
-    ap = argparse.ArgumentParser(); ap.add_argument("--days", type=int, default=7); ap.add_argument("--target-window", type=int, default=14); ap.add_argument("--target", type=int, help="override criteria.md target (testing)"); ap.add_argument("--out")
+    ap = argparse.ArgumentParser(); ap.add_argument("--days", type=int, default=7); ap.add_argument("--target-window", type=int, default=14); ap.add_argument("--target", type=int, help="override profile.yaml target (testing)"); ap.add_argument("--out")
     a = ap.parse_args()
     c = J.connect()
     cfg = yaml.safe_load(open(os.path.join(J.HERE, "sources.yaml")))
@@ -180,7 +180,7 @@ def main():
     if a.target is not None: target = a.target
     strong_src = sorted(s for s, x in agg14.items() if (x["strong"] + x["solid"] + x["legacy_ss"]) >= 3 and (x["interested"] + x["applied"]) >= 1 and not s.startswith("legacy"))
     L += ["", f"## Strong-source target (last {a.target_window} days)", "",
-          f"- Target (criteria.md): **{target if target is not None else 'not set'}**" + (f" · rule: {rule}" if rule else ""),
+          f"- Target (profile.yaml): **{target if target is not None else 'not set'}**" + (f" · rule: {rule}" if rule else ""),
           f"- Strong sources now ({len(strong_src)}): {', '.join(strong_src) or 'none'}",
           "- Counting: two-way Strong/Solid for roles scored from 2026-10-20 on; legacy Strong/Solid for older rows in the window (transition until the 14-day window holds only two-way scores)."]
     if target is not None and len(strong_src) < target:
@@ -205,9 +205,9 @@ def main():
         if k in SUGGEST and v / tot >= 0.3:
             L.append(f"  - Suggestion: {SUGGEST[k]}")
     if user_reasons:
-        L += ["", "Skips the user made personally (strongest signal for criteria.md):", ""]
+        L += ["", "Skips the user made personally (strongest signal for profile.yaml):", ""]
         for k, v in user_reasons.most_common():
-            L.append(f"- {k}: {v}" + (f" → suggest a criteria.md rule: {SUGGEST[k]}" if k in SUGGEST else ""))
+            L.append(f"- {k}: {v}" + (f" → suggest a profile.yaml rule: {SUGGEST[k]}" if k in SUGGEST else ""))
     ex = [r for r in jobs.values() if r["status"] == "Skipped" and r["skipped_by"] == "user"][:10]
     L += [f"  - e.g. {r['company']} | {r['title']}: {(r['legacy_status'] or '')[:80]}" for r in ex]
 
@@ -247,7 +247,7 @@ def main():
         import subprocess as _sp
         r = _sp.run([sys.executable, os.path.join(J.HERE, "evals", "build_private.py"), "--append-disagreements", "--days", "7"], capture_output=True, text=True, timeout=120)
         L += ["", "## Eval set", "", "- " + (r.stdout.strip() or r.stderr.strip()[-200:]),
-              "- Re-run `python3 evals/run.py --check` after any change to the skill, criteria.md, the scorer prompt or the model."]
+              "- Re-run `python3 evals/run.py --check` after any change to the skill, profile.yaml, the scorer prompt or the model."]
     except Exception as e:
         L += ["", f"## Eval set\n\n- disagreement hook failed: {e}"]
     since28 = (today - dt.timedelta(days=28)).isoformat()

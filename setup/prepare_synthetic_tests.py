@@ -22,9 +22,11 @@ policy.update(synthetic=True,max_review_rounds=2,pay_floor=110000,travel_max=11,
  home_area_regex="example city",excluded_area_regex="excluded example city",restrict_onsite_to_home=True,
  clearance_block_regex="(?i)security clearance",hard_gap_terms=[["ExampleLang","ExampleLang"],["example-training","example-training"]])
 (search/"profile/policy.yaml").write_text(yaml.safe_dump(policy))
-candidate=yaml.safe_load((search/"profile/candidate.yaml").read_text());candidate["standing_answer_rules"]=[{"question_rx":"(?i)sponsorship","answer_rx":"(?i)^no$"}]
+profile=yaml.safe_load((search/"profile/profile.yaml").read_text())
+candidate=profile.setdefault("identity", {})
+candidate["standing_answer_rules"]=[{"question_rx":"(?i)sponsorship","answer_rx":"(?i)^no$"}]
 candidate["selected_work_md"]="**Card Atlas.** A fictional exercise in sorting sample cards."
-(search/"profile/candidate.yaml").write_text(yaml.safe_dump(candidate))
+(search/"profile/profile.yaml").write_text(yaml.safe_dump(profile, sort_keys=False))
 claims=yaml.safe_load((search/"profile/claims.yaml").read_text())
 claims["banned"]=[{"rx":"pretend omniscience|all imaginary colors","why":"explicitly invented fixture rule"}]
 claims["scoped_phrases"]=[{"rx":"pretend orchard audit","scopes":["health"],"why":"invented scoped phrase"}]

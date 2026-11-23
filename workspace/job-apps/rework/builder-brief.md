@@ -13,7 +13,7 @@ Rules: rework/apply-rubric.md (facts) and rework/PIPELINE.md (order). Read only 
 SUMMARY (apply-rubric.md "SUMMARY method"): map the JD top 3-5 asks to claim ids privately, then write usually 3-4 self-contained full-sentence bullets (not a fixed count) plus the logistics line. Introduce unfamiliar products, explain transitions, no forced 2-6 word labels, no defensive disclaimers.
 
 Facts (only approved claims.yaml IDs are authoritative):
-- Read candidate.yaml and claims.yaml; no personal fact, year restriction, term ban or project ordering is supplied by this distribution.
+- Read profile.yaml and claims.yaml; no personal fact, year restriction, term ban or project ordering is supplied by this distribution.
 - Personal rule values come from the new user’s approved private config.
 
 Report back (short): package path, job id, base, apply URL and ATS, posted pay, blockers.py result, cover required (yes/no and the source), precheck result, and any tooling problem.

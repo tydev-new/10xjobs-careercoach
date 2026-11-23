@@ -45,7 +45,7 @@ Showing the work is optional and takes about 15 to 30 minutes: a small research 
 Proof lines: `python3 <apps-workspace>/lib/agent_config.py outreach-proof` prints the default lines. The text comes from claims.yaml, with each line's usage rule (for example, never merging two teams). Use a line as written, or shorten it without changing what it says. Check each draft with `python3 <apps-workspace>/tools/check_claims.py --text "…" --scope <lane>`. Do not paraphrase a claim into a different technology or a different scale.
 
 ## How a draft should sound
-Short, specific, and not needy. Aim for `outreach.draft_length_words`, not a soft check-in essay. Ask for a 15-minute call or a pointer, not a resume dump. Do not put internal pipeline talk in a note someone else will read. Prefer whole words to abbreviations. Sign-offs come from candidate.yaml.
+Short, specific, and not needy. Aim for `outreach.draft_length_words`, not a soft check-in essay. Ask for a 15-minute call or a pointer, not a resume dump. Do not put internal pipeline talk in a note someone else will read. Prefer whole words to abbreviations. Sign-offs come from `profile/profile.yaml`.
 
 ## Cadence
 The weekly batch is `outreach.weekly_wave` drafts, for Applied roles that have gone quiet plus new companies of interest. Log them in contacts/, then stop for the candidate to approve sending. Pair the batch with the Gmail sync so a rejected role does not get a follow-up.

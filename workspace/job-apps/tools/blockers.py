@@ -6,7 +6,7 @@ from pathlib import Path as _JobbiPath
 import os as _jobbi_os, sys as _jobbi_sys
 _JOBBI_ROOT = _JobbiPath(_jobbi_os.environ.get("JOBBI_ROOT", str(_JobbiPath(__file__).resolve().parents[3])))
 _jobbi_sys.path.insert(0, str(_JOBBI_ROOT))
-from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate
+from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate, profile_module as _jobbi_profile
 _JOBBI_SEARCH = _JOBBI_ROOT / "workspace" / "job-search"
 _JOBBI_APPS = _JOBBI_ROOT / "workspace" / "job-apps"
 _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
@@ -16,7 +16,12 @@ import argparse, json, re, sqlite3, sys
 from pathlib import Path
 DB = Path(str(_JOBBI_SEARCH / 'pipeline/jobs.db'))
 JS = Path(str(_JOBBI_SEARCH))
-PAY_FLOOR = _JOBBI_POLICY.get("pay_floor")   # Candidate-specific annotation removed.
+def _pay_floor():
+    row = _jobbi_profile().record("pay_floor")
+    if row is not None:
+        return row.get("value")
+    return _JOBBI_POLICY.get("pay_floor")
+PAY_FLOOR = _pay_floor()
 TRAVEL_MAX = _JOBBI_POLICY.get("travel_max")
 HOME_AREA_RX = _JOBBI_POLICY.get("home_area_regex", r"(?!)")
 SOFT = re.compile(r"(?i)prefer|nice[- ]to[- ]have|bonus|\bplus\b|a plus|ideally|familiarity|exposure to|knowledge of|understanding of|trade-?offs")
@@ -62,6 +67,9 @@ def check(text, location="", pay="", urls=(), ats_type="", remote_check="", rec=
     loc = f"{location or ''}".lower()
     body = text.lower()
     in_home_area = bool(re.search(HOME_AREA_RX, loc)) or bool(re.search(HOME_AREA_RX, body[:3000]))
+    places = [str(place).lower() for place in (_jobbi_profile().value("location") or [])]
+    if any(place and (place in loc or place in body[:3000]) for place in places):
+        in_home_area = True
     remote = remote_check == "remote-region" or bool(re.search(r"\bremote\b", loc)) or bool(re.search(r"(?i)\b(?:fully remote|remote[- ](?:first|friendly|us|in the us)|remote within the (?:u\.?s|united states)|work from anywhere in the us)\b", text))
     if remote_check == "out-of-area": add("BLOCKER", "onsite / hybrid outside the configured home area (remote_check out-of-area)", location or "")
     elif re.search(_JOBBI_POLICY.get("excluded_area_regex", r"(?!)"), loc) and not in_home_area and not remote:

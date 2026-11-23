@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-'Two-way fit for one role: WANT (meets criteria.md: pass/fail, hard filter) x WIN (JD vs the lane\'s base resume: high/medium/low).\n\n  score.py --id <job_id> --prompt [--jd-file jd.txt]\n      prints the filled step-6 scoring prompt (pipeline/scoring-prompt.md: the one prompt the live flow and the evals share)\n      with criteria.md, the lane\'s base resume and the posting; score the role with it, then save the result as below\n  score.py --id <job_id> --show\n      prints the role, the base resume to compare against, and the analysis path to write\n[Candidate-specific example/rule removed; read approved configuration.]\n      writes jd-analysis/job-<id>-<slug>.md, sets want/win/fit/base_resume/scored_with=two-way-v1, re-renders views\n\nfit = combined_fit(want, win, blockers): Strong only when want=pass AND win=high AND no blockers;\npass+high-with-blocker or pass+medium -> Solid; pass+low -> Stretch (Weak if it has blockers);\nwant=fail -> fit Skip AND status Skipped (want is a hard filter; pass --skip-reason).\n--remote (home-area | remote-region | out-of-area | unverified) is required for roles outside the configured home-area list and for LinkedIn\nremote-filter cards: verify from the JD text or the ATS location field, never from the LinkedIn filter. out-of-area must be\nwant=fail with skip reason geo; unverified keeps the role and marks it "remote unverified" (current criteria).\nMigrated rows marked scored_with=\'legacy\' retain their prior fit until explicitly re-scored.'
+'Two-way fit for one role: WANT (meets profile.yaml: pass/fail, hard filter) x WIN (JD vs the lane\'s base resume: high/medium/low).\n\n  score.py --id <job_id> --prompt [--jd-file jd.txt]\n      prints the filled step-6 scoring prompt (pipeline/scoring-prompt.md: the one prompt the live flow and the evals share)\n      with profile.yaml, the lane\'s base resume and the posting; score the role with it, then save the result as below\n  score.py --id <job_id> --show\n      prints the role, the base resume to compare against, and the analysis path to write\n[Candidate-specific example/rule removed; read approved configuration.]\n      writes jd-analysis/job-<id>-<slug>.md, sets want/win/fit/base_resume/scored_with=two-way-v1, re-renders views\n\nfit = combined_fit(want, win, blockers): Strong only when want=pass AND win=high AND no blockers;\npass+high-with-blocker or pass+medium -> Solid; pass+low -> Stretch (Weak if it has blockers);\nwant=fail -> fit Skip AND status Skipped (want is a hard filter; pass --skip-reason).\n--remote (home-area | remote-region | out-of-area | unverified) is required for roles outside the configured home-area list and for LinkedIn\nremote-filter cards: verify from the JD text or the ATS location field, never from the LinkedIn filter. out-of-area must be\nwant=fail with skip reason geo; unverified keeps the role and marks it "remote unverified" (current criteria).\nMigrated rows marked scored_with=\'legacy\' retain their prior fit until explicitly re-scored.'
 
 # Portable path/config adapter; pipeline implementation below is retained.
 from pathlib import Path as _JobbiPath
 import os as _jobbi_os, sys as _jobbi_sys
 _JOBBI_ROOT = _JobbiPath(_jobbi_os.environ.get("JOBBI_ROOT", str(_JobbiPath(__file__).resolve().parents[3])))
 _jobbi_sys.path.insert(0, str(_JOBBI_ROOT))
-from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate
+from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate, profile_module as _jobbi_profile
 _JOBBI_SEARCH = _JOBBI_ROOT / "workspace" / "job-search"
 _JOBBI_APPS = _JOBBI_ROOT / "workspace" / "job-apps"
 _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
@@ -41,6 +41,9 @@ def needs_remote_check(row):
     loc = row["location"] or ""
     if "(Remote filter)" in loc:
         return True
+    places = _jobbi_profile().value("location") or []
+    if any(str(place).lower() in loc.lower() for place in places):
+        return False
     g = (yaml.safe_load(open(os.path.join(J.HERE, "sources.yaml"))) or {}).get("geo", {})
     home_area = any(re.search(r, loc, re.I) for r in g.get("include", [])) and not any(re.search(r, loc, re.I) for r in g.get("exclude", []))
     return not home_area
@@ -78,9 +81,8 @@ def main():
         base = a.base; bpath = os.path.join(sc["base_resumes_dir"], base, sc.get("resume_file", "resume-native.md"))
     apath = os.path.join(sc.get("analysis_dir", "jd-analysis"), f"job-{r['id']}-{slug(r['company'])}-{slug(r['title'])[:40]}.md")
     if a.prompt:
-        crit = os.path.join(J.WS, "criteria.md")
         jd = open(a.jd_file).read() if a.jd_file else f"(JD text not stored: read it at {r['url'] or 'the posting URL'})"
-        print(FC.render_prompt(open(crit).read() if os.path.exists(crit) else "",
+        print(FC.render_prompt(_jobbi_profile().criteria_for_prompt(),
                                open(bpath).read() if bpath and os.path.exists(bpath) else f"(base resume not found: {bpath})",
                                {"company": r["company"], "title": r["title"], "location": r["location"], "pay": r["pay_text"], "jd_text": jd}))
         return
@@ -115,7 +117,7 @@ def main():
          f"- Scored {J.now_iso()} with two-way-v1 against base `{base}`",
          f"- Where it can be worked from (verified from JD / ATS, not the LinkedIn filter): **{result.remote_check or 'n/a'}**"
          + (" — remote unverified, confirm before packaging" if result.remote_check == "unverified" else ""), "",
-         f"## Want (criteria.md): **{a.want.upper()}**", "", a.want_why or "_no note_", "",
+         f"## Want (profile.yaml): **{a.want.upper()}**", "", a.want_why or "_no note_", "",
          f"## Win (JD vs {base} base resume): **{(a.win or 'n/a').upper()}**", "",
          "| Must-have (from the JD) | Proof on the resume |", "|---|---|"]
     L += [f"| {J.esc(m[0].strip())} | {J.esc(m[1].strip()) if len(m) > 1 and m[1].strip() else '**none: gap**'} |" for m in musts]

@@ -18,7 +18,6 @@ Python 3.10+ and Poppler (`pdfinfo`, `pdftotext`). Follow [INSTALL.md](INSTALL.m
 python3 setup/bootstrap.py /absolute/path/to/new-private-kit
 export JOBBI_ROOT=/absolute/path/to/new-private-kit
 python3 "$JOBBI_ROOT/workspace/job-apps/lib/agent_config.py"
-python3 "$JOBBI_ROOT/setup/onboarding_status.py"
 python3 "$JOBBI_ROOT/setup/intake.py" report
 ```
 
@@ -26,7 +25,7 @@ python3 "$JOBBI_ROOT/setup/intake.py" report
 
 ## Approvals
 
-Replace the synthetic `candidate.yaml`, `claims.yaml`, and base resumes with facts the current user has approved. Choose policy, criteria, sources, and standing answers explicitly. Nothing in this tree is an inherited authorization, standing demographic answer, target list, or schedule.
+Replace the synthetic identity in `profile/profile.yaml`, `claims.yaml`, and base resumes with facts the current user has approved. Choose policy, lanes, sources, and standing answers explicitly. Nothing in this tree is an inherited authorization, standing demographic answer, target list, or schedule.
 
 `tools/submit_gate.py` reports readiness only. It is not permission to submit. Submission stays browser-only and needs the current user's explicit go naming the roles. Upload only the files the gate prints. Use approved standing answers. Do not invent facts or credentials.
 

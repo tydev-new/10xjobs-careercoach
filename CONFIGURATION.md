@@ -15,12 +15,11 @@ become private once populated. `.gitignore` alone is not a publication boundary.
   `python3 setup/intake.py confirm` records their yes and sets it approved. Do not
   approve a claim by editing its status in claims.yaml. Intake does not authorize
   send or submit.
-- `workspace/job-search/profile/intake.yaml`: the value, source, and date for each
-  field intake wrote. Tools still read the canonical files below. Empty in this
-  public tree.
-- `workspace/job-search/profile/candidate.yaml`: identity/contact, selected work,
-  resume header/signature, approved form-answer rules, base/employer key mappings.
-  Replace fictional fields; do not assume an example is an approved fact.
+- `workspace/job-search/profile/profile.yaml`: identity and contact, the eight
+  intake fields (each value has a source and a date), lane name, description,
+  and competitiveness, and the criteria note. This is the only profile file
+  those answers live in. Empty intake fields in this public tree. Replace
+  fictional identity fields. Do not assume an example is an approved fact.
 - `workspace/job-search/profile/claims.yaml`: approved proof, source, evidence,
   numbers, anchors, roles, and wording that is conditional, scoped, or forbidden.
   The user approves a new fact by saying it, or by confirming an extracted one
@@ -34,9 +33,11 @@ become private once populated. `.gitignore` alone is not a publication boundary.
   separate deterministic checks: explicitly synchronize with approved facts.
 - `workspace/job-search/profile/policy.yaml`: choose age/date, page/word/bullet,
   pay/travel/location, review-round, outreach and Workday rules deliberately.
-- `workspace/job-search/criteria.md`, `pipeline/sources.yaml`, `pipeline/scoring.yaml`
-  and `workspace/job-search/profile/agent-config.yaml`: screening, boards, enabled adapters,
-  lane/role routing and paths. Select fresh sources; no former company list survives.
+- `pipeline/sources.yaml`, `pipeline/scoring.yaml`, and
+  `workspace/job-search/profile/agent-config.yaml`: boards, enabled adapters,
+  and paths. Sweep reads roles, places, and named boards from `profile.yaml`
+  when it runs. It does not copy them into `sources.yaml`. Select fresh sources.
+  No former company list survives.
   A board type the sweep does not fetch yet is a new file in
   `workspace/job-search/pipeline/adapters/`. The steps are in
   `skills/job-search-source/SKILL.md` under New ATS. That does not require a sweep.py edit.
@@ -56,10 +57,11 @@ lists the intake fields that are still missing and which task each one blocks.
 `python3 setup/intake.py set` merges one answered field and records where it came
 from and the date. A claim the user states is stored approved. An extracted claim
 stays unconfirmed until confirm. It does not authorize send or submit. It is not a
-full validator of every policy key. `python3 setup/onboarding_status.py` still
-lists starter values that are null, empty, or synthetic, and now also prints
-`INTAKE_MISSING`. Runtime config is currently fragmented, not a single
-validated schema. US-oriented enum/pay parsing assumptions remain.
+full validator of every policy key. The same `report` command lists empty
+policy settings, whether sources are configured, the synthetic-profile flag,
+and a don't-publish warning when the profile is not marked synthetic.
+`setup/onboarding_status.py` is gone. US-oriented enum and pay parsing
+assumptions remain.
 
 ## Policy keys consumed directly by retained source
 The following names are configuration inputs, not inherited default values. Some

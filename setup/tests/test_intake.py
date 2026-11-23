@@ -10,14 +10,12 @@ sys.path.insert(0, str(ROOT / "setup"))
 import intake  # noqa: E402
 
 FILES = (
-    "workspace/job-search/profile/candidate.yaml",
+    "workspace/job-search/profile/profile.yaml",
     "workspace/job-search/profile/claims.yaml",
     "workspace/job-search/profile/policy.yaml",
-    "workspace/job-search/profile/intake.yaml",
     "workspace/job-search/profile/agent-config.yaml",
     "workspace/job-search/pipeline/sources.yaml",
     "workspace/job-search/pipeline/scoring.yaml",
-    "workspace/job-search/criteria.md",
 )
 
 
@@ -36,14 +34,16 @@ def load(path):
 
 def snapshot(root):
     search = root / "workspace/job-search"
+    profile = load(search / "profile/profile.yaml")
     return {
-        "candidate": load(search / "profile/candidate.yaml"),
+        "profile": profile,
+        "identity": profile.get("identity"),
         "claims": load(search / "profile/claims.yaml"),
         "policy": load(search / "profile/policy.yaml"),
         "sources": load(search / "pipeline/sources.yaml"),
         "scoring": load(search / "pipeline/scoring.yaml"),
         "agent": load(search / "profile/agent-config.yaml"),
-        "criteria": (search / "criteria.md").read_text(),
+        "criteria": profile.get("criteria") or "",
         "bytes": {rel: (root / rel).read_bytes() for rel in FILES},
     }
 
@@ -94,31 +94,28 @@ def test_set_merges_pay_without_clobber(tmp_path):
     before = snapshot(root)
     intake.set_field(root, "pay_floor", "180k", "user-stated", "2026-11-22")
     after = snapshot(root)
-    assert after["policy"]["pay_floor"] == 180000
-    for key, value in before["policy"].items():
-        if key != "pay_floor":
-            assert after["policy"][key] == value
-    assert after["policy"]["synthetic"] is True
-    assert after["policy"]["travel_max"] is None
-    assert after["candidate"] == before["candidate"]
+    assert after["policy"] == before["policy"]
+    assert after["identity"] == before["identity"]
+    assert after["criteria"] == before["criteria"]
+    assert after["profile"]["lanes"] == before["profile"]["lanes"]
     assert norm(after["claims"]) == norm(before["claims"])
     assert after["sources"] == before["sources"]
     assert after["bytes"]["workspace/job-search/pipeline/scoring.yaml"] == before["bytes"]["workspace/job-search/pipeline/scoring.yaml"]
     assert after["bytes"]["workspace/job-search/profile/agent-config.yaml"] == before["bytes"]["workspace/job-search/profile/agent-config.yaml"]
     assert after["bytes"]["workspace/job-search/profile/claims.yaml"] == before["bytes"]["workspace/job-search/profile/claims.yaml"]
-    ledger = load(root / "workspace/job-search/profile/intake.yaml")
-    assert ledger["submit_authorized"] is False
-    assert ledger["send_authorized"] is False
-    assert ledger["synthetic"] is True
-    pay = ledger["fields"]["pay_floor"]
+    assert after["bytes"]["workspace/job-search/pipeline/sources.yaml"] == before["bytes"]["workspace/job-search/pipeline/sources.yaml"]
+    profile = after["profile"]
+    assert profile["submit_authorized"] is False
+    assert profile["send_authorized"] is False
+    assert profile["synthetic"] is True
+    pay = profile["fields"]["pay_floor"]
     assert pay["value"] == 180000
     assert pay["source"] == "user-stated"
     assert pay["date"] == "2026-11-22"
     assert pay["explicit"] is True
-    text = (root / "workspace/job-search/criteria.md").read_text()
-    assert text.startswith("# New user onboarding\n")
-    assert "Bundled examples are synthetic" in text
-    assert "## Pay floor\n180000" in text
+    assert after["criteria"].startswith("# New user onboarding\n")
+    assert "Bundled examples are synthetic" in after["criteria"]
+    assert "## Pay floor" not in after["criteria"]
     report = intake.build_report(root)
     assert report["fields"]["pay_floor"]["state"] == "set"
     assert report["fields"]["pay_floor"]["ask"] == "no"
@@ -131,27 +128,15 @@ def test_list_merge_replace_and_sources_keep_other_keys(tmp_path):
     before = snapshot(root)
     intake.set_field(root, "target_roles", ["Backend Engineer"], "extracted-from-resume", "2026-11-22")
     intake.set_field(root, "target_roles", ["Product Manager"], "user-stated", "2026-11-22")
+    profile = load(root / "workspace/job-search/profile/profile.yaml")
+    assert profile["fields"]["target_roles"]["value"] == ["Backend Engineer", "Product Manager"]
+    assert profile["lanes"] == []
     sources = load(root / "workspace/job-search/pipeline/sources.yaml")
-    assert sources["lanes"]["unconfigured"] == ["(?!)"]
-    assert "(?i)" + re.escape("Backend Engineer") in sources["lanes"]["Backend Engineer"]
-    assert "(?i)" + re.escape("Product Manager") in sources["lanes"]["Product Manager"]
-    assert sources["sources"] == {}
-    assert sources["exclude_title"] == []
-    assert sources["exclude_company"] == []
-    assert sources["protected_sources"] == []
-    assert sources["window"] == before["sources"]["window"]
-    criteria = (root / "workspace/job-search/criteria.md").read_text()
-    assert "- Backend Engineer" in criteria
-    assert "- Product Manager" in criteria
+    assert sources == before["sources"]
     intake.set_field(root, "target_roles", ["Staff Engineer"], "user-stated", "2026-11-22", replace=True)
-    sources = load(root / "workspace/job-search/pipeline/sources.yaml")
-    assert "Backend Engineer" not in sources["lanes"]
-    assert "Product Manager" not in sources["lanes"]
-    assert "Staff Engineer" in sources["lanes"]
-    assert sources["lanes"]["unconfigured"] == ["(?!)"]
-    criteria = (root / "workspace/job-search/criteria.md").read_text()
-    assert "- Staff Engineer" in criteria
-    assert "- Backend Engineer" not in criteria
+    profile = load(root / "workspace/job-search/profile/profile.yaml")
+    assert profile["fields"]["target_roles"]["value"] == ["Staff Engineer"]
+    assert load(root / "workspace/job-search/pipeline/sources.yaml") == before["sources"]
     policy = load(root / "workspace/job-search/profile/policy.yaml")
     assert policy["pay_floor"] is None
     assert policy["home_locations"] == []
@@ -159,17 +144,15 @@ def test_list_merge_replace_and_sources_keep_other_keys(tmp_path):
 
 def test_location_and_named_source_turns_on_without_wiping_geo(tmp_path):
     root = scaffold(tmp_path)
+    before = snapshot(root)
+    sys.path.insert(0, str(ROOT))
+    from runtime_config import profile_module
     intake.set_field(root, "location", "Austin", "user-stated", "2026-11-22")
     intake.set_field(root, "location", ["Dallas"], "user-stated", "2026-11-22")
     policy = load(root / "workspace/job-search/profile/policy.yaml")
-    assert policy["home_locations"] == ["Austin", "Dallas"]
-    assert policy["excluded_locations"] == []
-    assert policy["restrict_onsite_to_home"] is False
+    assert policy == before["policy"]
     sources = load(root / "workspace/job-search/pipeline/sources.yaml")
-    assert sources["geo"]["exclude"] == []
-    assert sources["geo"]["remote_us"] == []
-    assert any("Austin" in item for item in sources["geo"]["include"])
-    assert any("Dallas" in item for item in sources["geo"]["include"])
+    assert sources == before["sources"]
     intake.set_field(root, "preferred_sources", "Example Co", "user-stated", "2026-11-22")
     intake.set_field(
         root,
@@ -178,22 +161,25 @@ def test_location_and_named_source_turns_on_without_wiping_geo(tmp_path):
         "user-stated",
         "2026-11-22",
     )
-    sources = load(root / "workspace/job-search/pipeline/sources.yaml")
-    assert sources["sources"]["ashby"]["enabled"] is True
-    assert sources["sources"]["ashby"]["boards"] == [
-        {"company": "Example Workshop", "ats_type": "ashby", "slug": "example-workshop"}
-    ]
-    saved = load(root / "workspace/job-search/profile/intake.yaml")["fields"]["preferred_sources"]["value"]
+    assert load(root / "workspace/job-search/pipeline/sources.yaml") == before["sources"]
+    saved = load(root / "workspace/job-search/profile/profile.yaml")["fields"]["preferred_sources"]["value"]
     assert {"company": "Example Co", "enabled": True} in saved
     assert {"company": "Example Workshop", "ats_type": "ashby", "slug": "example-workshop", "enabled": True} in saved
+    overlaid = profile_module().overlay_sources(sources, root)
+    assert overlaid["sources"]["ashby"]["enabled"] is True
+    assert overlaid["sources"]["ashby"]["boards"] == [
+        {"company": "Example Workshop", "ats_type": "ashby", "slug": "example-workshop"}
+    ]
+    assert any("Austin" in item for item in overlaid["geo"]["include"])
+    assert any("Dallas" in item for item in overlaid["geo"]["include"])
+    assert overlaid["geo"]["exclude"] == []
     assert sources["protected_sources"] == []
     intake.set_field(root, "work_mode", "Remote", "user-stated", "2026-11-22")
-    policy = load(root / "workspace/job-search/profile/policy.yaml")
-    assert policy["restrict_onsite_to_home"] is False
-    assert policy["home_locations"] == ["Austin", "Dallas"]
+    assert load(root / "workspace/job-search/profile/policy.yaml")["home_locations"] == []
     report = intake.build_report(root)
     assert report["fields"]["work_mode"]["value"] == "remote"
     assert report["fields"]["work_mode"]["source"] == "user-stated"
+    assert report["fields"]["location"]["value"] == ["Austin", "Dallas"]
 
 
 def test_validation_refuses_without_writing(tmp_path):
@@ -317,15 +303,17 @@ def test_explicit_empty_is_not_asked_again(tmp_path):
     assert report["fields"]["pay_floor"]["ask"] == "no"
     policy = load(root / "workspace/job-search/profile/policy.yaml")
     assert policy["pay_floor"] is None
-    assert "## Dealbreakers\n(none)" in (root / "workspace/job-search/criteria.md").read_text()
+    profile = load(root / "workspace/job-search/profile/profile.yaml")
+    assert "## Dealbreakers" not in (profile.get("criteria") or "")
+    assert profile["fields"]["dealbreakers"]["value"] == []
 
 
-def test_scalar_update_keeps_previous_and_drift_is_visible(tmp_path):
+def test_scalar_update_keeps_previous_and_ignores_policy(tmp_path):
     root = scaffold(tmp_path)
     intake.set_field(root, "pay_floor", 100000, "user-stated", "2026-11-01")
     intake.set_field(root, "pay_floor", 120000, "user-stated", "2026-11-22")
-    ledger = load(root / "workspace/job-search/profile/intake.yaml")
-    pay = ledger["fields"]["pay_floor"]
+    profile = load(root / "workspace/job-search/profile/profile.yaml")
+    pay = profile["fields"]["pay_floor"]
     assert pay["value"] == 120000
     assert pay["previous"]["value"] == 100000
     assert pay["previous"]["date"] == "2026-11-01"
@@ -335,17 +323,20 @@ def test_scalar_update_keeps_previous_and_drift_is_visible(tmp_path):
         yaml.dump(policy, Dumper=intake.Dumper, sort_keys=False, allow_unicode=True, width=4096)
     )
     report = intake.build_report(root)
-    assert report["fields"]["pay_floor"]["state"] == "drift"
-    assert report["fields"]["pay_floor"]["ask"] == "value"
-    assert report["fields"]["pay_floor"]["canonical"] == 250000
+    assert report["fields"]["pay_floor"]["state"] == "set"
+    assert report["fields"]["pay_floor"]["value"] == 120000
+    assert report["fields"]["pay_floor"]["ask"] == "no"
+    assert "canonical" not in report["fields"]["pay_floor"]
     intake.set_field(root, "work_auth", "authorized to work, no sponsorship", "user-stated", "2026-11-22")
-    candidate = load(root / "workspace/job-search/profile/candidate.yaml")
-    assert candidate["name"] == "Alex Example"
-    assert candidate["email"] == "alex@example.invalid"
-    assert candidate["phone"] is None
-    assert candidate["synthetic"] is True
-    assert candidate["sponsorship_needed"] is None
-    assert candidate["work_auth"] == "authorized to work, no sponsorship"
+    profile = load(root / "workspace/job-search/profile/profile.yaml")
+    identity = profile["identity"]
+    assert identity["name"] == "Alex Example"
+    assert identity["email"] == "alex@example.invalid"
+    assert identity["phone"] is None
+    assert identity["synthetic"] is True
+    assert identity["sponsorship_needed"] is None
+    assert "work_auth" not in identity
+    assert profile["fields"]["work_auth"]["value"] == "authorized to work, no sponsorship"
 
 
 def test_cli_report_set_and_onboarding_hook(tmp_path):
@@ -377,11 +368,13 @@ def test_cli_report_set_and_onboarding_hook(tmp_path):
     assert "SUBMIT_AUTHORIZED: no" in good.stdout
     assert "SEND_AUTHORIZED: no" in good.stdout
     status = subprocess.run(
-        [sys.executable, str(ROOT / "setup/onboarding_status.py"), "--root", str(root)],
+        [sys.executable, str(ROOT / "setup/intake.py"), "--root", str(root), "report"],
         check=True, text=True, capture_output=True,
     )
     assert "SYNTHETIC_PROFILE: yes" in status.stdout
     assert "SUBMIT_AUTHORIZED: no" in status.stdout
-    assert "INTAKE_MISSING:" in status.stdout
-    assert "target_roles" in status.stdout
-    assert "pay_floor" not in status.stdout.split("INTAKE_MISSING:", 1)[1]
+    assert "SOURCES_CONFIGURED: no" in status.stdout
+    assert "UNCONFIGURED:" in status.stdout
+    missing = next(line for line in status.stdout.splitlines() if line.startswith("INTAKE_MISSING:"))
+    assert "target_roles" in missing
+    assert "pay_floor" not in missing

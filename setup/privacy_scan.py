@@ -77,18 +77,24 @@ def load_yaml(path):
 
 def empty_state(root):
     out = []
-    cand_path = root / "workspace/job-search/profile/candidate.yaml"
-    cand = load_yaml(cand_path)
-    if cand is None:
-        return ["missing workspace/job-search/profile/candidate.yaml"]
-    if cand.get("synthetic") is not True:
-        out.append("candidate.yaml: synthetic flag is not true")
-    if cand.get("name") != "Alex Example" or cand.get("email") != "alex@example.invalid":
-        out.append("candidate.yaml: public identity is not the bundled Alex Example placeholder")
-    if cand.get("phone") not in (None, ""):
-        out.append("candidate.yaml: phone is set")
-    if cand.get("standing_answer_rules"):
-        out.append("candidate.yaml: standing answers are set")
+    profile = load_yaml(root / "workspace/job-search/profile/profile.yaml")
+    if profile is None:
+        return ["missing workspace/job-search/profile/profile.yaml"]
+    ident = profile.get("identity") or {}
+    if profile.get("synthetic") is not True or ident.get("synthetic") is not True:
+        out.append("profile.yaml: synthetic flag is not true")
+    if ident.get("name") != "Alex Example" or ident.get("email") != "alex@example.invalid":
+        out.append("profile.yaml: public identity is not the bundled Alex Example placeholder")
+    if ident.get("phone") not in (None, ""):
+        out.append("profile.yaml: phone is set")
+    if ident.get("standing_answer_rules"):
+        out.append("profile.yaml: standing answers are set")
+    if profile.get("submit_authorized") not in (False, None):
+        out.append("profile.yaml: submit is authorized")
+    if profile.get("send_authorized") not in (False, None):
+        out.append("profile.yaml: send is authorized")
+    if profile.get("fields"):
+        out.append("profile.yaml: fields are populated")
     claims = load_yaml(root / "workspace/job-search/profile/claims.yaml")
     if not claims or claims.get("synthetic") is not True or claims.get("owner") != "Alex Example":
         out.append("claims.yaml: not the bundled synthetic example")
@@ -108,16 +114,6 @@ def empty_state(root):
     proof = ((cfg or {}).get("outreach") or {}).get("proof_defaults")
     if proof:
         out.append("agent-config.yaml: outreach proof defaults are set")
-    intake = load_yaml(root / "workspace/job-search/profile/intake.yaml")
-    if intake:
-        if intake.get("synthetic") is not True:
-            out.append("intake.yaml: synthetic flag is not true")
-        if intake.get("submit_authorized") not in (False, None):
-            out.append("intake.yaml: submit is authorized")
-        if intake.get("send_authorized") not in (False, None):
-            out.append("intake.yaml: send is authorized")
-        if intake.get("fields"):
-            out.append("intake.yaml: fields are populated")
     tenants = root / "workspace/job-search/workday-tenants.md"
     if tenants.is_file():
         for line in tenants.read_text().splitlines():
@@ -137,12 +133,17 @@ def self_test():
         pipe = root / "workspace/job-search/pipeline"
         profile.mkdir(parents=True)
         pipe.mkdir(parents=True)
-        (profile / "candidate.yaml").write_text(textwrap.dedent("""\
+        (profile / "profile.yaml").write_text(textwrap.dedent("""\
             synthetic: true
-            name: Alex Example
-            email: alex@example.invalid
-            phone: null
-            standing_answer_rules: []
+            submit_authorized: false
+            send_authorized: false
+            identity:
+              synthetic: true
+              name: Alex Example
+              email: alex@example.invalid
+              phone: null
+              standing_answer_rules: []
+            fields: {}
             """))
         (profile / "claims.yaml").write_text("synthetic: true\nowner: Alex Example\nclaims: []\n")
         (profile / "policy.yaml").write_text("synthetic: true\nhome_locations: []\nexcluded_locations: []\nworkday_search_terms: []\nworkday_lanes: []\n")
@@ -150,25 +151,37 @@ def self_test():
         (pipe / "sources.yaml").write_text("sources: {}\nexclude_title: []\nexclude_company: []\nprotected_sources: []\n")
         (root / "workspace/job-search/workday-tenants.md").write_text("| Company | Host |\n|---|---|\n")
         clean = scan(root)
-        (profile / "intake.yaml").write_text("schema: intake-v1\nsynthetic: true\nsubmit_authorized: false\nsend_authorized: false\nfields:\n  pay_floor:\n    value: 1\n")
+        (profile / "profile.yaml").write_text(textwrap.dedent("""\
+            synthetic: true
+            submit_authorized: false
+            send_authorized: false
+            identity:
+              synthetic: true
+              name: Alex Example
+              email: alex@example.invalid
+              phone: null
+              standing_answer_rules: []
+            fields:
+              pay_floor:
+                value: 1
+            """))
         populated = scan(root)
-        (profile / "intake.yaml").unlink()
         bad_email = "hidden.person@" + "private.test"
         bad_path = "/Users" + "/someone/notes"
         (root / "note.md").write_text(f"Reach me at {bad_email} or {bad_path}\n")
         dirty = scan(root)
         (root / "note.md").unlink()
-        (profile / "candidate.yaml").write_text("synthetic: true\nname: Hidden Person\nemail: " + bad_email + "\nphone: null\nstanding_answer_rules: []\n")
+        (profile / "profile.yaml").write_text("synthetic: true\nidentity:\n  synthetic: true\n  name: Hidden Person\n  email: " + bad_email + "\n  phone: null\n  standing_answer_rules: []\nfields: {}\n")
         swapped = scan(root)
     bad = []
     if clean:
         bad.append("clean fixture failed: " + "; ".join(clean))
     if not any("email" in x for x in dirty) or not any("private-path" in x for x in dirty):
         bad.append("dirty fixture did not report email and path: " + "; ".join(dirty))
-    if not any("candidate.yaml" in x for x in swapped):
+    if not any("profile.yaml" in x for x in swapped):
         bad.append("swapped identity was accepted: " + "; ".join(swapped))
-    if not any("intake.yaml: fields are populated" in x for x in populated):
-        bad.append("populated intake was accepted: " + "; ".join(populated))
+    if not any("profile.yaml: fields are populated" in x for x in populated):
+        bad.append("populated profile was accepted: " + "; ".join(populated))
     if bad:
         raise SystemExit("privacy scan self-test failed: " + " | ".join(bad))
     print("privacy scan self-test: PASS")

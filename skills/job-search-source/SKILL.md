@@ -8,10 +8,10 @@ description: >-
 ---
 # Job search source
 
-Inputs are the user's criteria.md (roles, field, location, pay, dealbreakers, and how many strong sources they want) and sources.yaml. Tools live in the workspace pipeline folder: sweep.py, upsert.py, update_status.py, find.py, score.py, and weekly_report.py. The eval check ships with this skill in evals/.
+Inputs are the user's profile (`python3 "$JOBBI_ROOT/workspace/job-apps/lib/profile.py"`: roles, location, work mode, pay, dealbreakers, lanes, and the criteria note, including how many strong sources they want) and sources.yaml. Tools live in the workspace pipeline folder: sweep.py, upsert.py, update_status.py, find.py, score.py, and weekly_report.py. sweep.py reads roles, places, and named boards from the profile. The eval check ships with this skill in evals/.
 
 ## Sequence
-1. Read criteria.md. Do not copy its rules into this skill.
+1. Read profile.yaml. Do not copy its rules into this skill.
 2. Build or extend sources.yaml for the user's field.
    - Find companies from venture-capital portfolios, funding news, top-company lists, and peers of strong past matches.
    - Detect each company's applicant-tracking system from its careers links (jobs.ashbyhq.com/<slug>, boards.greenhouse.io/<slug>, jobs.lever.co/<slug>, jobs.smartrecruiters.com/<slug>, myworkdayjobs.com).
@@ -31,11 +31,11 @@ The sweep already fetches ashby, greenhouse, lever, smartrecruiters, workday, li
 
 ## Learn
 Each week, rank sources by the user's picks, applications, and interviews first, and by model fit scores second (`weekly_report.py`). Cut sources that produce nothing. Expand strong ones with similar companies. Never cut a source the user chose to keep (`protected_sources` in sources.yaml).
-If fewer strong sources than the target in criteria.md produced strong matches in the last 2 weeks, find more (peers of the best sources, venture-capital portfolios, field boards). Test each with one sweep (`sweep.py --test-source <type>:<slug> --add`), keep the ones that produce, and repeat until the target is met or nothing new turns up.
-Record why roles are skipped. When the same reasons pile up, suggest tighter criteria.md rules. Do not apply those rules yourself.
+If fewer strong sources than the target in the profile criteria note produced strong matches in the last 2 weeks, find more (peers of the best sources, venture-capital portfolios, field boards). Test each with one sweep (`sweep.py --test-source <type>:<slug> --add`), keep the ones that produce, and repeat until the target is met or nothing new turns up.
+Record why roles are skipped. When the same reasons pile up, suggest tighter rules in the profile criteria note or in a lane's competitiveness field. Do not apply those rules yourself.
 
 ## Evals
-The eval check ships in evals/. It holds the runner (run.py), the fit checks (fitcheck.py), the one scoring prompt (scoring-prompt.md, which the live score.py also uses), and 15 made-up starter cases with no personal info (examples/). Before any change to this skill, criteria.md, scoring-prompt.md, or the model, run `python3 evals/run.py --backend <backend> --check`. It scores the starter cases and the user's own set, grades every result in code, and exits nonzero if agreement drops or misses rise. Block the change when it fails.
+The eval check ships in evals/. It holds the runner (run.py), the fit checks (fitcheck.py), the one scoring prompt (scoring-prompt.md, which the live score.py also uses), and 15 made-up starter cases with no personal info (examples/). Before any change to this skill, profile.yaml, scoring-prompt.md, or the model, run `python3 evals/run.py --backend <backend> --check`. It scores the starter cases and the user's own set, grades every result in code, and exits nonzero if agreement drops or misses rise. Block the change when it fails.
 The user's own set is built from past applications and skips by the pipeline's `evals/build_private.py`. It lives outside this skill, at <search-workspace>/pipeline/evals/private by default (set another folder with `--private DIR` or JOB_SEARCH_EVAL_PRIVATE). It never goes in this folder or in any repo. If it is missing, the runner says so and checks only the starter cases. Use `--save-baseline` only when the user accepts the new results. Add disagreements to the user's set weekly (weekly_report.py does this).
 
 ## Guardrails

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Eval harness for step 6 of the job-search-source skill (two-way fit: want x win -> call).
 
-MUST run on every change to the skill, criteria.md, the scoring prompt (pipeline/scoring-prompt.md) or the model:
+MUST run on every change to the skill, profile.yaml, the scoring prompt (pipeline/scoring-prompt.md) or the model:
     python3 evals/run.py --suite examples --suite private --backend <backend> --check
 --check exits 1 when any metric regresses against evals/baseline.json (private baselines live in evals/private/).
 

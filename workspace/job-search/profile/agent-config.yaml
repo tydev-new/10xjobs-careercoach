@@ -1,8 +1,6 @@
 version: portable-config-v1
-candidate_file: ${JOBBI_ROOT}/workspace/job-search/profile/candidate.yaml
+profile_file: ${JOBBI_ROOT}/workspace/job-search/profile/profile.yaml
 claims_file: ${JOBBI_ROOT}/workspace/job-search/profile/claims.yaml
-criteria_file: ${JOBBI_ROOT}/workspace/job-search/criteria.md
-profile_file: ${JOBBI_ROOT}/workspace/job-search/profile.md
 paths:
   search_workspace: ${JOBBI_ROOT}/workspace/job-search
   apps_workspace: ${JOBBI_ROOT}/workspace/job-apps

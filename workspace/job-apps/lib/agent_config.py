@@ -4,7 +4,8 @@
   python3 agent_config.py                 print the config (paths, preferences)
   python3 agent_config.py path <key>      one path, e.g. `path jobs_db`
   python3 agent_config.py outreach-proof  proof lines for cold notes: claim text from claims.yaml plus its rule
-  python3 agent_config.py candidate       identity and contact lines from candidate.yaml (no address)
+  python3 agent_config.py candidate       identity and contact from profile.yaml (no address)
+  python3 agent_config.py profile         the profile file, including intake answers
 """
 
 # Portable path/config adapter; pipeline implementation below is retained.
@@ -12,7 +13,7 @@ from pathlib import Path as _JobbiPath
 import os as _jobbi_os, sys as _jobbi_sys
 _JOBBI_ROOT = _JobbiPath(_jobbi_os.environ.get("JOBBI_ROOT", str(_JobbiPath(__file__).resolve().parents[3])))
 _jobbi_sys.path.insert(0, str(_JOBBI_ROOT))
-from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate
+from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate, profile_module as _jobbi_profile
 _JOBBI_SEARCH = _JOBBI_ROOT / "workspace" / "job-search"
 _JOBBI_APPS = _JOBBI_ROOT / "workspace" / "job-apps"
 _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
@@ -43,8 +44,10 @@ def main():
         for p in outreach_proof(cfg):
             print(f"- [{p['claim']}] " + (f"{p['lead']}: " if p["lead"] else "") + p["text"] + (f"  (rule: {p['rule']})" if p["rule"] else ""))
     elif a[0] == "candidate":
-        c = yaml.safe_load(Path(cfg["candidate_file"]).read_text()); c.pop("address", None)
+        c = _jobbi_profile().identity(); c.pop("address", None)
         print(yaml.safe_dump(c, sort_keys=False, allow_unicode=True))
+    elif a[0] == "profile":
+        print(yaml.safe_dump(_jobbi_profile().load(), sort_keys=False, allow_unicode=True))
     else: sys.exit(__doc__)
 
 if __name__ == "__main__":

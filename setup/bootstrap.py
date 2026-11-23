@@ -20,8 +20,9 @@ for rel,hash in entries.items():
  q=Path(rel)
  if q.is_absolute() or ".." in q.parts or hashlib.sha256((source/q).read_bytes()).hexdigest()!=hash:
   raise SystemExit("distribution bytes changed: use a new audited distribution, not an onboarded root")
-for rel in ("candidate.yaml","claims.yaml"):
- if yaml.safe_load((source/"workspace/job-search/profile"/rel).read_text()).get("synthetic") is not True:raise SystemExit("only synthetic source templates may be bootstrapped")
+profile=yaml.safe_load((source/"workspace/job-search/profile/profile.yaml").read_text())
+if profile.get("synthetic") is not True or (profile.get("identity") or {}).get("synthetic") is not True:raise SystemExit("only synthetic source templates may be bootstrapped")
+if yaml.safe_load((source/"workspace/job-search/profile/claims.yaml").read_text()).get("synthetic") is not True:raise SystemExit("only synthetic source templates may be bootstrapped")
 target.mkdir(parents=True)
 for rel in sorted(expected):
  out=target/rel;out.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source/rel,out)

@@ -5,7 +5,7 @@ SSOT for how the assistant runs this search. **Skills** = process, memory, gates
 ## Practical rules
 
 1. **Pipeline truth → skills**  
-   Coach / evaluate / apply / source keep workspace SSOT (`plan.md`, the jobs DB `pipeline/jobs.db` via find.py / upsert.py / update_status.py, criteria, JD analysis, package folders). `jobs.md` and `active.md` are generated views (render.py); never hand-edit them. Prefer the skill sequence over inventing a parallel board.
+   Coach / evaluate / apply / source keep workspace SSOT (`plan.md`, the jobs DB `pipeline/jobs.db` via find.py / upsert.py / update_status.py, `profile/profile.yaml`, JD analysis, package folders). `jobs.md` and `active.md` are generated views (render.py); never hand-edit them. Prefer the skill sequence over inventing a parallel board.
 
 2. **Story wording → native lead**  
    Scar → owned turn → one number → disagreeable lesson; spine vs depth; altitude. Storybank skill = coverage map, `stories/` + index, confirm-only, no invent — not mechanical STAR.
@@ -27,7 +27,7 @@ SSOT for how the assistant runs this search. **Skills** = process, memory, gates
    Dealbreakers → lane → verdict → `pipeline/score.py` (writes `jd-analysis/job-<id>-*.md` + `.json` step-6 record and the DB row) + short card. Skip deep decode when dealbreaker already kills the role.
 
 7. **Sourcing → source skill**  
-   Multi-source scan under the current private criteria. Criteria owns who to hunt; source owns how to hunt.
+   Multi-source scan under the current private profile. profile.yaml owns who to hunt; source owns how to hunt.
 
 8. **Outreach / inbox → outreach skill**  
    Contact mining + drafts only until explicit send ask. Gmail sync updates the jobs DB with `update_status.py` (rejects/confirms/interviews), then render.py.

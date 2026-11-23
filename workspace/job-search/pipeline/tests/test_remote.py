@@ -1,4 +1,4 @@
-"""criteria.md v6.2 item 6: remote roles outside the configured home area are kept; on-site/hybrid elsewhere fails; LinkedIn filter is not proof."""
+"""Remote roles outside the configured home area are kept; on-site or hybrid elsewhere fails; a LinkedIn filter is not proof."""
 
 # Portable path/config adapter; pipeline implementation below is retained.
 from pathlib import Path as _JobbiPath

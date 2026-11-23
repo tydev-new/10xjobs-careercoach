@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 export PYTHONDONTWRITEBYTECODE=1
-python3 setup/onboarding_status.py
+python3 setup/intake.py report
 python3 setup/check_public_gates.py
 DEST="$(mktemp -d)"
 cleanup() { rm -rf "$DEST"; }

@@ -1,6 +1,6 @@
 # Evals for job-search-source step 6 (two-way fit)
 
-**Run on every change to the skill text, criteria.md, the scoring prompt (`pipeline/scoring-prompt.md`) or the model. The change is blocked if this fails:**
+**Run on every change to the skill text, profile.yaml, the scoring prompt (`pipeline/scoring-prompt.md`) or the model. The change is blocked if this fails:**
 
     python3 evals/run.py --backend <backend> --check          # both suites; exit 1 on any regression
 

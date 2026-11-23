@@ -18,7 +18,7 @@ Read `operating-rules.md` when it is present.
 1. **The pipeline record uses the skills.** Keep `plan.md`, the jobs database (`pipeline/jobs.db`, through find.py, upsert.py, and update_status.py), criteria, analyses, and applications as the one record. `jobs.md` and `active.md` are generated views.
 2. **Story wording is yours.** Use the shape in `coach.story_shape`.
 3. **Resume and cover wording is yours.** Aim for the density in `coach.resume_density_reference`. The apply skill owns claims, package specs, and `tools/submit_gate.py`.
-4. **Finding roles uses the source skill.** Scan listings, and use the lane filters in criteria.md.
+4. **Finding roles uses the source skill.** Scan listings, and use the lane filters in `profile/profile.yaml`.
 5. **Outreach and Gmail use the outreach skill.** Sync outcomes into the jobs database with `pipeline/update_status.py`.
 6. **A live application site uses your judgment plus the apply checks.** It needs a passing `tools/submit_gate.py`. Do not invent passwords.
 7. **Prep for a booked interview, and drills, use the interview skill.**
@@ -33,7 +33,7 @@ Read `operating-rules.md` when it is present.
 - A rate or funnel number from fewer than 5 cases.
 
 ## On start
-1. Read `plan.md`, `criteria.md`, `profile.md`, and `operating-rules.md`. A file that is still the onboarding stub is empty. Read the pipeline from the database: `python3 pipeline/find.py --status Applied`, then `--status Interviewing` and `--status Packaged`, or read the generated `active.md`.
+1. Read `plan.md`, `profile/profile.yaml`, and `operating-rules.md`. A criteria note that is still the onboarding text has no preferences yet. Read the pipeline from the database: `python3 pipeline/find.py --status Applied`, then `--status Interviewing` and `--status Packaged`, or read the generated `active.md`.
 2. Check `documents/` and `jd-inbox/` for new files, and say what you found.
 3. Name the stage: groundwork, searching, applying, interviewing, or deciding.
 

@@ -19,7 +19,7 @@ from pathlib import Path as _JobbiPath
 import os as _jobbi_os, sys as _jobbi_sys
 _JOBBI_ROOT = _JobbiPath(_jobbi_os.environ.get("JOBBI_ROOT", str(_JobbiPath(__file__).resolve().parents[3])))
 _jobbi_sys.path.insert(0, str(_JOBBI_ROOT))
-from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate
+from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate, profile_module as _jobbi_profile
 _JOBBI_SEARCH = _JOBBI_ROOT / "workspace" / "job-search"
 _JOBBI_APPS = _JOBBI_ROOT / "workspace" / "job-apps"
 _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
@@ -558,6 +558,7 @@ def company_in_play(c, company):
 def run(args):
     raw_cfg = yaml.safe_load(open(CFG_PATH))
     cfg, cfg_errors = SC.validate_sources(raw_cfg)   # bad entries are skipped with a clear error; never a crash
+    cfg = _jobbi_profile().overlay_sources(cfg)
     for e in cfg_errors:
         print("sources.yaml: skipped entry ->", e, file=sys.stderr)
     flt = Filters(cfg)

@@ -13,13 +13,13 @@ Paths below are relative to the search workspace, `paths.search_workspace` from 
 One verdict per role, ready for a decision. The candidate decides whether to apply. You give the odds and the blockers.
 
 ## Inputs
-Job text or a link, and maybe a company. Read `criteria.md` and `profile.md` first. They hold the lanes, location, dealbreakers, pay floor, and competitiveness rules. If `profile.md` is still the onboarding stub, use `criteria.md` and the yaml files. Read approved facts from `claims.yaml` with `python3 <apps-workspace>/lib/claims.py <scope>`.
+Job text or a link, and maybe a company. Read the profile first with `python3 "$JOBBI_ROOT/workspace/job-apps/lib/profile.py"`. It holds identity, target roles, location, work mode, pay floor, dealbreakers, work authorization, lane descriptions, competitiveness rules, and the criteria note. Read approved facts from `claims.yaml` with `python3 <apps-workspace>/lib/claims.py <scope>`.
 
 ## Sequence
 1. **Near match.** Look the role up first with `python3 pipeline/find.py --company "<co>"` or `--url <url>`. Do not add a duplicate. Update the existing row. Add a new row only with `pipeline/upsert.py`.
-2. **Dealbreakers.** Check the dealbreakers in criteria.md, such as sponsorship, location, clearance, or an obvious spam or fake posting. On a dealbreaker, run `pipeline/update_status.py --status Skipped --skip-reason <code>` (or Blocked) with the quoted reason, and stop before deep research.
-3. **Lane.** Assign one lane from criteria.md, or Off-lane. Apply any standing competitiveness rules in criteria.md for that lane.
-4. **Pay.** Compare the offer with the floor in criteria.md. Follow criteria.md on when a low-cash fit stays Stretch instead of Skip.
+2. **Dealbreakers.** Check the dealbreakers in the profile, such as sponsorship, location, clearance, or an obvious spam or fake posting. On a dealbreaker, run `pipeline/update_status.py --status Skipped --skip-reason <code>` (or Blocked) with the quoted reason, and stop before deep research.
+3. **Lane.** Assign one lane from the profile, or Off-lane. Apply that lane's competitiveness rule.
+4. **Pay.** Compare the offer with the pay floor in the profile. Follow the criteria note on when a low-cash fit stays Stretch instead of Skip.
 5. **Read the role, only if it is still alive.** Summarize the role, separate must-haves from nice-to-haves, and list gaps against the profile and claims. Use the five-part fit score only when it changes the verdict. Write a company fact only when you can source it. A must-have that no approved claim covers is a hard-requirement gap. Record it as a blocker, not a soft gap, so apply flags it instead of writing around it.
 6. **Verdict.** Strong, Solid, Stretch, Long-Shot, or Weak. The default apply queue is Strong and Solid only, unless the candidate says otherwise. A Stretch needs one line on why.
 7. **Save.** Run `pipeline/score.py --id <id> --want … --win … --must "need :: proof" --gap … --blocker …` (this is step 6 in the scorer).

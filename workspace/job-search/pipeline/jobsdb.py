@@ -164,7 +164,7 @@ def log(msg):
         f.write(f"{now_iso()} {msg}\n")
 
 EXTRA_COLUMNS = {"skip_reason": "TEXT", "skipped_by": "TEXT", "replied": "INTEGER DEFAULT 0",
-                 # two-way fit (2026-10-20): want = meets criteria.md (pass/fail), win = JD vs the lane base resume (high/medium/low)
+                 # two-way fit (2026-10-20): want = meets profile.yaml (pass/fail), win = JD vs the lane base resume (high/medium/low)
                  "want": "TEXT CHECK (want IN ('pass','fail') OR want IS NULL)", "win": "TEXT CHECK (win IN ('high','medium','low') OR win IS NULL)",
                  "scored_with": "TEXT", "base_resume": "TEXT", "ats_type": "TEXT",
                  # where the role can be worked from, as verified at scoring: home-area | remote-region | out-of-area | unverified

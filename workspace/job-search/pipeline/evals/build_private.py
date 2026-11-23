@@ -3,14 +3,14 @@
   build_private.py                 (re)build ~40-60 cases: applied/interviewed, user skips with reasons, dealbreaker skips,
                                    borderline, and edge cases (public sector, under the pay floor, Director at a late-stage company)
   build_private.py --append-disagreements [--days 7]   weekly hook: append roles where the user's action disagreed with the call
-Profiles point to criteria.md and the lane base resumes (paths from scoring.yaml)."""
+Profiles carry the profile.yaml criteria text and the lane base resumes (paths from scoring.yaml)."""
 
 # Portable path/config adapter; pipeline implementation below is retained.
 from pathlib import Path as _JobbiPath
 import os as _jobbi_os, sys as _jobbi_sys
 _JOBBI_ROOT = _JobbiPath(_jobbi_os.environ.get("JOBBI_ROOT", str(_JobbiPath(__file__).resolve().parents[4])))
 _jobbi_sys.path.insert(0, str(_JOBBI_ROOT))
-from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate
+from runtime_config import policy as _jobbi_policy, candidate as _jobbi_candidate, profile_module as _jobbi_profile
 _JOBBI_SEARCH = _JOBBI_ROOT / "workspace" / "job-search"
 _JOBBI_APPS = _JOBBI_ROOT / "workspace" / "job-apps"
 _JOBBI_POLICY = _jobbi_policy(_JOBBI_ROOT)
@@ -34,7 +34,7 @@ def profiles():
     rules = _JOBBI_POLICY.get("eval_rules", {})
     out = {}
     for base in ("tpm", "solutions-fde-delivery", "eng-manager", "ic-builder"):
-        out[f"user-{base}"] = {"label": "PRIVATE: the user's own profile (do not commit)", "criteria_path": os.path.join(J.WS, "criteria.md"),
+        out[f"user-{base}"] = {"label": "PRIVATE: the user's own profile (do not commit)", "criteria": _jobbi_profile().criteria_for_prompt(),
                                "resume_path": os.path.join(sc["base_resumes_dir"], base, sc.get("resume_file", "resume-native.md")), "rules": rules}
     return out
 

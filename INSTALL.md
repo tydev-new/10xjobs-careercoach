@@ -35,13 +35,12 @@ The destination must be a new directory outside this tree. Bootstrap checks this
 Only in the private copy. Start with the intake skill, [skills/job-search-intake/SKILL.md](skills/job-search-intake/SKILL.md). The user can paste a resume, LinkedIn text, files, or answer in chat. The agent writes the fields it can use and leaves the rest until a task needs them.
 
 ```sh
-python3 "$JOBBI_ROOT/setup/onboarding_status.py"
 python3 "$JOBBI_ROOT/setup/intake.py" report
 ```
 
 Kit-wide rules are in [AGENTS.md](AGENTS.md). Bootstrap copies that file with the rest of the kit. Skills are not installed as separate packages.
 
-`intake.py report` lists the intake fields that are still missing and which task each one blocks. `intake.py set` merges one answer into the private file it belongs in and records where it came from and the date. A claim the user states is stored approved. A claim taken from a resume or other file stays unconfirmed until `intake.py confirm` sets it approved. It does not authorize an application or an email. Hand-editing other profile files still works. Claim approval goes through set or confirm, not a status edit in claims.yaml. The file list is [CONFIGURATION.md](CONFIGURATION.md). A missing field is asked once, when a task needs it, then written back.
+`intake.py report` lists the intake fields that are still missing and which task each one blocks. It also lists empty policy settings, whether sources are configured, the synthetic-profile flag, and a don't-publish warning when the profile is not synthetic. `intake.py set` writes one answer into `profile/profile.yaml` and records where it came from and the date. A claim the user states is stored approved in `claims.yaml`. A claim taken from a resume or other file stays unconfirmed until `intake.py confirm` sets it approved. It does not authorize an application or an email. Hand-editing the profile still works. Claim approval goes through set or confirm, not a status edit in claims.yaml. The file list is [CONFIGURATION.md](CONFIGURATION.md). A missing field is asked once, when a task needs it, then written back.
 
 ## Offline tests
 

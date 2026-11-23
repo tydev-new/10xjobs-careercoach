@@ -12,7 +12,7 @@ Workspace default: `<search-workspace>/`.
 Keep practice going even with nothing scheduled. Prepare when a loop is booked.
 
 ## Rubric
-Score each from 1 to 5: substance, structure, relevance, credibility, and what sets them apart. Match the level in `profile.md`.
+Score each from 1 to 5: substance, structure, relevance, credibility, and what sets them apart. Match the level in `profile/profile.yaml`.
 
 ## Modes
 

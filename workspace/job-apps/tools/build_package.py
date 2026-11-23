@@ -3,7 +3,7 @@
   - the base resume text   base-resumes/<base>/resume-native.md   (bullets live here, not in Python)
   - shared blocks          base-resumes/_shared/*.md               (e.g. publications.md)
   - approved facts         <search-workspace>/profile/claims.yaml
-  - identity               <search-workspace>/profile/candidate.yaml (name, contact, signature)
+  - identity               <search-workspace>/profile/profile.yaml (name, contact, signature)
   - the package spec       <pkg>/package.yaml: header lines, line edits vs the base (each citing claim ids or
                            marked wording_only with a basis), and the cover (greeting, opening, bullets, closing, date)
                            ONLY when the form requires one (2026-11-04: fetch_form.py form.json or cover_required: true;
@@ -43,7 +43,7 @@ JA = Path(str(_JOBBI_APPS)); TOOLS = JA / "tools"; BASES = JA / "base-resumes"; 
 sys.path.insert(0, str(JA / "lib")); sys.path.insert(0, str(TOOLS))
 import claims as CL
 import fetch_form
-CAND = yaml.safe_load(Path(str(_JOBBI_SEARCH / 'profile/candidate.yaml')).read_text())
+CAND = _JOBBI_CAND
 SPEC = "package.yaml"
 NATIVE_GLOBS = _JOBBI_POLICY.get("native_package_globs", ["daily-*/*/review.json"])
 
@@ -145,7 +145,7 @@ def extract(pkg):
             "resume": {"head": head, "shared": shared, "edits": edits}}
     if (pkg / "cover.txt").exists():
         blocks = (pkg / "cover.txt").read_text().strip("\n").split("\n\n")
-        sig = blocks[-1].split("\n"); assert sig == CAND["cover_signature"], f"cover signature differs from candidate.yaml: {sig}"
+        sig = blocks[-1].split("\n"); assert sig == CAND["cover_signature"], f"cover signature differs from profile.yaml: {sig}"
         bi = [i for i, x in enumerate(blocks) if x.startswith("- ")]; assert len(bi) == 1, "cover: expected one bullet block"
         bl = []
         for line in blocks[bi[0]].split("\n"):
